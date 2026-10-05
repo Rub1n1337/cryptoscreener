@@ -187,6 +187,32 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 .aside h4{margin:14px 0 8px;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
 .foot{text-align:center;color:var(--faint);font-size:12px;margin-top:18px}
 
+/* ---------- progressive disclosure ---------- */
+#hdr{display:none}
+.fl{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute)}.fl.inl{flex-direction:row;align-items:center;gap:8px;height:var(--h)}
+.tablewrap:not(.more) .hx{display:none}
+.chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.ctitle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:18px;font-weight:700}
+.ctitle .coin i{width:30px;height:30px;font-size:13px}.ctitle .coin b{font-size:18px}
+.cprice{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.chead .stats{margin-top:4px;font-size:12.5px}
+.cact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seg.mini{margin:0;padding:2px;border-radius:9px}.seg.mini .tab{height:30px;padding:0 10px;font-size:13px;border-radius:7px}
+details.dis{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);margin:0 0 12px}
+details.dis>summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;font-weight:600}
+details.dis>summary::-webkit-details-marker{display:none}
+details.dis>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform .2s}
+details.dis[open]>summary::after{transform:rotate(-135deg)}
+details.dis>summary .mute{font-weight:400;font-size:13px}
+details.dis>.dbody{padding:0 16px 16px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.step{background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.step .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accbg);color:var(--acc);font-weight:700;font-size:13px;margin-bottom:10px}
+.step b{display:block;margin-bottom:4px;font-size:14.5px}.step p{margin:0;color:var(--mute);font-size:13px;line-height:1.5}
+.sdot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--lo)}.sdot.bad{background:var(--up)}.sdot.idle{background:var(--acc)}
+@media(max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.steps{grid-template-columns:1fr}}
+
 /* ---------- responsive ---------- */
 @media(max-width:1180px){.form{grid-template-columns:1fr 1fr}.factions{grid-column:1/-1;flex-direction:row}}
 @media(max-width:1100px){.grid,.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
@@ -231,6 +257,8 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
   <symbol id="i-bad" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
 </svg>
 <header class="top"><div class="topin">
@@ -241,9 +269,9 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
   <nav class="tabs">
     <button class="tab on" data-t="market"><svg class="i"><use href="#i-market"/></svg><span class="tt">Рынок</span></button>
     <button class="tab" data-t="journal"><svg class="i"><use href="#i-journal"/></svg><span class="tt">Журнал</span></button>
-    <button class="tab" data-t="backtest"><svg class="i"><use href="#i-backtest"/></svg><span class="tt">Бэктест</span></button>
-    <button class="tab" data-t="help"><svg class="i"><use href="#i-help"/></svg><span class="tt">Инструкция</span></button>
-    <button class="tab" data-t="changes"><svg class="i"><use href="#i-changes"/></svg><span class="tt">Обновления</span><span class="badge" id="ver"></span></button>
+    <button class="tab" data-t="backtest"><svg class="i"><use href="#i-backtest"/></svg><span class="tt">Проверка</span></button>
+    <button class="tab" data-t="help"><svg class="i"><use href="#i-help"/></svg><span class="tt">Как это работает</span></button>
+    <button class="tab" data-t="changes"><svg class="i"><use href="#i-changes"/></svg><span class="tt">Что нового</span><span class="badge" id="ver"></span></button>
   </nav>
   <div class="tools">
     <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
@@ -257,32 +285,37 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 
   <!-- MARKET -->
   <section id="market">
-    <div class="phead"><div><h2>Рынок</h2><p>Сканер Binance: выход цены за статистический канал, подтверждение разворота объёмом, сжатия волатильности и скорость возврата к центру. Наведите на заголовок — появится подсказка.</p></div></div>
+    <div class="phead"><div><h2>Рынок</h2><p>Монеты, которые ушли слишком далеко от своей обычной цены и начали разворачиваться. Нажмите на монету — увидите график и разбор.</p></div></div>
     <div class="intro hidden" id="intro">
-      <div><div class="h">Как пользоваться — 3 шага</div>
+      <div><div class="h">Добро пожаловать</div>
         <ol>
-          <li>В таблице монет (справа, на телефоне — ниже графика) ищите метки <span class="tag loc">▲ сигнал LONG</span> и <span class="tag upc">▼ сигнал SHORT</span> — это подтверждённые развороты от полосы канала.</li>
-          <li>Кликните по монете — откроются её график и «Разбор сигнала»: что выполнено и из чего сложилась сила.</li>
-          <li>Во вкладке «Журнал сделок» смотрите, как по этим сигналам торгует бот, а в «Бэктесте» — работают ли правила на истории.</li>
+          <li>Зелёная метка <span class="tag loc">▲ сигнал LONG</span> — монета подешевела сильнее обычного и разворачивается вверх. Красная <span class="tag upc">▼ сигнал SHORT</span> — наоборот.</li>
+          <li>Нажмите на монету, чтобы увидеть график и почему сигнал сильный или слабый.</li>
+          <li>В «Журнале» — как по этим сигналам торгует бот. Деньги виртуальные.</li>
         </ol>
-        <div class="mute" style="margin-top:4px">Торговля бумажная, деньги виртуальные. Наведите на любой заголовок — появится подсказка.</div>
       </div>
-      <button id="introOk">Понятно</button>
+      <button id="introOk" class="primary">Понятно</button>
     </div>
     <div class="cards">
-      <div class="card" title="Медиана %B по всем парам. 50% — рынок в середине своих каналов, ближе к 0% — у нижних полос, ближе к 100% — у верхних."><div class="t">Термометр рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s">медиана %B</div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
-      <div class="card" title="Доля пар в нижних 10% канала или ниже него — кандидаты на отскок вверх."><div class="t">У нижней полосы</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
-      <div class="card" title="Доля пар в верхних 10% канала или выше него — кандидаты на откат вниз."><div class="t">У верхней полосы</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
-      <div class="card" title="Подтверждённые сигналы: касание полосы за последние 4 свечи, разворотная свеча закрылась внутри канала, объём выше нормы."><div class="t">Сигналов сейчас</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
-      <div class="card" title="Пары, у которых волатильность за 20 свечей меньше половины обычной. Часто это затишье перед сильным движением."><div class="t">Сжатия</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">σ за 20 свечей &lt; ½ обычной</div></div>
+      <div class="card" title="Где сейчас рынок в целом: 50% — монеты в середине своих обычных диапазонов, ближе к 0% — у нижних границ, ближе к 100% — у верхних."><div class="t">Настроение рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s"></div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
+      <div class="card" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх."><div class="t">Дешевле обычного</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
+      <div class="card" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз."><div class="t">Дороже обычного</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
+      <div class="card" title="Подтверждённые развороты: цена вышла за границу, вернулась, и это подтвердил объём."><div class="t">Сигналы</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
+      <div class="card" title="Монеты, которые сейчас вдвое спокойнее обычного. Часто это затишье перед сильным движением."><div class="t">Затишье</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">монет без движения</div></div>
     </div>
 
     <div class="grid">
       <div class="panel">
-        <div style="font-weight:600;font-size:16px" id="ctitle">—</div>
-        <div class="ctrl">
-          <label>Монета <input id="csym" list="symlist" placeholder="BTC, SOL… + Enter" style="width:150px"><datalist id="symlist"></datalist></label>
-          <label title="Таймфрейм свечей — и для графика, и для сканера, и для вашего бота">ТФ <select id="tf"><option>5m</option><option>15m</option><option>1h</option><option>4h</option></select></label>
+        <div class="chead">
+          <div style="min-width:0"><div class="ctitle" id="ctitle">—</div><div class="stats" id="cstats"></div></div>
+          <div class="cact">
+            <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" list="symlist" placeholder="Другая монета" style="width:150px"><datalist id="symlist"></datalist></div>
+            <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button></div>
+            <button class="icon" id="cset" title="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
+          </div>
+        </div>
+        <div class="ctrl hidden" id="sheet">
+          <select id="tf" class="hidden"><option>5m</option><option>15m</option><option>1h</option><option>4h</option></select>
           <label title="Как считается центр и ширина канала. Подробности — во вкладке «Инструкция»">Модель канала <select id="method">
             <option value="log">Лог-канал (в ln цены)</option>
             <option value="classic">Классика (SMA ± σ)</option>
@@ -292,51 +325,51 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
           <label title="Длина окна: по скольким последним свечам считается канал">N <input type="range" id="N" min="20" max="300" step="1"><b id="Nv"></b></label>
           <label title="Ширина канала в σ. 2 — классические полосы Боллинджера, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="4" step="0.1"><b id="kv"></b></label>
           <label title="Сколько свечей показать на графике">Свечей <input type="range" id="cn" min="100" max="800" step="10"><b id="cnv"></b></label>
-          <button id="reset" title="Вернуть лог-канал, N=210, k=3, 15m">Сброс</button>
+          <button id="reset" title="Вернуть стандартные настройки">Сбросить</button>
+          <div class="mute" style="font-size:12px;flex-basis:100%" id="mhint"></div>
         </div>
-        <div class="mute" style="font-size:12px;margin-bottom:6px" id="mhint"></div>
-        <div class="stats" id="cstats"></div>
-        <canvas id="cv" style="margin-top:8px"></canvas>
-        <div class="zoomhint">колёсико — масштаб · перетаскивание — прокрутка во времени · двойной клик — сброс</div>
+        <canvas id="cv" style="margin-top:12px"></canvas>
         <div class="legend">
-          <span><i style="border-color:#ef4444"></i>верхняя полоса</span>
-          <span><i style="border-color:#64748b;border-top-style:dashed"></i>центр</span>
-          <span><i style="border-color:#22c55e"></i>нижняя полоса</span>
-          <span>▮ свечи (когда помещаются) или линия закрытия</span>
-          <span><i style="border-color:#f5b70a;border-top-style:dashed"></i>текущая цена</span>
-          <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>позиция бота: вход / TP / SL</span>
-          <span>снизу — объём и RSI(14)</span>
+          <span><i style="border-color:#ef4444"></i>верхняя граница</span>
+          <span><i style="border-color:#64748b;border-top-style:dashed"></i>обычная цена</span>
+          <span><i style="border-color:#22c55e"></i>нижняя граница</span>
+          <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>сделка бота</span>
+          <span class="faint">колёсико — масштаб · перетаскивание — время · двойной клик — сброс</span>
         </div>
         <div class="detail" id="detail"></div>
       </div>
 
       <div class="panel">
         <div class="filters">
-          <select id="fz" title="Где сейчас цена относительно канала"><option value="">Все зоны</option><option value="lo">Нижняя зона (%B &lt; 10%)</option><option value="hi">Верхняя зона (%B &gt; 90%)</option><option value="out">За каналом</option><option value="in">Внутри канала</option></select>
-          <select id="fl" title="Тип метки"><option value="">Все метки</option><option value="sig">Сигналы (подтверждено)</option><option value="touch">Касания и выходы</option><option value="sq">Сжатия</option><option value="fav">★ Избранное</option></select>
-          <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты   /" title="Горячая клавиша: /"></div>
-          <select id="top" title="Сколько самых ликвидных пар сканировать" style="flex:0 0 auto;min-width:0"><option value="100">100 пар</option><option value="150">150 пар</option><option value="250">250 пар</option><option value="400">400 пар</option></select>
-          <button id="refresh" class="icon" title="Обновить сейчас" style="flex:0 0 auto;min-width:0"><svg class="i"><use href="#i-refresh"/></svg></button>
+          <div class="search" style="flex:1 1 160px"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
+          <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы</button><button class="tab" data-fl="sq">Затишье</button><button class="tab" data-fl="fav" title="Избранное">★</button></div>
+          <button id="more" class="icon" title="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
+          <button id="refresh" class="icon" title="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
         </div>
-        <div class="tablewrap"><table>
+        <div class="filters hidden" id="morebar">
+          <select id="fz" title="Где сейчас цена относительно канала"><option value="">Любое положение</option><option value="lo">У нижней границы</option><option value="hi">У верхней границы</option><option value="out">За границей</option><option value="in">Внутри диапазона</option></select>
+          <select id="fl" class="hidden"><option value="">Все</option><option value="sig">Сигналы</option><option value="touch">Касания</option><option value="sq">Затишье</option><option value="fav">Избранное</option></select>
+          <select id="top" title="Сколько самых ликвидных монет проверять"><option value="100">100 монет</option><option value="150">150 монет</option><option value="250">250 монет</option><option value="400">400 монет</option></select>
+        </div>
+        <div class="tablewrap" id="mtable"><table>
           <thead><tr id="mhead">
-            <th data-s="fav" title="Избранное — всегда наверху при сортировке по умолчанию">★</th>
+            <th data-s="fav" title="Избранное — всегда наверху">★</th>
             <th data-s="sym">Монета</th>
             <th data-s="price">Цена</th>
-            <th data-s="pB" title="%B — позиция в канале: 0% — на нижней полосе, 50% — в центре, 100% — на верхней. На шкале: зелёная граница — низ, красная — верх, пунктир — центр">%B</th>
-            <th data-s="z" class="hm" title="Отклонение от центра в σ модели. При k = 3 полосы — это ±3σ">Откл.</th>
-            <th data-s="label" title="▲/▼ сигнал — подтверждённый разворот; «за каналом» — цена прямо сейчас за полосой; «касание» — была за полосой недавно, разворот не подтверждён; «сжатие» — затишье">Метка</th>
-            <th data-s="score" title="Сила сигнала 0–100, считается только при касании полосы. Яркая — разворот подтверждён, серая — нет. Бот входит при силе ≥ порога">Сила</th>
-            <th data-s="vol" class="hm" title="Объём относительно медианы за ~100 свечей. Незакрытая свеча пересчитана на полную длительность">Объём</th>
-            <th data-s="hl" class="hm" title="T½ — за сколько обычно исчезает половина отклонения от центра. Коротко — монета хорошо «пружинит». ∞ — тренд, отскок рискован">T½</th>
+            <th data-s="pB" title="Где цена внутри своего обычного диапазона: 0% — у нижней границы, 50% — посередине, 100% — у верхней">Диапазон</th>
+            <th data-s="z" class="hm hx" title="Отклонение от обычной цены в σ. При k = 3 границы — это ±3σ">Откл.</th>
+            <th data-s="label" title="▲/▼ сигнал — подтверждённый разворот; «за каналом» — цена прямо сейчас за границей; «касание» — была за границей недавно; «сжатие» — затишье">Сигнал</th>
+            <th data-s="score" title="Сила сигнала 0–100. Яркая — разворот подтверждён, серая — пока нет">Сила</th>
+            <th data-s="vol" class="hm hx" title="Объём относительно обычного">Объём</th>
+            <th data-s="hl" class="hm hx" title="За сколько монета обычно возвращается к своей цене наполовину. ∞ — тренд">T½</th>
           </tr></thead>
           <tbody id="tb">
-            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm"></td><td></td><td></td><td class="hm"></td><td class="hm"></td></tr>
-            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm"></td><td></td><td></td><td class="hm"></td><td class="hm"></td></tr>
-            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm"></td><td></td><td></td><td class="hm"></td><td class="hm"></td></tr>
-            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm"></td><td></td><td></td><td class="hm"></td><td class="hm"></td></tr>
-            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm"></td><td></td><td></td><td class="hm"></td><td class="hm"></td></tr>
-            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm"></td><td></td><td></td><td class="hm"></td><td class="hm"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
           </tbody>
         </table></div>
       </div>
@@ -351,7 +384,7 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
       <button class="tab jm" data-m="mine" title="Ваш личный бот: работает в этом браузере, пока вкладка открыта, на ваших настройках">Мой бот</button>
     </div>
     <div class="sub" id="jdesc"></div>
-    <div class="panel" id="srv" style="margin-bottom:12px"></div>
+    <div id="srv"></div>
     <div class="cards auto" id="jcards"></div>
     <div class="ctrl" id="jmine">
       <label><input type="checkbox" id="boton"> Бот торгует (бумажная торговля в браузере, пока вкладка открыта)</label>
@@ -376,37 +409,33 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 
   <!-- BACKTEST -->
   <section id="backtest" class="hidden">
-    <div class="phead"><div><h2>Бэктест</h2><p>Те же правила, что у ботов, на истории Binance: сигнал на закрытии свечи, вход с проскальзыванием, тейк, стоп или тайм-стоп, с комиссиями. За минуту видно, есть ли у настроек преимущество.</p></div></div>
-    <div class="form">
-      <div class="fgroup"><h4>Стратегия</h4><div class="fields">
-        <label title="Идея входа. «Отскок» — от полосы к центру (как у ботов сейчас); «Отскок по тренду» — только в сторону наклона центра канала; «Пробой» — в сторону свежего закрытия за полосой, тейк = 2 стопа">Идея входа <select id="btStrat">
-          <option value="revert">Отскок от полосы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой полосы</option>
-        </select></label>
-        <label title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:76px"></label>
-        <label title="Фильтр тренда: входить, только если монета быстро возвращается к центру (T½ не больше N свечей)">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">≤ 40 св.</option><option value="20">≤ 20 св.</option></select></label>
-        <label class="inline" title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
-      </div></div>
-      <div class="fgroup"><h4>Канал</h4><div class="fields">
-        <label title="Модель канала">Модель <select id="btMethod">
+    <div class="phead"><div><h2>Проверка на истории</h2><p>Узнайте, как правила бота сработали бы в прошлом — с комиссиями и проскальзыванием. Займёт около минуты.</p></div></div>
+    <div class="fgroup" style="margin-bottom:12px"><div class="fields" style="align-items:flex-end">
+      <label title="«Отскок» — от границы к обычной цене (как у ботов сейчас); «Отскок по тренду» — только по направлению движения; «Пробой» — вслед за выходом за границу">Идея входа <select id="btStrat">
+        <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option>
+      </select></label>
+      <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option></select></label>
+      <label title="Сколько самых ликвидных монет взять">Монет <select id="btTop"><option>20</option><option>50</option><option>100</option></select></label>
+      <button id="btRun" class="primary" style="height:var(--h);padding:0 22px"><svg class="i"><use href="#i-play"/></svg>Проверить</button>
+    </div></div>
+    <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, канал, таймфрейм</span></summary><div class="dbody">
+      <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+        <label class="fl" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:80px"></label>
+        <label class="fl" title="Входить, только если монета быстро возвращается к своей цене">Фильтр тренда <select id="btHL"><option value="0">выкл</option><option value="40">мягкий</option><option value="20">строгий</option></select></label>
+        <label class="fl" title="Модель канала">Модель <select id="btMethod">
           <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
         </select></label>
-        <label title="Длина окна канала, свечей">N <input type="number" id="btN" min="20" max="300" style="width:76px"></label>
-        <label title="Ширина канала в σ">k <input type="number" id="btK" min="1" max="4" step="0.1" style="width:70px"></label>
-      </div></div>
-      <div class="fgroup"><h4>Данные</h4><div class="fields">
-        <label title="Таймфрейм. 5m не предлагается: слишком много истории">ТФ <select id="btTf"><option>15m</option><option>1h</option><option>4h</option></select></label>
-        <label title="Сколько последних дней истории прогнать">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option></select></label>
-        <label title="Сколько самых ликвидных пар взять">Пар <select id="btTop"><option>20</option><option>50</option><option>100</option></select></label>
-      </div></div>
-      <div class="factions">
-        <button id="btRun" class="primary"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
+        <label class="fl" title="Длина окна канала, свечей">N <input type="number" id="btN" min="20" max="300" style="width:80px"></label>
+        <label class="fl" title="Ширина канала в σ">k <input type="number" id="btK" min="1" max="4" step="0.1" style="width:72px"></label>
+        <label class="fl" title="Таймфрейм свечей">ТФ <select id="btTf"><option>15m</option><option>1h</option><option>4h</option></select></label>
+        <label class="fl inl" title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
+        <button id="btShared" title="Подставить настройки общего бота">Как у общего бота</button>
         <button id="btMine" title="Подставить настройки с вкладки «Рынок»">Мои настройки</button>
-        <button id="btShared" title="Подставить фиксированные настройки общего бота">Как у общего бота</button>
       </div>
-    </div>
+    </div></details>
     <div class="mute" id="btStatus" style="margin-bottom:14px;font-size:13px"></div>
-    <div class="banner info" id="btEmpty"><svg class="i"><use href="#i-info"/></svg><div><b>Выберите настройки и нажмите «Запустить».</b><br>
-      <span class="mute">Совет: начните с «Как у общего бота», 30 дней и 50 пар — так результат можно сравнить с живым журналом. Проверяйте вывод на двух разных периодах: если плюс есть только в одном — это подгонка, а не преимущество.</span></div></div>
+    <div class="banner info" id="btEmpty"><svg class="i"><use href="#i-info"/></svg><div><b>Выберите идею входа и нажмите «Проверить».</b><br>
+      <span class="mute">Если результат в плюсе только на одном периоде — это случайность, а не преимущество. Проверьте на 30 и на 60 днях.</span></div></div>
     <div id="btOut" class="hidden">
       <div class="banner" id="btVerdict"></div>
       <div class="cards auto" id="btCards"></div>
@@ -426,96 +455,80 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 
   <!-- CHANGELOG -->
   <section id="changes" class="hidden">
-    <div class="phead"><div><h2>Обновления</h2><p>Что появилось и что исправлено в каждой версии.</p></div></div>
+    <div class="phead"><div><h2>Что нового</h2><p>Главные изменения сервиса.</p></div></div>
     <div class="panel doc" id="changelog"></div>
   </section>
 
   <!-- HELP -->
   <section id="help" class="hidden">
-    <div class="phead"><div><h2>Инструкция и термины</h2><p>Как пользоваться сервисом, что означает каждая цифра и как устроены боты.</p></div></div>
-    <div class="panel doc">
-    <h3>Коротко: как пользоваться</h3>
-    <ol>
-      <li>Смотрите таблицу на вкладке «Рынок». Сверху — сигналы и монеты дальше всего от центра своего канала.</li>
-      <li>Ищите метки <span class="tag loc">▲ сигнал LONG</span> и <span class="tag upc">▼ сигнал SHORT</span> — подтверждённые развороты от полосы.</li>
-      <li>Кликните по монете — слева график и «Разбор сигнала»: что выполнено, чего не хватает, из чего сложилась сила.</li>
-      <li>Во вкладке «Журнал сделок» — результаты ботов. Клик по сделке открывает её карточку: свечи, вход и выход, и почему бот вошёл.</li>
-    </ol>
-
-    <h3>Термины</h3>
-    <div class="gloss">
-      <b>Канал</b><span>Коридор вокруг цены: центр ± k·σ за последние N свечей. Модель канала задаёт, как считаются центр и σ.</span>
-      <b>Центр, полосы</b><span>Центр — «нормальная» цена за окно. Верхняя и нижняя полосы — границы канала.</span>
-      <b>%B</b><span>Позиция цены в канале: 0% — на нижней полосе, 50% — в центре, 100% — на верхней, больше 100% или меньше 0% — за каналом.</span>
-      <b>Отклонение, σ</b><span>На сколько стандартных отклонений модели цена ушла от центра. При k = 3 полосы — это ±3σ.</span>
-      <b>Касание</b><span>Тень свечи вышла за полосу за последние 4 свечи.</span>
-      <b>Подтверждение разворота</b><span>Все 4 условия: свеча касания закрылась; следующая свеча в сторону отскока; цена вернулась внутрь канала; объём выше нормы.</span>
-      <b>Сигнал</b><span>Касание с подтверждением разворота. Касание низа → LONG, верха → SHORT.</span>
-      <b>Сила сигнала</b><span>Оценка 0–100 из пяти компонент: глубина прокола, объём, RSI, подтверждение, возврат к центру.</span>
-      <b>Объём ×</b><span>Объём свечи / медиана объёма за ~100 свечей. ×2 — вдвое выше обычного.</span>
-      <b>T½ (полураспад)</b><span>За сколько обычно исчезает половина отклонения от центра. ∞ — тренд, цена не стремится к центру.</span>
-      <b>Сжатие</b><span>Волатильность за 20 свечей меньше половины обычной.</span>
-      <b>LONG / SHORT</b><span>Ставка на рост / на падение.</span>
-      <b>Тейк (TP)</b><span>Цена фиксации прибыли — у центра канала, 1–3% хода. Исполняется лимитным ордером, без проскальзывания.</span>
-      <b>Стоп (SL)</b><span>Цена ограничения убытка — 1.5·ATR, 0.8–2.5% от входа.</span>
-      <b>Тайм-стоп</b><span>Выход по рынку, если за 48 свечей не сработали ни тейк, ни стоп.</span>
-      <b>Размер позиции</b><span>Сумма сделки в долларах = цена входа × количество монет.</span>
-      <b>Риск, 1R</b><span>Сколько долларов теряем, если сработает стоп. Бот подбирает размер так, чтобы 1R = 2% баланса.</span>
-      <b>R (результат)</b><span>Итог сделки, делённый на её риск. +1.5R — заработали в полтора раза больше, чем рисковали; −1R — полный стоп.</span>
-      <b>PnL до / после комиссий</b><span>Прибыль или убыток по цене / с вычетом комиссии биржи.</span>
-      <b>Комиссия</b><span>0.075% от суммы за вход и столько же за выход.</span>
-      <b>Проскальзывание</b><span>Рыночный ордер исполняется чуть хуже цены сигнала. Учитываем 0.05% на входе, стопе и тайм-стопе.</span>
-      <b>Winrate</b><span>Доля прибыльных сделок. Сам по себе ничего не говорит: 40% winrate с крупными прибылями лучше 70% с крупными убытками.</span>
-      <b>Средний результат (ожидание)</b><span>Средний R на сделку после комиссий. Больше 0 — у стратегии есть преимущество; это главная цифра журнала.</span>
-      <b>Profit factor</b><span>Сумма прибылей / сумма убытков. Больше 1 — система в плюсе.</span>
-      <b>Макс. просадка</b><span>Самое большое падение баланса от пика до дна, в процентах.</span>
+    <div class="phead"><div><h2>Как это работает</h2><p>Коротко о том, что делает сервис и как им пользоваться.</p></div></div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><b>Ищем перекосы</b><p>У каждой монеты есть обычный диапазон цены. Сервис каждую минуту проверяет 150 самых популярных монет Binance и замечает, когда цена ушла за его границу.</p></div>
+      <div class="step"><div class="n">2</div><b>Ждём разворот</b><p>Сигнал появляется, только когда цена вернулась в диапазон и это подтвердил объём торгов. Сила сигнала от 0 до 100 показывает, насколько он убедителен.</p></div>
+      <div class="step"><div class="n">3</div><b>Бот торгует</b><p>По сильным сигналам бот открывает сделку с заранее заданными тейком и стопом. Деньги виртуальные — это учебный режим, без риска.</p></div>
+      <div class="step"><div class="n">4</div><b>Честный итог</b><p>В журнале видно каждую сделку с комиссиями. В «Проверке на истории» — как правила сработали бы в прошлом.</p></div>
     </div>
 
-    <h3>Модели канала</h3>
-    <ul>
-      <li><b>Лог-канал</b> (по умолчанию): всё считается в ln(цены), полосы = exp(μ ± k·σ). Канал асимметричен: вверх шире, чем вниз — как и сами проценты.</li>
-      <li><b>Классика</b>: обычные полосы Боллинджера (SMA ± k·σ) для сравнения.</li>
-      <li><b>Робастная</b>: центр — медиана, ширина — 1.4826·MAD. Один шпиль не расширяет канал; но при переходе цены на новый уровень канал остаётся узким, и монета надолго «за каналом». Режим для поиска резких выходов.</li>
-      <li><b>EWMA</b>: экспоненциальные среднее и дисперсия. Быстрее реагирует, но канал шире — используйте k ≈ 2.</li>
-    </ul>
+    <div class="panel doc" style="margin-bottom:12px">
+      <h3>Метки в таблице</h3>
+      <ul>
+        <li><span class="tag loc">▲ сигнал LONG</span> — монета подешевела сильнее обычного и разворачивается вверх. <span class="tag upc">▼ сигнал SHORT</span> — подорожала и разворачивается вниз.</li>
+        <li><span class="tag uo">за каналом ↑</span> <span class="tag lout">за каналом ↓</span> — цена прямо сейчас за границей, разворота ещё нет.</li>
+        <li><span class="tag up">касание верха</span> <span class="tag lo">касание низа</span> — цена недавно выходила за границу, но подтверждения пока не хватает.</li>
+        <li><span class="tag sq">сжатие</span> — монета вдвое спокойнее обычного; часто это затишье перед резким движением.</li>
+      </ul>
+      <h3>Два бота</h3>
+      <ul>
+        <li><b>Общий бот</b> работает на сервере круглосуточно, у всех один журнал. Его состояние — зелёная точка в верхней панели.</li>
+        <li><b>Мой бот</b> — ваша песочница: торгует в этом браузере, пока вкладка открыта, на ваших настройках.</li>
+      </ul>
+      <h3>Уведомления</h3>
+      <p>Нажмите на колокольчик в верхней панели — браузер будет сообщать о новых сигналах и сделках, даже когда вкладка свёрнута. Рядом — кнопка звука.</p>
+      <p class="mute" style="font-size:13px">Сервис учебный: торговля бумажная, ордера на биржу не отправляются. Это не инвестиционный совет.</p>
+    </div>
 
-    <h3>Сила сигнала (0–100)</h3>
-    <p><code>сила = 100·(0.25·D + 0.25·V + 0.15·R + 0.20·C + 0.15·M)</code>, каждая компонента в [0; 1]:</p>
-    <ul>
-      <li><b>D</b> — глубина прокола: 1 − e^(−2·e), где e — на сколько σ тень вышла за полосу;</li>
-      <li><b>V</b> — объём: min(1, z объёма / 3), z — робастный z-score ln(объёма);</li>
-      <li><b>R</b> — RSI(14): для лонга (35 − RSI)/20, для шорта (RSI − 65)/20;</li>
-      <li><b>C</b> — подтверждение разворота (все 4 условия);</li>
-      <li><b>M</b> — возврат к центру: 1 − T½/40 свечей (0 при тренде). T½ = −ln2/lnφ, где φ — коэффициент AR(1) для ln(цена) − ln(центр).</li>
-    </ul>
+    <details class="dis"><summary>Словарь терминов <span class="mute">· что означает каждая цифра</span></summary><div class="dbody">
+      <div class="gloss">
+        <b>Диапазон, %B</b><span>Где цена внутри своего обычного коридора: 0% — у нижней границы, 50% — посередине, 100% — у верхней.</span>
+        <b>Отклонение, σ</b><span>Насколько далеко цена ушла от обычной, в стандартных отклонениях. При k = 3 границы — это ±3σ.</span>
+        <b>Сила сигнала</b><span>Оценка 0–100: глубина выхода за границу, объём, RSI, подтверждение разворота и то, как быстро монета обычно возвращается.</span>
+        <b>Объём ×</b><span>Объём торгов относительно обычного. ×2 — вдвое выше нормы.</span>
+        <b>T½</b><span>За сколько монета обычно проходит половину пути обратно к своей цене. ∞ — монета в тренде.</span>
+        <b>LONG / SHORT</b><span>Ставка на рост / на падение.</span>
+        <b>Тейк и стоп</b><span>Цена фиксации прибыли и цена ограничения убытка. Задаются сразу при входе.</span>
+        <b>Тайм-стоп</b><span>Выход по рынку, если за 48 свечей не сработали ни тейк, ни стоп.</span>
+        <b>Риск, 1R</b><span>Сколько потеряем, если сработает стоп. Бот рискует 2% баланса на сделку.</span>
+        <b>R</b><span>Итог сделки в рисках: +1.5R — заработали в полтора раза больше, чем рисковали; −1R — полный стоп.</span>
+        <b>Средний результат</b><span>Средний R на сделку после комиссий. Больше нуля — у стратегии есть преимущество. Главная цифра журнала.</span>
+        <b>Winrate</b><span>Доля прибыльных сделок. Сама по себе мало что значит: важно, сколько приносит средняя сделка.</span>
+        <b>Profit factor</b><span>Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе.</span>
+        <b>Макс. просадка</b><span>Самое большое падение баланса от пика.</span>
+        <b>Комиссия и проскальзывание</b><span>Биржа берёт 0.075% за вход и выход; рыночные ордера исполняются чуть хуже цены — учитываем 0.05%.</span>
+      </div>
+    </div></details>
 
-    <h3>Два бота</h3>
-    <ul>
-      <li><b>🌐 Общий бот 24/7</b> работает на сервере (Supabase) каждую минуту, даже когда сайт никто не открывал. Журнал один для всех, настройки фиксированы. Плашка «Сторож» следит за ним: если он молчит дольше 5 минут — она красная.</li>
-      <li><b>👤 Мой бот</b> — песочница в вашем браузере на ваших текущих настройках, пока вкладка открыта. Журнал видите только вы.</li>
-      <li>Оба бота используют один и тот же файл с математикой, поэтому при одинаковых настройках считают одинаково.</li>
-    </ul>
+    <details class="dis"><summary>Методика <span class="mute">· для тех, кому интересны формулы</span></summary><div class="dbody doc">
+      <h3>Модели канала</h3>
+      <ul>
+        <li><b>Лог-канал</b> (по умолчанию): SMA ± k·σ в логарифмах цены, границы = exp(μ ± k·σ). Вверх шире, чем вниз — как и проценты.</li>
+        <li><b>Классика</b>: полосы Боллинджера, SMA ± k·σ.</li>
+        <li><b>Робастная</b>: медиана ± k·1.4826·MAD. Выбросы не расширяют канал, но при переходе на новый уровень монета надолго «за каналом».</li>
+        <li><b>EWMA</b>: экспоненциальные среднее и дисперсия; канал шире, лучше k ≈ 2.</li>
+      </ul>
+      <h3>Сила сигнала</h3>
+      <p><code>сила = 100·(0.25·D + 0.25·V + 0.15·R + 0.20·C + 0.15·M)</code>: D = 1 − e^(−2·e), где e — выход тени за границу в σ; V = min(1, z объёма / 3), z — робастный z-score ln(объёма); R — RSI(14): (35 − RSI)/20 для лонга, (RSI − 65)/20 для шорта; C — подтверждение разворота; M = 1 − T½/40. T½ = −ln2/lnφ, φ — коэффициент AR(1) для ln(цена) − ln(центр).</p>
+      <h3>Подтверждение разворота</h3>
+      <p>Касание границы за последние 4 свечи, свеча касания закрыта, следующая свеча в сторону отскока и закрылась внутри канала, объём выше нормы (z ≥ 1). Объём незакрытой свечи пересчитывается на полную длительность.</p>
+      <h3>Правила сделок</h3>
+      <ul>
+        <li>Вход по рынку при силе ≥ порога (у общего бота 60). Не больше 3 позиций, повтор по той же монете — не раньше чем через 4 свечи.</li>
+        <li>Тейк — у обычной цены, 1–3% хода; стоп — 1.5·ATR(14), 0.8–2.5%. Если тейк меньше 0.8 стопа — сделка пропускается.</li>
+        <li>Размер позиции — чтобы стоп стоил 2% баланса, но не больше трети баланса.</li>
+        <li>Если за одну свечу задеты и тейк, и стоп — считаем стоп. Через 48 свечей — выход по рынку.</li>
+      </ul>
+    </div></details>
+  </section>
 
-    <h3>Уведомления в Telegram</h3>
-    <p>Общий бот может присылать сообщения об открытии и закрытии сделок (с ценой, тейком, стопом, PnL и R) и о сбоях сервера. Подключение занимает 3 минуты; токен бота — это секрет, поэтому он хранится только в закрытой таблице базы и никогда не попадает на сайт.</p>
-    <ol>
-      <li>В Telegram откройте <b>@BotFather</b> → команда <code>/newbot</code> → придумайте имя. BotFather пришлёт <b>токен</b> вида <code>123456:ABC…</code>.</li>
-      <li>Напишите своему новому боту любое сообщение (или добавьте его администратором в канал/группу и напишите там).</li>
-      <li>Откройте в браузере <code>https://api.telegram.org/bot&lt;ТОКЕН&gt;/getUpdates</code> и найдите <code>"chat":{"id":…}</code> — это <b>chat_id</b> (у каналов он начинается с <code>-100</code>).</li>
-      <li>В Supabase откройте <b>SQL Editor</b> проекта <code>cryptoscreener</code> и выполните:<br>
-        <code>update public.tg_config set enabled = true, bot_token = '&lt;ТОКЕН&gt;', chat_id = '&lt;CHAT_ID&gt;' where id = 1;</code></li>
-    </ol>
-    <p>Сообщения начнут приходить со следующей сделки. Выключить: <code>update public.tg_config set enabled = false where id = 1;</code></p>
-
-    <h3>Правила сделок</h3>
-    <ul>
-      <li>Вход по рынку — только по сигналу с силой ≥ порога. Не более 3 позиций, повтор по той же монете — не раньше чем через 4 свечи.</li>
-      <li>Если тейк меньше 0.8 стопа — сделка пропускается.</li>
-      <li>Если за одну свечу задеты и тейк, и стоп — считаем стоп (пессимистично).</li>
-      <li>Торговля только бумажная: деньги виртуальные, ордера на биржу не отправляются.</li>
-    </ul>
-    <p>Это инструмент для изучения, а не торговый совет. Отскок от полосы — вероятностная идея: в сильном тренде цена может долго идти вдоль полосы.</p>
-  </div></section>
 
   <div class="foot" id="foot">—</div>
 </div>
@@ -648,14 +661,16 @@ function renderCards() {
   if (!rows.length) return;
   const med = median(rows.map(r => clamp(r.pB, 0, 1))) * 100;
   const cold = rows.filter(r => r.pB < 0.1).length, hot = rows.filter(r => r.pB > 0.9).length;
-  $('#c1').textContent = med.toFixed(1) + '%';
-  $('#c1s').textContent = med < 35 ? 'рынок у низов каналов' : med > 65 ? 'рынок у верхов каналов' : 'спокойный рынок';
+  $('#c1').textContent = med < 35 ? 'Распродажа' : med > 65 ? 'Разогрет' : 'Спокойный';
+  $('#c1s').textContent = `монеты в среднем на ${med.toFixed(0)}% своего диапазона`;
   $('#c1m').style.width = med + '%';
-  $('#c2').textContent = (cold / rows.length * 100).toFixed(1) + '%'; $('#c2s').textContent = `${cold} пар · %B < 10%`;
-  $('#c3').textContent = (hot / rows.length * 100).toFixed(1) + '%'; $('#c3s').textContent = `${hot} пар · %B > 90%`;
-  $('#c4').textContent = rows.filter(r => r.rev).length; $('#c4s').textContent = `подтверждено за 4 свечи · касаний ${rows.filter(r => r.touch).length}`;
-  $('#c5').textContent = rows.filter(r => r.squeeze).length;
-  $('#hdr').textContent = `· ${S.tf} · ${({robust:'MAD', ewma:'EWMA', log:'LOG', classic:'BB'})[S.method]}(${S.N}, ${S.k})`;
+  $('#c2').textContent = cold; $('#c2s').textContent = `из ${rows.length} монет · возможен отскок вверх`;
+  $('#c3').textContent = hot; $('#c3s').textContent = `из ${rows.length} монет · возможен откат вниз`;
+  const sigN = rows.filter(r => r.rev).length;
+  const plur = (n, f) => f[n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2];
+  $('#c4').textContent = sigN; $('#c4s').textContent = sigN ? `подтверждённ${plur(sigN, ['ый разворот', 'ых разворота', 'ых разворотов'])}` : 'сейчас нет — это нормально';
+  const sqN = rows.filter(r => r.squeeze).length;
+  $('#c5').textContent = sqN; $('#c5').nextElementSibling.textContent = `${plur(sqN, ['монета', 'монеты', 'монет'])} без движения`;
 }
 function gauge(pB) {
   // track spans %B from -20% to 120%; the channel itself is the shaded 0..100% part
@@ -692,11 +707,11 @@ function renderTable() {
     return `<tr class="row${r.sym === chartSym ? ' sel' : ''}" data-sym="${r.sym}">
       <td><span class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}">${favs.has(r.sym) ? '★' : '☆'}</span></td>
       <td>${coin(r.sym)}</td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
-      <td class="hm ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
+      <td class="hm hx ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
       <td>${r.label ? `<span class="tag ${r.cls}">${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
       <td>${sc}</td>
-      <td class="hm" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
-      <td class="hm ${isFinite(r.hl) ? 'mute' : 'faint'}">${hl}</td></tr>`;
+      <td class="hm hx" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
+      <td class="hm hx ${isFinite(r.hl) ? 'mute' : 'faint'}">${hl}</td></tr>`;
   }).join('') || '<tr><td colspan="9" class="mute">Нет пар под фильтр</td></tr>';
 }
 
@@ -875,8 +890,10 @@ function computeChart() {
   chart = Object.assign(d, {sym:chartSym, B:bands(d.c, S.N, S.k, S.method), R:rsi(d.c)});
   const i = d.c.length - 1, B = chart.B;
   const pB = (d.c[i] - B.lo[i]) / (B.up[i] - B.lo[i]), hl = halfLife(d.c, B.mid);
-  $('#ctitle').textContent = `${pair(chartSym)} — ${METHOD_NAME[S.method]} (${S.N}, ${S.k}) · ${S.tf}`;
-  $('#cstats').innerHTML = `цена <b>${fp(d.c[i])}</b> · %B <b>${(pB*100).toFixed(1)}%</b> · откл. <b>${B.z[i].toFixed(2)}σ</b> · верх ${fp(B.up[i])} · центр ${fp(B.mid[i])} · низ ${fp(B.lo[i])} · ширина ${((B.up[i]-B.lo[i])/B.mid[i]*100).toFixed(2)}% · RSI <b>${chart.R[i].toFixed(0)}</b> · T½ <b>${isFinite(hl) ? dur(hl*TFMS[S.tf]) : '∞'}</b>`;
+  const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
+  $('#ctitle').innerHTML = `${coin(chartSym)} <span class="cprice">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
+  $('#cstats').innerHTML = `${(pB*100).toFixed(0)}% диапазона · границы ${fp(B.lo[i])} — ${fp(B.up[i])} · RSI ${chart.R[i].toFixed(0)}`
+    + `<span class="faint"> · ${METHOD_NAME[S.method]} ${S.N}/${S.k}</span>`;
   drawChart(); renderDetail();
 }
 const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})), ...J.open.map(p => ({p, who:'мой'}))];
@@ -1013,11 +1030,13 @@ function renderServer() {
   const okN = win.filter(r => r.ok).length, expected = Math.min(240, Math.max(1, Math.round((Date.now() - (runs.length ? Date.parse(runs[runs.length - 1].ts) : Date.now())) / 6e4) + 1));
   const avgMs = okN ? win.filter(r => r.ok).reduce((a, r) => a + r.ms, 0) / okN : null;
   const lastErr = runs.find(r => !r.ok);
-  el.innerHTML = `<div class="ptitle">Работа сервера <span>· каждая клетка — одна минута за последние 2 часа: зелёная — прогон успешен, красная — ошибка, серая — прогона не было</span></div>
+  const share = okN / expected * 100, st = share >= 95 ? '' : share >= 80 ? 'idle' : 'bad';
+  const wasOpen = el.querySelector('details')?.open ? ' open' : '';
+  el.innerHTML = `<details class="dis"${wasOpen}><summary><span class="sdot ${st}"></span>${st ? 'Сервер работает с перебоями' : 'Сервер работает'} <span class="mute">· ${share.toFixed(0)}% проверок успешны за 4 часа</span></summary>
+    <div class="dbody"><div class="mute" style="font-size:12px">Каждая клетка — одна минута за последние 2 часа: зелёная — проверка рынка прошла, красная — ошибка, серая — проверки не было.</div>
     <div class="strip">${cells.join('')}</div>
-    <div class="mute" style="font-size:12px">Успешных прогонов за последние 4 часа: <b style="color:var(--text)">${okN} из ${expected}</b> (${(okN / expected * 100).toFixed(1)}%) ·
-      средняя длительность ${avgMs == null ? '—' : (avgMs / 1000).toFixed(1) + ' с'} ·
-      ${lastErr ? `последняя ошибка ${dt(Date.parse(lastErr.ts))}: <span class="neg">${lastErr.error}</span>` : 'ошибок нет'}</div>`;
+    <div class="mute" style="font-size:12px">${okN} из ${expected} проверок · в среднем ${avgMs == null ? '—' : (avgMs / 1000).toFixed(1) + ' с'} ·
+      ${lastErr ? `последняя ошибка ${dt(Date.parse(lastErr.ts))}: <span class="neg">${lastErr.error}</span>` : 'ошибок нет'}</div></div></details>`;
 }
 
 // ---------- journal ----------
@@ -1040,8 +1059,8 @@ function renderJournal() {
   if (!D) { $('#jdesc').textContent = 'Загружаю журнал общего бота…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
-    ? `Один бот на сервере для всех посетителей, работает круглосуточно. Настройки фиксированы: ${METHOD_NAME[set.method]} (${set.N}, ${set.k}), ${set.tf}, топ-${set.top} пар, мин. сила ${set.minScore}. Последний прогон: ${SJ.checked ? dt(SJ.checked) : '—'}, пар просканировано ${SJ.scanned ?? '—'}.`
-    : `Ваш личный бот: торгует в этом браузере, пока вкладка открыта, на ваших текущих настройках — ${METHOD_NAME[S.method]} (${S.N}, ${S.k}), ${S.tf}, мин. сила ${S.minScore}. Журнал виден только вам.`;
+    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. Последняя проверка рынка — ${SJ.checked ? hm(SJ.checked) : '—'}. <span class="faint">Входит при силе сигнала от ${set.minScore}, ${set.tf}.</span>`
+    : `Ваша песочница: бот торгует в этом браузере, пока вкладка открыта, на ваших настройках с вкладки «Рынок». Журнал видите только вы. <span class="faint">Сила от ${S.minScore}, ${S.tf}.</span>`;
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
   const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
   $('#jcards').innerHTML =
@@ -1280,74 +1299,35 @@ function drawEquity() {
 
 // ---------- changelog ----------
 const CHANGELOG = [
-  {v:'1.0', date:'05.10.2026', title:'Новый дизайн и взаимодействие', items:[
-    'Новая визуальная система: шрифт Inter, моноширинные цифры, спокойная тёмная палитра с уровнями поверхностей, единые кнопки и поля, SVG-иконки вместо эмодзи.',
-    'Закреплённая верхняя панель: навигация, индикатор «Сторожа» (клик — подробности), кнопки уведомлений и звука. Большая плашка состояния больше не занимает экран.',
-    'Всплывающие уведомления на сайте: новые сигналы, сделки вашего и общего бота, выход новой версии. Клик по уведомлению ведёт к монете или журналу.',
-    'Уведомления браузера (по желанию, кнопка с колокольчиком): приходят, даже когда вкладка свёрнута.',
-    'Ссылки на страницы и монеты: адрес вида …/#market/SOL открывает сразу нужную монету — им можно поделиться. Кнопки «назад/вперёд» браузера работают.',
-    'Горячие клавиши: «/» — поиск монеты, Esc — закрыть карточку.',
-    'Таблица монет: цветные значки монет, выделение выбранной строки, заглушки во время загрузки.',
-    'Бэктест: настройки собраны в группы «Стратегия», «Канал», «Данные» с заметной кнопкой запуска; вердикт — цветной баннер с иконкой.',
-    'У каждой вкладки заголовок с коротким пояснением; история обновлений — лентой.',
+  {v:'1.1', date:'5 октября 2026', title:'Проще и понятнее', items:[
+    'На экране только главное. Настройки графика — под шестерёнкой, дополнительные колонки таблицы — под кнопкой рядом с поиском.',
+    'Быстрые фильтры: все монеты, только сигналы, затишье или избранное — в одно касание.',
+    'Понятные названия: «Настроение рынка», «Дешевле обычного», «Дороже обычного».',
+    'Инструкция стала короче: четыре шага, а словарь и формулы — по желанию.',
   ]},
-  {v:'0.9', date:'05.10.2026', title:'Удобство, мобильная версия, надёжность и Telegram', items:[
-    'Графики на «Рынке» и в карточке сделки: колёсико — масштаб вокруг курсора, перетаскивание мышью или пальцем — прокрутка во времени, двойной клик — сброс.',
-    'Мобильная версия: на узком экране второстепенные колонки скрываются, вкладки прокручиваются, карточка сделки на весь экран.',
-    'Подсказка «Как пользоваться — 3 шага» при первом визите.',
-    'Журнал работы общего бота: каждый прогон записывается (успех/ошибка, длительность, число пар и сигналов), история хранится 3 дня. В журнале общего бота — панель «Работа сервера»: полоса по минутам за 2 часа, доля успешных прогонов, последняя ошибка.',
-    'Уведомления в Telegram от общего бота: открытие и закрытие сделок (цена, тейк, стоп, PnL, R) и первый сбой подряд. Как подключить — в «Инструкции».',
-    'Серверный бот обновлён до текущей общей математики (код в репозитории и на сервере снова совпадает).',
+  {v:'1.0', date:'5 октября 2026', title:'Новый дизайн', items:[
+    'Новый внешний вид и удобная мобильная версия с навигацией внизу экрана.',
+    'Уведомления о новых сигналах и сделках — включаются колокольчиком в верхней панели.',
+    'Ссылкой на монету можно поделиться: она откроется сразу на нужном графике.',
   ]},
-  {v:'0.8', date:'05.10.2026', title:'Три стратегии в бэктесте', items:[
-    'В бэктесте можно выбрать стратегию: «Отскок от полосы» (как у ботов), «Отскок по тренду» (только в сторону наклона центра канала) и «Пробой полосы» (в сторону свежего закрытия за полосой с объёмом, тейк = 2 стопа). Плюс опция «только LONG».',
-    'Логика «какую сделку брать» вынесена в общую функцию: боты, бэктест и любые будущие стратегии используют один код.',
-    'Сравнение на 50 парах, два разных месяца (август–сентябрь и сентябрь–октябрь), 15m и 1h, с комиссиями и проскальзыванием: ни одна из 3 стратегий ни в одном варианте не была в плюсе в обоих месяцах на достаточном числе сделок. Лучшие отдельные результаты держались на 5–30 сделках — это шум, а не преимущество.',
-    'Настройки общего бота по-прежнему не меняются.',
+  {v:'0.9', date:'5 октября 2026', title:'Удобные графики', items:[
+    'Графики можно приближать колёсиком и листать мышью или пальцем.',
+    'В журнале видно, что сервер бота работает без перебоев.',
   ]},
-  {v:'0.7', date:'05.10.2026', title:'Исследование стратегии на бэктесте', items:[
-    'В бэктест добавлен фильтр тренда «T½ ≤ 20 / 40 свечей»: вход только по монетам, которые быстро возвращаются к центру.',
-    'Прогнано 108 комбинаций настроек (модель, N, k, мин. сила, фильтр T½) на 50 парах за 30 дней (15m). Ни одна не была в плюсе в обеих половинах периода.',
-    'Проверка на «невиденных» данных (предыдущие 30 дней): все «улучшенные» варианты — порог 70, фильтр T½ — оказались хуже текущих настроек. Улучшение было подгонкой под один удачный месяц.',
-    'Вывод: у стратегии «отскок от полосы» в текущем виде нет устойчивого преимущества; подбор параметров его не создаёт. Настройки общего бота не меняются — он остаётся честным эталоном. Следующий шаг — проверять другую идею входа, а не крутить параметры.',
+  {v:'0.6', date:'5 октября 2026', title:'Проверка на истории', items:[
+    'Можно узнать, как правила бота сработали бы за последние 7–60 дней, и сравнить разные идеи входа.',
+    'Честный вывод по итогам проверок: у стратегии пока нет устойчивого преимущества, поэтому бот торгует как эталон, а мы продолжаем исследование.',
   ]},
-  {v:'0.6', date:'05.10.2026', title:'Бэктест и вкладка обновлений', items:[
-    'Новая вкладка «Бэктест»: те же правила, что у ботов, прогоняются на истории Binance за 7–60 дней по 20–100 парам. Вердикт, средний результат в R, комиссии, просадка, кривая баланса.',
-    'Разбивка результатов по силе сигнала (проверка, что сильные сигналы действительно лучше), по LONG/SHORT, по причине выхода и по половинам периода (стабильность).',
-    'Сделки бэктеста открываются в той же карточке сделки, что и в журнале.',
-    'Математика сигнала разделена на «подготовку рядов» и «сигнал на свече»: живой сканер и бэктест считают одной функцией.',
-    'Подписи цен справа на графиках больше не наезжают друг на друга: метки входа, TP и SL раздвигаются и показываются плашками.',
-    'Эта вкладка «Обновления».',
+  {v:'0.5', date:'5 октября 2026', title:'Честный журнал', items:[
+    'В каждой сделке видны комиссия и итог в рисках (R).',
+    'Карточка сделки: график, вход и выход, и почему бот решил войти.',
   ]},
-  {v:'0.5', date:'05.10.2026', title:'Честный журнал и карточка сделки', items:[
-    'Единый файл математики для сайта и серверного бота — при одинаковых настройках они считают одинаково.',
-    'Журнал: размер позиции, причина выхода, длительность, PnL до и после комиссий, комиссия, результат в R.',
-    'Новые метрики: средний результат (ожидание) в R, profit factor со средней прибылью/убытком, комиссии отдельно, максимальная просадка.',
-    'Учёт проскальзывания 0.05% на входе, стопе и тайм-стопе.',
-    'Карточка сделки: свечной график, канал на настройках входа, точки входа/выхода, линии TP/SL, объём, RSI и «почему бот вошёл» — снимок сигнала в момент входа.',
-    'Единые термины: «сила сигнала», «отклонение, σ», «%B». Словарь из 26 понятий в инструкции.',
+  {v:'0.4', date:'5 октября 2026', title:'Бот работает круглосуточно', items:[
+    'Общий бот торгует на сервере 24/7 — даже когда сайт закрыт. У всех один журнал.',
+    'Рядом — «Мой бот» для экспериментов со своими настройками.',
   ]},
-  {v:'0.4', date:'05.10.2026', title:'Общий бот 24/7', items:[
-    'Серверный бот на Supabase: запускается каждую минуту, торгует круглосуточно, журнал один для всех.',
-    'Журнал с двумя режимами: «Общий бот 24/7» и «Мой бот» (песочница в браузере на ваших настройках).',
-    'Плашка «Сторож» следит за общим ботом и краснеет, если он не отвечает дольше 5 минут.',
-  ]},
-  {v:'0.3', date:'05.10.2026', title:'Автообновление', items:[
-    'Открытые вкладки сами перезагружаются при выходе новой версии; журнал и настройки сохраняются.',
-  ]},
-  {v:'0.2', date:'05.10.2026', title:'Исправления и понятность', items:[
-    'Объём незакрытой свечи пересчитывается на полную длительность — свежие касания больше не выглядят «пустыми».',
-    'Метки разделены: подтверждённый сигнал, «за каналом», «касание», «сжатие».',
-    'Блок «Разбор сигнала» под графиком: что выполнено, чего не хватает, из чего сложилась сила.',
-    'Подсказки на заголовках, шкала позиции в канале, линии позиций бота на графике.',
-    'Лог-канал по умолчанию вместо робастного (робастный давал слишком много пар «за каналом»).',
-    'Исправлены потеря настроек во время сканирования и гонка при быстром переключении монет.',
-  ]},
-  {v:'0.1', date:'05.10.2026', title:'Первая версия', items:[
-    'Сканер рынка Binance: термометр рынка, сигналы, сжатия, таблица пар.',
-    'Четыре модели канала: лог-канал, классика, робастная (медиана ± MAD), EWMA.',
-    'Сила сигнала, T½ (скорость возврата к центру), подтверждение объёмом.',
-    'Бумажный бот с тейком и стопом и журнал сделок.',
+  {v:'0.1', date:'5 октября 2026', title:'Запуск', items:[
+    'Сканер рынка, график монеты, разбор сигнала и бумажный бот.',
   ]},
 ];
 function renderChangelog() {
@@ -1370,7 +1350,23 @@ function syncInputs() {
   $('#N').value = S.N; $('#Nv').textContent = S.N; $('#k').value = S.k; $('#kv').textContent = S.k;
   $('#cn').value = S.candles; $('#cnv').textContent = S.candles;
   $('#minsc').value = S.minScore; $('#minscv').textContent = S.minScore; $('#boton').checked = J.on;
+  document.querySelectorAll('#tfseg .tab').forEach(b => b.classList.toggle('on', b.dataset.tf === S.tf));
 }
+// timeframe segmented control drives the (hidden) #tf select
+document.querySelectorAll('#tfseg .tab').forEach(b => b.onclick = () => {
+  $('#tf').value = b.dataset.tf; $('#tf').dispatchEvent(new Event('change'));
+  document.querySelectorAll('#tfseg .tab').forEach(x => x.classList.toggle('on', x === b));
+});
+$('#cset').onclick = () => { const open = $('#sheet').classList.toggle('hidden') === false; $('#cset').classList.toggle('on', open); };
+// quick filters and "more" (extra columns + filters)
+document.querySelectorAll('#flseg .tab').forEach(b => b.onclick = () => {
+  $('#fl').value = b.dataset.fl;
+  document.querySelectorAll('#flseg .tab').forEach(x => x.classList.toggle('on', x === b));
+  renderTable();
+});
+const setMore = on => { $('#mtable').classList.toggle('more', on); $('#morebar').classList.toggle('hidden', !on); $('#more').classList.toggle('on', on); save('sr_more', on); };
+$('#more').onclick = () => setMore(!$('#mtable').classList.contains('more'));
+setMore(load('sr_more', false));
 let scanTimer;
 const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); };
 $('#N').oninput = e => { S.N = +e.target.value; $('#Nv').textContent = S.N; computeChart(); };
