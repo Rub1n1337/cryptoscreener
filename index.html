@@ -451,9 +451,9 @@ details.dis>.dbody{padding:0 16px 16px}
     <div class="phead"><div><h2>Бэктест</h2><p>Как правила бота сработали бы на истории Binance — с комиссиями и проскальзыванием.</p></div></div>
     <div class="fgroup" style="margin-bottom:12px"><div class="fields" style="align-items:flex-end">
       <label title="«Отскок» — от границы к обычной цене (как у ботов сейчас); «Отскок по тренду» — только по направлению движения; «Пробой» — вслед за выходом за границу">Идея входа <select id="btStrat">
-        <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option>
+        <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму рынка</option>
       </select></label>
-      <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option></select></label>
+      <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option></select></label>
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
       <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
       <button id="btRun" class="primary" style="height:var(--h);padding:0 22px"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
@@ -475,6 +475,8 @@ details.dis>.dbody{padding:0 16px 16px}
         <label class="fl" title="Длина окна канала, свечей">N <input type="number" id="btN" min="20" max="300" style="width:80px"></label>
         <label class="fl" title="Ширина канала в σ">k <input type="number" id="btK" min="1" max="4" step="0.1" style="width:72px"></label>
         <label class="fl" title="Таймфрейм свечей">ТФ <select id="btTf"><option>15m</option><option>1h</option><option>4h</option></select></label>
+        <label class="fl" title="Режим рынка по BTC: ER = чистое движение за ~7 дней / весь пройденный путь. Ниже порога — флэт (боковик), выше — тренд">Флэт, если ER BTC <select id="btER"><option value="0.1">&lt; 0.10</option><option value="0.15">&lt; 0.15</option><option value="0.25">&lt; 0.25</option></select></label>
+        <label class="fl inl" title="Входить только когда BTC в боковике"><input type="checkbox" id="btFlat"> только во флэте</label>
         <label class="fl inl" title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
         <button id="btShared" title="Подставить настройки общего бота">Как у общего бота</button>
         <button id="btMine" title="Подставить настройки с вкладки «Рынок»">Мои настройки</button>
@@ -1300,12 +1302,14 @@ function btSettings() {
           minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, minWidth:+$('#btW').value || 0,
           top:custom ? custom.length : +$('#btTop').value, custom,
           strategy:$('#btStrat').value, longOnly:$('#btLong').checked,
-          rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1};
+          rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1,
+          erMax:+$('#btER').value || 0.15, flatOnly:$('#btFlat').checked};
 }
 function btFill(s) {
   $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0);
   $('#btStrat').value = s.strategy || 'revert'; $('#btLong').checked = !!s.longOnly; $('#btW').value = String(s.minWidth || 0);
   $('#btRR').value = String(s.rr || 0); $('#btRisk').value = String(Math.round((s.risk ?? M.RISK) * 1000) / 10); $('#btLev').value = String(s.lev ?? 1);
+  $('#btER').value = String(s.erMax ?? 0.15); $('#btFlat').checked = !!s.flatOnly;
   btEstimate();
 }
 function btEstimate() {
@@ -1327,7 +1331,8 @@ async function runBacktest() {
     const now = Date.now(), endT = Math.floor(now / 36e5) * 36e5;   // whole hours → reruns hit the cache
     const from = endT - days * 864e5, startT = from - 450 * tfms;      // 450 bars of warm-up covers N ≤ 300
     if (s.custom && !s.custom.length) throw new Error('список монет пуст');
-    const syms = s.custom || M.pickSymbols(await api('/api/v3/ticker/24hr'), s.top, [], now);
+    const traded = s.custom || M.pickSymbols(await api('/api/v3/ticker/24hr'), s.top, [], now);
+    const syms = traded.includes('BTCUSDT') ? traded : [...traded, 'BTCUSDT'];   // BTC is always loaded: it defines the market regime
     const hist = {}; let done = 0;
     await pool(syms, 4, async sym => {
       try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {}
@@ -1336,9 +1341,9 @@ async function runBacktest() {
     st.textContent = 'Считаю…'; await sleep(30);
     const t0 = performance.now();
     btHist = {hist, from};
-    btRes = M.backtest(hist, s, {start:10000, from});
+    btRes = M.backtest(hist, s, {start:10000, from, only:traded});
     btRes.settings = s; btRes.days = days;
-    const miss = syms.filter(x => !hist[x]?.length);
+    const miss = traded.filter(x => !hist[x]?.length);
     st.textContent = `Готово: ${btRes.pairs} монет, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
@@ -1398,6 +1403,7 @@ function renderBacktest() {
   $('#btSplit').innerHTML = groupHead + '<tbody>'
     + groupRow('LONG', by(x => x.side, 'LONG')) + groupRow('SHORT', by(x => x.side, 'SHORT'))
     + ['тейк', 'стоп', 'тайм-стоп', 'конец теста'].filter(z => tr.some(x => x.reason === z)).map(z => groupRow('выход: ' + z, by(x => x.reason, z))).join('')
+    + [['flat', 'BTC во флэте'], ['up', 'BTC в росте'], ['down', 'BTC в падении']].filter(([k]) => tr.some(x => x.snap?.regime === k)).map(([k, nm]) => groupRow(nm, by(x => x.snap?.regime, k))).join('')
     + groupRow('1-я половина периода', h1) + groupRow('2-я половина периода', h2) + '</tbody>';
   const list = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
   $('#btTrades').innerHTML = list.map(x => `<tr class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
@@ -1432,6 +1438,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'1.5', date:'5 октября 2026', title:'Режим рынка в бэктесте', items:[
+    'Бэктест умеет определять режим рынка по BTC: боковик, рост или падение (по эффективности движения за ~7 дней).',
+    'Новая стратегия «Переключатель по режиму рынка»: в боковике — отскок, в росте — пробой только в LONG, в падении — без сделок. И фильтр «только во флэте» для любой стратегии.',
+    'В результатах — разбивка сделок по режимам: BTC во флэте, в росте, в падении.',
+    'Периоды бэктеста 90 и 180 дней.',
+  ]},
   {v:'1.4', date:'5 октября 2026', title:'Риск-менеджмент в бэктесте и дневной боллинджер', items:[
     'Бэктест: свой RR (к центру канала, 1:1.5, 1:2, 1:3), риск на сделку (0.5–3%) и максимальное плечо (1×–10×).',
     'Бэктест: топ-20/50/100/200 монет или свой список — например «BTC, ETH, SOL».',
@@ -1625,7 +1637,7 @@ attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom
 $('#btRun').onclick = runBacktest;
 $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); };
 $('#btShared').onclick = () => { if (SJ) btFill(SJ.settings); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btFlat'].forEach(s => $(s).onchange = btEstimate);
 $('#btCustom').oninput = btEstimate;
 $('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });
 $('#btTrades').onclick = e => {

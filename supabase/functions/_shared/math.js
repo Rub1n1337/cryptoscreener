@@ -169,6 +169,10 @@ export function signalAt(P, i, sym, now) {
     if (c[p] > B.up[p] && c[p - 1] <= B.up[p - 1] && bz >= 1) brk = { side: 'long', volZ: bz };
     else if (c[p] < B.lo[p] && c[p - 1] >= B.lo[p - 1] && bz >= 1) brk = { side: 'short', volZ: bz };
   }
+  // efficiency ratio over ~7 days (capped at 300 bars): |net move| / path length; ≈0 — range, ≈1 — clean trend
+  const L = Math.min(erBars(S.tf), i);
+  let path = 0; for (let j = i - L + 1; j <= i; j++) path += Math.abs(c[j] - c[j - 1]);
+  const er = path ? Math.abs(c[i] - c[i - L]) / path : 0, erCh = c[i] / c[i - L] - 1;
   const outUp = c[i] > B.up[i], outLo = c[i] < B.lo[i];
   let label = '', cls = '', kind = '';
   if (touch && rev) { kind = 'sig'; label = touch.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT'; cls = touch.side === 'low' ? 'loc' : 'upc'; }
@@ -176,24 +180,47 @@ export function signalAt(P, i, sym, now) {
   else if (touch) { kind = 'touch'; label = touch.side === 'low' ? 'касание низа' : 'касание верха'; cls = touch.side === 'low' ? 'lo' : 'up'; }
   else if (squeeze) { kind = 'sq'; label = 'сжатие'; cls = 'sq'; }
   return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, rev, score, comps, checks, exc, volX, volZ,
-           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side, slope, brk };
+           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side, slope, brk, er, erCh };
 }
+export const erBars = tf => Math.min(300, Math.round(7 * 864e5 / TFMS[tf]));
+export function erSeries(c, L) {
+  const out = Array(c.length).fill(null);
+  for (let i = L; i < c.length; i++) {
+    let path = 0; for (let j = i - L + 1; j <= i; j++) path += Math.abs(c[j] - c[j - 1]);
+    out[i] = { er: path ? Math.abs(c[i] - c[i - L]) / path : 0, ch: c[i] / c[i - L] - 1 };
+  }
+  return out;
+}
+// market regime from BTC: flat (ER below the threshold), trend up, trend down
+export const regimeOf = (mkt, S) => !mkt ? null : mkt.er < (S.erMax ?? 0.15) ? 'flat' : mkt.ch > 0 ? 'up' : 'down';
 
 // ---------- strategies ----------
 // S.strategy: 'revert' (bounce off a band back to the centre, default), 'revert_trend' (bounce only in the direction
 // of the channel's trend), 'breakout' (trade in the direction of a fresh close beyond a band). S.longOnly skips shorts.
-export const STRATEGIES = { revert: 'Отскок от полосы', revert_trend: 'Отскок по тренду', breakout: 'Пробой полосы' };
+export const STRATEGIES = { revert: 'Отскок от полосы', revert_trend: 'Отскок по тренду', breakout: 'Пробой полосы', switch: 'Переключатель по режиму рынка' };
+// 'switch': BTC flat → bounce off a band; BTC trending up → breakout, LONG only; BTC trending down → stay out
+export function modeOf(r, S) {
+  const st = S.strategy || 'revert';
+  if (st !== 'switch') return st;
+  const reg = regimeOf(r.mkt, S);
+  return reg === 'up' ? 'breakout_long' : reg === 'down' ? 'none' : 'revert';
+}
 // returns 'LONG' / 'SHORT' if this signal is tradable under S, else null
 export function wants(r, S) {
   if (!r || r.score == null || r.score < S.minScore) return null;
-  const st = S.strategy || 'revert';
+  let st = modeOf(r, S);
+  if (st === 'none') return null;
+  // optional market filter for any strategy: trade only while BTC is flat
+  if (S.flatOnly && regimeOf(r.mkt, S) !== 'flat') return null;
+  const longOnly = S.longOnly || st === 'breakout_long';
+  if (st === 'breakout_long') st = 'breakout';
   let side = null;
   if (st === 'breakout') side = r.brk ? (r.brk.side === 'long' ? 'LONG' : 'SHORT') : null;
   else if (r.rev) {
     side = r.side === 'low' ? 'LONG' : 'SHORT';
     if (st === 'revert_trend' && !(side === 'LONG' ? r.slope > 0 : r.slope < 0)) side = null;
   }
-  if (side === 'SHORT' && S.longOnly) return null;
+  if (side === 'SHORT' && longOnly) return null;
   // optional channel-width filter: a wider channel leaves more room for the move back to the centre
   if (side && S.minWidth && !((r.up - r.lo) / r.mid * 100 >= S.minWidth)) return null;
   // optional trend filter for bounces: only coins that revert to the centre fast enough (T½ ≤ maxHL bars)
@@ -205,16 +232,16 @@ export function wants(r, S) {
 export function snapshot(r, S) {
   return { score: r.score, comps: r.comps, checks: r.checks, z: r.z, pB: r.pB, rsi: r.rsi, hl: isFinite(r.hl) ? r.hl : null,
            exc: r.exc, volX: r.volX, volZ: r.volZ, mid: r.mid, up: r.up, lo: r.lo, atr: r.atr,
-           slope: r.slope, brk: r.brk,
+           slope: r.slope, brk: r.brk, er: r.er, mkt: r.mkt ?? null, regime: regimeOf(r.mkt, S),
            settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0,
-                       rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0 } };
+                       rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0, erMax: S.erMax ?? 0.15, flatOnly: !!S.flatOnly } };
 }
 
 // ---------- trading rules ----------
 export function planEntry(r, balance, S, now) {
   const side = wants(r, S);
   if (!side) return null;
-  const sg = side === 'LONG' ? 1 : -1, brk = (S.strategy || 'revert') === 'breakout';
+  const sg = side === 'LONG' ? 1 : -1, brk = modeOf(r, S).startsWith('breakout');
   const e = r.price * (1 + sg * SLIP);   // market entry pays slippage
   const slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
   // take profit: S.rr > 0 — fixed reward:risk (TP = rr × stop distance);
@@ -267,6 +294,9 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
   }
   const opened = [];
   if (allowEntries) {
+    // market regime for every signal comes from BTC's own row
+    const btc = rows.find(r => r.sym === 'BTCUSDT'), mkt = btc ? { er: btc.er, ch: btc.erCh } : null;
+    for (const r of rows) r.mkt = mkt;
     const cool = new Set([...recentSyms, ...closed.map(x => x.sym)]);
     const cands = rows.filter(r => wants(r, S) && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
     for (const r of cands) {
@@ -319,12 +349,15 @@ const now = () => Date.now();
 // hist: {sym: klines[]} (closed bars, same tf, warm-up of at least N+100 bars before `from`).
 // Steps bar by bar through time over all pairs with the live rules: a signal is evaluated at the close of a bar,
 // entry at that close (+slippage), exits checked on the following bars (stop first if both are hit), time stop, cooldown, slot limit.
-export function backtest(hist, S, { start = 10000, from = 0 } = {}) {
+export function backtest(hist, S, { start = 10000, from = 0, only = null } = {}) {
   const tfms = TFMS[S.tf], P = {};
   for (const [sym, K] of Object.entries(hist)) {
     if (K.length < S.N + 20) continue;
     const Q = prepare(K, S); Q.idx = new Map(Q.t.map((t, i) => [t, i])); P[sym] = Q;
   }
+  // BTC drives the market regime; it may be loaded only for that (`only` = coins that are actually traded)
+  const BTC = P.BTCUSDT, btcReg = BTC ? erSeries(BTC.c, erBars(S.tf)) : null;
+  const tradable = only ? Object.keys(P).filter(s => only.includes(s)) : Object.keys(P);
   const times = [...new Set(Object.values(P).flatMap(Q => Q.t))].filter(t => t >= from).sort((a, b) => a - b);
   let balance = start;
   const open = [], trades = [], equity = [], lastClose = {};
@@ -342,12 +375,13 @@ export function backtest(hist, S, { start = 10000, from = 0 } = {}) {
       else if (j - p.ei >= TIME_STOP) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
     }
     if (open.length < MAX_OPEN) {
-      const cands = [];
-      for (const [sym, Q] of Object.entries(P)) {
-        const i = Q.idx.get(T);
+      const cands = [], bi = BTC ? BTC.idx.get(T) : null, mkt = bi != null ? btcReg[bi] : null;
+      for (const sym of tradable) {
+        const Q = P[sym], i = Q.idx.get(T);
         if (i == null || !touchedAt(Q, i) || open.some(p => p.sym === sym)) continue;
         if (lastClose[sym] != null && T - lastClose[sym] < COOLDOWN * tfms) continue;
         const r = signalAt(Q, i, sym, T + tfms);   // bar fully elapsed
+        if (r) r.mkt = mkt;
         if (wants(r, S)) { r.i = i; cands.push(r); }
       }
       cands.sort((a, b) => b.score - a.score);
@@ -360,5 +394,5 @@ export function backtest(hist, S, { start = 10000, from = 0 } = {}) {
     equity.push([T, balance]);
   }
   for (const p of [...open]) { const Q = P[p.sym]; const j = Q.n - 1; close(p, Q.c[j] * (1 - (p.side === 'LONG' ? 1 : -1) * SLIP), 'конец теста', Q.t[j]); }
-  return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: Object.keys(P).length };
+  return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: tradable.length };
 }
