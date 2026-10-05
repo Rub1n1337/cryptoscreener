@@ -209,6 +209,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .cl-item::before{content:"";position:absolute;left:-6px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--s3);border:2px solid var(--line2)}
 .cl-item:first-child::before{background:var(--acc);border-color:var(--acc)}
 .cl-item ul{margin:6px 0 0;padding-left:18px}
+.clold>summary{cursor:pointer;font-weight:600;padding:6px 0 14px;color:var(--blue)}.clold>summary .mute{font-weight:400}
 
 /* ---------- trade card ---------- */
 .modal{position:fixed;inset:0;background:var(--backdrop);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow:auto}
@@ -280,6 +281,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
   :is(#jopen,#jclosed,#btTrades) tr:not(.row) td{display:block;padding:14px 12px;white-space:normal}
   .statrow{gap:8px}.statrow .card{padding:11px 12px}.statrow .card .v{font-size:18px}
   .prof .ptech{display:none}
+  .steps{gap:8px}.step{padding:12px 14px}.step .n{display:inline-grid;width:22px;height:22px;font-size:12px;margin:0 8px 0 0;vertical-align:1px}.step b{display:inline;font-size:14px}.step p{margin-top:4px}
   /* forms (backtest, profile): an even two-column grid, every control full width */
   #backtest .fields,#bform .row{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}
   #backtest .fields>*,#bform .row>*{min-width:0}
@@ -2175,9 +2177,12 @@ const CHANGELOG = [
 ];
 function renderChangelog() {
   $('#ver').textContent = 'v' + CHANGELOG[0].v;
-  $('#changelog').innerHTML = CHANGELOG.map(c =>
-    `<div class="cl-item"><div style="font-weight:650;font-size:15px"><span class="tag" style="margin-right:8px">v${c.v}</span>${c.title} <span class="faint" style="font-weight:400;font-size:12px">· ${c.date}</span></div>
-     <ul>${c.items.map(i => `<li>${i}</li>`).join('')}</ul></div>`).join('');
+  const item = c => `<div class="cl-item"><div style="font-weight:650;font-size:15px"><span class="tag" style="margin-right:8px">v${c.v}</span>${c.title} <span class="faint" style="font-weight:400;font-size:12px">· ${c.date}</span></div>
+     <ul>${c.items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
+  // the latest three are open; older ones fold away so the page doesn't run for screens
+  const old = CHANGELOG.slice(3);
+  $('#changelog').innerHTML = CHANGELOG.slice(0, 3).map(item).join('')
+    + (old.length ? `<details class="clold"><summary>Ранние обновления <span class="mute">· ${old.length} ${plural(old.length, ['версия', 'версии', 'версий'])}, с v${old[old.length - 1].v} по v${old[0].v}</span></summary>${old.map(item).join('')}</details>` : '');
 }
 
 // ---------- sound ----------
