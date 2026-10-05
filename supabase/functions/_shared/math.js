@@ -191,8 +191,17 @@ export function erSeries(c, L) {
   }
   return out;
 }
-// market regime from BTC: flat (ER below the threshold), trend up, trend down
-export const regimeOf = (mkt, S) => !mkt ? null : mkt.er < (S.erMax ?? 0.15) ? 'flat' : mkt.ch > 0 ? 'up' : 'down';
+export const MAJORS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+// market regime: flat when BTC (or, with S.regimeSrc = 'majors', each of BTC/ETH/SOL) has ER below the threshold;
+// otherwise an impulse — up or down by the direction of BTC
+export function regimeOf(mkt, S) {
+  if (!mkt) return null;
+  const thr = S.erMax ?? 0.15;
+  const flat = S.regimeSrc === 'majors' && mkt.majors?.length ? mkt.majors.every(m => m.er < thr) : mkt.er < thr;
+  return flat ? 'flat' : mkt.ch > 0 ? 'up' : 'down';
+}
+// builds the market-regime object from per-coin {er, ch} values keyed by symbol
+export const marketOf = get => { const b = get('BTCUSDT'); if (!b) return null; return { er: b.er, ch: b.ch, majors: MAJORS.map(get).filter(Boolean) }; };
 
 // ---------- strategies ----------
 // S.strategy: 'revert' (bounce off a band back to the centre, default), 'revert_trend' (bounce only in the direction
@@ -210,8 +219,12 @@ export function wants(r, S) {
   if (!r || r.score == null || r.score < S.minScore) return null;
   let st = modeOf(r, S);
   if (st === 'none') return null;
-  // optional market filter for any strategy: trade only while BTC is flat
-  if (S.flatOnly && regimeOf(r.mkt, S) !== 'flat') return null;
+  // optional market filter for any strategy: only in a flat market / only in an impulse
+  const reg = regimeOf(r.mkt, S), only = S.regimeOnly || (S.flatOnly ? 'flat' : 'any');
+  if (only === 'flat' && reg !== 'flat') return null;
+  if (only === 'impulse' && (reg == null || reg === 'flat')) return null;
+  // optional filter on the coin itself: skip bounces on a coin that is trending on its own (ER of the coin ≥ coinErMax)
+  if (S.coinErMax && st !== 'breakout' && st !== 'breakout_long' && r.er >= S.coinErMax) return null;
   const longOnly = S.longOnly || st === 'breakout_long';
   if (st === 'breakout_long') st = 'breakout';
   let side = null;
@@ -234,7 +247,8 @@ export function snapshot(r, S) {
            exc: r.exc, volX: r.volX, volZ: r.volZ, mid: r.mid, up: r.up, lo: r.lo, atr: r.atr,
            slope: r.slope, brk: r.brk, er: r.er, mkt: r.mkt ?? null, regime: regimeOf(r.mkt, S),
            settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0,
-                       rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0, erMax: S.erMax ?? 0.15, flatOnly: !!S.flatOnly } };
+                       rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0, erMax: S.erMax ?? 0.15,
+                       regimeOnly: S.regimeOnly || (S.flatOnly ? 'flat' : 'any'), regimeSrc: S.regimeSrc || 'btc', coinErMax: S.coinErMax || 0 } };
 }
 
 // ---------- trading rules ----------
@@ -283,7 +297,7 @@ export function closeTrade(p, exit, reason, now) {
            reason, fee, gross, pnl, r: risk ? pnl / risk : null, note: p.note, snap: p.snap ?? null };
 }
 // one bot step: manage exits, then open new positions. Pure — the caller persists the result.
-export function botTick({ rows, klines, open, recentSyms, balance, S, now, allowEntries = true }) {
+export function botTick({ rows, klines, open, recentSyms, balance, S, now, allowEntries = true, market }) {
   const closed = [], stillOpen = [];
   for (const p of open) {
     const K = klines[p.sym];
@@ -294,8 +308,8 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
   }
   const opened = [];
   if (allowEntries) {
-    // market regime for every signal comes from BTC's own row
-    const btc = rows.find(r => r.sym === 'BTCUSDT'), mkt = btc ? { er: btc.er, ch: btc.erCh } : null;
+    // market regime for every signal comes from the BTC/ETH/SOL rows (or a regime passed in by the caller)
+    const mkt = market !== undefined ? market : marketOf(s => { const x = rows.find(r => r.sym === s); return x ? { er: x.er, ch: x.erCh } : null; });
     for (const r of rows) r.mkt = mkt;
     const cool = new Set([...recentSyms, ...closed.map(x => x.sym)]);
     const cands = rows.filter(r => wants(r, S) && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
@@ -355,8 +369,10 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
     if (K.length < S.N + 20) continue;
     const Q = prepare(K, S); Q.idx = new Map(Q.t.map((t, i) => [t, i])); P[sym] = Q;
   }
-  // BTC drives the market regime; it may be loaded only for that (`only` = coins that are actually traded)
-  const BTC = P.BTCUSDT, btcReg = BTC ? erSeries(BTC.c, erBars(S.tf)) : null;
+  // BTC/ETH/SOL drive the market regime; they may be loaded only for that (`only` = coins that are actually traded)
+  const BTC = P.BTCUSDT, regS = {};
+  for (const s of MAJORS) if (P[s]) regS[s] = erSeries(P[s].c, erBars(S.tf));
+  const regAt = (s, T) => { const Q = P[s], i = Q ? Q.idx.get(T) : null; return i != null ? regS[s][i] : null; };
   const tradable = only ? Object.keys(P).filter(s => only.includes(s)) : Object.keys(P);
   const times = [...new Set(Object.values(P).flatMap(Q => Q.t))].filter(t => t >= from).sort((a, b) => a - b);
   let balance = start;
@@ -375,7 +391,7 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
       else if (j - p.ei >= TIME_STOP) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
     }
     if (open.length < MAX_OPEN) {
-      const cands = [], bi = BTC ? BTC.idx.get(T) : null, mkt = bi != null ? btcReg[bi] : null;
+      const cands = [], mkt = BTC ? marketOf(s => regAt(s, T)) : null;
       for (const sym of tradable) {
         const Q = P[sym], i = Q.idx.get(T);
         if (i == null || !touchedAt(Q, i) || open.some(p => p.sym === sym)) continue;
