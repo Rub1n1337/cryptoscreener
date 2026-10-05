@@ -5,6 +5,7 @@ import * as M from "../_shared/math.js";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
+const SITE = "https://cryptoscreener-topaz.vercel.app";
 
 async function api(path: string) {
   let err: unknown;
@@ -17,6 +18,29 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
   let i = 0;
   await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) await fn(items[i++]); }));
 }
+
+// ---------- Telegram (optional: configured in public.tg_config, see README) ----------
+const fp = (p: number) => { const a = Math.abs(p); return "$" + (a >= 1000 ? p.toFixed(0) : a >= 100 ? p.toFixed(2) : a >= 1 ? p.toFixed(3) : p.toPrecision(4)); };
+const pct = (v: number, e: number) => { const x = (v / e - 1) * 100; return (x > 0 ? "+" : "−") + Math.abs(x).toFixed(2) + "%"; };
+const pair = (s: string) => s.replace(/USDT$/, "/USDT");
+async function notify(lines: string[]) {
+  if (!lines.length) return;
+  const { data: tg } = await db.from("tg_config").select("enabled, bot_token, chat_id").eq("id", 1).maybeSingle();
+  if (!tg?.enabled || !tg.bot_token || !tg.chat_id) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${tg.bot_token}/sendMessage`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: tg.chat_id, text: lines.join("\n\n") + `\n\n<a href="${SITE}">Sigma Radar</a> · бумажная торговля`, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+  } catch { /* notifications must never break trading */ }
+}
+const openedMsg = (p: any) =>
+  `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side} ${pair(p.sym)}</b> — общий бот открыл позицию\n` +
+  `вход ${fp(p.entry)} · тейк ${fp(p.tp)} (${pct(p.tp, p.entry)}) · стоп ${fp(p.sl)} (${pct(p.sl, p.entry)})\n` +
+  `сила сигнала ${p.snap?.score ?? "—"} · риск $${p.risk.toFixed(2)}`;
+const closedMsg = (t: any) =>
+  `${t.pnl > 0 ? "✅" : "❌"} <b>${pair(t.sym)} ${t.side}</b> закрыта: ${t.reason}\n` +
+  `${fp(t.entry)} → ${fp(t.exit)} · PnL ${t.pnl >= 0 ? "+" : "−"}$${Math.abs(t.pnl).toFixed(2)} (${t.r >= 0 ? "+" : "−"}${Math.abs(t.r).toFixed(2)}R) · комиссия $${t.fee.toFixed(2)}`;
 
 async function run() {
   const now = Date.now();
@@ -43,7 +67,8 @@ async function run() {
   const upserts = [...res.stillOpen, ...res.opened];
   if (upserts.length) { const { error } = await db.from("positions").upsert(upserts); if (error) throw error; }
   await db.from("bot_state").update({ balance: res.balance, checked_at: new Date(now).toISOString(), scanned: Object.keys(klines).length, last_error: null }).eq("id", 1);
-  return { scanned: Object.keys(klines).length, signals: rows.filter((r) => r.rev).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length };
+  await notify([...res.closed.map(closedMsg), ...res.opened.map(openedMsg)]);
+  return { scanned: Object.keys(klines).length, signals: rows.filter((r) => M.wants(r, S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length };
 }
 
 Deno.serve(async (req) => {
@@ -51,12 +76,21 @@ Deno.serve(async (req) => {
   if (!sec || req.headers.get("x-bot-token") !== sec.token) return new Response("forbidden", { status: 403 });
   const { data: locked } = await db.rpc("bot_try_lock", { seconds: 120 });
   if (!locked) return Response.json({ skipped: "another run in progress" });
+  const t0 = Date.now();
   try {
-    return Response.json(await run());
+    const out = await run();
+    await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, ...out, open: undefined });
+    return Response.json(out);
   } catch (e) {
-    await db.from("bot_state").update({ last_error: String((e as Error)?.message ?? e), checked_at: new Date().toISOString() }).eq("id", 1);
-    return Response.json({ error: String(e) }, { status: 500 });
+    const msg = String((e as Error)?.message ?? e);
+    await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);
+    // alert only on the first failure in a row, not every minute
+    const { data: prev } = await db.from("bot_runs").select("ok").order("ts", { ascending: false }).limit(1);
+    await db.from("bot_runs").insert({ ok: false, ms: Date.now() - t0, error: msg });
+    if (prev?.[0]?.ok !== false) await notify([`⚠️ <b>Общий бот: ошибка</b>\n${msg}`]);
+    return Response.json({ error: msg }, { status: 500 });
   } finally {
+    await db.from("bot_runs").delete().lt("ts", new Date(Date.now() - 3 * 864e5).toISOString());
     await db.from("bot_state").update({ lock_until: null }).eq("id", 1);
   }
 });

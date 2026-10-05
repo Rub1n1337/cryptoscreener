@@ -20,6 +20,14 @@
 
 Открытые вкладки сами перезагружаются, когда выходит новая версия сайта.
 
+Каждый прогон общего бота пишется в `bot_runs` (хранится 3 дня) — на сайте это панель «Работа сервера».
+
+### Telegram
+Общий бот присылает сообщения об открытии/закрытии сделок и о сбоях. Токен хранится только в закрытой таблице `tg_config` (без публичного доступа). Подключение — токен от @BotFather и chat_id из `getUpdates`, затем в SQL Editor:
+```sql
+update public.tg_config set enabled = true, bot_token = '<ТОКЕН>', chat_id = '<CHAT_ID>' where id = 1;
+```
+
 ## Запуск локально
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File serve.ps1

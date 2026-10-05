@@ -80,7 +80,20 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
 .kv{display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:13px;margin-bottom:12px}.kv span{color:var(--mute)}.kv b{font-weight:600;text-align:right}
 .aside h4{margin:12px 0 6px;font-size:13px;color:var(--acc);text-transform:uppercase;letter-spacing:.03em}
 @media(max-width:1100px){.grid,.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.cards{grid-template-columns:1fr}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}}
+@media(max-width:700px){
+  .wrap{padding:8px 10px 24px}h1{font-size:19px}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tab{white-space:nowrap;padding:8px 12px;font-size:14px;flex:0 0 auto}
+  .hm{display:none}
+  td,th{padding:6px 4px}
+  .ctrl label{flex:1 1 44%}.filters>*{min-width:44%}
+  .modal{padding:0}.mbox{border-radius:0;min-height:100%;border:0}
+  .cards{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:17px}}
+.intro{display:flex;gap:14px;align-items:flex-start;background:#121a2b;border:1px solid #23314d;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px}
+.intro ol{margin:4px 0 0;padding-left:18px}.intro b{color:var(--acc)}.intro button{margin-left:auto;flex:0 0 auto}
+.zoomhint{font-size:11px;color:var(--faint);margin-top:4px}
+.strip{display:flex;gap:1px;height:16px;margin:6px 0}.strip i{flex:1;border-radius:1px;background:#1f2937}.strip i.ok{background:#16a34a}.strip i.err{background:#dc2626}
 </style>
 </head>
 <body>
@@ -99,6 +112,17 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
 
   <!-- MARKET -->
   <section id="market">
+    <div class="intro hidden" id="intro">
+      <div><b>Как пользоваться — 3 шага</b>
+        <ol>
+          <li>В таблице монет (справа, на телефоне — ниже графика) ищите метки <span class="tag loc">▲ сигнал LONG</span> и <span class="tag upc">▼ сигнал SHORT</span> — это подтверждённые развороты от полосы канала.</li>
+          <li>Кликните по монете — откроются её график и «Разбор сигнала»: что выполнено и из чего сложилась сила.</li>
+          <li>Во вкладке «Журнал сделок» смотрите, как по этим сигналам торгует бот, а в «Бэктесте» — работают ли правила на истории.</li>
+        </ol>
+        <div class="mute" style="margin-top:4px">Торговля бумажная, деньги виртуальные. Наведите на любой заголовок — появится подсказка.</div>
+      </div>
+      <button id="introOk">Понятно</button>
+    </div>
     <div class="cards">
       <div class="card" title="Медиана %B по всем парам. 50% — рынок в середине своих каналов, ближе к 0% — у нижних полос, ближе к 100% — у верхних."><div class="t">Термометр рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s">медиана %B</div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
       <div class="card" title="Доля пар в нижних 10% канала или ниже него — кандидаты на отскок вверх."><div class="t">У нижней полосы</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
@@ -127,6 +151,7 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
         <div class="mute" style="font-size:12px;margin-bottom:6px" id="mhint"></div>
         <div class="stats" id="cstats"></div>
         <canvas id="cv" style="margin-top:8px"></canvas>
+        <div class="zoomhint">колёсико — масштаб · перетаскивание — прокрутка во времени · двойной клик — сброс</div>
         <div class="legend">
           <span><i style="border-color:#ef4444"></i>верхняя полоса</span>
           <span><i style="border-color:#64748b;border-top-style:dashed"></i>центр</span>
@@ -153,11 +178,11 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
             <th data-s="sym">Монета</th>
             <th data-s="price">Цена</th>
             <th data-s="pB" title="%B — позиция в канале: 0% — на нижней полосе, 50% — в центре, 100% — на верхней. На шкале: зелёная граница — низ, красная — верх, пунктир — центр">%B</th>
-            <th data-s="z" title="Отклонение от центра в σ модели. При k = 3 полосы — это ±3σ">Откл.</th>
+            <th data-s="z" class="hm" title="Отклонение от центра в σ модели. При k = 3 полосы — это ±3σ">Откл.</th>
             <th data-s="label" title="▲/▼ сигнал — подтверждённый разворот; «за каналом» — цена прямо сейчас за полосой; «касание» — была за полосой недавно, разворот не подтверждён; «сжатие» — затишье">Метка</th>
             <th data-s="score" title="Сила сигнала 0–100, считается только при касании полосы. Яркая — разворот подтверждён, серая — нет. Бот входит при силе ≥ порога">Сила</th>
-            <th data-s="vol" title="Объём относительно медианы за ~100 свечей. Незакрытая свеча пересчитана на полную длительность">Объём</th>
-            <th data-s="hl" title="T½ — за сколько обычно исчезает половина отклонения от центра. Коротко — монета хорошо «пружинит». ∞ — тренд, отскок рискован">T½</th>
+            <th data-s="vol" class="hm" title="Объём относительно медианы за ~100 свечей. Незакрытая свеча пересчитана на полную длительность">Объём</th>
+            <th data-s="hl" class="hm" title="T½ — за сколько обычно исчезает половина отклонения от центра. Коротко — монета хорошо «пружинит». ∞ — тренд, отскок рискован">T½</th>
           </tr></thead>
           <tbody id="tb"><tr><td colspan="9" class="mute">Сканирую рынок…</td></tr></tbody>
         </table></div>
@@ -172,6 +197,7 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
       <button class="tab jm" data-m="mine" title="Ваш личный бот: работает в этом браузере, пока вкладка открыта, на ваших настройках">👤 Мой бот</button>
     </div>
     <div class="sub" id="jdesc"></div>
+    <div class="panel" id="srv" style="margin-bottom:12px"></div>
     <div class="cards auto" id="jcards"></div>
     <div class="ctrl" id="jmine">
       <label><input type="checkbox" id="boton"> Бот торгует (бумажная торговля в браузере, пока вкладка открыта)</label>
@@ -180,15 +206,15 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
     </div>
     <div class="panel" style="margin-bottom:12px"><div class="ptitle">Открытые позиции <span>· клик — карточка позиции</span></div>
       <div class="tablewrap"><table><thead><tr>
-        <th>Открыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Сейчас</th><th title="Сумма позиции в долларах">Размер</th><th>Тейк</th><th>Стоп</th>
+        <th>Открыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Сейчас</th><th class="hm" title="Сумма позиции в долларах">Размер</th><th class="hm">Тейк</th><th class="hm">Стоп</th>
         <th title="Нереализованный PnL после комиссии на вход и выход">PnL сейчас</th><th title="Текущий результат в R: 1R — сумма, которую потеряем на стопе">R сейчас</th><th>Сила</th>
       </tr></thead><tbody id="jopen"></tbody></table></div>
     </div>
     <div class="panel"><div class="ptitle">Закрытые сделки <span>· клик по строке — карточка сделки, по заголовку — сортировка</span></div>
       <div class="tablewrap"><table><thead><tr id="jhead">
         <th data-s="tclose">Закрыта</th><th data-s="sym">Монета</th><th data-s="side">Сторона</th><th data-s="entry">Вход</th><th data-s="exit">Выход</th>
-        <th data-s="size" title="Сумма позиции в долларах">Размер</th><th data-s="reason">Причина выхода</th><th data-s="hold">Длит.</th>
-        <th data-s="gross" title="Результат по цене, без учёта комиссий">PnL до ком.</th><th data-s="fee" title="Комиссия биржи за вход и выход">Комиссия</th>
+        <th data-s="size" class="hm" title="Сумма позиции в долларах">Размер</th><th data-s="reason">Причина выхода</th><th data-s="hold" class="hm">Длит.</th>
+        <th data-s="gross" class="hm" title="Результат по цене, без учёта комиссий">PnL до ком.</th><th data-s="fee" class="hm" title="Комиссия биржи за вход и выход">Комиссия</th>
         <th data-s="pnl" title="Итог сделки после комиссий">PnL</th><th data-s="r" title="Итог в R: +1R — заработали столько, сколько рисковали; −1R — полный стоп">R</th>
       </tr></thead><tbody id="jclosed"></tbody></table></div>
     </div>
@@ -227,7 +253,7 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
       </div>
       <div class="panel" style="margin-top:12px"><div class="ptitle">Сделки бэктеста <span>· клик — карточка сделки</span></div>
         <div class="tablewrap"><table><thead><tr>
-          <th>Закрыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Выход</th><th>Размер</th><th>Причина выхода</th><th>Длит.</th><th>PnL до ком.</th><th>Комиссия</th><th>PnL</th><th>R</th><th>Сила</th>
+          <th>Закрыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Выход</th><th class="hm">Размер</th><th>Причина выхода</th><th class="hm">Длит.</th><th class="hm">PnL до ком.</th><th class="hm">Комиссия</th><th>PnL</th><th>R</th><th class="hm">Сила</th>
         </tr></thead><tbody id="btTrades"></tbody></table></div>
       </div>
       <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: пары берутся из сегодняшнего топа по объёму (монеты, которые выпали из топа, не попадают); исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Прошлое не гарантирует будущего.</div>
@@ -301,6 +327,17 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
       <li>Оба бота используют один и тот же файл с математикой, поэтому при одинаковых настройках считают одинаково.</li>
     </ul>
 
+    <h3>Уведомления в Telegram</h3>
+    <p>Общий бот может присылать сообщения об открытии и закрытии сделок (с ценой, тейком, стопом, PnL и R) и о сбоях сервера. Подключение занимает 3 минуты; токен бота — это секрет, поэтому он хранится только в закрытой таблице базы и никогда не попадает на сайт.</p>
+    <ol>
+      <li>В Telegram откройте <b>@BotFather</b> → команда <code>/newbot</code> → придумайте имя. BotFather пришлёт <b>токен</b> вида <code>123456:ABC…</code>.</li>
+      <li>Напишите своему новому боту любое сообщение (или добавьте его администратором в канал/группу и напишите там).</li>
+      <li>Откройте в браузере <code>https://api.telegram.org/bot&lt;ТОКЕН&gt;/getUpdates</code> и найдите <code>"chat":{"id":…}</code> — это <b>chat_id</b> (у каналов он начинается с <code>-100</code>).</li>
+      <li>В Supabase откройте <b>SQL Editor</b> проекта <code>cryptoscreener</code> и выполните:<br>
+        <code>update public.tg_config set enabled = true, bot_token = '&lt;ТОКЕН&gt;', chat_id = '&lt;CHAT_ID&gt;' where id = 1;</code></li>
+    </ol>
+    <p>Сообщения начнут приходить со следующей сделки. Выключить: <code>update public.tg_config set enabled = false where id = 1;</code></p>
+
     <h3>Правила сделок</h3>
     <ul>
       <li>Вход по рынку — только по сигналу с силой ≥ порога. Не более 3 позиций, повтор по той же монете — не раньше чем через 4 свечи.</li>
@@ -320,6 +357,7 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
     <div class="mhead"><h2 id="mtitle">—</h2><span class="mute" id="mmeta"></span><button id="mclose" title="Закрыть (Esc)">✕</button></div>
     <div class="mgrid">
       <div><canvas id="tcv"></canvas>
+        <div class="zoomhint">колёсико — масштаб · перетаскивание — прокрутка во времени · двойной клик — сброс</div>
         <div class="legend">
           <span>▮ свечи</span><span><i style="border-color:#ef4444"></i>верхняя полоса</span><span><i style="border-color:#64748b;border-top-style:dashed"></i>центр</span><span><i style="border-color:#22c55e"></i>нижняя полоса</span>
           <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>вход</span><span><i style="border-color:#22c55e;border-top-style:dashed"></i>тейк</span><span><i style="border-color:#ef4444;border-top-style:dashed"></i>стоп</span>
@@ -466,11 +504,11 @@ function renderTable() {
     return `<tr class="row${r.sym === chartSym ? ' sel' : ''}" data-sym="${r.sym}">
       <td><span class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}">${favs.has(r.sym) ? '★' : '☆'}</span></td>
       <td><b>${base(r.sym)}</b></td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
-      <td class="${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
+      <td class="hm ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
       <td>${r.label ? `<span class="tag ${r.cls}">${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
       <td>${sc}</td>
-      <td style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
-      <td class="${isFinite(r.hl) ? 'mute' : 'faint'}">${hl}</td></tr>`;
+      <td class="hm" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
+      <td class="hm ${isFinite(r.hl) ? 'mute' : 'faint'}">${hl}</td></tr>`;
   }).join('') || '<tr><td colspan="9" class="mute">Нет пар под фильтр</td></tr>';
 }
 
@@ -481,7 +519,7 @@ function renderChart(cv, d, o = {}) {
   if (!W || !d) return null;
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1), e = n - 1;
+  const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1), e = clamp(o.to ?? n - 1, s, n - 1);
   const padL = 8, padR = 96, pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
   const cnt = e - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
   const X = i => padL + (i - s + 0.5) * bw;
@@ -535,10 +573,11 @@ function renderChart(cv, d, o = {}) {
     g.beginPath(); g.arc(X(m.i), Y(m.price), 5, 0, 7); g.fillStyle = m.col; g.fill(); g.strokeStyle = '#0a0e15'; g.lineWidth = 2; g.stroke();
     if (m.label) { const w = g.measureText(m.label).width, lx = X(m.i) + 8 + w > W - padR ? X(m.i) - 8 - w : X(m.i) + 8; g.fillStyle = m.col; g.fillText(m.label, lx, Y(m.price) + (m.below ? 14 : -12)); }
   }
-  if (o.live) { g.setLineDash([3, 3]); g.strokeStyle = '#f5b70a88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(c[e])); g.lineTo(W - padR, Y(c[e])); g.stroke(); g.setLineDash([]); }
+  const cur = o.live ? c[n - 1] : c[e];
+  if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = '#f5b70a88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
   if (isFinite(B.up[e])) tags.push({y:Y(B.up[e]), text:fp(B.up[e]), col:'#ef4444'});
   if (isFinite(B.lo[e])) tags.push({y:Y(B.lo[e]), text:fp(B.lo[e]), col:'#22c55e'});
-  tags.push({y:Y(c[e]), text:fp(c[e]), col:'#f5b70a', box:true});
+  tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur), col:'#f5b70a', box:true});
   // spread tags so they never overlap: sort by y, push down, then shift the stack up if it ran past the bottom
   tags.sort((a, b) => a.y - b.y);
   for (let q = 0; q < tags.length; q++) tags[q].ty = Math.max(clamp(tags[q].y, 8, pH - 6), q ? tags[q-1].ty + 15 : 8);
@@ -591,11 +630,43 @@ function renderChart(cv, d, o = {}) {
   return {s, e, padL, bw};
 }
 const hoverIndex = (geo, cv, ev) => geo ? geo.s + Math.floor((ev.clientX - cv.getBoundingClientRect().left - geo.padL) / geo.bw) : null;
+
+// ---------- zoom & pan: view = {span, endOff} — bars visible, bars hidden on the right; null = default ----------
+function viewRange(n, minFrom, view, defSpan) {
+  const room = Math.max(20, n - minFrom);
+  const span = clamp(Math.round(view?.span ?? defSpan), Math.min(20, room), room);
+  const endOff = clamp(Math.round(view?.endOff ?? 0), 0, room - span);
+  const to = n - 1 - endOff;
+  return {from: to - span + 1, to, span, endOff};
+}
+// api.state() → {n, minFrom, defSpan, view, geo}; api.set(view) stores the view and redraws
+function attachZoom(cv, api) {
+  let drag = null;
+  const range = st => viewRange(st.n, st.minFrom, st.view, st.defSpan);
+  cv.addEventListener('wheel', e => {
+    const st = api.state(); if (!st?.geo) return;
+    e.preventDefault();
+    const r = range(st), span = Math.round(clamp(r.span * (e.deltaY > 0 ? 1.2 : 1 / 1.2), 20, st.n - st.minFrom));
+    const cur = clamp(hoverIndex(st.geo, cv, e), r.from, r.to), frac = (cur - r.from) / Math.max(1, r.span - 1);
+    const to = Math.round(cur - frac * (span - 1)) + span - 1;   // keep the bar under the cursor in place
+    api.set({span, endOff: st.n - 1 - to});
+  }, {passive:false});
+  const down = x => { const st = api.state(); if (!st?.geo) return; const r = range(st); drag = {x, endOff:r.endOff, span:r.span, bw:st.geo.bw}; };
+  const move = x => { if (!drag) return false; api.set({span:drag.span, endOff:drag.endOff + Math.round((x - drag.x) / drag.bw)}); return true; };
+  cv.addEventListener('mousedown', e => { down(e.clientX); cv.style.cursor = 'grabbing'; });
+  window.addEventListener('mousemove', e => { if (move(e.clientX)) e.preventDefault(); });
+  window.addEventListener('mouseup', () => { drag = null; cv.style.cursor = ''; });
+  cv.addEventListener('touchstart', e => { if (e.touches.length === 1) down(e.touches[0].clientX); }, {passive:true});
+  cv.addEventListener('touchmove', e => { if (e.touches.length === 1 && move(e.touches[0].clientX)) e.preventDefault(); }, {passive:false});
+  cv.addEventListener('touchend', () => { drag = null; });
+  cv.addEventListener('dblclick', () => api.set(null));
+}
 const barAt = (t, time) => { let i = 0; while (i + 1 < t.length && t[i + 1] <= time) i++; return i; };
 
 // ---------- market chart ----------
-let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, chartGeo = null;
+let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, chartGeo = null, chartView = null;
 async function loadChart(sym) {
+  if (sym && sym !== chartSym) chartView = null;
   chartSym = sym || chartSym; save('sr_chart', chartSym);
   const req = ++chartReq, want = chartSym;
   if (!chart) $('#ctitle').textContent = pair(want) + ' — загрузка…';
@@ -628,7 +699,8 @@ function drawChart() {
     levels.push({v:p.entry, col:'#a78bfa', tag:who === 'общий' ? 'общ.' : 'мой', i0},
                 {v:p.tp, col:'#22c55e', tag:'TP', i0}, {v:p.sl, col:'#ef4444', tag:'SL', i0});
   }
-  chartGeo = renderChart($('#cv'), chart, {from: chart.c.length - S.candles, levels, live:true, hoverI});
+  const r = viewRange(chart.c.length, S.N - 1, chartView, S.candles);
+  chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, live:true, hoverI});
 }
 
 // ---------- signal breakdown (shared by the market panel and the trade card) ----------
@@ -699,14 +771,15 @@ async function sb(path) {
 }
 async function fetchShared() {
   try {
-    const [st, open, closed] = await Promise.all([
+    const [st, open, closed, runs] = await Promise.all([
       sb('bot_state?id=eq.1&select=balance,start_balance,settings,checked_at,last_error,scanned'),
       sb('positions?select=*&order=time.desc'),
       sb('trades?select=*&order=tclose.desc&limit=1000'),
+      sb('bot_runs?select=ts,ok,ms,scanned,signals,opened,closed,error&order=ts.desc&limit=240').catch(() => []),
     ]);
     const s = st[0];
     SJ = {balance:s.balance, start:s.start_balance, settings:s.settings, error:s.last_error, scanned:s.scanned,
-          checked:s.checked_at ? Date.parse(s.checked_at) : 0, open, closed, on:true};
+          checked:s.checked_at ? Date.parse(s.checked_at) : 0, open, closed, runs, on:true};
   } catch (e) { if (SJ) SJ.fetchError = String(e.message || e); }
   renderGuard();
   if (!$('#journal').classList.contains('hidden')) renderJournal();
@@ -725,6 +798,28 @@ function renderGuard() {
     <span> проверено ${SJ.checked ? new Date(SJ.checked).toLocaleString('ru') : '—'} · позиций ${SJ.open.length} · PnL 24ч ${usd(s.pnl24)} · ${mineTxt}</span>`;
 }
 
+// server health of the shared bot: one cell per minute for the last 2 hours
+function renderServer() {
+  const el = $('#srv');
+  el.classList.toggle('hidden', jMode !== 'shared' || !SJ);
+  if (jMode !== 'shared' || !SJ) return;
+  const runs = SJ.runs || [], byMin = new Map(runs.map(r => [Math.floor(Date.parse(r.ts) / 6e4), r]));
+  const nowMin = Math.floor(Date.now() / 6e4), cells = [];
+  for (let m = nowMin - 119; m <= nowMin; m++) {
+    const r = byMin.get(m);
+    cells.push(`<i class="${r ? (r.ok ? 'ok' : 'err') : ''}" title="${new Date(m * 6e4).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'})} — ${r ? (r.ok ? `ок, ${r.ms} мс, пар ${r.scanned}, сигналов ${r.signals}` : 'ошибка: ' + r.error) : 'нет прогона'}"></i>`);
+  }
+  const win = runs.filter(r => Date.now() - Date.parse(r.ts) < 4 * 36e5);
+  const okN = win.filter(r => r.ok).length, expected = Math.min(240, Math.max(1, Math.round((Date.now() - (runs.length ? Date.parse(runs[runs.length - 1].ts) : Date.now())) / 6e4) + 1));
+  const avgMs = okN ? win.filter(r => r.ok).reduce((a, r) => a + r.ms, 0) / okN : null;
+  const lastErr = runs.find(r => !r.ok);
+  el.innerHTML = `<div class="ptitle">Работа сервера <span>· каждая клетка — одна минута за последние 2 часа: зелёная — прогон успешен, красная — ошибка, серая — прогона не было</span></div>
+    <div class="strip">${cells.join('')}</div>
+    <div class="mute" style="font-size:12px">Успешных прогонов за последние 4 часа: <b style="color:var(--text)">${okN} из ${expected}</b> (${(okN / expected * 100).toFixed(1)}%) ·
+      средняя длительность ${avgMs == null ? '—' : (avgMs / 1000).toFixed(1) + ' с'} ·
+      ${lastErr ? `последняя ошибка ${dt(Date.parse(lastErr.ts))}: <span class="neg">${lastErr.error}</span>` : 'ошибок нет'}</div>`;
+}
+
 // ---------- journal ----------
 function equitySvg(D) {
   const pts = [D.start]; [...D.closed].sort((a, b) => a.tclose - b.tclose).forEach(x => pts.push(pts[pts.length-1] + x.pnl));
@@ -740,6 +835,7 @@ const journalData = () => jMode === 'shared' ? SJ : J;
 function renderJournal() {
   document.querySelectorAll('.jm').forEach(b => b.classList.toggle('on', b.dataset.m === jMode));
   $('#jmine').classList.toggle('hidden', jMode !== 'mine');
+  renderServer();
   const D = journalData(), shared = jMode === 'shared';
   if (!D) { $('#jdesc').textContent = 'Загружаю журнал общего бота…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
@@ -762,14 +858,14 @@ function renderJournal() {
     const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry;
     const u = sg * (last - p.entry) * p.qty - (p.entry + last) * p.qty * M.FEE, risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
     return `<tr class="row" data-kind="open" data-id="${p.id}" title="Открыть карточку позиции"><td>${dt(p.time)} <span class="faint">${dur(now - p.time)}</span></td><td><b>${base(p.sym)}</b></td>
-      <td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(last)}</td><td>$${(p.qty * p.entry).toFixed(0)}</td><td>${fp(p.tp)}</td><td>${fp(p.sl)}</td>
+      <td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(last)}</td><td class="hm">$${(p.qty * p.entry).toFixed(0)}</td><td class="hm">${fp(p.tp)}</td><td class="hm">${fp(p.sl)}</td>
       <td class="${cl(u)}">${usd(u)}</td><td class="${cl(u)}">${rr(risk ? u / risk : null)}</td><td>${scoreOf(p)}</td></tr>`;
   }).join('') || '<tr><td colspan="11" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
   const list = D.closed.map(M.normTrade).sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * jDir; });
   document.querySelectorAll('#jhead th').forEach(th => th.classList.toggle('sorted', th.dataset.s === jSort));
   $('#jclosed').innerHTML = list.map(x => `<tr class="row" data-kind="closed" data-id="${x.id}" title="Открыть карточку сделки"><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td>
-    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td>$${x.size.toFixed(0)}</td>
-    <td>${reasonTag(x.reason)}</td><td class="mute">${dur(x.hold)}</td><td class="${cl(x.gross)}">${usd(x.gross)}</td><td class="neg">${usd(-x.fee)}</td>
+    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
+    <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
     <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td></tr>`).join('')
     || '<tr><td colspan="12" class="mute">Сделок пока нет. Пропуск сделок — норма: бот ждёт подтверждённых сигналов.</td></tr>';
 }
@@ -835,11 +931,18 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
     ];
     const marks = [{i:ei, price:x.entry, col:'#a78bfa', label:'вход', below:sg < 0}];
     if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? '#22c55e' : '#ef4444', label:`выход · ${x.reason}`, below:sg > 0});
-    tcard = {d, opts:{from:Math.max(set.N - 1, ei - 120), levels, marks, live:isOpen, hoverI:null}};
-    tcard.geo = renderChart(cv, d, tcard.opts);
+    const from0 = Math.max(set.N - 1, ei - 120);
+    tcard = {d, minFrom:set.N - 1, defSpan:d.c.length - from0, view:null, opts:{levels, marks, live:isOpen, hoverI:null}};
+    drawCard();
   } catch (e) {
     g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = '#ef4444'; g.fillText('Не удалось загрузить свечи: ' + e.message, 16, 24);
   }
+}
+function drawCard() {
+  if (!tcard) return;
+  const r = viewRange(tcard.d.c.length, tcard.minFrom, tcard.view, tcard.defSpan);
+  tcard.opts.from = r.from; tcard.opts.to = r.to;
+  tcard.geo = renderChart($('#tcv'), tcard.d, tcard.opts);
 }
 function closeModal() { $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null; }
 
@@ -945,9 +1048,9 @@ function renderBacktest() {
     + groupRow('1-я половина периода', h1) + groupRow('2-я половина периода', h2) + '</tbody>';
   const list = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
   $('#btTrades').innerHTML = list.map(x => `<tr class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td>
-    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td>$${x.size.toFixed(0)}</td>
-    <td>${reasonTag(x.reason)}</td><td class="mute">${dur(x.hold)}</td><td class="${cl(x.gross)}">${usd(x.gross)}</td><td class="neg">${usd(-x.fee)}</td>
-    <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td><td>${x.snap?.score ?? '—'}</td></tr>`).join('')
+    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
+    <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
+    <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td><td class="hm">${x.snap?.score ?? '—'}</td></tr>`).join('')
     || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
   drawEquity();
 }
@@ -975,6 +1078,14 @@ function drawEquity() {
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'0.9', date:'05.10.2026', title:'Удобство, мобильная версия, надёжность и Telegram', items:[
+    'Графики на «Рынке» и в карточке сделки: колёсико — масштаб вокруг курсора, перетаскивание мышью или пальцем — прокрутка во времени, двойной клик — сброс.',
+    'Мобильная версия: на узком экране второстепенные колонки скрываются, вкладки прокручиваются, карточка сделки на весь экран.',
+    'Подсказка «Как пользоваться — 3 шага» при первом визите.',
+    'Журнал работы общего бота: каждый прогон записывается (успех/ошибка, длительность, число пар и сигналов), история хранится 3 дня. В журнале общего бота — панель «Работа сервера»: полоса по минутам за 2 часа, доля успешных прогонов, последняя ошибка.',
+    'Уведомления в Telegram от общего бота: открытие и закрытие сделок (цена, тейк, стоп, PnL, R) и первый сбой подряд. Как подключить — в «Инструкции».',
+    'Серверный бот обновлён до текущей общей математики (код в репозитории и на сервере снова совпадает).',
+  ]},
   {v:'0.8', date:'05.10.2026', title:'Три стратегии в бэктесте', items:[
     'В бэктесте можно выбрать стратегию: «Отскок от полосы» (как у ботов), «Отскок по тренду» (только в сторону наклона центра канала) и «Пробой полосы» (в сторону свежего закрытия за полосой с объёмом, тейк = 2 стопа). Плюс опция «только LONG».',
     'Логика «какую сделку брать» вынесена в общую функцию: боты, бэктест и любые будущие стратегии используют один код.',
@@ -1051,7 +1162,7 @@ let scanTimer;
 const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); };
 $('#N').oninput = e => { S.N = +e.target.value; $('#Nv').textContent = S.N; computeChart(); };
 $('#k').oninput = e => { S.k = +e.target.value; $('#kv').textContent = S.k; computeChart(); };
-$('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').textContent = S.candles; drawChart(); };
+$('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').textContent = S.candles; chartView = null; drawChart(); };
 $('#N').onchange = () => { loadChart(); rescanSoon(); };
 $('#k').onchange = rescanSoon;
 $('#cn').onchange = () => { save('sr_settings', S); loadChart(); };
@@ -1097,9 +1208,11 @@ const cv = $('#cv');
 cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); drawChart(); };
 cv.onmouseleave = () => { hoverI = null; drawChart(); };
 const tcv = $('#tcv');
-tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
-tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
-window.onresize = () => { drawChart(); if (tcard) tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
+tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); drawCard(); };
+tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCard(); };
+window.onresize = () => { drawChart(); drawCard(); };
+attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:S.N - 1, defSpan:S.candles, view:chartView, geo:chartGeo}, set:v => { chartView = v; drawChart(); }});
+attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
 
 $('#btRun').onclick = runBacktest;
 $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); };
@@ -1113,6 +1226,8 @@ $('#btTrades').onclick = e => {
 window.addEventListener('resize', () => { if (btRes) drawEquity(); });
 $('#btDays').value = '30'; $('#btTop').value = '50'; btFill(S);
 renderChangelog();
+if (!load('sr_intro', false)) $('#intro').classList.remove('hidden');
+$('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };
 
 syncInputs(); renderGuard(); renderJournal(); loadChart(); scan(); fetchShared();
 setInterval(scan, SCAN_MS);
