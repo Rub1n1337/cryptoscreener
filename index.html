@@ -230,6 +230,70 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--s1)}
 .prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12.5px}
+/* summary cards double as filter shortcuts */
+.card[data-cf]{cursor:pointer;transition:border-color .15s}.card[data-cf]:hover{border-color:var(--hover)}.card[data-cf].on{border-color:var(--acc)}
+.sheetbar{display:none}
+/* ---------- phone: the market is a list first; a coin's chart opens full screen ---------- */
+@media(max-width:700px){
+  #market .phead{margin-bottom:8px}#market .phead p{display:none}
+  .intro{padding:12px 14px;gap:10px;font-size:13px}.intro .h{font-size:14px}.intro ol li:not(:first-child){display:none}.intro ol{padding-left:16px}.intro button{height:36px}
+  .cards>.card{flex:0 0 auto;min-width:112px;padding:9px 12px}.cards .card .s,.cards .meter{display:none}
+  .cards .card .t{font-size:10px}.cards .card .v{font-size:17px;margin:2px 0 0}
+  #market .grid{display:flex;flex-direction:column;gap:12px}
+  #market .tpanel{order:-1;padding:10px}
+  /* the search + quick filters stay under the header while scrolling the list */
+  .tpanel>.filters:first-child{position:sticky;top:59px;z-index:6;background:var(--s1);margin:-10px -10px 8px;padding:10px;border-radius:var(--r) var(--r) 0 0}
+  #cpanel{display:none}
+  body.sheet #cpanel{display:block;position:fixed;inset:0;z-index:60;overflow:auto;overscroll-behavior:contain;border:0;border-radius:0;background:var(--bg);padding:0 12px 24px}
+  body.sheet .sheetbar{display:flex;position:sticky;top:0;z-index:2;margin:0 -12px 10px;padding:8px 6px;background:var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .sheetbar button{background:transparent;border-color:transparent;color:var(--blue);font-weight:600;gap:2px;padding:0 8px;height:40px}
+  body.sheet #cv{height:52vh}
+  #cpanel .cact .search{display:none}#cpanel .cact .seg{flex:1}
+  #snd,#refresh{display:none}
+  .tpanel>.filters:first-child .seg{flex:1 1 auto;min-width:0}.tpanel>.filters:first-child .seg .tab{flex:1;padding:0 8px}
+}
+/* ---------- phone: trade tables become cards (coin, side and result first; details under them) ---------- */
+@media(max-width:700px){
+  .phead p{display:none}
+  .tablewrap:has(#jopen) thead,.tablewrap:has(#jclosed) thead,.tablewrap:has(#btTrades) thead{display:none}
+  .tablewrap:has(:is(#jopen,#jclosed,#btTrades)) :is(table,tbody){display:block;width:100%}.tablewrap:has(:is(#jopen,#jclosed,#btTrades)){overflow-x:hidden}
+  .sorthint{display:none}
+  #jopen tr.row,#jclosed tr.row,#btTrades tr.row{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--row-line)}
+  #jopen tr.row td,#jclosed tr.row td,#btTrades tr.row td{display:none;padding:0;border:0;text-align:left}
+  /* closed trades (journal and backtest): 1 date · 2 coin · 3 side · 4 entry · 5 exit · 7 reason · 11 PnL · 12 R */
+  :is(#jclosed,#btTrades) tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(7),:nth-child(11),:nth-child(12)){display:block}
+  :is(#jclosed,#btTrades) tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry exit reason"}
+  :is(#jclosed,#btTrades) td:nth-child(2){grid-area:coin}:is(#jclosed,#btTrades) td:nth-child(3){grid-area:side;font-size:12px;font-weight:600}
+  :is(#jclosed,#btTrades) td:nth-child(11){grid-area:pnl;text-align:right}:is(#jclosed,#btTrades) td:nth-child(12){grid-area:r;text-align:right;font-size:12.5px}
+  :is(#jclosed,#btTrades) td:nth-child(1){grid-area:date;font-size:12px;color:var(--mute)}:is(#jclosed,#btTrades) td:nth-child(7){grid-area:reason;justify-self:end}:is(#jopen,#jclosed,#btTrades) td{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  :is(#jclosed,#btTrades) td:nth-child(4){grid-area:entry}:is(#jclosed,#btTrades) td:nth-child(5){grid-area:exit}
+  :is(#jclosed,#btTrades) td:is(:nth-child(4),:nth-child(5)),#jopen td:is(:nth-child(4),:nth-child(5)){font-size:12px;color:var(--mute)}
+  :is(#jclosed,#btTrades) td:nth-child(4)::before,#jopen td:nth-child(4)::before{content:"вход "}
+  :is(#jclosed,#btTrades) td:nth-child(5)::before{content:"выход "}#jopen td:nth-child(5)::before{content:"сейчас "}
+  /* open positions: 1 opened · 2 coin · 3 side · 4 entry · 5 now · 9 PnL · 10 R */
+  #jopen tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10)){display:block}
+  #jopen tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry now ."}
+  #jopen td:nth-child(2){grid-area:coin}#jopen td:nth-child(3){grid-area:side;font-size:12px;font-weight:600}#jopen td:nth-child(9){grid-area:pnl;text-align:right;font-weight:650}
+  #jopen td:nth-child(10){grid-area:r;text-align:right;font-size:12.5px}#jopen td:nth-child(1){grid-area:date;font-size:12px;color:var(--mute)}
+  #jopen td:nth-child(4){grid-area:entry}#jopen td:nth-child(5){grid-area:now}
+  /* empty-state rows keep their single full-width cell */
+  :is(#jopen,#jclosed,#btTrades) tr:not(.row) td{display:block;padding:14px 12px;white-space:normal}
+  .statrow{gap:8px}.statrow .card{padding:11px 12px}.statrow .card .v{font-size:18px}
+  .prof .ptech{display:none}
+  /* forms (backtest, profile): an even two-column grid, every control full width */
+  #backtest .fields,#bform .row{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}
+  #backtest .fields>*,#bform .row>*{min-width:0}
+  #backtest .fields :is(select,input:not([type=checkbox])),#bform .row :is(select,input:not([type=checkbox])){width:100%!important}
+  #backtest .fields>label:first-child,#backtest .fields>span.faint,#btRun,#btCustomL,#bform .row>label:first-child,#pfListL{grid-column:1/-1}
+  #btRun{height:44px!important;order:9}
+  #btVerdict,.tpanel,#pimp{scroll-margin-top:70px}
+  #bform .pfbar{display:flex!important}
+  /* trade card: sticky header with the close button in the corner */
+  .mbox{padding:0 14px 20px}
+  .mhead{position:sticky;top:0;z-index:3;margin:0 -14px 12px;padding:12px 60px 10px 14px;background:var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);gap:2px 10px}
+  .mhead h2{font-size:17px;flex-basis:100%}.mhead .mute{font-size:12px}
+  #mclose{position:absolute;top:10px;right:10px;margin:0;width:40px;padding:0}
+}
 /* own confirm / prompt dialog */
 .cmdk.dlgwrap{align-items:center;padding:16px;z-index:90}
 .dlgbox{width:min(440px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:16px;box-shadow:var(--shadow);padding:20px}
@@ -239,10 +303,10 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight:650}button.danger:hover{filter:brightness(1.08);background:var(--up);border-color:var(--up)}
 @media(max-width:560px){.dlga button{flex:1}}
 /* profile form: sticky "unsaved changes" bar */
-.pfbar{position:sticky;bottom:12px;z-index:5;align-items:center!important}
+.pfbar{align-items:center!important}.pfbar.dirty{position:sticky;bottom:12px;z-index:5}
 .pfbar.dirty{background:var(--s2);border:1px solid var(--warn-line);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
 .pfbt{flex:1 1 200px;font-weight:600;font-size:13.5px}.pfbar:not(.dirty) .pfbt{display:none}
-@media(max-width:700px){.pfbar{bottom:80px}}
+@media(max-width:700px){.pfbar.dirty{bottom:80px}.pfbar button{flex:1}}
 @media(max-width:560px){.pfbar.dirty .pfbt{flex-basis:100%}.pfbar button{flex:1}}
 /* events popover under the bell */
 #ntf{position:relative}
@@ -427,6 +491,7 @@ details.dis>.dbody{padding:0 16px 16px}
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
@@ -480,14 +545,15 @@ details.dis>.dbody{padding:0 16px 16px}
     </div>
     <div class="cards">
       <div class="card" title="Где сейчас рынок в целом: 50% — монеты в середине своих обычных диапазонов, ближе к 0% — у нижних границ, ближе к 100% — у верхних."><div class="t">Настроение рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s"></div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
-      <div class="card" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх."><div class="t">Дешевле обычного</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
-      <div class="card" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз."><div class="t">Дороже обычного</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
-      <div class="card" title="Подтверждённые развороты: цена вышла за границу, вернулась, и это подтвердил объём."><div class="t">Сигналы</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
-      <div class="card" title="Монеты, которые сейчас вдвое спокойнее обычного. Часто это затишье перед сильным движением."><div class="t">Затишье</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">монет без движения</div></div>
+      <div class="card" data-cf="lo" role="button" tabindex="0" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх. Нажмите, чтобы показать их."><div class="t">Дешевле обычного</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
+      <div class="card" data-cf="hi" role="button" tabindex="0" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз. Нажмите, чтобы показать их."><div class="t">Дороже обычного</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
+      <div class="card" data-cf="sig" role="button" tabindex="0" title="Подтверждённые развороты: цена вышла за границу, вернулась, и это подтвердил объём. Нажмите, чтобы показать их."><div class="t">Сигналы</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
+      <div class="card" data-cf="sq" role="button" tabindex="0" title="Монеты, которые сейчас вдвое спокойнее обычного. Часто это затишье перед сильным движением. Нажмите, чтобы показать их."><div class="t">Затишье</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">монет без движения</div></div>
     </div>
 
     <div class="grid">
-      <div class="panel">
+      <div class="panel" id="cpanel">
+        <div class="sheetbar"><button id="sheetBack" aria-label="Назад к списку монет"><svg class="i"><use href="#i-back"/></svg>Монеты</button></div>
         <div class="chead">
           <div style="min-width:0"><div class="ctitle" id="ctitle">—</div><div class="stats" id="cstats"></div></div>
           <div class="cact">
@@ -621,7 +687,7 @@ details.dis>.dbody{padding:0 16px 16px}
         <th title="Нереализованный PnL после комиссии на вход и выход">PnL сейчас</th><th title="Текущий результат в R: 1R — сумма, которую потеряем на стопе">R сейчас</th><th>Сила</th>
       </tr></thead><tbody id="jopen"></tbody></table></div>
     </div>
-    <div class="panel"><div class="ptitle">Закрытые сделки <span>· клик по строке — карточка сделки, по заголовку — сортировка</span></div>
+    <div class="panel"><div class="ptitle">Закрытые сделки <span>· клик по строке — карточка сделки<span class="sorthint">, по заголовку — сортировка</span></span></div>
       <div class="tablewrap"><table><thead><tr id="jhead">
         <th data-s="tclose">Закрыта</th><th data-s="sym">Монета</th><th data-s="side">Сторона</th><th data-s="entry">Вход</th><th data-s="exit">Выход</th>
         <th data-s="size" class="hm" title="Сумма позиции в долларах">Размер</th><th data-s="reason">Причина выхода</th><th data-s="hold" class="hm">Длит.</th>
@@ -774,7 +840,7 @@ details.dis>.dbody{padding:0 16px 16px}
 <!-- TRADE CARD -->
 <div class="modal hidden" id="modal">
   <div class="mbox">
-    <div class="mhead"><h2 id="mtitle">—</h2><span class="mute" id="mmeta"></span><button id="mclose" title="Закрыть (Esc)">✕</button></div>
+    <div class="mhead"><h2 id="mtitle">—</h2><span class="mute" id="mmeta"></span><button id="mclose" title="Закрыть (Esc)" aria-label="Закрыть карточку">✕</button></div>
     <div class="mgrid">
       <div><canvas id="tcv"></canvas>
         <div class="zoomhint"><span class="hint-mouse">колёсико — масштаб · перетаскивание — прокрутка во времени · двойной клик — сброс</span><span class="hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span></div>
@@ -884,7 +950,7 @@ async function scan() {
       if (newSig.length) {
         if (sound) beep();
         const r0 = newSig[0];
-        notifyUser(`${r0.side === 'low' ? '▲ LONG' : '▼ SHORT'} ${pair(r0.sym)} — новый сигнал`, `сила ${r0.score}${newSig.length > 1 ? ` · ещё ${newSig.length - 1}` : ''} · клик — открыть график`, 'warn', () => { go('market'); loadChart(r0.sym); });
+        notifyUser(`${r0.side === 'low' ? '▲ LONG' : '▼ SHORT'} ${pair(r0.sym)} — новый сигнал`, `сила ${r0.score}${newSig.length > 1 ? ` · ещё ${newSig.length - 1}` : ''} · клик — открыть график`, 'warn', () => { openCoin(r0.sym); });
       }
       prevScanDone = true; scanErr = null;
       runBot();
@@ -948,6 +1014,7 @@ function renderTable() {
   if (!rows.length) { if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
   $('#cntSig').textContent = rows.filter(r => r.rev).length || ''; $('#cntSq').textContent = rows.filter(r => r.squeeze).length || ''; $('#cntFav').textContent = rows.filter(r => favs.has(r.sym)).length || '';
   const fz = $('#fz').value, fl = $('#fl').value, q = $('#fs').value.trim().toUpperCase();
+  document.querySelectorAll('.card[data-cf]').forEach(c => c.classList.toggle('on', c.dataset.cf === fz || c.dataset.cf === fl));
   const list = rows.filter(r => {
     if (q && !r.sym.includes(q)) return false;
     if (fz === 'lo' && r.pB >= 0.1) return false;
@@ -992,7 +1059,10 @@ function renderChart(cv, d, o = {}) {
   // the view may extend past the last candle (eView > n-1): that is empty space on the right
   const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1);
   const eView = Math.max(s + 1, o.to ?? n - 1), e = Math.min(eView, n - 1);
-  const padL = 8, padR = 96, pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
+  // the right gutter is as wide as the longest price tag, so tags are never cut and no space is wasted
+  g.font = '11px system-ui';
+  const tagW = Math.max(...[...(o.levels || []).map(L => `${L.tag || ''} ${fp(L.v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1])].map(x => g.measureText(x).width));
+  const padL = 8, padR = clamp(Math.ceil(tagW) + 18, 56, 130), pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
   const cnt = eView - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
   const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i <= e ? t[i] : t[e] + (i - e) * step;
   const X = i => padL + (i - s + 0.5) * bw;
@@ -1895,6 +1965,7 @@ async function runBacktest() {
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
     renderBacktest();
+    if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
     st.textContent = 'Ошибка: ' + (e.message || e);
   }
@@ -1985,6 +2056,15 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.3', date:'6 октября 2026', title:'Удобно на телефоне', items:[
+    'Рынок на телефоне начинается со списка монет — он виден сразу, без прокрутки через график. Поиск и фильтры остаются под рукой при прокрутке.',
+    'Нажмите на монету — график откроется на весь экран. Назад к списку — кнопкой «Монеты» или жестом «назад», и список останется на том же месте.',
+    'Карточки сводки сверху — это кнопки: «Сигналы», «Дешевле обычного», «Дороже обычного», «Затишье» сразу показывают эти монеты.',
+    'Сделки в журнале и бэктесте на телефоне — аккуратными карточками: монета, сторона и итог крупно, вход, выход и причина — под ними.',
+    'Карточка сделки: крестик закрытия всегда в углу, подписи цен на графике больше не обрезаются.',
+    'Формы бэктеста и профиля — ровной сеткой; после запуска бэктеста экран сам переходит к результату.',
+    'Звук сигнала на телефоне включается в колокольчике — в шапке стало свободнее.',
+  ]},
   {v:'2.2', date:'6 октября 2026', title:'Аудит: точнее и удобнее', items:[
     '«Подходящих сигналов пока нет» теперь ведёт на кнопку «Показать рынок глазами профиля»: рынок переключается на таймфрейм и канал профиля, и видно ровно те сигналы, которые взвешивает бот.',
     'Разбор сигнала больше не обещает «бот войдёт», если график настроен не так, как общий бот, — честно говорит, по каким настройкам торгуют боты.',
@@ -2162,7 +2242,7 @@ $('#tb').onclick = e => {
   if (e.target.closest('[data-retry]')) { $('#tb').innerHTML = ('<tr class="sk">' + '<td></td>'.repeat(9) + '</tr>').repeat(6); scan(); return; }
   const f = e.target.closest('[data-fav]');
   if (f) { const s = f.dataset.fav; favs.has(s) ? favs.delete(s) : favs.add(s); save('sr_favs', [...favs]); renderTable(); if (s === chartSym) computeChart(); return; }
-  const tr = e.target.closest('tr.row'); if (tr) loadChart(tr.dataset.sym);
+  const tr = e.target.closest('tr.row'); if (tr) openCoin(tr.dataset.sym);
 };
 ['#jopen', '#jclosed'].forEach(s => $(s).onclick = e => { const tr = e.target.closest('tr.row'); if (tr) openTrade(tr.dataset.kind, tr.dataset.id); });
 $('#mclose').onclick = closeModal;
@@ -2186,12 +2266,41 @@ function go(t, push = true) {
   if (t === 'backtest' && btRes) drawEquity();
   if (t === 'market') drawChart();
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
-  window.scrollTo({top:0});
+  window.scrollTo({top:0, behavior:'instant'});
 }
 function setHash() {
   const h = '#' + page + (page === 'market' && chartSym ? '/' + base(chartSym) : '');
   if (location.hash !== h) history.replaceState(null, '', h);
 }
+// ---------- phone: the list comes first, a coin's chart opens as a full-screen sheet over it ----------
+// The sheet pushes a history entry, so the system back gesture closes it instead of leaving the site.
+const isPhone = () => matchMedia('(max-width:700px)').matches;
+let sheetY = 0;
+function openSheet() {
+  if (document.body.classList.contains('sheet')) return;
+  sheetY = scrollY; document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden';
+  history.pushState({sheet:1}, ''); $('#cpanel').scrollTop = 0;
+  requestAnimationFrame(drawChart);   // the canvas had no size while hidden
+}
+function closeSheet() { document.body.classList.remove('sheet'); document.documentElement.style.overflow = ''; scrollTo({top:sheetY, behavior:'instant'}); }   // back to the same place in the list
+function openCoin(sym) {
+  if (page !== 'market') go('market');   // staying on the market keeps the list's scroll position
+  loadChart(sym);
+  if (isPhone()) openSheet();
+}
+$('#sheetBack').onclick = () => history.state?.sheet ? history.back() : closeSheet();
+window.addEventListener('popstate', () => { if (document.body.classList.contains('sheet')) closeSheet(); });
+matchMedia('(max-width:700px)').addEventListener('change', e => { if (!e.matches && document.body.classList.contains('sheet')) { closeSheet(); drawChart(); } });   // rotated to a wide screen
+// summary cards are shortcuts to the matching filter; a second tap clears it
+document.querySelectorAll('.card[data-cf]').forEach(c => {
+  c.onclick = () => {
+    const k = c.dataset.cf, on = c.classList.contains('on');
+    $('#fz').value = !on && (k === 'lo' || k === 'hi') ? k : '';
+    document.querySelector(`#flseg [data-fl="${!on && (k === 'sig' || k === 'sq') ? k : ''}"]`).click();
+    if (!on && isPhone()) $('.tpanel').scrollIntoView({block:'start', behavior:'smooth'});
+  };
+  c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); c.click(); } };
+});
 function readHash() {
   const [t, sym] = location.hash.replace(/^#/, '').split('/');
   if (sym) { const s = sym.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (s) chartSym = s.endsWith('USDT') ? s : s + 'USDT'; }
@@ -2288,11 +2397,12 @@ function renderEvents() {
     <div class="evl">${EV.length ? EV.map(e => `<button class="evi${evRead.has(e.id) ? '' : ' new'}" data-ev="${e.id}"><i class="${e.kind}"></i>
       <span class="evt"><b>${e.title}</b>${e.body ? `<span>${e.body}</span>` : ''}<span class="faint">${ago(Date.now() - e.t)} назад</span></span></button>`).join('')
       : '<div class="evempty">Пока тихо. Новые сигналы и сделки ботов появятся здесь.</div>'}</div>
-    <div class="evf"><span>${on ? 'Уведомления браузера включены — придут, даже когда вкладка свёрнута' : 'Получать уведомления, даже когда вкладка свёрнута'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>`;
+    <div class="evf"><span>${on ? 'Уведомления браузера включены — придут, даже когда вкладка свёрнута' : 'Получать уведомления, даже когда вкладка свёрнута'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>
+    <div class="evf"><span>Звук при новом сигнале</span><button data-ev="snd" aria-pressed="${sound}">${sound ? 'Выключить' : 'Включить'}</button></div>`;
 }
 const openLink = l => {
   if (!l) return;
-  if (l.startsWith('c:')) { go('market'); loadChart(l.slice(2)); }
+  if (l.startsWith('c:')) openCoin(l.slice(2));
   else { jMode = l.slice(2); save('sr_jmode', jMode); go('journal'); if (jMode === 'shared') fetchShared(); }
 };
 const evClose = () => { $('#evp').classList.remove('open'); $('#ntf').setAttribute('aria-expanded', 'false'); };
@@ -2307,6 +2417,7 @@ $('#evp').onclick = async e => {
   const id = e.target.closest('[data-ev]')?.dataset.ev; if (!id) return;
   if (id === 'all') EV.forEach(x => evRead.add(x.id));
   else if (id === 'ntf') await toggleNtf();
+  else if (id === 'snd') $('#snd').click();
   else { evRead.add(id); evClose(); openLink(EV.find(x => x.id === id)?.link); }
   // the read set only keeps ids that are still in the list, so it never grows without bound
   evRead = new Set([...evRead].filter(x => EV.some(ev => ev.id === x))); save('sr_evread', [...evRead]);
@@ -2495,7 +2606,7 @@ const CMD_SETTINGS = [
 let cmdItems = [], cmdIdx = 0, cmdBack = null;
 const recentGet = () => load('sr_recent', []);
 const recentAdd = id => save('sr_recent', [id, ...recentGet().filter(x => x !== id)].slice(0, 5));
-const cmdCoin = r => ({id:'c:' + r.sym, label:pair(r.sym), hint:`${fp(r.price)}${r.label ? ' · ' + r.label : ''}`, run:() => { go('market'); loadChart(r.sym); }});
+const cmdCoin = r => ({id:'c:' + r.sym, label:pair(r.sym), hint:`${fp(r.price)}${r.label ? ' · ' + r.label : ''}`, run:() => openCoin(r.sym)});
 function cmdBuild(raw) {
   const q = raw.trim().toLowerCase(), qs = q ? [...new Set([q, layoutFix(q)])] : [];
   const hit = (label, kw = []) => qs.some(x => label.toLowerCase().includes(x) || kw.some(k => k.startsWith(x) || (x.length >= 3 && k.includes(x))));
@@ -2524,7 +2635,7 @@ function cmdBuild(raw) {
   // nothing matched: maybe a coin outside the scanner's list — offer to open its chart
   const sym = qs.find(x => /^[a-z0-9]{2,12}$/.test(x));
   if (!groups.length && sym) { const s = sym.toUpperCase() + 'USDT';
-    groups.push(['Монеты', [{id:'c:' + s, label:`Открыть график ${pair(s)}`, hint:'монеты нет в списке сканера', run:() => { go('market'); loadChart(s); }}]]); }
+    groups.push(['Монеты', [{id:'c:' + s, label:`Открыть график ${pair(s)}`, hint:'монеты нет в списке сканера', run:() => openCoin(s)}]]); }
   return groups;
 }
 function cmdRender() {
