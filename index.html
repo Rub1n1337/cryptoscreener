@@ -227,6 +227,35 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--s1)}
 .prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12.5px}
+/* live freshness: pulsing dot + ticking "updated N s ago" */
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--lo);flex:0 0 auto;animation:livep 2.4s infinite}
+.live.stale{color:var(--acc-t)}.live.stale i{background:var(--acc);animation:none}.live.wait i{background:var(--faint);animation:none}
+@keyframes livep{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+@media (prefers-reduced-motion:reduce){.live i{animation:none}}
+/* why the bot is idle */
+.bh-why{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--accbg);border:1px solid var(--warn-line);font-size:13px;line-height:1.5}
+.bh-why b{color:var(--text)}.bh-why .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.bh-why button{height:34px;font-size:13px}
+/* shared profile banner */
+.pimp{display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap;padding:14px 16px;margin-bottom:12px;border-radius:var(--r);border:1px solid var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
+.pimp>div{flex:1 1 320px;min-width:0}.pimp p{margin:3px 0 0;font-size:13px;color:var(--mute)}
+/* quick jump (Ctrl+K) */
+.cmdk{position:fixed;inset:0;z-index:80;background:var(--backdrop);display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px}
+.cmdbox{width:min(620px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
+.cmdin{display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line)}
+.cmdin svg{color:var(--faint)}
+.cmdin input:not([type=checkbox]):not([type=range]){flex:1;min-width:0;height:54px;border:0;background:transparent;font-size:16px;padding:0;outline:none}
+.cmdl{overflow:auto;padding:6px}
+.cmdg{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:10px 10px 4px}
+.cmdi{display:flex;align-items:center;gap:10px;width:100%;height:auto;min-height:44px;padding:8px 10px;border:0;border-radius:10px;background:transparent;text-align:left;justify-content:flex-start;font-weight:500}
+.cmdi:hover{background:var(--s2);border:0}.cmdi.on{background:var(--s3)}
+.cmdi .ct{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cmdi .ch{font-size:12px;color:var(--mute);white-space:nowrap}
+.cmdempty{padding:22px 12px;text-align:center;color:var(--mute);font-size:13px}
+.cmdf{display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+.cmdbtn{gap:8px;color:var(--mute)}.cmdbtn kbd{margin-left:4px}
+@media(max-width:700px){.cmdk{padding:10px}.cmdbox{max-height:80vh}.cmdf{display:none}}
+.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 3px transparent}}
 /* my bot: status, profile picker, extra options */
 .bhero{display:flex;gap:14px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--s2)}
 .bhero.ok{border-color:var(--ok-line)}.bhero.warn{border-color:var(--warn-line)}
@@ -303,7 +332,7 @@ details.dis>.dbody{padding:0 16px 16px}
 @media(max-width:1180px){.form{grid-template-columns:1fr 1fr}.factions{grid-column:1/-1;flex-direction:row}}
 @media(max-width:1200px){.grid{grid-template-columns:1fr}}
 @media(max-width:1100px){.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:860px){.brand span.bt{display:none}.pill span.pt{display:none}}
+@media(max-width:860px){.brand span.bt{display:none}.pill .pt{display:none}}
 @media(max-width:700px){
   .topin{gap:10px;padding:0 10px;justify-content:space-between}
   .brand small{display:none}
@@ -332,7 +361,7 @@ details.dis>.dbody{padding:0 16px 16px}
   .guard{top:62px;right:10px}
 }
 @media(max-width:560px){.prof{flex-wrap:wrap}.prof .pa{width:100%}.prof.pick .pa{padding-left:30px}.prof .pa button{flex:1}.bh-a{width:100%}.bh-a button{flex:1}.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
-/* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}}
+/* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){.cmdbtn kbd{display:none}:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}}
 </style>
 </head>
 <body>
@@ -372,17 +401,23 @@ details.dis>.dbody{padding:0 16px 16px}
   <div class="tools">
     <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
     <button class="icon" id="ntf" title="Уведомления браузера о новых сигналах и сделках" aria-label="Уведомления браузера о новых сигналах и сделках"><svg class="i"><use href="#i-bell"/></svg></button>
+    <button class="pill cmdbtn" id="cmdbtn" title="Быстрый переход: монета, раздел или настройка" aria-label="Быстрый переход"><svg class="i"><use href="#i-search"/></svg><span class="pt">Поиск</span><kbd class="pt">Ctrl K</kbd></button>
     <button class="icon" id="thm" title="Светлая или тёмная тема" aria-label="Переключить тему"><svg class="i"><use href="#i-sun"/></svg></button>
     <button class="icon" id="snd" title="Звук при новом сигнале" aria-label="Звук при новом сигнале"><svg class="i"><use href="#i-mute"/></svg></button>
   </div>
 </div></header>
 <div id="guard" class="guard"><b>СТОРОЖ</b> загрузка…</div>
 <div id="toasts"></div>
+<div id="cmdk" class="cmdk hidden"><div class="cmdbox" role="dialog" aria-modal="true" aria-label="Быстрый переход">
+  <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><kbd>Esc</kbd></div>
+  <div id="cmdl" class="cmdl" role="listbox"></div>
+  <div class="cmdf"><span>↑↓ выбрать</span><span>Enter открыть</span><span>Esc закрыть</span></div>
+</div></div>
 <div class="wrap">
 
   <!-- MARKET -->
   <section id="market">
-    <div class="phead"><div><h2>Рынок</h2><p>Монеты, которые ушли слишком далеко от своей обычной цены и начали разворачиваться. Нажмите на монету — увидите график и разбор.</p></div></div>
+    <div class="phead"><div><h2>Рынок</h2><p>Монеты, которые ушли слишком далеко от своей обычной цены и начали разворачиваться. Нажмите на монету — увидите график и разбор.</p></div><div id="mlive"></div></div>
     <div class="intro hidden" id="intro">
       <div><div class="h">Добро пожаловать</div>
         <ol>
@@ -484,6 +519,7 @@ details.dis>.dbody{padding:0 16px 16px}
     <div id="srv"></div>
     <div class="panel" id="jmine" style="margin-bottom:12px">
       <!-- 1. what the bot is doing right now, in plain words, with one main action -->
+      <div class="pimp hidden" id="pimp"></div>
       <div class="bhero" id="bhero"></div>
       <!-- 2. which rules it trades by -->
       <div class="bsec">
@@ -491,7 +527,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <div class="seg mini" id="bmode"><button class="tab" data-m="single">Выбираю сам</button><button class="tab" data-m="auto">Автоматически по рынку</button></div></div>
         <p class="hint" id="bhint"></p>
         <div id="blist"></div>
-        <button id="bnew" style="margin-top:8px">+ Новый профиль</button>
+        <div class="row" style="margin-top:8px;gap:8px"><button id="bnew">+ Новый профиль</button><button id="bimport" title="Добавить профиль, которым с вами поделились">Добавить по ссылке</button></div>
       </div>
       <!-- 3. rarely needed -->
       <details class="dis bmore"><summary>Дополнительно <span class="mute">· где работает бот, граница боковика, сброс журнала</span></summary><div class="dbody">
@@ -803,6 +839,7 @@ async function scan() {
       renderCards(); renderTable(); renderJournal(); renderDetail();
       $('#symlist').innerHTML = rows.map(r => `<option value="${base(r.sym)}">`).join('');
       footBase = `${rows.length} пар${fails ? ` (${fails} не загрузились)` : ''} · биржа Binance · ТФ ${tf} · обновлено ${new Date().toLocaleTimeString('ru')}`;
+      $('#mlive').innerHTML = liveTag(lastScan, 3 * SCAN_MS); tickLive();
     }
   } catch (e) {
     footBase = 'ошибка загрузки данных: ' + e.message + ' — повторю через минуту';
@@ -810,6 +847,16 @@ async function scan() {
   scanning = false;
   tickFoot();
   if (scanQueued) scan();
+}
+// live freshness badge: a pulsing dot + "обновлено N с назад", ticking every second; amber when the data is stale
+const ago = ms => ms < 60e3 ? Math.max(0, Math.round(ms / 1000)) + ' с' : ms < 36e5 ? Math.round(ms / 6e4) + ' мин' : Math.round(ms / 36e5) + ' ч';
+const liveTag = (ts, staleMs, label = 'обновлено') => `<span class="live" data-ts="${ts || 0}" data-stale="${staleMs}" data-l="${label}"><i></i><span></span></span>`;
+function tickLive() {
+  document.querySelectorAll('.live[data-ts]').forEach(el => {
+    const ts = +el.dataset.ts, age = Date.now() - ts, st = !ts ? 'wait' : age > +el.dataset.stale ? 'stale' : '';
+    el.className = 'live ' + st;
+    el.lastChild.textContent = !ts ? 'ждём данные…' : `${el.dataset.l} ${ago(age)} назад${st ? ' · данные устарели' : ''}`;
+  });
 }
 function tickFoot() {
   if (scanning) return;
@@ -1129,6 +1176,7 @@ function renderDetail() {
 
 // ---------- my bot (browser): profiles ----------
 // A profile = which coins + which rules. "Auto" picks the flat or the impulse profile from the BTC/ETH/SOL regime.
+const cleanName = s => String(s || '').replace(/[<>&"'`]/g, '').trim().slice(0, 60) || 'Профиль';
 const PROFILE_DEF = {method:'log', N:210, k:3, tf:'15m', minScore:60, strategy:'revert', rr:0, risk:0.02, lev:1, minWidth:0, maxHL:0, longOnly:false, coinErMax:0, regimeOnly:'any'};
 const PRESETS = [
   {id:'p-flat1h', name:'Боковик · 1h (проверен за год)', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'1h', rr:2, risk:0.01, lev:3, regimeOnly:'flat'}},
@@ -1138,6 +1186,7 @@ const PRESETS = [
 let BP = load('sr_bot', null) || {profiles:PRESETS, mode:'single', active:'p-flat1h', flat:'p-flat1h', impulse:'p-imp', erMax:0.15};
 if (!BP.profiles.some(p => p.id === 'p-flat1h')) BP.profiles.unshift(PRESETS[0]);   // add the year-tested preset to older setups
 BP.where ||= 'browser';
+BP.profiles.forEach(p => { p.name = cleanName(p.name); });
 let UB = load('sr_ubot', null);   // {id, secret} of this browser's server bot
 let SB_MINE = null;               // the server bot's journal, when it runs on the server
 const saveBP = () => save('sr_bot', BP);
@@ -1242,6 +1291,60 @@ async function runBot() {
   } catch (e) { console.warn('my bot', e); }
   botBusy = false;
 }
+// ---------- sharing profiles: a link carries one profile; everything is re-validated on the way in ----------
+// (names end up in innerHTML, so they are stripped of markup wherever a profile enters: form, link, storage)
+const num = (v, a, b, d) => { v = +v; return isFinite(v) ? clamp(v, a, b) : d; };
+function cleanProfile(p) {
+  const s = p?.set || {}, D = PROFILE_DEF, c = p?.coins || {};
+  const pick = (v, ok, d) => ok.includes(v) ? v : d;
+  const set = {method:pick(s.method, ['log', 'classic', 'robust', 'ewma'], D.method), N:Math.round(num(s.N, 20, 300, D.N)), k:num(s.k, 1, 5, D.k),
+    tf:pick(s.tf, ['5m', '15m', '1h', '4h', '1d'], D.tf), minScore:Math.round(num(s.minScore, 0, 100, D.minScore)),
+    strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:num(s.rr, 0, 10, 0), risk:num(s.risk, 0.001, 0.05, D.risk),
+    lev:num(s.lev, 1, 10, 1), minWidth:num(s.minWidth, 0, 30, 0), maxHL:num(s.maxHL, 0, 500, 0), coinErMax:num(s.coinErMax, 0, 1, 0),
+    longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any')};
+  const list = Array.isArray(c.list) ? c.list.map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{2,20}USDT$/.test(x)).slice(0, 200) : [];
+  return {name:cleanName(p?.name), coins:c.mode === 'list' && list.length ? {mode:'list', list} : {mode:'top', top:[20, 50, 100, 150, 200].includes(+c.top) ? +c.top : 150}, set};
+}
+const b64u = s => btoa(String.fromCharCode(...new TextEncoder().encode(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0)));
+const shareLink = p => location.origin + location.pathname + '#p=' + b64u(JSON.stringify({app:'sigma-radar', v:1, p:cleanProfile(p)}));
+function parseShared(text) {
+  const t = String(text || '').trim(), m = t.match(/#p=([A-Za-z0-9_-]+)/) || t.match(/^([A-Za-z0-9_-]{20,})$/);
+  if (!m) return {error:'Это не ссылка на профиль Sigma Radar.'};
+  try {
+    const d = JSON.parse(unb64u(m[1]));
+    if (d?.app !== 'sigma-radar' || typeof d.p !== 'object') throw 0;
+    if ((d.v || 0) > 1) return {error:'Профиль сделан в более новой версии сайта — обновите страницу.'};
+    return {p:cleanProfile(d.p)};
+  } catch { return {error:'Ссылка повреждена — попросите прислать её ещё раз.'}; }
+}
+let pendingImport = null;
+function showImport(p) {
+  pendingImport = p;
+  $('#pimp').innerHTML = `<div><b>Вам прислали профиль «${p.name}»</b><p>${profPlain(p)}</p><p class="faint" style="font-size:11.5px">${profSummary(p)}</p></div>
+    <div class="bh-a"><button class="primary" data-imp="add">Добавить себе</button><button data-imp="no">Не надо</button></div>`;
+  $('#pimp').classList.remove('hidden');
+}
+$('#pimp').onclick = e => {
+  const a = e.target.closest('[data-imp]')?.dataset.imp; if (!a) return;
+  if (a === 'add' && pendingImport) {
+    const p = {...pendingImport, id:'p' + Date.now()};
+    if (BP.profiles.some(x => x.name === p.name)) p.name = cleanName(p.name + ' (копия)');
+    BP.profiles.push(p); saveBP(); renderBotPanel(); syncServerBot();
+    toast(`Профиль «${p.name}» добавлен`, 'нажмите на него в списке, чтобы бот торговал по нему', 'ok');
+  }
+  pendingImport = null; $('#pimp').classList.add('hidden');
+};
+async function shareProfile(p) {
+  const url = shareLink(p);
+  try { await navigator.clipboard.writeText(url); toast('Ссылка на профиль скопирована', 'отправьте её — у получателя профиль добавится в «Мой бот» одним нажатием', 'ok'); }
+  catch { prompt('Скопируйте ссылку на профиль:', url); }
+}
+function importByLink() {
+  const t = prompt('Вставьте ссылку на профиль'); if (!t) return;
+  const r = parseShared(t);
+  if (r.error) toast('Не получилось добавить профиль', r.error, 'warn'); else { showImport(r.p); $('#pimp').scrollIntoView({block:'nearest', behavior:'smooth'}); }
+}
 // ---------- my bot: panel ----------
 let editId = null;
 // plain-language description of a profile, for people who don't read "лог-канал 210/3"
@@ -1255,6 +1358,37 @@ const profPlain = p => { const s = profSet(p);
   const tfp = TF_PLAIN[s.tf] || s.tf;
   return `${idea}.${when} ${tfp[0].toUpperCase() + tfp.slice(1)}, ${p.coins.mode === 'list' ? 'монеты: ' + p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}, риск ${(s.risk * 100).toFixed(s.risk < 0.01 ? 1 : 0)}% на сделку.`; };
 const regPlain = r => r === 'flat' ? 'боковик' : r === 'up' ? 'импульс вверх' : r === 'down' ? 'импульс вниз' : '—';
+// why the bot isn't opening trades right now — in words, with the one action that changes it
+const allowsReg = (p, r) => { const x = profSet(p);
+  if (!r) return true;
+  if (x.regimeOnly === 'flat' && r !== 'flat') return false;
+  if (x.regimeOnly === 'impulse' && r === 'flat') return false;
+  return !(x.strategy === 'switch' && r === 'down'); };
+function idleReason(act, reg, srv) {
+  const D = srv ? SB_MINE : J;
+  if (!D?.checked) return '';
+  const open = D.open || [], closed = D.closed || [];
+  if (open.length >= M.MAX_OPEN) return `<div class="bh-why"><b>Все ${M.MAX_OPEN} места заняты.</b> Новую сделку бот откроет, когда закроется одна из текущих.</div>`;
+  if (reg && !allowsReg(act, reg)) {
+    const s = profSet(act), now = regPlain(reg);
+    const text = s.regimeOnly === 'flat' ? `профиль «${act.name}» торгует только в боковике, а сейчас ${now}`
+      : s.regimeOnly === 'impulse' ? `профиль «${act.name}» торгует только в импульсе, а сейчас боковик`
+      : `в падающем рынке профиль «${act.name}» в сделки не входит`;
+    const alt = BP.profiles.find(p => p.id !== act.id && allowsReg(p, reg));
+    let acts = '';
+    if (alt && BP.mode === 'auto') acts = `<button data-act="slot:${reg === 'flat' ? 'flat' : 'impulse'}:${alt.id}">Брать «${alt.name}» в ${reg === 'flat' ? 'боковике' : 'импульсе'}</button>`;
+    else if (alt) {
+      acts = `<button data-act="use:${alt.id}">Торговать по «${alt.name}»</button>`;
+      if (s.regimeOnly === 'flat') acts += `<button data-act="auto:${act.id}:${alt.id}">Авто: «${act.name}» в боковике, «${alt.name}» в импульсе</button>`;
+      if (s.regimeOnly === 'impulse') acts += `<button data-act="auto:${alt.id}:${act.id}">Авто: «${alt.name}» в боковике, «${act.name}» в импульсе</button>`;
+    }
+    return `<div class="bh-why"><b>Бот ждёт:</b> ${text}. Новых сделок не будет, пока рынок не сменится — так профиль и задуман.${acts ? `<div class="acts">${acts}</div>` : ''}</div>`;
+  }
+  const last = closed.reduce((m, x) => Math.max(m, x.tclose || 0), 0);
+  if (!open.length && (!last || Date.now() - last > 6 * 36e5))
+    return `<div class="bh-why"><b>Подходящих сигналов пока нет.</b> Профиль входит только по подтверждённым разворотам с силой от ${profSet(act).minScore} — такие бывают не каждый час. ${last ? `Последняя сделка закрылась ${ago(Date.now() - last)} назад.` : 'Сделок ещё не было.'}<div class="acts"><button data-act="market">Посмотреть сигналы на рынке</button></div></div>`;
+  return '';
+}
 function renderBotPanel() {
   $('#bER').value = String(BP.erMax);
   document.querySelectorAll('#bmode .tab').forEach(b => b.classList.toggle('on', b.dataset.m === BP.mode));
@@ -1267,16 +1401,19 @@ function renderBotPanel() {
   const checked = srv ? SB_MINE?.checked : J.checked;
   const title = !on ? 'Бот на паузе' : srv ? 'Бот торгует 24/7' : 'Бот торгует в этой вкладке';
   const sub = !on ? `Новых сделок не открывает. Профиль «${act.name}».`
-    : srv ? `На сервере, даже когда сайт закрыт · профиль «${act.name}»${checked ? ` · проверка рынка в ${hm(checked)}` : ' · первая проверка — в течение минуты'}`
+    : srv ? `На сервере, даже когда сайт закрыт · профиль «${act.name}»`
     : `Профиль «${act.name}». Если закрыть вкладку, бот остановится.`;
+  const live = on ? `<div style="margin-top:6px">${liveTag(checked, 3 * 60e3, 'проверка рынка')}</div>` : '';
+  const why = on ? idleReason(act, reg, srv) : '';
   const ers = botRegime ? M.MAJORS.map(s => `${base(s)} ${botRegime.by?.[s] ? botRegime.by[s].er.toFixed(2) : '—'}`).join(', ') : '';
   const market = reg ? `<div class="bh-m" title="ER за 7 дней: ${ers}. Боковик — когда у всех трёх меньше ${BP.erMax}">Рынок сейчас: <b>${regPlain(reg)}</b> — ${reg === 'flat' ? 'BTC, ETH и SOL ходят в коридоре' : 'крупные монеты в сильном движении'}.${BP.mode === 'auto' ? ` Поэтому бот взял профиль «${act.name}».` : ''}</div>` : '';
   const btns = !on ? `<button class="primary" data-act="on">Продолжить торговлю</button>`
     : srv ? `<button data-act="off">Поставить на паузу</button>`
     : `<button class="primary" data-act="server">Запустить на сервере 24/7</button><button data-act="off">Пауза</button>`;
   $('#bhero').className = 'bhero ' + (!on ? 'warn' : srv ? 'ok' : 'warn');
-  $('#bhero').innerHTML = `<div style="min-width:0;flex:1 1 360px"><div class="bh-t"><span class="sdot ${!on ? 'idle' : srv ? '' : 'idle'}"></span>${title}</div><div class="bh-s">${sub}</div>${market}
-    ${srv && SB_MINE?.error ? `<div class="bh-err">Ошибка на сервере: ${SB_MINE.error}</div>` : ''}</div><div class="bh-a">${btns}</div>`;
+  $('#bhero').innerHTML = `<div style="min-width:0;flex:1 1 360px"><div class="bh-t"><span class="sdot ${!on ? 'idle' : srv ? '' : 'idle'}"></span>${title}</div><div class="bh-s">${sub}</div>${live}${market}
+    ${srv && SB_MINE?.error ? `<div class="bh-err">Ошибка на сервере: ${SB_MINE.error}</div>` : ''}${why}</div><div class="bh-a">${btns}</div>`;
+  tickLive();
   // profile picker
   $('#bhint').textContent = BP.mode === 'auto'
     ? 'Бот сам смотрит на рынок и меняет профиль. Отметьте, какой профиль брать в боковике, а какой — в импульсе.'
@@ -1289,7 +1426,7 @@ function renderBotPanel() {
       ${auto ? '' : '<span class="radio"></span>'}
       <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-flat1h' && !/проверен/.test(p.name) ? ' <span class="tag lo" title="Бэктест за 12 месяцев, топ-50, 1h: в среднем +0.13R на сделку после комиссий">проверен за год</span>' : ''}
         <div class="pplain">${profPlain(p)}</div><div class="ptech">${profSummary(p)}</div>${roles}</div>
-      <div class="pa"><button data-pe="${p.id}">Изменить</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
+      <div class="pa"><button data-pe="${p.id}">Изменить</button><button data-ps="${p.id}" title="Скопировать ссылку на этот профиль, чтобы отправить другу">Поделиться</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
 }
 function openForm(p) {
   editId = p?.id || null; const s = {...PROFILE_DEF, ...(p?.set || {})};
@@ -1306,7 +1443,7 @@ function openForm(p) {
 function saveForm() {
   const listMode = $('#pfCoins').value === 'list', list = parseCoins($('#pfList').value);
   if (listMode && !list.length) { toast('Впишите монеты', 'например: BTC, ETH, SOL', 'warn'); return; }
-  const p = {id:editId || 'p' + Date.now(), name:$('#pfName').value.trim() || 'Профиль',
+  const p = {id:editId || 'p' + Date.now(), name:cleanName($('#pfName').value),
     coins:listMode ? {mode:'list', list} : {mode:'top', top:+$('#pfCoins').value},
     set:{method:$('#pfMethod').value, N:clamp(+$('#pfN').value || 210, 20, 300), k:clamp(+$('#pfK').value || 3, 1, 5), tf:$('#pfTf').value,
          minScore:clamp(+$('#pfMin').value || 0, 0, 100), strategy:$('#pfStrat').value, rr:+$('#pfRR').value || 0, risk:(+$('#pfRisk').value || 2) / 100,
@@ -1436,8 +1573,9 @@ function renderJournal() {
   if (!D) { $('#jdesc').textContent = 'Загружаю журнал общего бота…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
-    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. Последняя проверка рынка — ${SJ.checked ? hm(SJ.checked) : '—'}. <span class="faint">Входит при силе сигнала от ${set.minScore}, ${set.tf}.</span>`
+    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')} · <span class="faint">Входит при силе сигнала от ${set.minScore}, ${set.tf}.</span>`
     : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
+  tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
   const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
   const chg = D.balance / D.start - 1;
@@ -1726,6 +1864,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.0', date:'6 октября 2026', title:'Быстрый поиск и профили по ссылке', items:[
+    'Поиск по всему сайту — кнопка «Поиск» в верхней панели или Ctrl+K: монеты, разделы, профили и отдельные настройки вроде «плечо», «риск», «бэктест». Понимает и неправильную раскладку: «ыщд» найдёт SOL.',
+    'Профилем можно поделиться: кнопка «Поделиться» копирует ссылку. Кто её откроет, добавит профиль себе одним нажатием.',
+    'Если бот не открывает сделки, он объясняет почему — например, «профиль торгует только в боковике, а сейчас импульс» — и предлагает, что сделать.',
+    'Рядом с данными видно, насколько они свежие: «обновлено 12 с назад». Если данные устарели, отметка становится жёлтой.',
+  ]},
   {v:'1.9', date:'6 октября 2026', title:'«Мой бот» стал понятнее', items:[
     'Сверху — что бот делает прямо сейчас: торгует, на паузе или работает только в этой вкладке, по какому профилю и какой сейчас рынок. И одна главная кнопка.',
     'Профиль выбирается нажатием на карточку. У каждого профиля — простое описание, что он делает.',
@@ -1905,7 +2049,9 @@ function readHash() {
   return t || 'market';
 }
 document.querySelectorAll('.tab[data-t]').forEach(b => b.onclick = () => go(b.dataset.t));
-window.addEventListener('hashchange', () => { const prev = chartSym; const t = readHash(); go(t, false); if (chartSym !== prev) loadChart(chartSym); });
+window.addEventListener('hashchange', () => {
+  if (location.hash.startsWith('#p=')) { const r = parseShared(location.hash); history.replaceState(null, '', '#journal'); jMode = 'mine'; go('journal', false); if (r.p) showImport(r.p); else toast('Не получилось открыть профиль', r.error, 'warn'); return; }
+  const prev = chartSym; const t = readHash(); go(t, false); if (chartSym !== prev) loadChart(chartSym); });
 document.addEventListener('keydown', e => {
   if (e.key === '/' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName)) { e.preventDefault(); go('market'); $('#fs').focus(); }
 });
@@ -1936,7 +2082,18 @@ $('#guardPill').onclick = e => { e.stopPropagation(); $('#guard').classList.togg
 document.addEventListener('click', e => { if (!e.target.closest('#guard')) $('#guard').classList.remove('open'); });
 // main button of the status card: pause / resume / move to the server
 const setOn = v => { J.on = v; save('sr_journal', J); if (SB_MINE) SB_MINE.on = v; renderGuard(); renderBotPanel(); syncServerBot(); };
-$('#bhero').onclick = e => { const a = e.target.closest('[data-act]')?.dataset.act; if (a === 'on') setOn(true); if (a === 'off') setOn(false); if (a === 'server') setWhere('server'); };
+$('#bhero').onclick = e => {
+  const a = e.target.closest('[data-act]')?.dataset.act; if (!a) return;
+  const [k, x, y] = a.split(':');
+  if (k === 'on') setOn(true);
+  if (k === 'off') setOn(false);
+  if (k === 'server') setWhere('server');
+  if (k === 'market') { go('market'); document.querySelector('#flseg [data-fl=sig]')?.click(); }
+  if (k === 'use') { BP.mode = 'single'; pickProfile(x); }
+  if (k === 'slot') { BP[x] = y; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); toast(`В ${x === 'flat' ? 'боковике' : 'импульсе'} бот берёт «${profById(y).name}»`, '', 'ok'); }
+  if (k === 'auto') { Object.assign(BP, {mode:'auto', flat:x, impulse:y}); saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot();
+    toast('Бот сам выбирает профиль по рынку', `боковик — «${profById(x).name}», импульс — «${profById(y).name}»`, 'ok'); }
+};
 const pickProfile = id => { if (BP.active === id) return; BP.active = id; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot();
   toast(`Бот торгует по профилю «${profById(id).name}»`, BP.where === 'server' ? 'сервер подхватит его на следующей проверке — в течение минуты' : 'со следующей проверки рынка', 'ok'); };
 document.querySelectorAll('#bwhere .tab').forEach(b => b.onclick = () => setWhere(b.dataset.w));
@@ -1944,11 +2101,13 @@ document.querySelectorAll('#bwhere .tab').forEach(b => b.onclick = () => setWher
 document.querySelectorAll('#bmode .tab').forEach(b => b.onclick = () => { BP.mode = b.dataset.m; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); });
 $('#bER').onchange = e => { BP.erMax = +e.target.value; saveBP(); renderBotPanel(); syncServerBot(); runBot(); };
 $('#bnew').onclick = () => openForm(null);
+$('#bimport').onclick = importByLink;
 $('#pfCancel').onclick = () => $('#bform').classList.add('hidden');
 $('#pfSave').onclick = saveForm;
 $('#pfCoins').onchange = () => $('#pfListL').classList.toggle('hidden', $('#pfCoins').value !== 'list');
 $('#blist').onclick = e => {
-  const ed = e.target.closest('[data-pe]'), del = e.target.closest('[data-pd]'), role = e.target.closest('[data-role]');
+  const ed = e.target.closest('[data-pe]'), del = e.target.closest('[data-pd]'), role = e.target.closest('[data-role]'), sh = e.target.closest('[data-ps]');
+  if (sh) { shareProfile(profById(sh.dataset.ps)); return; }
   if (role) { BP[role.dataset.role] = role.dataset.id; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); return; }
   if (!ed && !del) { const c = e.target.closest('.prof.pick'); if (c) pickProfile(c.dataset.pick); return; }
   if (ed) openForm(profById(ed.dataset.pe));
@@ -1966,10 +2125,10 @@ $('#btSave').onclick = () => {
   const s = btSettings(), name = prompt('Название профиля', `${M.STRATEGIES[s.strategy]} · ${s.tf}${s.rr ? ' · 1:' + s.rr : ''}`);
   if (!name) return;
   const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly} = s;
-  BP.profiles.push({id:'p' + Date.now(), name, coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
+  BP.profiles.push({id:'p' + Date.now(), name:cleanName(name), coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
     set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly}});
   saveBP(); renderBotPanel(); syncServerBot();
-  toast(`Профиль «${name}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
+  toast(`Профиль «${cleanName(name)}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
 };
 $('#jreset').onclick = async () => {
   if (!confirm(BP.where === 'server' ? 'Сбросить журнал серверного бота и баланс?' : 'Сбросить журнал вашего бота и баланс?')) return;
@@ -2033,10 +2192,115 @@ if (BP.where === 'server') fetchServerBot();
 if (!load('sr_intro', false)) $('#intro').classList.remove('hidden');
 $('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };
 
+// ---------- quick jump (Ctrl+K): coins, pages, profiles and individual settings ----------
+// Keywords are in both languages; a query typed in the wrong keyboard layout ("ыщд" for "sol") is tried as well.
+const RU_KEYS = 'йцукенгшщзхъфывапролджэячсмитьбю', EN_KEYS = "qwertyuiop[]asdfghjkl;'zxcvbnm,.";
+const layoutFix = s => [...s].map(ch => { const i = RU_KEYS.indexOf(ch); return i >= 0 ? EN_KEYS[i] : ch; }).join('');
+const focusEl = sel => setTimeout(() => {
+  const el = $(sel); if (!el) return;
+  el.scrollIntoView({block:'center', behavior:'smooth'}); el.focus?.({preventScroll:true});
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+}, 150);
+const openMine = () => { jMode = 'mine'; save('sr_jmode', jMode); go('journal'); };
+const openMore = sel => { openMine(); $('.bmore').open = true; focusEl(sel); };
+const editActive = sel => { openMine(); openForm(activeProfile()); focusEl(sel); };
+const CMD_PAGES = [
+  {label:'Рынок', hint:'сканер и график', kw:['рынок', 'market', 'сканер', 'scanner'], run:() => go('market')},
+  {label:'Журнал общего бота', hint:'один бот для всех, 24/7', kw:['журнал', 'общий', 'shared', 'journal'], run:() => { jMode = 'shared'; save('sr_jmode', jMode); go('journal'); }},
+  {label:'Мой бот', hint:'профили и журнал', kw:['мой', 'бот', 'my', 'bot', 'личн'], run:openMine},
+  {label:'Бэктест', hint:'проверка на истории', kw:['бэктест', 'backtest', 'история', 'тест'], run:() => go('backtest')},
+  {label:'Как это работает', hint:'справка и словарь', kw:['справка', 'help', 'словарь', 'термин', 'помощь'], run:() => go('help')},
+  {label:'Что нового', hint:'обновления сайта', kw:['новое', 'обновлен', 'changelog', 'версия'], run:() => go('changes')},
+];
+const CMD_SETTINGS = [
+  {label:'Плечо', kw:['плечо', 'leverage', 'lev'], run:() => editActive('#pfLev')},
+  {label:'Риск на сделку', kw:['риск', 'risk', 'rm', 'мани'], run:() => editActive('#pfRisk')},
+  {label:'RR — тейк к стопу', kw:['rr', 'тейк', 'take', 'стоп', 'stop', 'соотношен'], run:() => editActive('#pfRR')},
+  {label:'Монеты профиля', kw:['монеты', 'список', 'пары', 'coins', 'pairs', 'топ'], run:() => editActive('#pfCoins')},
+  {label:'Таймфрейм профиля', kw:['таймфрейм', 'timeframe', 'tf', 'свеч', '15m', '1h', '4h'], run:() => editActive('#pfTf')},
+  {label:'Когда входить: боковик или импульс', kw:['боковик', 'флэт', 'flat', 'импульс', 'impulse', 'режим', 'тренд'], run:() => editActive('#pfReg')},
+  {label:'Граница боковика (ER)', kw:['er', 'граница', 'порог', 'боковик', 'флэт'], run:() => openMore('#bER')},
+  {label:'Где работает бот: сервер или браузер', kw:['сервер', 'server', 'браузер', 'browser', '24/7', 'вкладк'], run:() => openMore('#bwhere')},
+  {label:'Сбросить журнал моего бота', kw:['сброс', 'reset', 'заново', 'очистить'], run:() => openMore('#jreset')},
+  {label:'Новый профиль', kw:['новый', 'создать', 'new', 'профиль', 'profile'], run:() => { openMine(); openForm(null); focusEl('#pfName'); }},
+  {label:'Добавить профиль по ссылке', kw:['импорт', 'import', 'ссылк', 'добавить', 'поделить', 'share'], run:() => { openMine(); importByLink(); }},
+  {label:'Настройки канала: модель, N, k', kw:['модель', 'канал', 'боллинджер', 'bollinger', 'сигма', 'sigma', 'ширина'], run:() => { go('market'); $('#cset').click(); focusEl('#method'); }},
+  {label:'Бэктест за год', kw:['бэктест', 'backtest', 'история', 'год', '365'], run:() => { go('backtest'); $('#btDays').value = '365'; focusEl('#btRun'); }},
+  {label:'Уведомления браузера', kw:['уведомлен', 'notification', 'колокол', 'push'], run:() => focusEl('#ntf')},
+  {label:'Звук сигнала', kw:['звук', 'sound', 'beep'], run:() => $('#snd').click()},
+  {label:'Светлая или тёмная тема', kw:['тема', 'theme', 'светл', 'тёмн', 'темн', 'dark', 'light'], run:() => $('#thm').click()},
+];
+let cmdItems = [], cmdIdx = 0, cmdBack = null;
+const recentGet = () => load('sr_recent', []);
+const recentAdd = id => save('sr_recent', [id, ...recentGet().filter(x => x !== id)].slice(0, 5));
+const cmdCoin = r => ({id:'c:' + r.sym, label:pair(r.sym), hint:`${fp(r.price)}${r.label ? ' · ' + r.label : ''}`, run:() => { go('market'); loadChart(r.sym); }});
+function cmdBuild(raw) {
+  const q = raw.trim().toLowerCase(), qs = q ? [...new Set([q, layoutFix(q)])] : [];
+  const hit = (label, kw = []) => qs.some(x => label.toLowerCase().includes(x) || kw.some(k => k.startsWith(x) || (x.length >= 3 && k.includes(x))));
+  const pages = CMD_PAGES.map(p => ({...p, id:'g:' + p.label}));
+  const groups = [];
+  if (!q) {
+    const known = [...pages, ...rows.map(cmdCoin)];
+    const rec = recentGet().map(id => known.find(x => x.id === id)).filter(Boolean);
+    if (rec.length) groups.push(['Недавние', rec]);
+    const sig = rows.filter(r => r.rev).sort((a, b) => b.score - a.score).slice(0, 5).map(cmdCoin);
+    if (sig.length) groups.push(['Сигналы сейчас', sig]);
+    groups.push(['Разделы', pages]);
+    return groups;
+  }
+  const b = r => base(r.sym).toLowerCase();
+  const starts = rows.filter(r => qs.some(x => b(r).startsWith(x)));
+  const inside = rows.filter(r => !starts.includes(r) && qs.some(x => x.length >= 2 && b(r).includes(x)));
+  const coins = [...starts, ...inside].slice(0, 8).map(cmdCoin);
+  if (coins.length) groups.push(['Монеты', coins]);
+  const pg = pages.filter(p => hit(p.label, p.kw)); if (pg.length) groups.push(['Разделы', pg]);
+  const st = CMD_SETTINGS.filter(s => hit(s.label, s.kw)).map(s => ({...s, id:'s:' + s.label, hint:'настройка'}));
+  if (st.length) groups.push(['Настройки', st]);
+  const pr = BP.profiles.filter(p => hit(p.name, ['профиль', 'profile'])).map(p => ({id:'p:' + p.id, label:`Профиль «${p.name}»`,
+    hint:p.id === activeProfile().id ? 'сейчас выбран' : 'торговать по нему', run:() => { openMine(); BP.mode = 'single'; pickProfile(p.id); }}));
+  if (pr.length) groups.push(['Профили', pr]);
+  // nothing matched: maybe a coin outside the scanner's list — offer to open its chart
+  const sym = qs.find(x => /^[a-z0-9]{2,12}$/.test(x));
+  if (!groups.length && sym) { const s = sym.toUpperCase() + 'USDT';
+    groups.push(['Монеты', [{id:'c:' + s, label:`Открыть график ${pair(s)}`, hint:'монеты нет в списке сканера', run:() => { go('market'); loadChart(s); }}]]); }
+  return groups;
+}
+function cmdRender() {
+  const groups = cmdBuild($('#cmdq').value);
+  cmdItems = groups.flatMap(g => g[1]); cmdIdx = Math.min(cmdIdx, Math.max(0, cmdItems.length - 1));
+  let i = 0;
+  $('#cmdl').innerHTML = cmdItems.length
+    ? groups.map(([g, items]) => `<div class="cmdg">${g}</div>` + items.map(it => { const n = i++;
+        return `<button class="cmdi${n === cmdIdx ? ' on' : ''}" role="option" aria-selected="${n === cmdIdx}" data-i="${n}" tabindex="-1"><span class="ct">${it.label}</span><span class="ch">${it.hint || ''}</span></button>`; }).join('')).join('')
+    : `<div class="cmdempty">Ничего не нашлось. Попробуйте монету (btc, sol) или слово: «плечо», «риск», «бэктест», «профиль».</div>`;
+  $('#cmdl .cmdi.on')?.scrollIntoView({block:'nearest'});
+}
+function cmdOpen() { cmdBack = document.activeElement; $('#cmdk').classList.remove('hidden'); $('#cmdq').value = ''; cmdIdx = 0; cmdRender(); $('#cmdq').focus(); }
+function cmdClose() { $('#cmdk').classList.add('hidden'); cmdBack?.focus?.({preventScroll:true}); }
+function cmdRun(i) { const it = cmdItems[i]; if (!it) return; cmdClose(); if (/^[cg]:/.test(it.id)) recentAdd(it.id); it.run(); }
+$('#cmdbtn').onclick = cmdOpen;
+if (/Mac|iPhone|iPad/.test(navigator.platform)) $('#cmdbtn kbd').textContent = '⌘K';
+$('#cmdq').oninput = () => { cmdIdx = 0; cmdRender(); };
+$('#cmdq').onkeydown = e => {
+  if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && cmdItems.length) { e.preventDefault(); cmdIdx = (cmdIdx + (e.key === 'ArrowDown' ? 1 : -1) + cmdItems.length) % cmdItems.length; cmdRender(); }
+  if (e.key === 'Enter') { e.preventDefault(); cmdRun(cmdIdx); }
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cmdClose(); }
+};
+$('#cmdl').onclick = e => { const b = e.target.closest('.cmdi'); if (b) cmdRun(+b.dataset.i); };
+$('#cmdl').onmousemove = e => { const b = e.target.closest('.cmdi'); if (b && +b.dataset.i !== cmdIdx) { cmdIdx = +b.dataset.i; $('#cmdl .cmdi.on')?.classList.remove('on'); b.classList.add('on'); } };
+$('#cmdk').onclick = e => { if (e.target.id === 'cmdk') cmdClose(); };
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); $('#cmdk').classList.contains('hidden') ? cmdOpen() : cmdClose(); }
+});
+
+// a shared profile link (#p=…) opens "Мой бот" with an offer to add it
+let sharedIn = null;
+if (location.hash.startsWith('#p=')) { sharedIn = parseShared(location.hash); history.replaceState(null, '', '#journal'); jMode = 'mine'; }
 const startPage = readHash();
 syncInputs(); renderGuard(); go(startPage, false); setHash(); loadChart(); scan(); fetchShared();
+if (sharedIn?.p) showImport(sharedIn.p); else if (sharedIn?.error) toast('Не получилось открыть профиль', sharedIn.error, 'warn');
 setInterval(scan, SCAN_MS);
-setInterval(tickFoot, 1000);
+setInterval(() => { tickFoot(); tickLive(); }, 1000);
 setInterval(() => { if (!document.hidden) loadChart(); }, SCAN_MS); // keep the chart's last candle fresh
 setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
 
