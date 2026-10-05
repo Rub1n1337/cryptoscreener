@@ -152,8 +152,13 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
 
   <!-- JOURNAL -->
   <section id="journal" class="hidden">
+    <div class="tabs" style="margin-bottom:6px">
+      <button class="tab jm" data-m="shared" title="Один бот на сервере для всех посетителей. Работает круглосуточно, даже когда сайт никто не открывал">🌐 Общий бот 24/7</button>
+      <button class="tab jm" data-m="mine" title="Ваш личный бот: работает в этом браузере, пока вкладка открыта, на ваших настройках">👤 Мой бот</button>
+    </div>
+    <div class="sub" id="jdesc"></div>
     <div class="cards" id="jcards"></div>
-    <div class="ctrl">
+    <div class="ctrl" id="jmine">
       <label><input type="checkbox" id="boton"> Бот торгует (бумажная торговля в браузере, пока вкладка открыта)</label>
       <label title="Бот открывает сделку только при подтверждённом сигнале с оценкой не ниже этой">Мин. оценка <input type="range" id="minsc" min="40" max="90" step="1"><b id="minscv"></b></label>
       <button id="jreset">Сбросить журнал</button>
@@ -218,6 +223,13 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
     </ul>
     <p>Разложение по компонентам для выбранной монеты — в блоке «Разбор сигнала» под графиком.</p>
 
+    <h3>Два бота: общий и мой</h3>
+    <ul>
+      <li><b>🌐 Общий бот 24/7</b> работает на сервере (Supabase) каждую минуту, даже когда сайт никто не открывал. Журнал один на всех посетителей, а настройки фиксированы: лог-канал (210, 3), 15m, топ-150, оценка ≥ 60. Это честная статистика стратегии. Плашка «Сторож» вверху следит именно за ним: если он не отвечает дольше 5 минут, она станет красной.</li>
+      <li><b>👤 Мой бот</b> — песочница: торгует в вашем браузере, пока вкладка открыта, на ваших текущих настройках (модель, N, k, ТФ, порог оценки). Журнал хранится только у вас. Так можно сравнить свои настройки с общими.</li>
+      <li>Позиции обоих ботов видны на графике монеты (линии входа, TP и SL с подписью «общий» или «мой»).</li>
+    </ul>
+
     <h3>Правила бумажного бота</h3>
     <ul>
       <li>Вход — только при подтверждённом развороте и оценке ≥ порога (по умолчанию 60). Касание низа → LONG, верха → SHORT.</li>
@@ -254,6 +266,9 @@ const METHOD_HINT = {
 };
 let favs = new Set(load('sr_favs', []));
 let J = load('sr_journal', null) || {balance:10000, start:10000, open:[], closed:[], on:true};
+// shared 24/7 bot: lives in Supabase, written only by the server-side bot, read-only here
+const SB_URL = 'https://aumldylzccbmddavtrqe.supabase.co/rest/v1/', SB_KEY = 'sb_publishable_dJ7vC-wBDBUNT9W1VgwPEg_M0WpHxXB';
+let SJ = null, jMode = load('sr_jmode', 'shared');
 let sound = false;
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
@@ -526,10 +541,10 @@ function drawChart() {
   if (!chart) return;
   const {t, h, l, c, B, R} = chart, n = c.length, s = Math.max(0, n - S.candles);
   const padL = 8, padR = 78, pH = H * 0.74, rTop = pH + 20, rH = H - rTop - 8;
-  const pos = J.open.find(p => p.sym === chartSym);
+  const poss = botPositions().filter(x => x.p.sym === chartSym);
   let mn = Infinity, mx = -Infinity;
   for (let i = s; i < n; i++) for (const v of [c[i], B.up[i], B.lo[i]]) if (isFinite(v)) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
-  if (pos) for (const v of [pos.entry, pos.tp, pos.sl]) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
+  for (const {p: pos} of poss) for (const v of [pos.entry, pos.tp, pos.sl]) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
   const pad = (mx - mn) * 0.06; mn -= pad; mx += pad;
   const X = i => padL + (i - s) / Math.max(1, n - 1 - s) * (W - padL - padR);
   const Y = v => 10 + (mx - v) / (mx - mn) * (pH - 20);
@@ -553,8 +568,8 @@ function drawChart() {
   g.font = '12px system-ui'; g.textBaseline = 'middle';
   const hline = (v, col, txt) => { g.setLineDash([3, 3]); g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(v)); g.lineTo(W - padR, Y(v)); g.stroke(); g.setLineDash([]);
     if (txt) { g.fillStyle = col; g.fillText(txt, padL + 4, Y(v) - 8); } };
-  if (pos) {
-    hline(pos.entry, '#a78bfa', `вход ${pos.side} ${fp(pos.entry)}`);
+  for (const {p: pos, who} of poss) {
+    hline(pos.entry, '#a78bfa', `${who} бот: вход ${pos.side} ${fp(pos.entry)}`);
     hline(pos.tp, '#22c55e', `TP ${fp(pos.tp)}`);
     hline(pos.sl, '#ef4444', `SL ${fp(pos.sl)}`);
   }
@@ -629,8 +644,8 @@ function renderDetail() {
     const ck = (ok, txt) => `<span class="${ok ? 'pos' : 'faint'}">${ok ? '✓' : '✗'} ${txt}</span>`;
     html += `<div class="checks">${ck(r.checks.closed, 'свеча касания закрыта')}${ck(r.checks.candle, 'разворотная свеча')}${ck(r.checks.inside, 'цена внутри канала')}${ck(r.checks.volume, 'объём выше нормы')}</div>`;
   }
-  const pos = J.open.find(p => p.sym === chartSym);
-  if (pos) html += `<div style="margin-top:8px;color:#a78bfa">Открыта позиция бота: ${pos.side} от ${fp(pos.entry)}, TP ${fp(pos.tp)}, SL ${fp(pos.sl)}.</div>`;
+  for (const {p: pos, who} of botPositions().filter(x => x.p.sym === chartSym))
+    html += `<div style="margin-top:8px;color:#a78bfa">Открыта позиция (${who} бот): ${pos.side} от ${fp(pos.entry)}, TP ${fp(pos.tp)}, SL ${fp(pos.sl)}.</div>`;
   el.innerHTML = html;
 }
 
@@ -679,36 +694,82 @@ function closePos(p, exit, reason, now) {
   J.open = J.open.filter(x => x.id !== p.id);
   J.closed.unshift(Object.assign({}, p, {exit, pnl, tclose:now, note:reason + ' · ' + p.note}));
 }
-function renderGuard() {
-  const ok = J.open.every(p => isFinite(p.tp) && isFinite(p.sl));
-  const pnl24 = J.closed.filter(x => Date.now() - x.tclose < 864e5).reduce((a, x) => a + x.pnl, 0);
-  const el = $('#guard'); el.className = 'guard' + (!ok ? ' bad' : J.on ? '' : ' idle');
-  el.innerHTML = `<b>СТОРОЖ ${ok ? 'OK' : 'ТРЕВОГА'}</b> ${ok ? (J.on ? 'Бот работает (бумажно), все позиции с тейком и стопом.' : 'Бот на паузе: новые сделки не открываются, открытые сопровождаются.') : 'Есть позиция без защиты!'}
-    <span> проверено ${J.checked ? new Date(J.checked).toLocaleString('ru') : '—'} · позиций ${J.open.length} · PnL 24ч ${pnl24 >= 0 ? '+' : ''}${pnl24.toFixed(2)} USDT</span>`;
+// ---------- shared bot (read-only from Supabase) ----------
+async function sb(path) {
+  const r = await fetch(SB_URL + path, {headers:{apikey:SB_KEY}, cache:'no-store'});
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
 }
-function equitySvg() {
-  const pts = [J.start]; [...J.closed].reverse().forEach(x => pts.push(pts[pts.length-1] + x.pnl));
+async function fetchShared() {
+  try {
+    const [st, open, closed] = await Promise.all([
+      sb('bot_state?id=eq.1&select=balance,start_balance,settings,checked_at,last_error,scanned'),
+      sb('positions?select=*&order=time.desc'),
+      sb('trades?select=*&order=tclose.desc&limit=1000'),
+    ]);
+    const s = st[0];
+    SJ = {balance:s.balance, start:s.start_balance, settings:s.settings, error:s.last_error, scanned:s.scanned,
+          checked:s.checked_at ? Date.parse(s.checked_at) : 0, open, closed, on:true};
+  } catch (e) { SJ = SJ || null; if (SJ) SJ.fetchError = String(e.message || e); }
+  renderGuard();
+  if (!$('#journal').classList.contains('hidden')) renderJournal();
+  if (chart) drawChart();
+}
+const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})), ...J.open.map(p => ({p, who:'мой'}))];
+
+function stats(D) {
+  const cl = D.closed, win = cl.filter(x => x.pnl > 0).length, pnl = cl.reduce((a, x) => a + x.pnl, 0);
+  const gw = cl.filter(x => x.pnl > 0).reduce((a, x) => a + x.pnl, 0), gl = -cl.filter(x => x.pnl <= 0).reduce((a, x) => a + x.pnl, 0);
+  return {n:cl.length, win, pnl, pf:gl ? gw / gl : null, wr:cl.length ? win / cl.length * 100 : null,
+          pnl24:cl.filter(x => Date.now() - x.tclose < 864e5).reduce((a, x) => a + x.pnl, 0)};
+}
+function renderGuard() {
+  const el = $('#guard'), mine = stats(J);
+  const mineTxt = `мой бот: ${J.on ? 'вкл' : 'пауза'}, позиций ${J.open.length}, PnL 24ч ${mine.pnl24 >= 0 ? '+' : ''}${mine.pnl24.toFixed(2)}`;
+  if (!SJ) { el.className = 'guard idle'; el.innerHTML = `<b>СТОРОЖ</b> Загружаю состояние общего бота… <span>${mineTxt}</span>`; return; }
+  const age = Date.now() - SJ.checked, s = stats(SJ);
+  const ok = SJ.open.every(p => isFinite(p.tp) && isFinite(p.sl)) && J.open.every(p => isFinite(p.tp) && isFinite(p.sl));
+  const stale = age > 5 * 60000;
+  el.className = 'guard' + (!ok || stale ? ' bad' : SJ.error ? ' idle' : '');
+  const msg = !ok ? 'Есть позиция без защиты!' : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${SJ.error}` : 'Общий бот работает 24/7, все позиции с тейком и стопом.';
+  el.innerHTML = `<b>СТОРОЖ ${ok && !stale ? 'OK' : 'ТРЕВОГА'}</b> ${msg}
+    <span> проверено ${SJ.checked ? new Date(SJ.checked).toLocaleString('ru') : '—'} · позиций ${SJ.open.length} · PnL 24ч ${s.pnl24 >= 0 ? '+' : ''}${s.pnl24.toFixed(2)} USDT · ${mineTxt}</span>`;
+}
+function equitySvg(D) {
+  const pts = [D.start]; [...D.closed].reverse().forEach(x => pts.push(pts[pts.length-1] + x.pnl));
   if (pts.length < 2) return '';
   const mn = Math.min(...pts), mx = Math.max(...pts), W = 160, H = 28;
   const d = pts.map((v, i) => `${(i / (pts.length - 1) * W).toFixed(1)},${(H - (mx === mn ? H/2 : (v - mn) / (mx - mn) * H)).toFixed(1)}`).join(' ');
-  return `<svg width="${W}" height="${H}" style="display:block;margin-top:4px"><polyline points="${d}" fill="none" stroke="${pts[pts.length-1] >= J.start ? '#22c55e' : '#ef4444'}" stroke-width="1.5"/></svg>`;
+  return `<svg width="${W}" height="${H}" style="display:block;margin-top:4px"><polyline points="${d}" fill="none" stroke="${pts[pts.length-1] >= D.start ? '#22c55e' : '#ef4444'}" stroke-width="1.5"/></svg>`;
 }
 let jSort = 'tclose', jDir = -1;
 function renderJournal() {
-  const cl = J.closed, win = cl.filter(x => x.pnl > 0).length, pnl = cl.reduce((a, x) => a + x.pnl, 0);
-  const gw = cl.filter(x => x.pnl > 0).reduce((a, x) => a + x.pnl, 0), gl = -cl.filter(x => x.pnl <= 0).reduce((a, x) => a + x.pnl, 0);
+  document.querySelectorAll('.jm').forEach(b => b.classList.toggle('on', b.dataset.m === jMode));
+  $('#jmine').classList.toggle('hidden', jMode !== 'mine');
+  const shared = jMode === 'shared';
+  if (shared && !SJ) { $('#jdesc').textContent = 'Загружаю журнал общего бота…'; $('#jcards').innerHTML = ''; $('#jopen').innerHTML = ''; $('#jclosed').innerHTML = ''; return; }
+  const D = shared ? SJ : J, st = stats(D);
+  const methodName = m => ({log:'лог-канал', classic:'классика', robust:'робастная', ewma:'EWMA'})[m] || m;
+  if (shared) {
+    const s = SJ.settings;
+    $('#jdesc').innerHTML = `Один бот на сервере для всех посетителей, работает круглосуточно — даже когда сайт никто не открывал. Настройки фиксированы: ${methodName(s.method)} (${s.N}, ${s.k}), ${s.tf}, топ-${s.top} пар, мин. оценка ${s.minScore}. Последний прогон: ${SJ.checked ? dt(SJ.checked) : '—'}, пар просканировано ${SJ.scanned ?? '—'}.`;
+  } else {
+    $('#jdesc').innerHTML = `Ваш личный бот: торгует в этом браузере, пока вкладка открыта, на ваших текущих настройках (${methodName(S.method)} (${S.N}, ${S.k}), ${S.tf}, мин. оценка ${S.minScore}). Журнал виден только вам.`;
+  }
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
-  $('#jcards').innerHTML = card('Всего сделок', cl.length, `открыто ${J.open.length} из 3`)
-    + card('WIN / LOSE', `<span class="pos">${win}</span> / <span class="neg">${cl.length - win}</span>`, 'прибыльные / убыточные')
-    + card('Winrate', cl.length ? (win / cl.length * 100).toFixed(1) + '%' : '—', `profit factor ${gl ? (gw / gl).toFixed(2) : '—'}`, '', 'Доля прибыльных сделок. Profit factor = сумма прибылей / сумма убытков; больше 1 — система в плюсе')
-    + card('PnL', (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' $', 'за всю историю' + equitySvg(), pnl >= 0 ? 'pos' : 'neg')
-    + card('Баланс', J.balance.toFixed(2) + ' $', `старт ${J.start} $ (виртуальные)`);
-  $('#jopen').innerHTML = J.open.map(p => {
+  let cmp = '';
+  if (!shared && SJ) { const o = stats(SJ); cmp = ` · общий: ${o.wr == null ? '—' : o.wr.toFixed(1) + '%'}`; }
+  $('#jcards').innerHTML = card('Всего сделок', st.n, `открыто ${D.open.length} из 3`)
+    + card('WIN / LOSE', `<span class="pos">${st.win}</span> / <span class="neg">${st.n - st.win}</span>`, 'прибыльные / убыточные')
+    + card('Winrate', st.wr == null ? '—' : st.wr.toFixed(1) + '%', `profit factor ${st.pf == null ? '—' : st.pf.toFixed(2)}${cmp}`, '', 'Доля прибыльных сделок. Profit factor = сумма прибылей / сумма убытков; больше 1 — система в плюсе')
+    + card('PnL', (st.pnl >= 0 ? '+' : '') + st.pnl.toFixed(2) + ' $', 'за всю историю' + equitySvg(D), st.pnl >= 0 ? 'pos' : 'neg')
+    + card('Баланс', D.balance.toFixed(2) + ' $', `старт ${D.start} $ (виртуальные)`);
+  $('#jopen').innerHTML = D.open.map(p => {
     const u = (p.side === 'LONG' ? p.last - p.entry : p.entry - p.last) * p.qty;
     return `<tr class="row" data-sym="${p.sym}"><td>${dt(p.time)}</td><td><b>${base(p.sym)}</b></td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(p.last)}</td>
       <td>${(p.qty * p.entry).toFixed(0)} $</td><td>${fp(p.tp)}</td><td>${fp(p.sl)}</td><td class="${u >= 0 ? 'pos' : 'neg'}">${u >= 0 ? '+' : ''}${u.toFixed(2)} $</td><td class="mute">${p.note}</td></tr>`;
   }).join('') || '<tr><td colspan="10" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
-  const list = [...cl].sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * jDir; });
+  const list = [...D.closed].sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * jDir; });
   $('#jclosed').innerHTML = list.map(x => `<tr><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td><td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td>
     <td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td>${(x.qty * x.entry).toFixed(0)} $</td><td>${fp(x.tp)}</td><td>${fp(x.sl)}</td>
     <td class="${x.pnl >= 0 ? 'pos' : 'neg'}">${x.pnl >= 0 ? '+' : ''}${x.pnl.toFixed(2)} $ (${((x.pnl / (x.qty * x.entry)) * 100).toFixed(2)}%)</td><td class="mute">${x.note}</td></tr>`).join('')
@@ -761,10 +822,11 @@ $('#tb').onclick = e => {
 $('#jopen').onclick = e => { const tr = e.target.closest('tr.row'); if (tr) { document.querySelector('.tab[data-t=market]').click(); loadChart(tr.dataset.sym); } };
 document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; sortDir = sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1); sortKey = k; renderTable(); });
 document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : -1; jSort = k; renderJournal(); });
-document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
+document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); });
+document.querySelectorAll('.tab[data-t]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tab[data-t]').forEach(x => x.classList.toggle('on', x === b));
   ['market', 'journal', 'help'].forEach(id => $('#' + id).classList.toggle('hidden', id !== b.dataset.t));
-  if (b.dataset.t === 'market') drawChart(); if (b.dataset.t === 'journal') renderJournal();
+  if (b.dataset.t === 'market') drawChart(); if (b.dataset.t === 'journal') { renderJournal(); fetchShared(); }
 });
 $('#snd').onclick = () => { sound = !sound; $('#snd').textContent = sound ? '🔔 Звук вкл' : '🔇 Звук выкл'; if (sound) beep(); };
 $('#boton').onchange = e => { J.on = e.target.checked; save('sr_journal', J); renderGuard(); };
@@ -776,7 +838,8 @@ cv.onmousemove = e => { if (!chart?._X) return; const {s, n, padL, padR, W} = ch
 cv.onmouseleave = () => { hoverI = null; drawChart(); };
 window.onresize = drawChart;
 
-syncInputs(); renderGuard(); renderJournal(); loadChart(); scan();
+syncInputs(); renderGuard(); renderJournal(); loadChart(); scan(); fetchShared();
+setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
 setInterval(scan, SCAN_MS);
 setInterval(tickFoot, 1000);
 setInterval(() => { if (!document.hidden) loadChart(); }, SCAN_MS); // keep the chart's last candle fresh

@@ -14,6 +14,12 @@
 
 Подробности формул — во вкладке «Инструкция» на странице.
 
+## Боты
+- **Общий бот 24/7** — Supabase Edge Function `supabase/functions/bot`, запускается каждую минуту через `pg_cron` (`supabase/cron.sql`). Пишет в таблицы `bot_state`, `positions`, `trades`; сайт читает их публичным ключом (только чтение, RLS).
+- **Мой бот** — та же логика в браузере, журнал в localStorage.
+
+Открытые вкладки сами перезагружаются, когда выходит новая версия сайта.
+
 ## Запуск локально
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File serve.ps1
