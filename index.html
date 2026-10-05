@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Sigma Radar</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b0f17'/><path d='M4 10 Q16 4 28 10' stroke='%23ef4444' stroke-width='2.5' fill='none'/><path d='M4 22 Q16 28 28 22' stroke='%2322c55e' stroke-width='2.5' fill='none'/><path d='M4 18 L10 14 L15 17 L21 11 L28 15' stroke='%23f5b70a' stroke-width='2.5' fill='none'/></svg>">
+<script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -16,6 +17,33 @@
   --panel:var(--s1);--panel2:var(--s2);
   --r:12px;--r-s:8px;--h:34px;
   --shadow:0 10px 30px rgba(0,0,0,.35);
+  --topbg:rgba(10,13,20,.82);--navbg:rgba(10,13,20,.96);--backdrop:rgba(3,6,12,.7);--ring:rgba(255,255,255,.05);
+  --hover:#3a4458;--row-line:#171d29;--sel:#182033;--gauge:#2a3650;--canvas:#0b0f17;
+  --intro:linear-gradient(135deg,#151c2c,#121722);--intro-line:#26314a;
+  --tag-t:#cbd5e1;--up-t:#ff9aa3;--lo-t:#86efac;--acc-t:#fcd34d;
+  --bad-line:#6b2027;--bad-bg:#2a1216;--ok-line:#1d5b35;--warn-line:#5c4a12;
+  /* chart colours (read by the canvas code through pal()) */
+  --c-up:#ef4444;--c-lo:#22c55e;--c-mid:#64748b;--c-trade:#a78bfa;--c-price:#e5e7eb;--c-acc:#f5b70a;
+  --c-axis:#566173;--c-label:#5c6679;--c-grid:#334155;--c-cross:#475569;--c-rsi:#60a5fa;--c-mute:#8b95a5;
+  --c-band:rgba(59,130,246,.07);--c-tip:rgba(15,22,34,.95);--c-volup:rgba(34,197,94,.45);--c-voldn:rgba(239,68,68,.45);
+  --c-hi:rgba(239,68,68,.06);--c-lo2:rgba(34,197,94,.06);--c-base:#3a4458;
+  color-scheme:dark;
+}
+:root[data-theme=light]{
+  --bg:#f4f5f8;--s1:#ffffff;--s2:#f3f4f7;--s3:#e8ebf0;--line:#e3e6ec;--line2:#d2d8e1;
+  --text:#11161f;--mute:#5a6375;--faint:#7c8596;
+  --acc:#c28a00;--accbg:rgba(194,138,0,.12);--up:#d42a3a;--lo:#15803d;--blue:#2f6bf0;--violet:#7c3aed;--mid:#64748b;
+  --shadow:0 10px 30px rgba(15,23,42,.12);
+  --topbg:rgba(244,245,248,.85);--navbg:rgba(255,255,255,.96);--backdrop:rgba(15,23,42,.35);--ring:rgba(15,23,42,.06);
+  --hover:#b9c1ce;--row-line:#edf0f4;--sel:#fff6dc;--gauge:#dfe5ef;--canvas:#ffffff;
+  --intro:linear-gradient(135deg,#fffaf0,#f6f8fc);--intro-line:#ecdcb4;
+  --tag-t:#334155;--up-t:#b4232f;--lo-t:#15803d;--acc-t:#8a6100;
+  --bad-line:#f2b8be;--bad-bg:#fdecee;--ok-line:#a7dcb9;--warn-line:#ead198;
+  --c-up:#dc2626;--c-lo:#16a34a;--c-mid:#7b8798;--c-trade:#7c3aed;--c-price:#1f2937;--c-acc:#c28a00;
+  --c-axis:#7c8596;--c-label:#7c8596;--c-grid:#d2d8e1;--c-cross:#9aa4b2;--c-rsi:#2f6bf0;--c-mute:#5a6375;
+  --c-band:rgba(47,107,240,.06);--c-tip:rgba(255,255,255,.97);--c-volup:rgba(22,163,74,.4);--c-voldn:rgba(220,38,38,.4);
+  --c-hi:rgba(220,38,38,.05);--c-lo2:rgba(22,163,74,.05);--c-base:#c3cad5;
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -28,7 +56,7 @@ a{color:inherit}
 svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ---------- top bar ---------- */
-.top{position:sticky;top:0;z-index:40;background:rgba(10,13,20,.82);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:40;background:var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .topin{max-width:1500px;margin:0 auto;padding:0 16px;height:58px;display:flex;align-items:center;gap:18px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:16px;white-space:nowrap}
 .brand small{font-weight:600;font-size:12px;color:var(--acc);background:var(--accbg);padding:2px 8px;border-radius:999px}
@@ -42,10 +70,10 @@ svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-
 .tab .badge{font-size:11px;color:var(--faint)}
 .tools{display:flex;gap:6px;align-items:center}
 .pill{display:flex;align-items:center;gap:8px;height:var(--h);padding:0 12px;border-radius:999px;border:1px solid var(--line2);background:var(--s2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap}
-.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 3px var(--ring)}
 .pill.ok .dot{background:var(--lo);box-shadow:0 0 0 3px rgba(34,197,94,.18)}
 .pill.idle .dot{background:var(--acc);box-shadow:0 0 0 3px var(--accbg)}
-.pill.bad{border-color:#6b2027;background:#2a1216}.pill.bad .dot{background:var(--up);animation:pulse 1.2s infinite}
+.pill.bad{border-color:var(--bad-line);background:var(--bad-bg)}.pill.bad .dot{background:var(--up);animation:pulse 1.2s infinite}
 @keyframes pulse{50%{box-shadow:0 0 0 6px rgba(240,82,95,.0)}0%{box-shadow:0 0 0 0 rgba(240,82,95,.5)}}
 
 /* ---------- layout ---------- */
@@ -63,11 +91,11 @@ svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-
 button,select,input{font:inherit;color:var(--text)}
 button,select,input:not([type=checkbox]):not([type=range]){height:var(--h);background:var(--s2);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 12px}
 button{cursor:pointer;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:background .15s,border-color .15s,color .15s}
-button:hover{background:var(--s3);border-color:#3a4458}
+button:hover{background:var(--s3);border-color:var(--hover)}
 button:disabled{opacity:.5;cursor:wait}
 button.primary{background:var(--acc);border-color:var(--acc);color:#1a1300;font-weight:650}
 button.primary:hover{background:#ffc62e;border-color:#ffc62e}
-button.icon{width:var(--h);padding:0;color:var(--mute)}button.icon.on{color:var(--acc);border-color:#5c4a12;background:var(--accbg)}
+button.icon{width:var(--h);padding:0;color:var(--mute)}button.icon.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 input:not([type=checkbox]):not([type=range]):focus,select:focus,button:focus-visible{outline:2px solid rgba(91,140,255,.55);outline-offset:1px}
 input::placeholder{color:var(--faint)}
 input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
@@ -104,7 +132,7 @@ kbd{font:11px/1 ui-monospace,monospace;color:var(--faint);border:1px solid var(-
 .stats{font-size:13px;color:var(--mute);line-height:1.7}.stats b{color:var(--text);font-weight:600}
 
 /* ---------- chart ---------- */
-canvas{width:100%;display:block;background:#0b0f17;border-radius:10px;border:1px solid var(--line);touch-action:pan-y}
+canvas{width:100%;display:block;background:var(--canvas);border-radius:10px;border:1px solid var(--line);touch-action:pan-y}
 #cv{height:480px;cursor:crosshair}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--mute);margin-top:8px}
 .legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
@@ -114,23 +142,23 @@ canvas{width:100%;display:block;background:#0b0f17;border-radius:10px;border:1px
 .tablewrap{max-height:660px;overflow:auto;border:1px solid var(--line);border-radius:10px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{position:sticky;top:0;z-index:1;background:var(--s1);color:var(--mute);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:10px 8px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line)}
-th:hover{color:var(--text)}th.sorted{color:var(--acc)}
-td{padding:9px 8px;border-bottom:1px solid #171d29;white-space:nowrap}
+th:hover{color:var(--text)}th.sorted{color:var(--acc)}th[data-dir=desc]::after{content:" ↓"}th[data-dir=asc]::after{content:" ↑"}
+td{padding:9px 8px;border-bottom:1px solid var(--row-line);white-space:nowrap}
 tr:last-child td{border-bottom:0}
 tr.row{cursor:pointer;transition:background .1s}tr.row:hover{background:var(--s2)}
-tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
+tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .coin{display:inline-flex;align-items:center;gap:8px}
 .coin i{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;background:hsl(var(--h) 55% 38%)}
-.star{color:#4b5563;cursor:pointer;font-size:15px}.star:hover{color:var(--mute)}.star.on{color:var(--acc)}
+.star{color:var(--faint);cursor:pointer;font-size:15px}.star:hover{color:var(--mute)}.star.on{color:var(--acc)}
 .gauge{display:inline-block;width:64px;height:10px;position:relative;vertical-align:middle;margin-right:8px;background:var(--s3);border-radius:5px}
-.gauge::before{content:"";position:absolute;left:14.3%;right:14.3%;top:0;bottom:0;background:#2a3650;border-left:1px solid var(--lo);border-right:1px solid var(--up)}
-.gauge::after{content:"";position:absolute;left:50%;top:2px;bottom:2px;border-left:1px dashed #64748b}
-.gauge i{position:absolute;top:1px;width:8px;height:8px;margin-left:-4px;border-radius:50%;z-index:1;box-shadow:0 0 0 2px #0b0f17}
-.tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:#cbd5e1;white-space:nowrap}
-.tag.up{background:rgba(240,82,95,.12);color:#ff9aa3}.tag.lo{background:rgba(34,197,94,.12);color:#86efac}.tag.sq{background:var(--accbg);color:#fcd34d}
+.gauge::before{content:"";position:absolute;left:14.3%;right:14.3%;top:0;bottom:0;background:var(--gauge);border-left:1px solid var(--lo);border-right:1px solid var(--up)}
+.gauge::after{content:"";position:absolute;left:50%;top:2px;bottom:2px;border-left:1px dashed var(--mid)}
+.gauge i{position:absolute;top:1px;width:8px;height:8px;margin-left:-4px;border-radius:50%;z-index:1;box-shadow:0 0 0 2px var(--canvas)}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:var(--tag-t);white-space:nowrap}
+.tag.up{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.lo{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sq{background:var(--accbg);color:var(--acc-t)}
 .tag.upc{background:#c9303d;color:#fff}.tag.loc{background:#16a34a;color:#fff}
-.tag.uo{background:transparent;color:#ff9aa3;box-shadow:inset 0 0 0 1px #6b2027}.tag.lout{background:transparent;color:#86efac;box-shadow:inset 0 0 0 1px #14532d}
-.tag.tp{background:rgba(34,197,94,.12);color:#86efac}.tag.sl{background:rgba(240,82,95,.12);color:#ff9aa3}.tag.ts{background:var(--s3);color:#cbd5e1}
+.tag.uo{background:transparent;color:var(--up-t);box-shadow:inset 0 0 0 1px var(--bad-line)}.tag.lout{background:transparent;color:var(--lo-t);box-shadow:inset 0 0 0 1px var(--ok-line)}
+.tag.tp{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sl{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.ts{background:var(--s3);color:var(--tag-t)}
 .sk td{color:transparent}
 .sk td::after{content:"";display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:sk 1.2s infinite}
 @keyframes sk{to{background-position:-200% 0}}
@@ -146,12 +174,12 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 /* ---------- banners, intro, toasts ---------- */
 .banner{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:var(--r);border:1px solid var(--line);background:var(--s1);margin-bottom:14px;font-size:14px;line-height:1.55}
 .banner svg.i{width:20px;height:20px;margin-top:1px}
-.banner.ok{border-color:#1d5b35;background:linear-gradient(0deg,rgba(34,197,94,.07),rgba(34,197,94,.07)),var(--s1)}.banner.ok svg{color:var(--lo)}
-.banner.warn{border-color:#5c4a12;background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}.banner.warn svg{color:var(--acc)}
-.banner.bad{border-color:#6b2027;background:linear-gradient(0deg,rgba(240,82,95,.08),rgba(240,82,95,.08)),var(--s1)}.banner.bad svg{color:var(--up)}
+.banner.ok{border-color:var(--ok-line);background:linear-gradient(0deg,rgba(34,197,94,.07),rgba(34,197,94,.07)),var(--s1)}.banner.ok svg{color:var(--lo)}
+.banner.warn{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}.banner.warn svg{color:var(--acc)}
+.banner.bad{border-color:var(--bad-line);background:linear-gradient(0deg,rgba(240,82,95,.08),rgba(240,82,95,.08)),var(--s1)}.banner.bad svg{color:var(--up)}
 .banner.info svg{color:var(--blue)}
 .banner b{color:var(--text)}
-.intro{display:flex;gap:16px;align-items:flex-start;background:linear-gradient(135deg,#151c2c,#121722);border:1px solid #26314a;border-radius:var(--r);padding:16px 18px;margin-bottom:14px;font-size:13.5px}
+.intro{display:flex;gap:16px;align-items:flex-start;background:var(--intro);border:1px solid var(--intro-line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;font-size:13.5px}
 .intro ol{margin:6px 0 0;padding-left:18px;line-height:1.7}.intro .h{font-weight:700;font-size:15px}.intro button{margin-left:auto;flex:0 0 auto}
 #toasts{position:fixed;right:16px;bottom:16px;z-index:70;display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100vw - 32px))}
 .toast{display:flex;gap:10px;align-items:flex-start;background:var(--s2);border:1px solid var(--line2);border-left:3px solid var(--blue);border-radius:10px;padding:11px 14px;box-shadow:var(--shadow);font-size:13px;animation:tin .25s ease-out;cursor:pointer}
@@ -180,7 +208,7 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 .cl-item ul{margin:6px 0 0;padding-left:18px}
 
 /* ---------- trade card ---------- */
-.modal{position:fixed;inset:0;background:rgba(3,6,12,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow:auto}
+.modal{position:fixed;inset:0;background:var(--backdrop);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow:auto}
 .mbox{background:var(--s1);border:1px solid var(--line2);border-radius:16px;width:min(1400px,100%);padding:18px;box-shadow:var(--shadow)}
 .mhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .mhead h2{margin:0;font-size:19px}.mhead .mute{font-size:13px}.mhead button{margin-left:auto}
@@ -194,10 +222,10 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 /* ---------- progressive disclosure ---------- */
 #hdr{display:none}
 .fl{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute)}.fl.inl{flex-direction:row;align-items:center;gap:8px;height:var(--h)}
-.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bstate{font-size:13px;margin-top:12px;padding:10px 12px;background:var(--s2);border:1px solid var(--line);border-radius:10px;line-height:1.55}
 .prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--s1)}
-.prof.on{border-color:#5c4a12;background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
+.prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12.5px}
 #bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .tablewrap:not(.more) .hx{display:none}
@@ -210,7 +238,7 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 .hside{display:flex;gap:28px;font-size:12px;color:var(--mute)}.hside div{display:flex;flex-direction:column;gap:3px}.hside b{font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
 .hchart{position:relative;height:150px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
 .hlab{position:absolute;left:0;transform:translateY(-130%);font-size:11px;color:var(--faint);pointer-events:none}
-.hend{position:absolute;right:0;width:9px;height:9px;margin:-4.5px -4.5px 0 0;border-radius:50%;box-shadow:0 0 0 4px rgba(255,255,255,.06)}
+.hend{position:absolute;right:0;width:9px;height:9px;margin:-4.5px -4.5px 0 0;border-radius:50%;box-shadow:0 0 0 4px var(--ring)}
 .haxis{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:8px}
 .hempty{height:110px;display:grid;place-items:center;color:var(--faint);border:1px dashed var(--line2);border-radius:10px;font-size:13px}
 .statrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}
@@ -262,7 +290,7 @@ details.dis>.dbody{padding:0 16px 16px}
   /* backdrop-filter would make the header the containing block of the fixed bottom bar */
   .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--bg)}
   /* navigation becomes a bottom tab bar on phones */
-  .top .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;background:rgba(10,13,20,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));overflow:visible;flex:none}
+  .top .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--navbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));overflow:visible;flex:none}
   .top .tab{flex:1;flex-direction:column;height:auto;gap:3px;padding:6px 2px;font-size:10.5px;min-width:0}
   .top .tab svg.i{width:20px;height:20px}
   .top .tab .badge{display:none}
@@ -283,7 +311,8 @@ details.dis>.dbody{padding:0 16px 16px}
   .form{grid-template-columns:1fr}
   .guard{top:62px;right:10px}
 }
-@media(max-width:560px){#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
+@media(max-width:560px){.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
+/* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}}
 </style>
 </head>
 <body>
@@ -304,6 +333,8 @@ details.dis>.dbody{padding:0 16px 16px}
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
 </svg>
 <header class="top"><div class="topin">
@@ -320,8 +351,9 @@ details.dis>.dbody{padding:0 16px 16px}
   </nav>
   <div class="tools">
     <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
-    <button class="icon" id="ntf" title="Уведомления браузера о новых сигналах и сделках"><svg class="i"><use href="#i-bell"/></svg></button>
-    <button class="icon" id="snd" title="Звук при новом сигнале"><svg class="i"><use href="#i-mute"/></svg></button>
+    <button class="icon" id="ntf" title="Уведомления браузера о новых сигналах и сделках" aria-label="Уведомления браузера о новых сигналах и сделках"><svg class="i"><use href="#i-bell"/></svg></button>
+    <button class="icon" id="thm" title="Светлая или тёмная тема" aria-label="Переключить тему"><svg class="i"><use href="#i-sun"/></svg></button>
+    <button class="icon" id="snd" title="Звук при новом сигнале" aria-label="Звук при новом сигнале"><svg class="i"><use href="#i-mute"/></svg></button>
   </div>
 </div></header>
 <div id="guard" class="guard"><b>СТОРОЖ</b> загрузка…</div>
@@ -356,7 +388,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <div class="cact">
             <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
             <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button><button class="tab" data-tf="1d" title="Дневные свечи">1д</button><button class="tab" data-tf="1w" title="Недельные свечи">1н</button></div>
-            <button class="icon" id="cset" title="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
+            <button class="icon" id="cset" title="Настройки канала" aria-label="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
           </div>
         </div>
         <div class="ctrl hidden" id="sheet">
@@ -375,10 +407,10 @@ details.dis>.dbody{padding:0 16px 16px}
         </div>
         <canvas id="cv" style="margin-top:12px"></canvas>
         <div class="legend">
-          <span><i style="border-color:#ef4444"></i>верхняя граница</span>
-          <span><i style="border-color:#64748b;border-top-style:dashed"></i>обычная цена</span>
-          <span><i style="border-color:#22c55e"></i>нижняя граница</span>
-          <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>сделка бота</span>
+          <span><i style="border-color:var(--c-up)"></i>верхняя граница</span>
+          <span><i style="border-color:var(--c-mid);border-top-style:dashed"></i>обычная цена</span>
+          <span><i style="border-color:var(--c-lo)"></i>нижняя граница</span>
+          <span><i style="border-color:var(--c-trade);border-top-style:dashed"></i>сделка бота</span>
           <span class="faint">колёсико — масштаб · перетаскивание — время · двойной клик — сброс</span>
         </div>
         <div class="detail" id="detail"></div>
@@ -388,8 +420,8 @@ details.dis>.dbody{padding:0 16px 16px}
         <div class="filters">
           <div class="search" style="flex:1 1 160px"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
           <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы</button><button class="tab" data-fl="sq">Затишье</button><button class="tab" data-fl="fav" title="Избранное">★</button></div>
-          <button id="more" class="icon" title="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
-          <button id="refresh" class="icon" title="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
+          <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
+          <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
         </div>
         <div class="filters hidden" id="morebar">
           <select id="fz" title="Где сейчас цена относительно канала"><option value="">Любое положение</option><option value="lo">У нижней границы</option><option value="hi">У верхней границы</option><option value="out">За границей</option><option value="in">Внутри диапазона</option></select>
@@ -634,8 +666,8 @@ details.dis>.dbody{padding:0 16px 16px}
       <div><canvas id="tcv"></canvas>
         <div class="zoomhint">колёсико — масштаб · перетаскивание — прокрутка во времени · двойной клик — сброс</div>
         <div class="legend">
-          <span>▮ свечи</span><span><i style="border-color:#ef4444"></i>верхняя полоса</span><span><i style="border-color:#64748b;border-top-style:dashed"></i>центр</span><span><i style="border-color:#22c55e"></i>нижняя полоса</span>
-          <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>вход</span><span><i style="border-color:#22c55e;border-top-style:dashed"></i>тейк</span><span><i style="border-color:#ef4444;border-top-style:dashed"></i>стоп</span>
+          <span>▮ свечи</span><span><i style="border-color:var(--c-up)"></i>верхняя полоса</span><span><i style="border-color:var(--c-mid);border-top-style:dashed"></i>центр</span><span><i style="border-color:var(--c-lo)"></i>нижняя полоса</span>
+          <span><i style="border-color:var(--c-trade);border-top-style:dashed"></i>вход</span><span><i style="border-color:var(--c-lo);border-top-style:dashed"></i>тейк</span><span><i style="border-color:var(--c-up);border-top-style:dashed"></i>стоп</span>
           <span>● вход / выход в момент сделки</span><span>канал — на настройках, с которыми бот входил</span>
         </div>
       </div>
@@ -669,12 +701,20 @@ let J = load('sr_journal', null) || {balance:10000, start:10000, open:[], closed
 const SB_URL = 'https://aumldylzccbmddavtrqe.supabase.co/rest/v1/', SB_KEY = 'sb_publishable_dJ7vC-wBDBUNT9W1VgwPEg_M0WpHxXB';
 let SJ = null, jMode = load('sr_jmode', 'shared');
 let sound = false;
+// chart colours come from the CSS tokens of the current theme (see :root / [data-theme=light])
+const PC = {};
+function pal() {
+  const cs = getComputedStyle(document.documentElement), v = n => cs.getPropertyValue(n).trim();
+  for (const k of ['up','lo','mid','trade','price','acc','axis','label','grid','cross','rsi','mute','band','tip','volup','voldn','hi','lo2','base']) PC[k] = v('--c-' + k);
+  PC.canvas = v('--canvas');
+}
+pal();
 const fp = p => { if (p == null || !isFinite(p)) return '—'; const a = Math.abs(p); return '$' + (a >= 1000 ? p.toFixed(0) : a >= 100 ? p.toFixed(2) : a >= 1 ? p.toFixed(3) : p.toPrecision(4)); };
 const usd = (x, sign = true) => x == null || !isFinite(x) ? '—' : (sign && x > 0 ? '+' : x < 0 ? '−' : '') + '$' + Math.abs(x).toFixed(2);
 const rr = x => x == null || !isFinite(x) ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(2) + 'R';
 const cl = x => x > 0 ? 'pos' : x < 0 ? 'neg' : '';
 const hm = t => new Date(t).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'});
-const dt = t => new Date(t).toLocaleString('ru', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+const dt = t => new Date(t).toLocaleString('ru', {day:'2-digit', month:'2-digit', ...(new Date(t).getFullYear() !== new Date().getFullYear() && {year:'2-digit'}), hour:'2-digit', minute:'2-digit'});
 const dur = ms => ms == null || !isFinite(ms) ? '—' : ms < 36e5 ? Math.round(ms/6e4) + 'м' : ms < 864e5 ? (ms/36e5).toFixed(1) + 'ч' : (ms/864e5).toFixed(1) + 'д';
 const base = s => s.replace(/USDT$/, '');
 const pair = s => s.replace(/USDT$/, '/USDT');
@@ -770,7 +810,7 @@ function renderCards() {
 function gauge(pB) {
   // track spans %B from -20% to 120%; the channel itself is the shaded 0..100% part
   const x = (clamp(pB, -0.2, 1.2) + 0.2) / 1.4 * 100;
-  const col = pB > 0.9 ? 'var(--up)' : pB < 0.1 ? 'var(--lo)' : '#93c5fd';
+  const col = pB > 0.9 ? 'var(--up)' : pB < 0.1 ? 'var(--lo)' : 'var(--blue)';
   return `<span class="gauge"><i style="left:${x}%;background:${col}"></i></span><span style="color:${col}">${(pB*100).toFixed(1)}%</span>`;
 }
 // compact labels for the table; the long wording stays in the breakdown and the glossary
@@ -796,7 +836,7 @@ function renderTable() {
     : sortKey === 'fav' ? (favs.has(r.sym) ? 1 : 0) : sortKey === 'vol' ? (r.volX ?? -1) : sortKey === 'score' ? (r.score ?? -1)
     : sortKey === 'label' ? kindRank[r.kind] : sortKey === 'hl' ? (isFinite(r.hl) ? -r.hl : -1e9) : r[sortKey];
   list.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sortDir; });
-  document.querySelectorAll('#mhead th').forEach(th => th.classList.toggle('sorted', th.dataset.s === sortKey));
+  document.querySelectorAll('#mhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === sortKey); th.dataset.dir = th.dataset.s === sortKey ? (sortDir > 0 ? 'asc' : 'desc') : ''; });
   $('#tb').innerHTML = list.map(r => {
     const hl = isFinite(r.hl) ? dur(r.hl * TFMS[S.tf]) : '∞';
     const sc = r.score == null ? '<span class="faint">—</span>'
@@ -840,28 +880,28 @@ function renderChart(cv, d, o = {}) {
     g.beginPath();
     for (let i = f0; i <= e; i++) g[i === f0 ? 'moveTo' : 'lineTo'](X(i), Y(B.up[i]));
     for (let i = e; i >= f0; i--) g.lineTo(X(i), Y(B.lo[i]));
-    g.fillStyle = 'rgba(59,130,246,.07)'; g.fill();
+    g.fillStyle = PC.band; g.fill();
   }
   const line = (arr, col, w = 1.3, dash = []) => { g.beginPath(); g.setLineDash(dash); let st = false;
     for (let i = s; i <= e; i++) { if (!isFinite(arr[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), Y(arr[i])); st = true; }
     g.strokeStyle = col; g.lineWidth = w; g.stroke(); g.setLineDash([]); };
-  line(B.up, '#ef4444'); line(B.lo, '#22c55e'); line(B.mid, '#64748b', 1, [4, 4]);
+  line(B.up, PC.up); line(B.lo, PC.lo); line(B.mid, PC.mid, 1, [4, 4]);
   // price
   if (candles) {
     const cw = Math.max(1, bw * 0.7);
     for (let i = s; i <= e; i++) {
-      const col = c[i] >= op[i] ? '#22c55e' : '#ef4444';
+      const col = c[i] >= op[i] ? PC.lo : PC.up;
       g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1;
       g.beginPath(); g.moveTo(X(i), Y(h[i])); g.lineTo(X(i), Y(l[i])); g.stroke();
       const y1 = Y(Math.max(op[i], c[i])), y2 = Y(Math.min(op[i], c[i]));
       g.fillRect(X(i) - cw / 2, y1, cw, Math.max(1, y2 - y1));
     }
   } else {
-    line(c, '#e5e7eb', 1.2);
+    line(c, PC.price, 1.2);
     const tri = (x, y, dir, col) => { g.beginPath(); g.moveTo(x, y); g.lineTo(x - 5, y - dir*8); g.lineTo(x + 5, y - dir*8); g.closePath(); g.fillStyle = col; g.fill(); };
     for (let i = Math.max(f0, s, 1); i <= e; i++) {
-      if (h[i] >= B.up[i] && !(h[i-1] >= B.up[i-1])) tri(X(i), Y(B.up[i]) - 8, -1, '#ef4444');
-      if (l[i] <= B.lo[i] && !(l[i-1] <= B.lo[i-1])) tri(X(i), Y(B.lo[i]) + 8, 1, '#22c55e');
+      if (h[i] >= B.up[i] && !(h[i-1] >= B.up[i-1])) tri(X(i), Y(B.up[i]) - 8, -1, PC.up);
+      if (l[i] <= B.lo[i] && !(l[i-1] <= B.lo[i-1])) tri(X(i), Y(B.lo[i]) + 8, 1, PC.lo);
     }
   }
   // levels (entry / TP / SL): dashed line over the trade's span, price tag in the right gutter
@@ -874,14 +914,14 @@ function renderChart(cv, d, o = {}) {
   }
   for (const m of o.marks || []) {
     if (m.i < s || m.i > e) continue;
-    g.beginPath(); g.arc(X(m.i), Y(m.price), 5, 0, 7); g.fillStyle = m.col; g.fill(); g.strokeStyle = '#0a0e15'; g.lineWidth = 2; g.stroke();
+    g.beginPath(); g.arc(X(m.i), Y(m.price), 5, 0, 7); g.fillStyle = m.col; g.fill(); g.strokeStyle = PC.canvas; g.lineWidth = 2; g.stroke();
     if (m.label) { const w = g.measureText(m.label).width, lx = X(m.i) + 8 + w > W - padR ? X(m.i) - 8 - w : X(m.i) + 8; g.fillStyle = m.col; g.fillText(m.label, lx, Y(m.price) + (m.below ? 14 : -12)); }
   }
   const cur = o.live ? c[n - 1] : c[e];
-  if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = '#f5b70a88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
-  if (isFinite(B.up[e])) tags.push({y:Y(B.up[e]), text:fp(B.up[e]), col:'#ef4444'});
-  if (isFinite(B.lo[e])) tags.push({y:Y(B.lo[e]), text:fp(B.lo[e]), col:'#22c55e'});
-  tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur), col:'#f5b70a', box:true});
+  if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = PC.acc + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
+  if (isFinite(B.up[e])) tags.push({y:Y(B.up[e]), text:fp(B.up[e]), col:PC.up});
+  if (isFinite(B.lo[e])) tags.push({y:Y(B.lo[e]), text:fp(B.lo[e]), col:PC.lo});
+  tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur), col:PC.acc, box:true});
   // spread tags so they never overlap: sort by y, push down, then shift the stack up if it ran past the bottom
   tags.sort((a, b) => a.y - b.y);
   for (let q = 0; q < tags.length; q++) tags[q].ty = Math.max(clamp(tags[q].y, 8, pH - 6), q ? tags[q-1].ty + 15 : 8);
@@ -895,41 +935,41 @@ function renderChart(cv, d, o = {}) {
     g.fillStyle = tg.col; g.fillText(tg.text, tx + 4, tg.ty);
   }
   // time axis
-  g.font = '11px system-ui'; g.fillStyle = '#566173';
+  g.font = '11px system-ui'; g.fillStyle = PC.axis;
   for (let q = 0; q <= 4; q++) {
     const i = Math.round(s + q * (eView - s) / 4), txt = dt(tAt(i)), w = g.measureText(txt).width;
     g.fillText(txt, clamp(X(i) - w / 2, padL, W - padR - w), pH + 6);
   }
   // volume
   let vmax = 0; for (let i = s; i <= e; i++) vmax = Math.max(vmax, v[i]);
-  g.fillStyle = '#5c6679'; g.fillText('Объём', padL + 2, vTop + 6);
+  g.fillStyle = PC.label; g.fillText('Объём', padL + 2, vTop + 6);
   for (let i = s; i <= e; i++) {
     const hh = vmax ? v[i] / vmax * vH : 0;
-    g.fillStyle = c[i] >= op[i] ? 'rgba(34,197,94,.45)' : 'rgba(239,68,68,.45)';
+    g.fillStyle = c[i] >= op[i] ? PC.volup : PC.voldn;
     g.fillRect(X(i) - Math.max(0.5, bw * 0.35), vTop + vH - hh, Math.max(1, bw * 0.7), hh);
   }
   // RSI
-  g.fillStyle = '#5c6679'; g.fillText('RSI', padL + 2, rTop + 7);
+  g.fillStyle = PC.label; g.fillText('RSI', padL + 2, rTop + 7);
   const RY = x => rTop + (100 - x) / 100 * rH;
-  g.fillStyle = 'rgba(239,68,68,.06)'; g.fillRect(padL, RY(100), W - padL - padR, RY(70) - RY(100));
-  g.fillStyle = 'rgba(34,197,94,.06)'; g.fillRect(padL, RY(30), W - padL - padR, RY(0) - RY(30));
-  g.strokeStyle = '#334155'; g.lineWidth = 1; g.setLineDash([3, 3]);
+  g.fillStyle = PC.hi; g.fillRect(padL, RY(100), W - padL - padR, RY(70) - RY(100));
+  g.fillStyle = PC.lo2; g.fillRect(padL, RY(30), W - padL - padR, RY(0) - RY(30));
+  g.strokeStyle = PC.grid; g.lineWidth = 1; g.setLineDash([3, 3]);
   for (const x of [30, 70]) { g.beginPath(); g.moveTo(padL, RY(x)); g.lineTo(W - padR, RY(x)); g.stroke(); }
   g.setLineDash([]); g.beginPath(); let st = false;
   for (let i = s; i <= e; i++) { if (!isFinite(R[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), RY(R[i])); st = true; }
-  g.strokeStyle = '#60a5fa'; g.stroke();
-  if (isFinite(R[e])) { g.fillStyle = '#60a5fa'; g.fillText(R[e].toFixed(0), W - padR + 6, RY(R[e])); }
+  g.strokeStyle = PC.rsi; g.stroke();
+  if (isFinite(R[e])) { g.fillStyle = PC.rsi; g.fillText(R[e].toFixed(0), W - padR + 6, RY(R[e])); }
   // hover
   const hi = o.hoverI;
   if (hi != null && hi >= s && hi <= e) {
     const x = X(hi);
-    g.strokeStyle = '#475569'; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
+    g.strokeStyle = PC.cross; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
     const pb = (c[hi] - B.lo[hi]) / (B.up[hi] - B.lo[hi]);
     const txt = [dt(t[hi]), candles ? `O ${fp(op[hi])}  H ${fp(h[hi])}` : '', candles ? `L ${fp(l[hi])}  C ${fp(c[hi])}` : 'цена ' + fp(c[hi]),
       isFinite(pb) ? `%B ${(pb*100).toFixed(1)}%  ${B.z[hi].toFixed(2)}σ` : '', 'RSI ' + (isFinite(R[hi]) ? R[hi].toFixed(0) : '—')].filter(Boolean);
     const bx = x > W / 2 ? x - 188 : x + 10;
-    g.font = '12px system-ui'; g.fillStyle = 'rgba(15,22,34,.95)'; g.fillRect(bx, 12, 178, txt.length * 17 + 10);
-    g.fillStyle = '#e5e7eb'; txt.forEach((s2, k) => g.fillText(s2, bx + 8, 22 + k * 17));
+    g.font = '12px system-ui'; g.fillStyle = PC.tip; g.fillRect(bx, 12, 178, txt.length * 17 + 10);
+    g.fillStyle = PC.price; txt.forEach((s2, k) => g.fillText(s2, bx + 8, 22 + k * 17));
   }
   return {s, e, padL, bw};
 }
@@ -1005,8 +1045,8 @@ function drawChart() {
   const levels = [];
   for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym)) {
     const i0 = barAt(chart.t, p.time);
-    levels.push({v:p.entry, col:'#a78bfa', tag:who === 'общий' ? 'общ.' : 'мой', i0},
-                {v:p.tp, col:'#22c55e', tag:'TP', i0}, {v:p.sl, col:'#ef4444', tag:'SL', i0});
+    levels.push({v:p.entry, col:PC.trade, tag:who === 'общий' ? 'общ.' : 'мой', i0},
+                {v:p.tp, col:PC.lo, tag:'TP', i0}, {v:p.sl, col:PC.up, tag:'SL', i0});
   }
   const r = viewRange(chart.c.length, chart.N - 1, chartView, S.candles);
   chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, live:true, hoverI});
@@ -1314,10 +1354,10 @@ function equityChart(D, tEnd) {
   const W = 1000, H = 150, X = t => ((t - t0) / Math.max(1, t1 - t0) * W).toFixed(1), Y = v => ((mx - v) / (mx - mn) * H).toFixed(1);
   let d = `M${X(pts[0][0])},${Y(pts[0][1])}`;
   for (let i = 1; i < pts.length; i++) d += ` H${X(pts[i][0])} V${Y(pts[i][1])}`;
-  const col = b >= D.start ? '#22c55e' : '#f0525f', ys = Y(D.start) / H * 100, ye = Y(b) / H * 100;
+  const col = b >= D.start ? PC.lo : PC.up, ys = Y(D.start) / H * 100, ye = Y(b) / H * 100;
   return `<div class="hchart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
       <defs><linearGradient id="eqg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".25"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
-      <line x1="0" x2="${W}" y1="${Y(D.start)}" y2="${Y(D.start)}" stroke="#3a4458" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"/>
+      <line x1="0" x2="${W}" y1="${Y(D.start)}" y2="${Y(D.start)}" stroke="${PC.base}" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"/>
       <path d="${d} V${H} H0 Z" fill="url(#eqg)"/>
       <path d="${d}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
       <span class="hlab" style="top:${ys}%">старт $${money(D.start)}</span>
@@ -1330,9 +1370,9 @@ function equitySvg(D, W = 150, H = 26) {
   const mn = Math.min(...pts, D.start), mx = Math.max(...pts, D.start), pad = 3;
   const Y = v => (pad + (H - 2 * pad) * (1 - (mx === mn ? 0.5 : (v - mn) / (mx - mn)))).toFixed(1);
   const d = pts.map((v, i) => `${(i / (pts.length - 1) * W).toFixed(1)},${Y(v)}`).join(' ');
-  const col = pts[pts.length-1] >= D.start ? '#22c55e' : '#f0525f';
+  const col = pts[pts.length-1] >= D.start ? PC.lo : PC.up;
   return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;width:100%;max-width:${W}px;height:${H}px">
-    <line x1="0" x2="${W}" y1="${Y(D.start)}" y2="${Y(D.start)}" stroke="#2c3547" stroke-dasharray="3 3"/>
+    <line x1="0" x2="${W}" y1="${Y(D.start)}" y2="${Y(D.start)}" stroke="${PC.base}" stroke-dasharray="3 3"/>
     <polyline points="0,${H} ${d} ${W},${H}" fill="${col}" fill-opacity=".08" stroke="none"/>
     <polyline points="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
 }
@@ -1386,7 +1426,7 @@ function renderJournal() {
       <td class="${cl(u)}">${usd(u)}</td><td class="${cl(u)}">${rr(risk ? u / risk : null)}</td><td>${scoreOf(p)}</td></tr>`;
   }).join('') || '<tr><td colspan="11" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
   const list = D.closed.map(M.normTrade).sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * jDir; });
-  document.querySelectorAll('#jhead th').forEach(th => th.classList.toggle('sorted', th.dataset.s === jSort));
+  document.querySelectorAll('#jhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === jSort); th.dataset.dir = th.dataset.s === jSort ? (jDir > 0 ? 'asc' : 'desc') : ''; });
   $('#jclosed').innerHTML = list.map(x => `<tr class="row" data-kind="closed" data-id="${x.id}" title="Открыть карточку сделки"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
@@ -1444,24 +1484,24 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   $('#maside').innerHTML = html;
   // chart
   tcard = null; renderChart($('#tcv'), null);
-  const cv = $('#tcv'), g = cv.getContext('2d'); cv.width = cv.clientWidth; cv.height = cv.clientHeight; g.fillStyle = '#8b95a5'; g.font = '13px system-ui'; g.fillText('Загружаю свечи…', 16, 24);
+  const cv = $('#tcv'), g = cv.getContext('2d'); cv.width = cv.clientWidth; cv.height = cv.clientHeight; g.fillStyle = PC.mute; g.font = '13px system-ui'; g.fillText('Загружаю свечи…', 16, 24);
   try {
     const start = Math.floor(x.time / tfms) * tfms - (set.N + 120) * tfms, end = isOpen ? Date.now() : x.tclose + 40 * tfms;
     const K = await api(`/api/v3/klines?symbol=${x.sym}&interval=${tf}&startTime=${start}&limit=${Math.min(1000, Math.ceil((end - start) / tfms) + 1)}`);
     const d = parse(K); d.B = bands(d.c, set.N, set.k, set.method); d.R = rsi(d.c);
     const ei = barAt(d.t, x.time), xi = isOpen ? d.c.length - 1 : barAt(d.t, x.tclose);
     const levels = [
-      {v:x.entry, col:'#a78bfa', tag:'вход', i0:ei, i1:xi},
-      {v:x.tp, col:'#22c55e', tag:'TP', i0:ei, i1:xi},
-      {v:x.sl, col:'#ef4444', tag:'SL', i0:ei, i1:xi},
+      {v:x.entry, col:PC.trade, tag:'вход', i0:ei, i1:xi},
+      {v:x.tp, col:PC.lo, tag:'TP', i0:ei, i1:xi},
+      {v:x.sl, col:PC.up, tag:'SL', i0:ei, i1:xi},
     ];
-    const marks = [{i:ei, price:x.entry, col:'#a78bfa', label:'вход', below:sg < 0}];
-    if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? '#22c55e' : '#ef4444', label:`выход · ${x.reason}`, below:sg > 0});
+    const marks = [{i:ei, price:x.entry, col:PC.trade, label:'вход', below:sg < 0}];
+    if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? PC.lo : PC.up, label:`выход · ${x.reason}`, below:sg > 0});
     const from0 = Math.max(set.N - 1, ei - 120);
     tcard = {d, minFrom:set.N - 1, defSpan:d.c.length - from0, view:null, opts:{levels, marks, live:isOpen, hoverI:null}};
     drawCard();
   } catch (e) {
-    g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = '#ef4444'; g.fillText('Не удалось загрузить свечи: ' + e.message, 16, 24);
+    g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = PC.up; g.fillText('Не удалось загрузить свечи: ' + e.message, 16, 24);
   }
 }
 function drawCard() {
@@ -1626,20 +1666,27 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
   const pad = (mx - mn) * 0.08 || 10; mn -= pad; mx += pad;
   const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
   const X = t => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR), Y = b => top + (mx - b) / (mx - mn) * (bot - top);
-  g.setLineDash([4, 4]); g.strokeStyle = '#475569'; g.beginPath(); g.moveTo(padL, Y(btRes.start)); g.lineTo(W - padR, Y(btRes.start)); g.stroke(); g.setLineDash([]);
-  const last = pts[pts.length - 1][1], col = last >= btRes.start ? '#22c55e' : '#ef4444';
+  g.setLineDash([4, 4]); g.strokeStyle = PC.cross; g.beginPath(); g.moveTo(padL, Y(btRes.start)); g.lineTo(W - padR, Y(btRes.start)); g.stroke(); g.setLineDash([]);
+  const last = pts[pts.length - 1][1], col = last >= btRes.start ? PC.lo : PC.up;
   g.beginPath(); pts.forEach(([t, b], i) => g[i ? 'lineTo' : 'moveTo'](X(t), Y(b)));
   g.strokeStyle = col; g.lineWidth = 1.6; g.stroke();
   g.lineTo(X(t1), Y(btRes.start)); g.lineTo(X(t0), Y(btRes.start)); g.closePath(); g.fillStyle = col + '1a'; g.fill();
   g.font = '11px system-ui'; g.textBaseline = 'middle';
-  g.fillStyle = '#8b95a5'; g.fillText('$' + btRes.start.toFixed(0), W - padR + 6, Y(btRes.start));
+  g.fillStyle = PC.mute; g.fillText('$' + btRes.start.toFixed(0), W - padR + 6, Y(btRes.start));
   g.fillStyle = col; g.fillText('$' + last.toFixed(2), W - padR + 6, clamp(Y(last), 8, bot) + (Math.abs(Y(last) - Y(btRes.start)) < 14 ? 14 : 0));
-  g.fillStyle = '#566173';
+  g.fillStyle = PC.axis;
   for (let q = 0; q <= 4; q++) { const t = t0 + q * (t1 - t0) / 4, txt = dt(t), w = g.measureText(txt).width; g.fillText(txt, clamp(X(t) - w / 2, padL, W - padR - w), H - 9); }
 }
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'1.8', date:'6 октября 2026', title:'Светлая тема', items:[
+    'Светлая тема: переключается кнопкой с солнцем в верхней панели и запоминается.',
+    'Таблица монет снова ровная: каждая монета в одной строке.',
+    'Цены и суммы выровнены по правому краю — разряды стоят друг под другом.',
+    'В заголовке таблицы стрелка показывает, в какую сторону идёт сортировка.',
+    'На телефоне кнопки стали крупнее — проще попасть пальцем.',
+  ]},
   {v:'1.7', date:'5 октября 2026', title:'Личный бот на сервере 24/7', items:[
     '«Мой бот» может работать на сервере круглосуточно — даже когда сайт закрыт. Переключите профиль на сайте, и сервер начнёт торговать по нему.',
     'Новый готовый профиль «Боковик · 1h (проверен за год)».',
@@ -1880,7 +1927,35 @@ cv.onmouseleave = () => { hoverI = null; drawChart(); };
 const tcv = $('#tcv');
 tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); drawCard(); };
 tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCard(); };
+// numeric columns (prices, %, $, R) are right-aligned; dates and text stay left
+const isNum = s => /^[+−-]?[$×]?\d/.test(s) && !/^\d\d\.\d\d/.test(s) && !/^\d\d:\d\d/.test(s);
+function alignNums(tb) {
+  const rows = [...tb.rows].filter(r => r.cells.length > 1), cols = Math.max(0, ...rows.map(r => r.cells.length));
+  const head = tb.closest('table')?.tHead?.rows[0];
+  for (let c = 0; c < cols; c++) {
+    const vals = rows.map(r => r.cells[c]?.textContent.trim()).filter(v => v && v !== '—');
+    const num = vals.length > 0 && vals.filter(isNum).length / vals.length > 0.8;
+    rows.forEach(r => r.cells[c]?.classList.toggle('n', num));
+    head?.cells[c]?.classList.toggle('n', num);
+  }
+}
+let alignQ = new Set();
+new MutationObserver(ms => {
+  for (const m of ms) { const tb = m.target.closest?.('tbody'); if (tb) alignQ.add(tb); }
+  if (alignQ.size) requestAnimationFrame(() => { alignQ.forEach(alignNums); alignQ.clear(); });
+}).observe(document.body, {childList: true, subtree: true});
 window.onresize = () => { drawChart(); drawCard(); };
+// theme: dark by default, light on request; charts read the new tokens and redraw
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem('sr_theme', t); } catch {}
+  $('#thm').innerHTML = `<svg class="i"><use href="#i-${t === 'light' ? 'moon' : 'sun'}"/></svg>`;
+  $('#thm').setAttribute('aria-label', t === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему');
+  pal();
+  try { drawChart(); drawCard(); renderJournal(); if (btRes) renderBacktest(); } catch {}
+}
+$('#thm').onclick = () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+if (document.documentElement.dataset.theme === 'light') applyTheme('light');
 attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:S.candles, view:chartView, geo:chartGeo}, set:v => { chartView = v; drawChart(); }});
 attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
 
