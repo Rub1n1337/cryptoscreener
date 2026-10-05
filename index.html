@@ -198,6 +198,10 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
   <section id="backtest" class="hidden">
     <div class="sub">Бэктест прогоняет те же правила, что у ботов, на истории Binance: сигнал проверяется на закрытии каждой свечи, вход по цене закрытия с проскальзыванием, дальше — тейк, стоп или тайм-стоп, с комиссиями. Так за минуту видно, есть ли у настроек преимущество, вместо недель живой торговли.</div>
     <div class="ctrl">
+      <label title="Идея входа. «Отскок» — от полосы к центру (как у ботов сейчас); «Отскок по тренду» — только в сторону наклона центра канала; «Пробой» — в сторону свежего закрытия за полосой, тейк = 2 стопа">Стратегия <select id="btStrat">
+        <option value="revert">Отскок от полосы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой полосы</option>
+      </select></label>
+      <label title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
       <label title="Модель канала">Модель <select id="btMethod">
         <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
       </select></label>
@@ -863,10 +867,12 @@ async function fetchHistory(sym, tf, startT, endT) {
 }
 function btSettings() {
   return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
-          minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, top:+$('#btTop').value};
+          minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, top:+$('#btTop').value,
+          strategy:$('#btStrat').value, longOnly:$('#btLong').checked};
 }
 function btFill(s) {
   $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && s.tf !== '5m' ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0);
+  $('#btStrat').value = s.strategy || 'revert'; $('#btLong').checked = !!s.longOnly;
   btEstimate();
 }
 function btEstimate() {
@@ -895,7 +901,7 @@ async function runBacktest() {
     btHist = {hist, from};
     btRes = M.backtest(hist, s, {start:10000, from});
     btRes.settings = s; btRes.days = days;
-    st.textContent = `Готово: ${btRes.pairs} пар, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс. Настройки: ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, мин. сила ${s.minScore}.`;
+    st.textContent = `Готово: ${btRes.pairs} пар, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс. ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, мин. сила ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}.`;
     renderBacktest();
   } catch (e) {
     st.textContent = 'Ошибка: ' + (e.message || e);
@@ -969,6 +975,12 @@ function drawEquity() {
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'0.8', date:'05.10.2026', title:'Три стратегии в бэктесте', items:[
+    'В бэктесте можно выбрать стратегию: «Отскок от полосы» (как у ботов), «Отскок по тренду» (только в сторону наклона центра канала) и «Пробой полосы» (в сторону свежего закрытия за полосой с объёмом, тейк = 2 стопа). Плюс опция «только LONG».',
+    'Логика «какую сделку брать» вынесена в общую функцию: боты, бэктест и любые будущие стратегии используют один код.',
+    'Сравнение на 50 парах, два разных месяца (август–сентябрь и сентябрь–октябрь), 15m и 1h, с комиссиями и проскальзыванием: ни одна из 3 стратегий ни в одном варианте не была в плюсе в обоих месяцах на достаточном числе сделок. Лучшие отдельные результаты держались на 5–30 сделках — это шум, а не преимущество.',
+    'Настройки общего бота по-прежнему не меняются.',
+  ]},
   {v:'0.7', date:'05.10.2026', title:'Исследование стратегии на бэктесте', items:[
     'В бэктест добавлен фильтр тренда «T½ ≤ 20 / 40 свечей»: вход только по монетам, которые быстро возвращаются к центру.',
     'Прогнано 108 комбинаций настроек (модель, N, k, мин. сила, фильтр T½) на 50 парах за 30 дней (15m). Ни одна не была в плюсе в обеих половинах периода.',
@@ -1092,7 +1104,7 @@ window.onresize = () => { drawChart(); if (tcard) tcard.geo = renderChart(tcv, t
 $('#btRun').onclick = runBacktest;
 $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); };
 $('#btShared').onclick = () => { if (SJ) btFill(SJ.settings); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL'].forEach(s => $(s).onchange = btEstimate);
 $('#btTrades').onclick = e => {
   const tr = e.target.closest('tr.row'); if (!tr || !btRes) return;
   const x = btRes.trades.find(t => String(t.id) === tr.dataset.id);

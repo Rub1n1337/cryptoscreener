@@ -160,6 +160,15 @@ export function signalAt(P, i, sym, now) {
     };
     score = Math.round(100 * (0.25*comps.D + 0.25*comps.V + 0.15*comps.R + 0.20*comps.C + 0.15*comps.M));
   }
+  // channel trend: slope of the centre over the last 20 bars (in % of price)
+  const slope = isFinite(B.mid[i - 20]) ? (B.mid[i] / B.mid[i - 20] - 1) * 100 : 0;
+  // breakout: the last closed bar closed beyond a band (the bar before it was inside) on above-normal volume
+  let brk = null;
+  if (p >= 1 && isFinite(B.up[p - 1])) {
+    const bz = vz(v[p]);
+    if (c[p] > B.up[p] && c[p - 1] <= B.up[p - 1] && bz >= 1) brk = { side: 'long', volZ: bz };
+    else if (c[p] < B.lo[p] && c[p - 1] >= B.lo[p - 1] && bz >= 1) brk = { side: 'short', volZ: bz };
+  }
   const outUp = c[i] > B.up[i], outLo = c[i] < B.lo[i];
   let label = '', cls = '', kind = '';
   if (touch && rev) { kind = 'sig'; label = touch.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT'; cls = touch.side === 'low' ? 'loc' : 'upc'; }
@@ -167,30 +176,53 @@ export function signalAt(P, i, sym, now) {
   else if (touch) { kind = 'touch'; label = touch.side === 'low' ? 'касание низа' : 'касание верха'; cls = touch.side === 'low' ? 'lo' : 'up'; }
   else if (squeeze) { kind = 'sq'; label = 'сжатие'; cls = 'sq'; }
   return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, rev, score, comps, checks, exc, volX, volZ,
-           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side };
+           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side, slope, brk };
+}
+
+// ---------- strategies ----------
+// S.strategy: 'revert' (bounce off a band back to the centre, default), 'revert_trend' (bounce only in the direction
+// of the channel's trend), 'breakout' (trade in the direction of a fresh close beyond a band). S.longOnly skips shorts.
+export const STRATEGIES = { revert: 'Отскок от полосы', revert_trend: 'Отскок по тренду', breakout: 'Пробой полосы' };
+// returns 'LONG' / 'SHORT' if this signal is tradable under S, else null
+export function wants(r, S) {
+  if (!r || r.score == null || r.score < S.minScore) return null;
+  const st = S.strategy || 'revert';
+  let side = null;
+  if (st === 'breakout') side = r.brk ? (r.brk.side === 'long' ? 'LONG' : 'SHORT') : null;
+  else if (r.rev) {
+    side = r.side === 'low' ? 'LONG' : 'SHORT';
+    if (st === 'revert_trend' && !(side === 'LONG' ? r.slope > 0 : r.slope < 0)) side = null;
+  }
+  if (side === 'SHORT' && S.longOnly) return null;
+  // optional trend filter for bounces: only coins that revert to the centre fast enough (T½ ≤ maxHL bars)
+  if (side && st !== 'breakout' && S.maxHL && !(isFinite(r.hl) && r.hl <= S.maxHL)) return null;
+  return side;
 }
 
 // what the bot saw at the moment of entry — stored with the trade
 export function snapshot(r, S) {
   return { score: r.score, comps: r.comps, checks: r.checks, z: r.z, pB: r.pB, rsi: r.rsi, hl: isFinite(r.hl) ? r.hl : null,
            exc: r.exc, volX: r.volX, volZ: r.volZ, mid: r.mid, up: r.up, lo: r.lo, atr: r.atr,
-           settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore } };
+           slope: r.slope, brk: r.brk,
+           settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0 } };
 }
 
 // ---------- trading rules ----------
 export function planEntry(r, balance, S, now) {
-  if (!r.rev || r.score < S.minScore) return null;
-  // optional trend filter: trade only coins that revert to the centre fast enough (T½ ≤ maxHL bars)
-  if (S.maxHL && !(isFinite(r.hl) && r.hl <= S.maxHL)) return null;
-  const side = r.side === 'low' ? 'LONG' : 'SHORT', sg = side === 'LONG' ? 1 : -1;
+  const side = wants(r, S);
+  if (!side) return null;
+  const sg = side === 'LONG' ? 1 : -1, brk = (S.strategy || 'revert') === 'breakout';
   const e = r.price * (1 + sg * SLIP);   // market entry pays slippage
-  const tpD = clamp(Math.abs(r.mid - e) / e, 0.01, 0.03), slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
+  const slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
+  // bounce: take profit at the centre (1–3%); breakout: no natural target, so 2× the stop distance (1–5%)
+  const tpD = brk ? clamp(2 * slD, 0.01, 0.05) : clamp(Math.abs(r.mid - e) / e, 0.01, 0.03);
   if (tpD < 0.8 * slD) return null;
   const qty = Math.min(balance * RISK / (e * slD), balance / 3 / e);
   if (!(qty > 0)) return null;
   const sl = e * (1 - sg * slD);
   return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf],
-           risk: Math.abs(e - sl) * qty, note: `${r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · сила ${r.score}`, snap: snapshot(r, S) };
+           risk: Math.abs(e - sl) * qty, snap: snapshot(r, S),
+           note: `${brk ? (sg > 0 ? 'пробой вверх' : 'пробой вниз') : r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · сила ${r.score}` };
 }
 // returns {exit, reason} or null; updates p.last
 export function checkExit(p, K, now) {
@@ -229,7 +261,7 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
   const opened = [];
   if (allowEntries) {
     const cool = new Set([...recentSyms, ...closed.map(x => x.sym)]);
-    const cands = rows.filter(r => r.rev && r.score >= S.minScore && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
+    const cands = rows.filter(r => wants(r, S) && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
     for (const r of cands) {
       if (stillOpen.length + opened.length >= MAX_OPEN) break;
       const p = planEntry(r, balance, S, now);
@@ -306,7 +338,7 @@ export function backtest(hist, S, { start = 10000, from = 0 } = {}) {
         if (i == null || !touchedAt(Q, i) || open.some(p => p.sym === sym)) continue;
         if (lastClose[sym] != null && T - lastClose[sym] < COOLDOWN * tfms) continue;
         const r = signalAt(Q, i, sym, T + tfms);   // bar fully elapsed
-        if (r?.rev && r.score >= S.minScore) { r.i = i; cands.push(r); }
+        if (wants(r, S)) { r.i = i; cands.push(r); }
       }
       cands.sort((a, b) => b.score - a.score);
       for (const r of cands) {
