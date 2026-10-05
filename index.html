@@ -780,6 +780,25 @@ syncInputs(); renderGuard(); renderJournal(); loadChart(); scan();
 setInterval(scan, SCAN_MS);
 setInterval(tickFoot, 1000);
 setInterval(() => { if (!document.hidden) loadChart(); }, SCAN_MS); // keep the chart's last candle fresh
+
+// ---------- auto-update: reload open tabs when a new version is deployed ----------
+// The journal and settings live in localStorage, so a reload loses nothing.
+const UPDATE_MS = 3 * 60000;
+const hashText = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
+const fetchSelf = () => fetch(location.pathname + '?_=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.text() : null).catch(() => null);
+let selfHash = null;
+fetchSelf().then(t => { if (t) selfHash = hashText(t); });
+async function checkUpdate() {
+  if (selfHash == null) return;
+  const t = await fetchSelf();
+  if (!t || hashText(t) === selfHash) return;
+  const el = $('#guard'); el.className = 'guard idle';
+  let n = 5;
+  const tick = () => { el.innerHTML = `<b>ОБНОВЛЕНИЕ</b> Вышла новая версия сайта — перезагружаю через ${n} с. Журнал и настройки сохранятся.`; if (n-- <= 0) location.reload(); else setTimeout(tick, 1000); };
+  tick();
+}
+setInterval(checkUpdate, UPDATE_MS);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 </script>
 </body>
 </html>
