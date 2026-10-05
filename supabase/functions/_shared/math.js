@@ -1,0 +1,230 @@
+// Single source of truth for the strategy math.
+// Used by the site (index.html imports it as an ES module) and by the shared bot (Supabase Edge Function).
+// Any change here changes both — the site picks it up on the next Vercel deploy, the bot on the next function deploy.
+
+export const TFMS = { '5m': 3e5, '15m': 9e5, '1h': 36e5, '4h': 144e5 };
+export const STABLE = new Set(['USDC','FDUSD','TUSD','BUSD','DAI','USDP','AEUR','EUR','EURI','USDE','USD1','BFUSD','XUSD','PYUSD','RLUSD','UST','USTC','SUSD']);
+export const FEE = 0.00075;   // exchange fee per side (taker, with BNB discount)
+export const SLIP = 0.0005;   // slippage on market fills: entry, stop and time-stop exits (TP is a limit order — no slippage)
+export const MAX_OPEN = 3;    // max simultaneous positions
+export const RISK = 0.02;     // share of balance lost if the stop is hit
+export const TIME_STOP = 48;  // bars until a forced market exit
+export const COOLDOWN = 4;    // bars before re-entering the same coin
+
+export const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+export const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
+
+// ---------- indicators ----------
+// returns {mid, up, lo, z}; z = deviation of the price from the centre in sigma units of the model
+export function bands(c, N, k, m) {
+  const n = c.length, mid = Array(n).fill(NaN), up = Array(n).fill(NaN), lo = Array(n).fill(NaN), z = Array(n).fill(NaN);
+  if (m === 'log') {
+    const r = bands(c.map(Math.log), N, k, 'classic');
+    return { mid: r.mid.map(Math.exp), up: r.up.map(Math.exp), lo: r.lo.map(Math.exp), z: r.z };
+  }
+  if (m === 'ewma') {
+    const a = 2 / (N + 1); let mu = c[0], v = 0;
+    for (let i = 0; i < n; i++) {
+      const d = c[i] - mu; mu += a * d; v = (1 - a) * (v + a * d * d);
+      if (i >= N - 1) { const s = Math.sqrt(v); mid[i] = mu; up[i] = mu + k*s; lo[i] = mu - k*s; z[i] = s ? (c[i] - mu) / s : 0; }
+    }
+    return { mid, up, lo, z };
+  }
+  for (let i = N - 1; i < n; i++) {
+    const w = c.slice(i - N + 1, i + 1); let mu, s;
+    if (m === 'robust') { mu = median(w); s = 1.4826 * median(w.map(x => Math.abs(x - mu))); }
+    else { mu = w.reduce((p, x) => p + x, 0) / N; s = Math.sqrt(w.reduce((p, x) => p + (x - mu) ** 2, 0) / N); }
+    mid[i] = mu; up[i] = mu + k*s; lo[i] = mu - k*s; z[i] = s ? (c[i] - mu) / s : 0;
+  }
+  return { mid, up, lo, z };
+}
+export function rsi(c, p = 14) {
+  const r = Array(c.length).fill(NaN); let g = 0, l = 0;
+  for (let i = 1; i < c.length; i++) {
+    const d = c[i] - c[i-1], G = Math.max(d, 0), L = Math.max(-d, 0);
+    if (i <= p) { g += G; l += L; if (i === p) { g /= p; l /= p; r[i] = l ? 100 - 100/(1 + g/l) : 100; } }
+    else { g = (g*(p-1) + G)/p; l = (l*(p-1) + L)/p; r[i] = l ? 100 - 100/(1 + g/l) : 100; }
+  }
+  return r;
+}
+export function atr(h, l, c, p = 14) {
+  let a = NaN;
+  for (let i = 1; i < c.length; i++) {
+    const tr = Math.max(h[i] - l[i], Math.abs(h[i] - c[i-1]), Math.abs(l[i] - c[i-1]));
+    a = i <= p ? (isNaN(a) ? tr : a + (tr - a) / i) : (a*(p-1) + tr)/p;
+  }
+  return a;
+}
+// half-life of the deviation from the centre via AR(1): x_t = phi * x_{t-1}
+export function halfLife(c, mid) {
+  const x = []; for (let i = 0; i < c.length; i++) if (isFinite(mid[i]) && mid[i] > 0) x.push(Math.log(c[i]) - Math.log(mid[i]));
+  const xs = x.slice(-150); let num = 0, den = 0;
+  for (let i = 1; i < xs.length; i++) { num += xs[i]*xs[i-1]; den += xs[i-1]*xs[i-1]; }
+  const phi = den ? num/den : 1;
+  return phi > 0 && phi < 1 ? -Math.LN2 / Math.log(phi) : Infinity;
+}
+export function parse(K) {
+  return { t: K.map(x => x[0]), o: K.map(x => +x[1]), h: K.map(x => +x[2]), l: K.map(x => +x[3]), c: K.map(x => +x[4]), v: K.map(x => +x[5]) };
+}
+
+// ---------- signal ----------
+// S = {method, N, k, tf}; the last kline is the forming one
+export function analyze(sym, K, S, now = Date.now()) {
+  const { t, o, h, l, c, v } = parse(K), n = c.length, i = n - 1, p = n - 2;
+  if (n < S.N + 10) return null;
+  const B = bands(c, S.N, S.k, S.method);
+  if (!isFinite(B.mid[i]) || B.up[i] <= B.lo[i]) return null;
+  const pB = (c[i] - B.lo[i]) / (B.up[i] - B.lo[i]);
+  const r = rsi(c)[i], hl = halfLife(c, B.mid);
+  // squeeze: volatility compression = sigma of log-returns over last 20 bars / sigma over last N bars
+  const lr = []; for (let j = 1; j < n; j++) lr.push(Math.log(c[j] / c[j-1]));
+  const sd = a => { const m = a.reduce((q, x) => q + x, 0) / a.length; return Math.sqrt(a.reduce((q, x) => q + (x - m) ** 2, 0) / a.length); };
+  const vlong = sd(lr.slice(-S.N)), comp = vlong ? sd(lr.slice(-20)) / vlong : 1;
+  const squeeze = comp < 0.5;
+  // volume: the forming bar is projected to a full bar, then robust z-score of ln(volume) vs ~96 earlier bars
+  const elapsed = clamp((now - t[i]) / TFMS[S.tf], 0.25, 1);
+  const va = v.slice(); va[i] = v[i] / elapsed;
+  const baseV = v.slice(Math.max(0, n - 100), n - 4).filter(x => x > 0).map(Math.log);
+  const vm = median(baseV), vmad = 1.4826 * median(baseV.map(x => Math.abs(x - vm))) || 1;
+  const vz = x => x > 0 && isFinite(vm) ? (Math.log(x) - vm) / vmad : 0;
+
+  let touch = null;
+  for (let j = n - 1; j >= n - 5; j--) {
+    if (l[j] <= B.lo[j]) { touch = { side: 'low', j }; break; }
+    if (h[j] >= B.up[j]) { touch = { side: 'up', j }; break; }
+  }
+  // volume shown: for a touch — the strongest bar since the touch, otherwise the last closed bar
+  let vRef = va[p];
+  if (touch) { vRef = 0; for (let q = touch.j; q <= i; q++) vRef = Math.max(vRef, va[q]); }
+  const volZ = vz(vRef), volX = isFinite(vm) ? vRef / Math.exp(vm) : null;
+
+  let score = null, rev = false, comps = null, checks = null, exc = 0;
+  if (touch) {
+    const j = touch.j, half = (B.up[j] - B.lo[j]) / (2 * S.k), low = touch.side === 'low';
+    exc = Math.max(0, low ? (B.lo[j] - l[j]) / half : (h[j] - B.up[j]) / half);
+    checks = {
+      closed: j <= p,
+      candle: j <= p && (low ? c[p] > o[p] : c[p] < o[p]),
+      inside: low ? c[p] > B.lo[p] && c[i] > B.lo[i] : c[p] < B.up[p] && c[i] < B.up[i],
+      volume: volZ >= 1,
+    };
+    rev = checks.closed && checks.candle && checks.inside && checks.volume;
+    comps = {
+      D: 1 - Math.exp(-2 * exc),
+      V: clamp(volZ / 3, 0, 1),
+      R: clamp(low ? (35 - r) / 20 : (r - 65) / 20, 0, 1),
+      C: rev ? 1 : 0,
+      M: isFinite(hl) ? clamp(1 - hl / 40, 0, 1) : 0,
+    };
+    score = Math.round(100 * (0.25*comps.D + 0.25*comps.V + 0.15*comps.R + 0.20*comps.C + 0.15*comps.M));
+  }
+  const outUp = c[i] > B.up[i], outLo = c[i] < B.lo[i];
+  let label = '', cls = '', kind = '';
+  if (touch && rev) { kind = 'sig'; label = touch.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT'; cls = touch.side === 'low' ? 'loc' : 'upc'; }
+  else if (outUp || outLo) { kind = 'out'; label = outUp ? 'за каналом ↑' : 'за каналом ↓'; cls = outUp ? 'uo' : 'lout'; }
+  else if (touch) { kind = 'touch'; label = touch.side === 'low' ? 'касание низа' : 'касание верха'; cls = touch.side === 'low' ? 'lo' : 'up'; }
+  else if (squeeze) { kind = 'sq'; label = 'сжатие'; cls = 'sq'; }
+  return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, rev, score, comps, checks, exc, volX, volZ,
+           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: atr(h, l, c), side: touch?.side };
+}
+
+// what the bot saw at the moment of entry — stored with the trade
+export function snapshot(r, S) {
+  return { score: r.score, comps: r.comps, checks: r.checks, z: r.z, pB: r.pB, rsi: r.rsi, hl: isFinite(r.hl) ? r.hl : null,
+           exc: r.exc, volX: r.volX, volZ: r.volZ, mid: r.mid, up: r.up, lo: r.lo, atr: r.atr,
+           settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore } };
+}
+
+// ---------- trading rules ----------
+export function planEntry(r, balance, S, now) {
+  if (!r.rev || r.score < S.minScore) return null;
+  const side = r.side === 'low' ? 'LONG' : 'SHORT', sg = side === 'LONG' ? 1 : -1;
+  const e = r.price * (1 + sg * SLIP);   // market entry pays slippage
+  const tpD = clamp(Math.abs(r.mid - e) / e, 0.01, 0.03), slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
+  if (tpD < 0.8 * slD) return null;
+  const qty = Math.min(balance * RISK / (e * slD), balance / 3 / e);
+  if (!(qty > 0)) return null;
+  const sl = e * (1 - sg * slD);
+  return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf],
+           risk: Math.abs(e - sl) * qty, note: `${r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · сила ${r.score}`, snap: snapshot(r, S) };
+}
+// returns {exit, reason} or null; updates p.last
+export function checkExit(p, K, now) {
+  const sg = p.side === 'LONG' ? 1 : -1;
+  const start = Math.floor(p.time / p.tfms) * p.tfms + p.tfms;   // bars fully after the entry
+  for (const k of K) {
+    if (k[0] < start) continue;
+    const hi = +k[2], lo = +k[3];
+    // if one bar touched both levels we assume the stop came first (pessimistic)
+    if (p.side === 'LONG' ? lo <= p.sl : hi >= p.sl) return { exit: p.sl * (1 - sg * SLIP), reason: 'стоп' };
+    if (p.side === 'LONG' ? hi >= p.tp : lo <= p.tp) return { exit: p.tp, reason: 'тейк' };
+  }
+  const c = +K[K.length - 1][4]; p.last = c;
+  if (p.side === 'LONG' ? c <= p.sl : c >= p.sl) return { exit: c * (1 - sg * SLIP), reason: 'стоп' };
+  if (p.side === 'LONG' ? c >= p.tp : c <= p.tp) return { exit: p.tp, reason: 'тейк' };
+  if (now - p.time > TIME_STOP * p.tfms) return { exit: c * (1 - sg * SLIP), reason: 'тайм-стоп' };
+  return null;
+}
+export function closeTrade(p, exit, reason, now) {
+  const sg = p.side === 'LONG' ? 1 : -1;
+  const gross = sg * (exit - p.entry) * p.qty, fee = (p.entry + exit) * p.qty * FEE, pnl = gross - fee;
+  const risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
+  return { id: p.id, sym: p.sym, side: p.side, entry: p.entry, exit, tp: p.tp, sl: p.sl, qty: p.qty, time: p.time, tclose: now,
+           reason, fee, gross, pnl, r: risk ? pnl / risk : null, note: p.note, snap: p.snap ?? null };
+}
+// one bot step: manage exits, then open new positions. Pure — the caller persists the result.
+export function botTick({ rows, klines, open, recentSyms, balance, S, now, allowEntries = true }) {
+  const closed = [], stillOpen = [];
+  for (const p of open) {
+    const K = klines[p.sym];
+    const x = K ? checkExit(p, K, now) : null;
+    if (!x) { stillOpen.push(p); continue; }
+    const t = closeTrade(p, x.exit, x.reason, now);
+    balance += t.pnl; closed.push(t);
+  }
+  const opened = [];
+  if (allowEntries) {
+    const cool = new Set([...recentSyms, ...closed.map(x => x.sym)]);
+    const cands = rows.filter(r => r.rev && r.score >= S.minScore && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
+    for (const r of cands) {
+      if (stillOpen.length + opened.length >= MAX_OPEN) break;
+      const p = planEntry(r, balance, S, now);
+      if (p) opened.push(p);
+    }
+  }
+  return { closed, stillOpen, opened, balance };
+}
+export function pickSymbols(ticker, top, extra, now) {
+  const list = ticker.filter(x => x.symbol.endsWith('USDT') && !STABLE.has(x.symbol.slice(0, -4)) && +x.quoteVolume > 0 && x.closeTime > now - 864e5)
+    .sort((a, b) => b.quoteVolume - a.quoteVolume).slice(0, top).map(x => x.symbol);
+  for (const s of extra) if (!list.includes(s)) list.push(s);
+  return list;
+}
+
+// ---------- journal statistics ----------
+// fills fields missing in trades recorded before fees/R were stored separately
+export function normTrade(x) {
+  const fee = x.fee ?? (x.entry + x.exit) * x.qty * FEE;
+  const reason = x.reason ?? String(x.note || '').split(' · ')[0];
+  const risk = Math.abs(x.entry - x.sl) * x.qty;
+  return { ...x, fee, gross: x.gross ?? x.pnl + fee, reason, r: x.r ?? (risk ? x.pnl / risk : null), size: x.entry * x.qty, hold: x.tclose - x.time };
+}
+export function journalStats(start, closed) {
+  const cl = closed.map(normTrade), n = cl.length;
+  const wins = cl.filter(x => x.pnl > 0), losses = cl.filter(x => x.pnl <= 0);
+  const sum = (a, f) => a.reduce((s, x) => s + f(x), 0);
+  const gw = sum(wins, x => x.pnl), gl = -sum(losses, x => x.pnl);
+  const rs = cl.map(x => x.r).filter(x => x != null && isFinite(x));
+  // max drawdown of net equity, chronological
+  let eq = start, peak = start, dd = 0;
+  for (const x of [...cl].sort((a, b) => a.tclose - b.tclose)) { eq += x.pnl; peak = Math.max(peak, eq); dd = Math.max(dd, (peak - eq) / peak); }
+  return {
+    n, win: wins.length, loss: losses.length, wr: n ? wins.length / n * 100 : null,
+    gross: sum(cl, x => x.gross), fees: sum(cl, x => x.fee), net: sum(cl, x => x.pnl),
+    avgWin: wins.length ? gw / wins.length : null, avgLoss: losses.length ? -gl / losses.length : null,
+    expR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
+    pf: gl ? gw / gl : null, maxDD: dd * 100, avgHold: n ? sum(cl, x => x.hold) / n : null,
+    pnl24: sum(cl.filter(x => now() - x.tclose < 864e5), x => x.pnl),
+  };
+}
+const now = () => Date.now();

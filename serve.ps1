@@ -12,6 +12,7 @@ while ($l.IsListening) {
   if (Test-Path $f -PathType Leaf) {
     $b = [IO.File]::ReadAllBytes($f)
     if ($f -like '*.html') { $ctx.Response.ContentType = 'text/html; charset=utf-8' }
+    if ($f -like '*.js') { $ctx.Response.ContentType = 'text/javascript; charset=utf-8' }
     $ctx.Response.OutputStream.Write($b, 0, $b.Length)
   } else { $ctx.Response.StatusCode = 404 }
   $ctx.Response.Close()

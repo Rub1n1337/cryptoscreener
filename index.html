@@ -6,10 +6,11 @@
 <title>Sigma Radar</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b0f17'/><path d='M4 10 Q16 4 28 10' stroke='%23ef4444' stroke-width='2.5' fill='none'/><path d='M4 22 Q16 28 28 22' stroke='%2322c55e' stroke-width='2.5' fill='none'/><path d='M4 18 L10 14 L15 17 L21 11 L28 15' stroke='%23f5b70a' stroke-width='2.5' fill='none'/></svg>">
 <style>
-:root{--bg:#0b0f17;--panel:#111827;--panel2:#0f1622;--line:#1f2937;--text:#e5e7eb;--mute:#8b95a5;--acc:#f5b70a;--up:#ef4444;--lo:#22c55e;--mid:#64748b;--blue:#3b82f6}
+:root{--bg:#0b0f17;--panel:#111827;--panel2:#0f1622;--line:#1f2937;--text:#e5e7eb;--mute:#8b95a5;--faint:#566173;--acc:#f5b70a;--up:#ef4444;--lo:#22c55e;--mid:#64748b;--blue:#3b82f6;--violet:#a78bfa}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:1500px;margin:0 auto;padding:12px 16px 30px}
+.num,td,.card .v,.kv b{font-variant-numeric:tabular-nums}
 .guard{background:#0d2016;border:1px solid #14532d;border-radius:6px;padding:8px 14px;font-size:13px}
 .guard b{color:#22c55e;margin-right:8px}.guard.bad{background:#2a1010;border-color:#7f1d1d}.guard.bad b{color:#ef4444}
 .guard.idle{background:#1a1a10;border-color:#4d4410}.guard.idle b{color:var(--acc)}
@@ -22,19 +23,22 @@ button{cursor:pointer}button:hover{border-color:#374151}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .tab{padding:9px 18px;font-size:15px}.tab.on{border-color:var(--acc);color:var(--acc)}
 .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}
+.cards.auto{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px}
-[title]{cursor:help}button[title],select[title],input[title]{cursor:pointer}
+[title]{cursor:help}button[title],select[title],input[title],tr[title]{cursor:pointer}
 .card .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.03em}
 .card .v{font-size:20px;font-weight:600;margin:2px 0}.card .s{font-size:11px;color:var(--mute)}
 .meter{height:4px;background:#1f2937;border-radius:2px;margin-top:6px}.meter i{display:block;height:100%;background:var(--blue);border-radius:2px}
 .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px}
+.ptitle{font-weight:600;margin-bottom:6px}.ptitle span{font-weight:400;font-size:12px;color:var(--mute)}
 .ctrl{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px;margin:8px 0}
 .ctrl label{color:var(--mute);font-size:12px;display:flex;align-items:center;gap:6px}
 .ctrl label b{color:var(--acc);min-width:28px}
 input[type=range]{padding:0;width:120px;accent-color:var(--blue)}
 .stats{font-size:13px;color:var(--mute)}.stats b{color:var(--acc)}
-canvas{width:100%;height:440px;display:block;background:#0a0e15;border-radius:6px}
+canvas{width:100%;display:block;background:#0a0e15;border-radius:6px}
+#cv{height:480px}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:var(--mute);margin-top:6px}
 .legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:4px}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}.filters>*{flex:1;min-width:110px}
@@ -53,43 +57,52 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
 .tag.up{background:#3b1414;color:#fca5a5}.tag.lo{background:#0f2e1c;color:#86efac}.tag.sq{background:#3a2e05;color:#fcd34d}
 .tag.upc{background:#b91c1c;color:#fff}.tag.loc{background:#15803d;color:#fff}
 .tag.uo{background:transparent;color:#fca5a5;border:1px solid #7f1d1d}.tag.lout{background:transparent;color:#86efac;border:1px solid #14532d}
-.pos{color:var(--lo)}.neg{color:var(--up)}.mute{color:var(--mute)}
-.faint{color:#566173}
+.tag.tp{background:#0f2e1c;color:#86efac}.tag.sl{background:#3b1414;color:#fca5a5}.tag.ts{background:#1f2937;color:#cbd5e1}
+.pos{color:var(--lo)}.neg{color:var(--up)}.mute{color:var(--mute)}.faint{color:var(--faint)}
 .detail{margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px}
-.detail .verdict{font-size:14px;margin-bottom:10px}
-.detail .verdict b{color:var(--acc)}
-.comp{display:grid;grid-template-columns:150px 1fr 70px;gap:8px;align-items:center;font-size:12px;margin:5px 0}
+.verdict{font-size:14px;margin-bottom:10px}.verdict b{color:var(--acc)}
+.comp{display:grid;grid-template-columns:150px 1fr 64px;gap:8px;align-items:center;font-size:12px;margin:5px 0}
 .comp .cb{height:6px;background:#1f2937;border-radius:3px;overflow:hidden}.comp .cb i{display:block;height:100%;background:var(--acc)}
 .comp .cn{color:var(--mute)}.comp .cv{text-align:right}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:8px}
 .foot{text-align:center;color:var(--mute);font-size:12px;margin-top:12px}
-.hidden{display:none}
-.doc{max-width:900px}.doc h3{color:var(--acc);margin:22px 0 6px}.doc code{background:#1f2937;padding:1px 5px;border-radius:4px}
+.hidden{display:none!important}
+.doc{max-width:960px}.doc h3{color:var(--acc);margin:22px 0 6px}.doc code{background:#1f2937;padding:1px 5px;border-radius:4px}
 .doc li{margin:4px 0}
-@media(max-width:1100px){.grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:560px){.cards{grid-template-columns:1fr}canvas{height:340px}.comp{grid-template-columns:110px 1fr 56px}}
+.gloss{display:grid;grid-template-columns:200px 1fr;gap:6px 16px;font-size:13px}.gloss b{color:var(--text)}.gloss span{color:var(--mute)}
+/* trade card */
+.modal{position:fixed;inset:0;background:rgba(3,6,12,.72);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:28px 16px;overflow:auto}
+.mbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;width:min(1400px,100%);padding:14px}
+.mhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.mhead h2{margin:0;font-size:18px}.mhead .mute{font-size:13px}.mhead button{margin-left:auto}
+.mgrid{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:12px}
+#tcv{height:560px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:5px 10px;font-size:13px;margin-bottom:12px}.kv span{color:var(--mute)}.kv b{font-weight:600;text-align:right}
+.aside h4{margin:12px 0 6px;font-size:13px;color:var(--acc);text-transform:uppercase;letter-spacing:.03em}
+@media(max-width:1100px){.grid,.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.cards{grid-template-columns:1fr}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div id="guard" class="guard"><b>СТОРОЖ</b> загрузка…</div>
-  <h1>Sigma Radar <small id="hdr"></small> <button id="snd" title="Короткий сигнал, когда появляется новый подтверждённый сигнал">🔇 Звук выкл</button></h1>
-  <div class="sub">Сканер рынка Binance: выход цены за статистический канал, подтверждение разворота объёмом, сжатия волатильности, скорость возврата к среднему. Наведите на заголовок — появится подсказка.</div>
+  <h1>Sigma Radar <small id="hdr"></small> <button id="snd" title="Короткий звук, когда появляется новый подтверждённый сигнал">🔇 Звук выкл</button></h1>
+  <div class="sub">Сканер рынка Binance: выход цены за статистический канал, подтверждение разворота объёмом, сжатия волатильности, скорость возврата к центру. Наведите на заголовок — появится подсказка.</div>
 
   <div class="tabs">
     <button class="tab on" data-t="market">📡 Рынок</button>
-    <button class="tab" data-t="journal">📒 Журнал торговли</button>
-    <button class="tab" data-t="help">📘 Инструкция</button>
+    <button class="tab" data-t="journal">📒 Журнал сделок</button>
+    <button class="tab" data-t="help">📘 Инструкция и термины</button>
   </div>
 
   <!-- MARKET -->
   <section id="market">
     <div class="cards">
-      <div class="card" title="Медиана позиции в канале (%B) по всем парам. 50% — рынок в середине своих каналов, ближе к 0% — всё у нижних полос, ближе к 100% — у верхних."><div class="t">Термометр рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s">медиана %B</div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
-      <div class="card" title="Доля пар, у которых цена в нижних 10% канала или ниже него — потенциальные отскоки вверх."><div class="t">Замёрзло (%B &lt; 10%)</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
-      <div class="card" title="Доля пар, у которых цена в верхних 10% канала или выше него — потенциальные откаты вниз."><div class="t">Перегрето (%B &gt; 90%)</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
-      <div class="card" title="Подтверждённые сигналы: было касание полосы за последние 4 свечи, свеча развернулась обратно в канал, объём выше нормы."><div class="t">Сигналов сейчас</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
-      <div class="card" title="Пары, у которых волатильность за 20 свечей меньше половины обычной. Часто это затишье перед сильным движением."><div class="t">Сжатия</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">σ(20) &lt; ½·σ(N) — затишье перед движением</div></div>
+      <div class="card" title="Медиана %B по всем парам. 50% — рынок в середине своих каналов, ближе к 0% — у нижних полос, ближе к 100% — у верхних."><div class="t">Термометр рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s">медиана %B</div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
+      <div class="card" title="Доля пар в нижних 10% канала или ниже него — кандидаты на отскок вверх."><div class="t">У нижней полосы</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
+      <div class="card" title="Доля пар в верхних 10% канала или выше него — кандидаты на откат вниз."><div class="t">У верхней полосы</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
+      <div class="card" title="Подтверждённые сигналы: касание полосы за последние 4 свечи, разворотная свеча закрылась внутри канала, объём выше нормы."><div class="t">Сигналов сейчас</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
+      <div class="card" title="Пары, у которых волатильность за 20 свечей меньше половины обычной. Часто это затишье перед сильным движением."><div class="t">Сжатия</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">σ за 20 свечей &lt; ½ обычной</div></div>
     </div>
 
     <div class="grid">
@@ -97,17 +110,17 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
         <div style="font-weight:600;font-size:16px" id="ctitle">—</div>
         <div class="ctrl">
           <label>Монета <input id="csym" list="symlist" placeholder="BTC, SOL… + Enter" style="width:150px"><datalist id="symlist"></datalist></label>
-          <label title="Таймфрейм свечей — и для графика, и для сканера">ТФ <select id="tf"><option>5m</option><option>15m</option><option>1h</option><option>4h</option></select></label>
-          <label title="Как считается центр и ширина канала. Подробности — во вкладке «Инструкция»">Математика <select id="method">
+          <label title="Таймфрейм свечей — и для графика, и для сканера, и для вашего бота">ТФ <select id="tf"><option>5m</option><option>15m</option><option>1h</option><option>4h</option></select></label>
+          <label title="Как считается центр и ширина канала. Подробности — во вкладке «Инструкция»">Модель канала <select id="method">
             <option value="log">Лог-канал (в ln цены)</option>
             <option value="classic">Классика (SMA ± σ)</option>
             <option value="robust">Робастная (медиана ± MAD)</option>
             <option value="ewma">EWMA (экспон. σ)</option>
           </select></label>
           <label title="Длина окна: по скольким последним свечам считается канал">N <input type="range" id="N" min="20" max="300" step="1"><b id="Nv"></b></label>
-          <label title="Ширина канала в σ. 2 — классические BB, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="4" step="0.1"><b id="kv"></b></label>
+          <label title="Ширина канала в σ. 2 — классические полосы Боллинджера, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="4" step="0.1"><b id="kv"></b></label>
           <label title="Сколько свечей показать на графике">Свечей <input type="range" id="cn" min="100" max="800" step="10"><b id="cnv"></b></label>
-          <button id="reset" title="Вернуть N=210, k=3, робастную математику, 15m">Сброс</button>
+          <button id="reset" title="Вернуть лог-канал, N=210, k=3, 15m">Сброс</button>
         </div>
         <div class="mute" style="font-size:12px;margin-bottom:6px" id="mhint"></div>
         <div class="stats" id="cstats"></div>
@@ -116,17 +129,17 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
           <span><i style="border-color:#ef4444"></i>верхняя полоса</span>
           <span><i style="border-color:#64748b;border-top-style:dashed"></i>центр</span>
           <span><i style="border-color:#22c55e"></i>нижняя полоса</span>
-          <span><i style="border-color:#e5e7eb"></i>цена закрытия</span>
-          <span>▼▲ выход за полосу</span>
+          <span>▮ свечи (когда помещаются) или линия закрытия</span>
           <span><i style="border-color:#f5b70a;border-top-style:dashed"></i>текущая цена</span>
-          <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>позиция бота (вход/TP/SL)</span>
+          <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>позиция бота: вход / TP / SL</span>
+          <span>снизу — объём и RSI(14)</span>
         </div>
         <div class="detail" id="detail"></div>
       </div>
 
       <div class="panel">
         <div class="filters">
-          <select id="fz" title="Где сейчас цена относительно канала"><option value="">Все зоны</option><option value="lo">Нижняя зона (&lt;10%)</option><option value="hi">Верхняя зона (&gt;90%)</option><option value="out">За каналом</option><option value="in">Внутри канала</option></select>
+          <select id="fz" title="Где сейчас цена относительно канала"><option value="">Все зоны</option><option value="lo">Нижняя зона (%B &lt; 10%)</option><option value="hi">Верхняя зона (%B &gt; 90%)</option><option value="out">За каналом</option><option value="in">Внутри канала</option></select>
           <select id="fl" title="Тип метки"><option value="">Все метки</option><option value="sig">Сигналы (подтверждено)</option><option value="touch">Касания и выходы</option><option value="sq">Сжатия</option><option value="fav">★ Избранное</option></select>
           <input id="fs" placeholder="Поиск монеты…">
           <select id="top" title="Сколько самых ликвидных пар сканировать" style="flex:0 0 auto;min-width:0"><option value="100">100 пар</option><option value="150">150 пар</option><option value="250">250 пар</option><option value="400">400 пар</option></select>
@@ -137,12 +150,12 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
             <th data-s="fav" title="Избранное — всегда наверху при сортировке по умолчанию">★</th>
             <th data-s="sym">Монета</th>
             <th data-s="price">Цена</th>
-            <th data-s="pB" title="%B: 0% — на нижней полосе, 50% — в центре, 100% — на верхней. Кружок на шкале: зелёная граница — низ, красная — верх">Канал</th>
-            <th data-s="z" title="На сколько σ цена отклонилась от центра. При k=3 полосы — это ±3σ">z</th>
-            <th data-s="label" title="▲/▼ сигнал — подтверждённый разворот; «за каналом» — цена прямо сейчас за полосой; «касание» — была за полосой недавно, но разворот не подтверждён; «сжатие» — затишье">Метка</th>
-            <th data-s="score" title="Сила сигнала 0–100, считается только при касании. Яркая — разворот подтверждён, серая — пока нет. Бот входит при оценке ≥ порога (60)">Оценка</th>
-            <th data-s="vol" title="Объём относительно медианы за ~100 свечей. Текущая незакрытая свеча пересчитана на полную длительность">Объём</th>
-            <th data-s="hl" title="T½ — за сколько обычно возвращается половина отклонения от центра. Коротко — монета хорошо «пружинит». ∞ — тренд, отскок рискован">T½</th>
+            <th data-s="pB" title="%B — позиция в канале: 0% — на нижней полосе, 50% — в центре, 100% — на верхней. На шкале: зелёная граница — низ, красная — верх, пунктир — центр">%B</th>
+            <th data-s="z" title="Отклонение от центра в σ модели. При k = 3 полосы — это ±3σ">Откл.</th>
+            <th data-s="label" title="▲/▼ сигнал — подтверждённый разворот; «за каналом» — цена прямо сейчас за полосой; «касание» — была за полосой недавно, разворот не подтверждён; «сжатие» — затишье">Метка</th>
+            <th data-s="score" title="Сила сигнала 0–100, считается только при касании полосы. Яркая — разворот подтверждён, серая — нет. Бот входит при силе ≥ порога">Сила</th>
+            <th data-s="vol" title="Объём относительно медианы за ~100 свечей. Незакрытая свеча пересчитана на полную длительность">Объём</th>
+            <th data-s="hl" title="T½ — за сколько обычно исчезает половина отклонения от центра. Коротко — монета хорошо «пружинит». ∞ — тренд, отскок рискован">T½</th>
           </tr></thead>
           <tbody id="tb"><tr><td colspan="9" class="mute">Сканирую рынок…</td></tr></tbody>
         </table></div>
@@ -157,18 +170,24 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
       <button class="tab jm" data-m="mine" title="Ваш личный бот: работает в этом браузере, пока вкладка открыта, на ваших настройках">👤 Мой бот</button>
     </div>
     <div class="sub" id="jdesc"></div>
-    <div class="cards" id="jcards"></div>
+    <div class="cards auto" id="jcards"></div>
     <div class="ctrl" id="jmine">
       <label><input type="checkbox" id="boton"> Бот торгует (бумажная торговля в браузере, пока вкладка открыта)</label>
-      <label title="Бот открывает сделку только при подтверждённом сигнале с оценкой не ниже этой">Мин. оценка <input type="range" id="minsc" min="40" max="90" step="1"><b id="minscv"></b></label>
+      <label title="Бот открывает сделку только при подтверждённом сигнале с силой не ниже этой">Мин. сила сигнала <input type="range" id="minsc" min="40" max="90" step="1"><b id="minscv"></b></label>
       <button id="jreset">Сбросить журнал</button>
     </div>
-    <div class="panel" style="margin-bottom:12px"><div style="font-weight:600;margin-bottom:6px">Открытые позиции</div>
-      <div class="tablewrap"><table><thead><tr><th>Время</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Сейчас</th><th>Объём</th><th>TP</th><th>SL</th><th>PnL</th><th>Комментарий</th></tr></thead><tbody id="jopen"></tbody></table></div>
+    <div class="panel" style="margin-bottom:12px"><div class="ptitle">Открытые позиции <span>· клик — карточка позиции</span></div>
+      <div class="tablewrap"><table><thead><tr>
+        <th>Открыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Сейчас</th><th title="Сумма позиции в долларах">Размер</th><th>Тейк</th><th>Стоп</th>
+        <th title="Нереализованный PnL после комиссии на вход и выход">PnL сейчас</th><th title="Текущий результат в R: 1R — сумма, которую потеряем на стопе">R сейчас</th><th>Сила</th>
+      </tr></thead><tbody id="jopen"></tbody></table></div>
     </div>
-    <div class="panel"><div style="font-weight:600;margin-bottom:6px">История сделок <span class="mute" style="font-weight:400;font-size:12px">· клик по заголовку — сортировка</span></div>
+    <div class="panel"><div class="ptitle">Закрытые сделки <span>· клик по строке — карточка сделки, по заголовку — сортировка</span></div>
       <div class="tablewrap"><table><thead><tr id="jhead">
-        <th data-s="tclose">Время</th><th data-s="sym">Монета</th><th data-s="side">Сторона</th><th data-s="entry">Вход</th><th data-s="exit">Выход</th><th data-s="qty">Объём</th><th data-s="tp">TP</th><th data-s="sl">SL</th><th data-s="pnl">Итог</th><th data-s="note">Комментарий</th>
+        <th data-s="tclose">Закрыта</th><th data-s="sym">Монета</th><th data-s="side">Сторона</th><th data-s="entry">Вход</th><th data-s="exit">Выход</th>
+        <th data-s="size" title="Сумма позиции в долларах">Размер</th><th data-s="reason">Причина выхода</th><th data-s="hold">Длит.</th>
+        <th data-s="gross" title="Результат по цене, без учёта комиссий">PnL до ком.</th><th data-s="fee" title="Комиссия биржи за вход и выход">Комиссия</th>
+        <th data-s="pnl" title="Итог сделки после комиссий">PnL</th><th data-s="r" title="Итог в R: +1R — заработали столько, сколько рисковали; −1R — полный стоп">R</th>
       </tr></thead><tbody id="jclosed"></tbody></table></div>
     </div>
   </section>
@@ -177,106 +196,131 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
   <section id="help" class="hidden"><div class="panel doc">
     <h3>Коротко: как пользоваться</h3>
     <ol>
-      <li>Смотрите таблицу справа. Сверху — монеты, которые дальше всего от центра своего канала.</li>
-      <li>Ищите метки <span class="tag loc">▲ сигнал LONG</span> и <span class="tag upc">▼ сигнал SHORT</span> — это подтверждённые развороты от полосы.</li>
-      <li>Кликните по монете — слева откроется график и блок «Разбор сигнала»: что выполнено, чего не хватает и из чего сложилась оценка.</li>
-      <li>Во вкладке «Журнал» бумажный бот сам торгует по этим сигналам — смотрите, работает ли идея на дистанции.</li>
+      <li>Смотрите таблицу на вкладке «Рынок». Сверху — сигналы и монеты дальше всего от центра своего канала.</li>
+      <li>Ищите метки <span class="tag loc">▲ сигнал LONG</span> и <span class="tag upc">▼ сигнал SHORT</span> — подтверждённые развороты от полосы.</li>
+      <li>Кликните по монете — слева график и «Разбор сигнала»: что выполнено, чего не хватает, из чего сложилась сила.</li>
+      <li>Во вкладке «Журнал сделок» — результаты ботов. Клик по сделке открывает её карточку: свечи, вход и выход, и почему бот вошёл.</li>
     </ol>
 
-    <h3>Что это</h3>
-    <p>Учебный сканер. Данные — публичный API Binance (спот, пары к USDT, без стейблкоинов). Торговля — <b>только бумажная</b>: бот считает виртуальные сделки прямо в браузере и пишет их в журнал (хранится в localStorage этого браузера). Реальных ордеров нет, ключи не нужны.</p>
+    <h3>Термины</h3>
+    <div class="gloss">
+      <b>Канал</b><span>Коридор вокруг цены: центр ± k·σ за последние N свечей. Модель канала задаёт, как считаются центр и σ.</span>
+      <b>Центр, полосы</b><span>Центр — «нормальная» цена за окно. Верхняя и нижняя полосы — границы канала.</span>
+      <b>%B</b><span>Позиция цены в канале: 0% — на нижней полосе, 50% — в центре, 100% — на верхней, больше 100% или меньше 0% — за каналом.</span>
+      <b>Отклонение, σ</b><span>На сколько стандартных отклонений модели цена ушла от центра. При k = 3 полосы — это ±3σ.</span>
+      <b>Касание</b><span>Тень свечи вышла за полосу за последние 4 свечи.</span>
+      <b>Подтверждение разворота</b><span>Все 4 условия: свеча касания закрылась; следующая свеча в сторону отскока; цена вернулась внутрь канала; объём выше нормы.</span>
+      <b>Сигнал</b><span>Касание с подтверждением разворота. Касание низа → LONG, верха → SHORT.</span>
+      <b>Сила сигнала</b><span>Оценка 0–100 из пяти компонент: глубина прокола, объём, RSI, подтверждение, возврат к центру.</span>
+      <b>Объём ×</b><span>Объём свечи / медиана объёма за ~100 свечей. ×2 — вдвое выше обычного.</span>
+      <b>T½ (полураспад)</b><span>За сколько обычно исчезает половина отклонения от центра. ∞ — тренд, цена не стремится к центру.</span>
+      <b>Сжатие</b><span>Волатильность за 20 свечей меньше половины обычной.</span>
+      <b>LONG / SHORT</b><span>Ставка на рост / на падение.</span>
+      <b>Тейк (TP)</b><span>Цена фиксации прибыли — у центра канала, 1–3% хода. Исполняется лимитным ордером, без проскальзывания.</span>
+      <b>Стоп (SL)</b><span>Цена ограничения убытка — 1.5·ATR, 0.8–2.5% от входа.</span>
+      <b>Тайм-стоп</b><span>Выход по рынку, если за 48 свечей не сработали ни тейк, ни стоп.</span>
+      <b>Размер позиции</b><span>Сумма сделки в долларах = цена входа × количество монет.</span>
+      <b>Риск, 1R</b><span>Сколько долларов теряем, если сработает стоп. Бот подбирает размер так, чтобы 1R = 2% баланса.</span>
+      <b>R (результат)</b><span>Итог сделки, делённый на её риск. +1.5R — заработали в полтора раза больше, чем рисковали; −1R — полный стоп.</span>
+      <b>PnL до / после комиссий</b><span>Прибыль или убыток по цене / с вычетом комиссии биржи.</span>
+      <b>Комиссия</b><span>0.075% от суммы за вход и столько же за выход.</span>
+      <b>Проскальзывание</b><span>Рыночный ордер исполняется чуть хуже цены сигнала. Учитываем 0.05% на входе, стопе и тайм-стопе.</span>
+      <b>Winrate</b><span>Доля прибыльных сделок. Сам по себе ничего не говорит: 40% winrate с крупными прибылями лучше 70% с крупными убытками.</span>
+      <b>Средний результат (ожидание)</b><span>Средний R на сделку после комиссий. Больше 0 — у стратегии есть преимущество; это главная цифра журнала.</span>
+      <b>Profit factor</b><span>Сумма прибылей / сумма убытков. Больше 1 — система в плюсе.</span>
+      <b>Макс. просадка</b><span>Самое большое падение баланса от пика до дна, в процентах.</span>
+    </div>
 
-    <h3>Чем отличается математика</h3>
-    <p>Классические полосы Боллинджера — это SMA ± k·σ. Проблема: σ раздувается одним выбросом-свечой, а симметричный канал плохо подходит для актива, который за окно вырос на 30%. Поэтому здесь есть четыре модели канала:</p>
+    <h3>Модели канала</h3>
     <ul>
-      <li><b>Лог-канал</b> (по умолчанию): всё считается в ln(цены), полосы = exp(μ ± k·σ). Канал асимметричен: вверх шире, чем вниз — как и сами проценты. Масштаб z сопоставим с классикой.</li>
-      <li><b>Классика</b>: обычные BB для сравнения.</li>
-      <li><b>Робастная</b>: центр = медиана за N свечей, ширина = 1.4826·MAD (медианное абсолютное отклонение). Один шпиль не расширяет канал. Обратная сторона: когда цена переходит на новый уровень, новые цены тоже считаются «выбросами», канал остаётся узким, и монета надолго «за каналом» (z бывает +10σ и больше). Режим для поиска резких выходов, а не для отскоков.</li>
-      <li><b>EWMA</b>: центр — экспоненциальное среднее, дисперсия — экспоненциально взвешенная (как в RiskMetrics). Реагирует на смену режима быстрее, но канал шире классического: при k = 3 касаний почти нет, используйте k ≈ 2.</li>
+      <li><b>Лог-канал</b> (по умолчанию): всё считается в ln(цены), полосы = exp(μ ± k·σ). Канал асимметричен: вверх шире, чем вниз — как и сами проценты.</li>
+      <li><b>Классика</b>: обычные полосы Боллинджера (SMA ± k·σ) для сравнения.</li>
+      <li><b>Робастная</b>: центр — медиана, ширина — 1.4826·MAD. Один шпиль не расширяет канал; но при переходе цены на новый уровень канал остаётся узким, и монета надолго «за каналом». Режим для поиска резких выходов.</li>
+      <li><b>EWMA</b>: экспоненциальные среднее и дисперсия. Быстрее реагирует, но канал шире — используйте k ≈ 2.</li>
     </ul>
 
-    <h3>Метки</h3>
-    <ul>
-      <li><span class="tag loc">▲ сигнал LONG</span> / <span class="tag upc">▼ сигнал SHORT</span> — касание полосы за последние 4 свечи, последняя закрытая свеча развернулась (закрылась в нужную сторону и внутри канала), объём выше нормы. Только по таким сигналам торгует бот.</li>
-      <li><span class="tag uo">за каналом ↑</span> / <span class="tag lout">за каналом ↓</span> — цена прямо сейчас за полосой. Разворота ещё нет — в тренде так можно идти долго.</li>
-      <li><span class="tag up">касание верха 12:45</span> / <span class="tag lo">касание низа</span> — цена недавно выходила за полосу (время свечи), вернулась, но подтверждения не хватает.</li>
-      <li><span class="tag sq">сжатие</span> — волатильность за 20 свечей меньше половины обычной.</li>
-    </ul>
-
-    <h3>Колонки таблицы</h3>
-    <ul>
-      <li><b>Канал (%B)</b> = (цена − низ)/(верх − низ). 0% — на нижней полосе, 100% — на верхней, &gt;100% — за каналом. На шкале: тёмная середина — канал, зелёная граница — низ, красная — верх, пунктир — центр.</li>
-      <li><b>z</b> — отклонение от центра в единицах σ модели. При k = 3 полоса — это z = ±3.</li>
-      <li><b>Объём</b> — объём свечи / медиана объёма примерно за 100 свечей. Для текущей незакрытой свечи объём пересчитывается на полную длительность (иначе свежая свеча всегда выглядела бы «пустой»). Подтверждение — робастный z-score ln(объёма) ≥ 1.</li>
-      <li><b>T½</b> — период полураспада отклонения: подгоняем AR(1) к ряду x = ln(цена) − ln(центр), φ = Σxₜxₜ₋₁ / Σxₜ₋₁², T½ = −ln2/lnφ. Короткий T½ — монета хорошо возвращается к среднему; «∞» — тренд, отскок ловить опасно.</li>
-    </ul>
-
-    <h3>Оценка сигнала (0–100)</h3>
-    <p>Считается только при касании полосы за последние 4 свечи. Взвешенная сумма пяти компонент в [0;1]:</p>
-    <p><code>score = 100·(0.25·D + 0.25·V + 0.15·R + 0.20·C + 0.15·M)</code></p>
+    <h3>Сила сигнала (0–100)</h3>
+    <p><code>сила = 100·(0.25·D + 0.25·V + 0.15·R + 0.20·C + 0.15·M)</code>, каждая компонента в [0; 1]:</p>
     <ul>
       <li><b>D</b> — глубина прокола: 1 − e^(−2·e), где e — на сколько σ тень вышла за полосу;</li>
-      <li><b>V</b> — объём: min(1, z_объёма / 3);</li>
-      <li><b>R</b> — RSI(14): для лонга (35 − RSI)/20, для шорта (RSI − 65)/20, обрезано в [0;1];</li>
-      <li><b>C</b> — подтверждение разворота (все три условия выполнены);</li>
-      <li><b>M</b> — качество возврата к среднему: 1 − T½/40 свечей (0 при тренде).</li>
+      <li><b>V</b> — объём: min(1, z объёма / 3), z — робастный z-score ln(объёма);</li>
+      <li><b>R</b> — RSI(14): для лонга (35 − RSI)/20, для шорта (RSI − 65)/20;</li>
+      <li><b>C</b> — подтверждение разворота (все 4 условия);</li>
+      <li><b>M</b> — возврат к центру: 1 − T½/40 свечей (0 при тренде). T½ = −ln2/lnφ, где φ — коэффициент AR(1) для ln(цена) − ln(центр).</li>
     </ul>
-    <p>Разложение по компонентам для выбранной монеты — в блоке «Разбор сигнала» под графиком.</p>
 
-    <h3>Два бота: общий и мой</h3>
+    <h3>Два бота</h3>
     <ul>
-      <li><b>🌐 Общий бот 24/7</b> работает на сервере (Supabase) каждую минуту, даже когда сайт никто не открывал. Журнал один на всех посетителей, а настройки фиксированы: лог-канал (210, 3), 15m, топ-150, оценка ≥ 60. Это честная статистика стратегии. Плашка «Сторож» вверху следит именно за ним: если он не отвечает дольше 5 минут, она станет красной.</li>
-      <li><b>👤 Мой бот</b> — песочница: торгует в вашем браузере, пока вкладка открыта, на ваших текущих настройках (модель, N, k, ТФ, порог оценки). Журнал хранится только у вас. Так можно сравнить свои настройки с общими.</li>
-      <li>Позиции обоих ботов видны на графике монеты (линии входа, TP и SL с подписью «общий» или «мой»).</li>
+      <li><b>🌐 Общий бот 24/7</b> работает на сервере (Supabase) каждую минуту, даже когда сайт никто не открывал. Журнал один для всех, настройки фиксированы. Плашка «Сторож» следит за ним: если он молчит дольше 5 минут — она красная.</li>
+      <li><b>👤 Мой бот</b> — песочница в вашем браузере на ваших текущих настройках, пока вкладка открыта. Журнал видите только вы.</li>
+      <li>Оба бота используют один и тот же файл с математикой, поэтому при одинаковых настройках считают одинаково.</li>
     </ul>
 
-    <h3>Правила бумажного бота</h3>
+    <h3>Правила сделок</h3>
     <ul>
-      <li>Вход — только при подтверждённом развороте и оценке ≥ порога (по умолчанию 60). Касание низа → LONG, верха → SHORT.</li>
-      <li>Тейк — к центру канала, но в пределах 1–3% хода.</li>
-      <li>Стоп — 1.5·ATR(14), в пределах 0.8–2.5%. Если тейк меньше 0.8 стопа — сделка пропускается.</li>
-      <li>Размер позиции — так, чтобы стоп стоил 2% виртуального баланса (не более ⅓ баланса в одной позиции). Не более 3 позиций одновременно, повторный вход в ту же монету — не раньше чем через 4 свечи.</li>
-      <li>Если за одну свечу задеты и тейк, и стоп — считаем стоп (пессимистично). Через 48 свечей — выход по рынку (тайм-стоп). Комиссия 0.075% за сторону.</li>
-      <li>Бот работает, пока страница открыта. Сканирование — каждые 60 секунд. Если вкладка была закрыта, при следующем открытии бот проверит, не задеты ли TP/SL за это время, по истории свечей.</li>
+      <li>Вход по рынку — только по сигналу с силой ≥ порога. Не более 3 позиций, повтор по той же монете — не раньше чем через 4 свечи.</li>
+      <li>Если тейк меньше 0.8 стопа — сделка пропускается.</li>
+      <li>Если за одну свечу задеты и тейк, и стоп — считаем стоп (пессимистично).</li>
+      <li>Торговля только бумажная: деньги виртуальные, ордера на биржу не отправляются.</li>
     </ul>
-
-    <h3>Важно</h3>
-    <p>Это инструмент для изучения, а не торговый совет. Отскок от полосы — вероятностная идея: в сильном тренде цена может идти вдоль полосы очень долго. Проверяйте статистику журнала на длинной дистанции, прежде чем делать выводы.</p>
+    <p>Это инструмент для изучения, а не торговый совет. Отскок от полосы — вероятностная идея: в сильном тренде цена может долго идти вдоль полосы.</p>
   </div></section>
 
   <div class="foot" id="foot">—</div>
 </div>
 
-<script>
+<!-- TRADE CARD -->
+<div class="modal hidden" id="modal">
+  <div class="mbox">
+    <div class="mhead"><h2 id="mtitle">—</h2><span class="mute" id="mmeta"></span><button id="mclose" title="Закрыть (Esc)">✕</button></div>
+    <div class="mgrid">
+      <div><canvas id="tcv"></canvas>
+        <div class="legend">
+          <span>▮ свечи</span><span><i style="border-color:#ef4444"></i>верхняя полоса</span><span><i style="border-color:#64748b;border-top-style:dashed"></i>центр</span><span><i style="border-color:#22c55e"></i>нижняя полоса</span>
+          <span><i style="border-color:#a78bfa;border-top-style:dashed"></i>вход</span><span><i style="border-color:#22c55e;border-top-style:dashed"></i>тейк</span><span><i style="border-color:#ef4444;border-top-style:dashed"></i>стоп</span>
+          <span>● вход / выход в момент сделки</span><span>канал — на настройках, с которыми бот входил</span>
+        </div>
+      </div>
+      <div class="aside" id="maside"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import * as M from './supabase/functions/_shared/math.js';
+const { TFMS, clamp, median, bands, rsi, halfLife, parse } = M;
+
 // ---------- utils ----------
 const $ = s => document.querySelector(s);
-const TFMS = {'5m':3e5,'15m':9e5,'1h':36e5,'4h':144e5};
 const DEF = {method:'log', N:210, k:3, tf:'15m', candles:540, top:150, minScore:60, v:2};
 const SCAN_MS = 60000;
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 let S = Object.assign({}, DEF, load('sr_settings', {}));
 if (!TFMS[S.tf]) S.tf = DEF.tf;
-if ((S.v || 1) < 2) { S.method = DEF.method; S.v = 2; } // v1 defaulted to robust, which is too sensitive as a default
+if ((S.v || 1) < 2) { S.method = DEF.method; S.v = 2; }
 const METHOD_HINT = {
   log: 'Лог-канал: как классика, но в процентах — вверх шире, чем вниз. Хороший вариант по умолчанию.',
   classic: 'Классические полосы Боллинджера (SMA ± k·σ) — для сравнения.',
   robust: 'Робастная: выбросы не расширяют канал, поэтому при выходе цены на новый уровень многие пары надолго оказываются «за каналом». Чувствительный режим.',
   ewma: 'EWMA: свежие свечи весят больше, канал шире классического — касаний мало. Попробуйте k ≈ 2.',
 };
+const METHOD_NAME = {log:'лог-канал', classic:'классика', robust:'робастная', ewma:'EWMA'};
 let favs = new Set(load('sr_favs', []));
 let J = load('sr_journal', null) || {balance:10000, start:10000, open:[], closed:[], on:true};
-// shared 24/7 bot: lives in Supabase, written only by the server-side bot, read-only here
 const SB_URL = 'https://aumldylzccbmddavtrqe.supabase.co/rest/v1/', SB_KEY = 'sb_publishable_dJ7vC-wBDBUNT9W1VgwPEg_M0WpHxXB';
 let SJ = null, jMode = load('sr_jmode', 'shared');
 let sound = false;
-const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
-const fp = p => { if (!isFinite(p)) return '—'; const a = Math.abs(p); return '$' + (a >= 1000 ? p.toFixed(0) : a >= 100 ? p.toFixed(2) : a >= 1 ? p.toFixed(3) : p.toPrecision(4)); };
+const fp = p => { if (p == null || !isFinite(p)) return '—'; const a = Math.abs(p); return '$' + (a >= 1000 ? p.toFixed(0) : a >= 100 ? p.toFixed(2) : a >= 1 ? p.toFixed(3) : p.toPrecision(4)); };
+const usd = (x, sign = true) => x == null || !isFinite(x) ? '—' : (sign && x > 0 ? '+' : x < 0 ? '−' : '') + '$' + Math.abs(x).toFixed(2);
+const rr = x => x == null || !isFinite(x) ? '—' : (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(2) + 'R';
+const cl = x => x > 0 ? 'pos' : x < 0 ? 'neg' : '';
 const hm = t => new Date(t).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'});
 const dt = t => new Date(t).toLocaleString('ru', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
-const dur = ms => ms < 36e5 ? Math.round(ms/6e4) + 'м' : ms < 864e5 ? (ms/36e5).toFixed(1) + 'ч' : (ms/864e5).toFixed(1) + 'д';
+const dur = ms => ms == null || !isFinite(ms) ? '—' : ms < 36e5 ? Math.round(ms/6e4) + 'м' : ms < 864e5 ? (ms/36e5).toFixed(1) + 'ч' : (ms/864e5).toFixed(1) + 'д';
 const base = s => s.replace(/USDT$/, '');
+const pair = s => s.replace(/USDT$/, '/USDT');
+const tfOf = ms => Object.keys(TFMS).find(k => TFMS[k] === ms);
 
 const BASES = ['https://data-api.binance.vision', 'https://api.binance.com'];
 async function api(path) {
@@ -291,149 +335,30 @@ async function pool(items, n, fn) {
   await Promise.all(Array.from({length:n}, async () => { while (i < items.length) await fn(items[i++]); }));
 }
 
-// ---------- math ----------
-// returns {mid, up, lo, z}; z = deviation of the price from the centre in sigma units of the model
-function bands(c, N, k, m) {
-  const n = c.length, mid = Array(n).fill(NaN), up = Array(n).fill(NaN), lo = Array(n).fill(NaN), z = Array(n).fill(NaN);
-  if (m === 'log') {
-    const r = bands(c.map(Math.log), N, k, 'classic');
-    return {mid:r.mid.map(Math.exp), up:r.up.map(Math.exp), lo:r.lo.map(Math.exp), z:r.z};
-  }
-  if (m === 'ewma') {
-    const a = 2 / (N + 1); let mu = c[0], v = 0;
-    for (let i = 0; i < n; i++) {
-      const d = c[i] - mu; mu += a * d; v = (1 - a) * (v + a * d * d);
-      if (i >= N - 1) { const s = Math.sqrt(v); mid[i] = mu; up[i] = mu + k*s; lo[i] = mu - k*s; z[i] = s ? (c[i] - mu) / s : 0; }
-    }
-    return {mid, up, lo, z};
-  }
-  for (let i = N - 1; i < n; i++) {
-    const w = c.slice(i - N + 1, i + 1); let mu, s;
-    if (m === 'robust') { mu = median(w); s = 1.4826 * median(w.map(x => Math.abs(x - mu))); }
-    else { mu = w.reduce((p, x) => p + x, 0) / N; s = Math.sqrt(w.reduce((p, x) => p + (x - mu) ** 2, 0) / N); }
-    mid[i] = mu; up[i] = mu + k*s; lo[i] = mu - k*s; z[i] = s ? (c[i] - mu) / s : 0;
-  }
-  return {mid, up, lo, z};
-}
-function rsi(c, p = 14) {
-  const r = Array(c.length).fill(NaN); let g = 0, l = 0;
-  for (let i = 1; i < c.length; i++) {
-    const d = c[i] - c[i-1], G = Math.max(d, 0), L = Math.max(-d, 0);
-    if (i <= p) { g += G; l += L; if (i === p) { g /= p; l /= p; r[i] = l ? 100 - 100/(1 + g/l) : 100; } }
-    else { g = (g*(p-1) + G)/p; l = (l*(p-1) + L)/p; r[i] = l ? 100 - 100/(1 + g/l) : 100; }
-  }
-  return r;
-}
-function atr(h, l, c, p = 14) {
-  let a = NaN;
-  for (let i = 1; i < c.length; i++) {
-    const tr = Math.max(h[i] - l[i], Math.abs(h[i] - c[i-1]), Math.abs(l[i] - c[i-1]));
-    a = i <= p ? (isNaN(a) ? tr : a + (tr - a) / i) : (a*(p-1) + tr)/p;
-  }
-  return a;
-}
-// half-life of deviation from the centre via AR(1): x_t = phi * x_{t-1}
-function halfLife(c, mid) {
-  const x = []; for (let i = 0; i < c.length; i++) if (isFinite(mid[i]) && mid[i] > 0) x.push(Math.log(c[i]) - Math.log(mid[i]));
-  const xs = x.slice(-150); let num = 0, den = 0;
-  for (let i = 1; i < xs.length; i++) { num += xs[i]*xs[i-1]; den += xs[i-1]*xs[i-1]; }
-  const phi = den ? num/den : 1;
-  return phi > 0 && phi < 1 ? -Math.LN2 / Math.log(phi) : Infinity;
-}
-function parse(K) {
-  return {t:K.map(x => x[0]), o:K.map(x => +x[1]), h:K.map(x => +x[2]), l:K.map(x => +x[3]), c:K.map(x => +x[4]), v:K.map(x => +x[5])};
-}
-
-function analyze(sym, K, tf = S.tf) {
-  const {t, o, h, l, c, v} = parse(K), n = c.length, i = n - 1, p = n - 2;
-  if (n < S.N + 10) return null;
-  const B = bands(c, S.N, S.k, S.method);
-  if (!isFinite(B.mid[i]) || B.up[i] <= B.lo[i]) return null;
-  const pB = (c[i] - B.lo[i]) / (B.up[i] - B.lo[i]);
-  const R = rsi(c), r = R[i];
-  const hl = halfLife(c, B.mid);
-  // squeeze: volatility compression = sigma of log-returns over last 20 bars / sigma over last N bars
-  const lr = []; for (let j = 1; j < n; j++) lr.push(Math.log(c[j] / c[j-1]));
-  const sd = a => { const m = a.reduce((q, x) => q + x, 0) / a.length; return Math.sqrt(a.reduce((q, x) => q + (x - m) ** 2, 0) / a.length); };
-  const vlong = sd(lr.slice(-S.N)), comp = vlong ? sd(lr.slice(-20)) / vlong : 1;
-  const squeeze = comp < 0.5;
-  // volume: the forming bar is projected to a full bar, then robust z-score of ln(volume) vs ~96 earlier bars
-  const elapsed = clamp((Date.now() - t[i]) / TFMS[tf], 0.25, 1);
-  const va = v.slice(); va[i] = v[i] / elapsed;
-  const baseV = v.slice(Math.max(0, n - 100), n - 4).filter(x => x > 0).map(Math.log);
-  const vm = median(baseV), vmad = 1.4826 * median(baseV.map(x => Math.abs(x - vm))) || 1;
-  const vz = x => x > 0 && isFinite(vm) ? (Math.log(x) - vm) / vmad : 0;
-
-  let touch = null;
-  for (let j = n - 1; j >= n - 5; j--) {
-    if (l[j] <= B.lo[j]) { touch = {side:'low', j}; break; }
-    if (h[j] >= B.up[j]) { touch = {side:'up', j}; break; }
-  }
-  // volume shown: for a touch — the strongest bar since the touch, otherwise the last closed bar
-  let vRef = va[p];
-  if (touch) { vRef = 0; for (let q = touch.j; q <= i; q++) vRef = Math.max(vRef, va[q]); }
-  const volZ = vz(vRef), volX = isFinite(vm) ? vRef / Math.exp(vm) : null;
-
-  let score = null, rev = false, comps = null, checks = null, exc = 0;
-  if (touch) {
-    const j = touch.j, half = (B.up[j] - B.lo[j]) / (2 * S.k);
-    exc = Math.max(0, touch.side === 'low' ? (B.lo[j] - l[j]) / half : (h[j] - B.up[j]) / half);
-    const low = touch.side === 'low';
-    checks = {
-      closed: j <= p,
-      candle: j <= p && (low ? c[p] > o[p] : c[p] < o[p]),
-      inside: low ? c[p] > B.lo[p] && c[i] > B.lo[i] : c[p] < B.up[p] && c[i] < B.up[i],
-      volume: volZ >= 1,
-    };
-    rev = checks.closed && checks.candle && checks.inside && checks.volume;
-    comps = {
-      D: 1 - Math.exp(-2 * exc),
-      V: clamp(volZ / 3, 0, 1),
-      R: clamp(low ? (35 - r) / 20 : (r - 65) / 20, 0, 1),
-      C: rev ? 1 : 0,
-      M: isFinite(hl) ? clamp(1 - hl / 40, 0, 1) : 0,
-    };
-    score = Math.round(100 * (0.25*comps.D + 0.25*comps.V + 0.15*comps.R + 0.20*comps.C + 0.15*comps.M));
-  }
-  const outUp = c[i] > B.up[i], outLo = c[i] < B.lo[i];
-  let label = '', cls = '', kind = '';
-  if (touch && rev) { kind = 'sig'; label = touch.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT'; cls = touch.side === 'low' ? 'loc' : 'upc'; }
-  else if (outUp || outLo) { kind = 'out'; label = outUp ? 'за каналом ↑' : 'за каналом ↓'; cls = outUp ? 'uo' : 'lout'; }
-  else if (touch) { kind = 'touch'; label = (touch.side === 'low' ? 'касание низа ' : 'касание верха ') + hm(t[touch.j]); cls = touch.side === 'low' ? 'lo' : 'up'; }
-  else if (squeeze) { kind = 'sq'; label = 'сжатие'; cls = 'sq'; }
-  return {sym, price:c[i], pB, z:B.z[i], rsi:r, hl, squeeze, comp, touch, rev, score, comps, checks, exc, volX, volZ, label, cls, kind,
-          mid:B.mid[i], up:B.up[i], lo:B.lo[i], atr:atr(h, l, c), side:touch?.side};
-}
-
 // ---------- scanner ----------
 let rows = [], cache = {}, scanning = false, scanQueued = false, lastScan = 0, footBase = '', sortKey = 'ext', sortDir = -1;
-const STABLE = new Set(['USDC','FDUSD','TUSD','BUSD','DAI','USDP','AEUR','EUR','EURI','USDE','USD1','BFUSD','XUSD','PYUSD','RLUSD','UST','USTC','SUSD']);
-
 async function scan() {
   if (scanning) { scanQueued = true; return; }
   scanning = true; scanQueued = false;
-  const foot = $('#foot'), tf = S.tf;
+  const foot = $('#foot'), tf = S.tf, set = {...S};
   try {
     foot.textContent = 'загружаю список пар…';
-    const tk = await api('/api/v3/ticker/24hr');
     const now = Date.now();
-    let list = tk.filter(x => x.symbol.endsWith('USDT') && !STABLE.has(x.symbol.slice(0, -4)) && +x.quoteVolume > 0 && x.closeTime > now - 864e5)
-                 .sort((a, b) => b.quoteVolume - a.quoteVolume).slice(0, S.top).map(x => x.symbol);
-    for (const p of J.open) if (!list.includes(p.sym)) list.push(p.sym);
+    const list = M.pickSymbols(await api('/api/v3/ticker/24hr'), S.top, J.open.map(p => p.sym), now);
     const limit = Math.min(1000, S.N + 150), res = [], fresh = {}; let done = 0, fails = 0;
     await pool(list, 10, async sym => {
-      try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${limit}`); fresh[sym] = K; const r = analyze(sym, K, tf); if (r) res.push(r); }
+      try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${limit}`); fresh[sym] = K; const r = M.analyze(sym, K, set); if (r) res.push(r); }
       catch { fails++; }
       if (++done % 10 === 0) foot.textContent = `сканирую ${done}/${list.length}…`;
     });
-    if (!scanQueued) { // settings changed during the scan → results are stale, the queued scan will replace them
+    if (!scanQueued) { // settings changed during the scan → results are stale, the queued scan replaces them
       const prevSig = new Set(rows.filter(r => r.rev).map(r => r.sym));
-      rows = res; cache = fresh; cache._tf = tf; lastScan = Date.now();
+      rows = res; cache = fresh; lastScan = Date.now();
       if (sound && rows.some(r => r.rev && r.score >= S.minScore && !prevSig.has(r.sym))) beep();
       runBot();
       renderCards(); renderTable(); renderJournal(); renderDetail();
       $('#symlist').innerHTML = rows.map(r => `<option value="${base(r.sym)}">`).join('');
-      footBase = `${rows.length} пар${fails ? ` (${fails} не загрузились)` : ''} · биржа binance · ТФ ${tf} · обновлено ${new Date().toLocaleTimeString('ru')}`;
+      footBase = `${rows.length} пар${fails ? ` (${fails} не загрузились)` : ''} · биржа Binance · ТФ ${tf} · обновлено ${new Date().toLocaleTimeString('ru')}`;
     }
   } catch (e) {
     footBase = 'ошибка загрузки данных: ' + e.message + ' — повторю через минуту';
@@ -450,28 +375,27 @@ function tickFoot() {
 
 function renderCards() {
   if (!rows.length) return;
-  const pbs = rows.map(r => clamp(r.pB, 0, 1)), med = median(pbs) * 100;
+  const med = median(rows.map(r => clamp(r.pB, 0, 1))) * 100;
   const cold = rows.filter(r => r.pB < 0.1).length, hot = rows.filter(r => r.pB > 0.9).length;
   $('#c1').textContent = med.toFixed(1) + '%';
   $('#c1s').textContent = med < 35 ? 'рынок у низов каналов' : med > 65 ? 'рынок у верхов каналов' : 'спокойный рынок';
   $('#c1m').style.width = med + '%';
-  $('#c2').textContent = (cold / rows.length * 100).toFixed(1) + '%'; $('#c2s').textContent = `${cold} пар у нижней полосы`;
-  $('#c3').textContent = (hot / rows.length * 100).toFixed(1) + '%'; $('#c3s').textContent = `${hot} пар у верхней полосы`;
-  const sig = rows.filter(r => r.rev).length, tch = rows.filter(r => r.touch).length;
-  $('#c4').textContent = sig; $('#c4s').textContent = `подтверждено за 4 свечи · касаний ${tch}`;
+  $('#c2').textContent = (cold / rows.length * 100).toFixed(1) + '%'; $('#c2s').textContent = `${cold} пар · %B < 10%`;
+  $('#c3').textContent = (hot / rows.length * 100).toFixed(1) + '%'; $('#c3s').textContent = `${hot} пар · %B > 90%`;
+  $('#c4').textContent = rows.filter(r => r.rev).length; $('#c4s').textContent = `подтверждено за 4 свечи · касаний ${rows.filter(r => r.touch).length}`;
   $('#c5').textContent = rows.filter(r => r.squeeze).length;
   $('#hdr').textContent = `· ${S.tf} · ${({robust:'MAD', ewma:'EWMA', log:'LOG', classic:'BB'})[S.method]}(${S.N}, ${S.k})`;
 }
-
 function gauge(pB) {
   // track spans %B from -20% to 120%; the channel itself is the shaded 0..100% part
   const x = (clamp(pB, -0.2, 1.2) + 0.2) / 1.4 * 100;
   const col = pB > 0.9 ? 'var(--up)' : pB < 0.1 ? 'var(--lo)' : '#93c5fd';
   return `<span class="gauge"><i style="left:${x}%;background:${col}"></i></span><span style="color:${col}">${(pB*100).toFixed(1)}%</span>`;
 }
+const labelOf = r => r.kind === 'touch' ? `${r.label} ${hm(r.touchTime)}` : r.label;
 function renderTable() {
   const fz = $('#fz').value, fl = $('#fl').value, q = $('#fs').value.trim().toUpperCase();
-  let list = rows.filter(r => {
+  const list = rows.filter(r => {
     if (q && !r.sym.includes(q)) return false;
     if (fz === 'lo' && r.pB >= 0.1) return false;
     if (fz === 'hi' && r.pB <= 0.9) return false;
@@ -492,124 +416,182 @@ function renderTable() {
   $('#tb').innerHTML = list.map(r => {
     const hl = isFinite(r.hl) ? dur(r.hl * TFMS[S.tf]) : '∞';
     const sc = r.score == null ? '<span class="faint">—</span>'
-      : `<b style="color:${r.rev ? (r.score >= S.minScore ? 'var(--acc)' : 'var(--text)') : '#566173'}" title="${r.rev ? 'разворот подтверждён' : 'разворот не подтверждён — бот не войдёт'}">${r.score}</b>`;
-    const vc = r.volZ >= 1 ? 'var(--acc)' : r.volZ <= -1 ? '#566173' : 'inherit';
+      : `<b style="color:${r.rev ? (r.score >= S.minScore ? 'var(--acc)' : 'var(--text)') : 'var(--faint)'}" title="${r.rev ? 'разворот подтверждён' : 'разворот не подтверждён — бот не войдёт'}">${r.score}</b>`;
+    const vc = r.volZ >= 1 ? 'var(--acc)' : r.volZ <= -1 ? 'var(--faint)' : 'inherit';
     return `<tr class="row${r.sym === chartSym ? ' sel' : ''}" data-sym="${r.sym}">
       <td><span class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}">${favs.has(r.sym) ? '★' : '☆'}</span></td>
-      <td><b>${base(r.sym)}</b></td><td>${fp(r.price)}</td>
-      <td>${gauge(r.pB)}</td>
+      <td><b>${base(r.sym)}</b></td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
       <td class="${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
-      <td>${r.label ? `<span class="tag ${r.cls}">${r.label}</span>` : '<span class="faint">—</span>'}</td>
+      <td>${r.label ? `<span class="tag ${r.cls}">${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
       <td>${sc}</td>
       <td style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
       <td class="${isFinite(r.hl) ? 'mute' : 'faint'}">${hl}</td></tr>`;
   }).join('') || '<tr><td colspan="9" class="mute">Нет пар под фильтр</td></tr>';
 }
 
-// ---------- chart ----------
-let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null;
+// ---------- chart renderer (market chart and trade card) ----------
+// d: {t,o,h,l,c,v,B,R}; o: {from, levels:[{v,col,label,i0,i1}], marks:[{i,price,col,label}], live, hoverI}
+function renderChart(cv, d, o = {}) {
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !d) return null;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1), e = n - 1;
+  const padL = 8, padR = 78, pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
+  const cnt = e - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
+  const X = i => padL + (i - s + 0.5) * bw;
+  let mn = Infinity, mx = -Infinity;
+  const acc = x => { if (isFinite(x)) { mn = Math.min(mn, x); mx = Math.max(mx, x); } };
+  for (let i = s; i <= e; i++) { acc(B.up[i]); acc(B.lo[i]); if (candles) { acc(h[i]); acc(l[i]); } else acc(c[i]); }
+  for (const L of o.levels || []) acc(L.v);
+  const pad = (mx - mn) * 0.06 || mx * 0.01; mn -= pad; mx += pad;
+  const Y = x => 8 + (mx - x) / (mx - mn) * (pH - 16);
+  g.font = '11px system-ui'; g.textBaseline = 'middle';
+  // channel
+  let f0 = s; while (f0 <= e && !isFinite(B.mid[f0])) f0++;
+  if (f0 <= e) {
+    g.beginPath();
+    for (let i = f0; i <= e; i++) g[i === f0 ? 'moveTo' : 'lineTo'](X(i), Y(B.up[i]));
+    for (let i = e; i >= f0; i--) g.lineTo(X(i), Y(B.lo[i]));
+    g.fillStyle = 'rgba(59,130,246,.07)'; g.fill();
+  }
+  const line = (arr, col, w = 1.3, dash = []) => { g.beginPath(); g.setLineDash(dash); let st = false;
+    for (let i = s; i <= e; i++) { if (!isFinite(arr[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), Y(arr[i])); st = true; }
+    g.strokeStyle = col; g.lineWidth = w; g.stroke(); g.setLineDash([]); };
+  line(B.up, '#ef4444'); line(B.lo, '#22c55e'); line(B.mid, '#64748b', 1, [4, 4]);
+  // price
+  if (candles) {
+    const cw = Math.max(1, bw * 0.7);
+    for (let i = s; i <= e; i++) {
+      const col = c[i] >= op[i] ? '#22c55e' : '#ef4444';
+      g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(X(i), Y(h[i])); g.lineTo(X(i), Y(l[i])); g.stroke();
+      const y1 = Y(Math.max(op[i], c[i])), y2 = Y(Math.min(op[i], c[i]));
+      g.fillRect(X(i) - cw / 2, y1, cw, Math.max(1, y2 - y1));
+    }
+  } else {
+    line(c, '#e5e7eb', 1.2);
+    const tri = (x, y, dir, col) => { g.beginPath(); g.moveTo(x, y); g.lineTo(x - 5, y - dir*8); g.lineTo(x + 5, y - dir*8); g.closePath(); g.fillStyle = col; g.fill(); };
+    for (let i = Math.max(f0, s, 1); i <= e; i++) {
+      if (h[i] >= B.up[i] && !(h[i-1] >= B.up[i-1])) tri(X(i), Y(B.up[i]) - 8, -1, '#ef4444');
+      if (l[i] <= B.lo[i] && !(l[i-1] <= B.lo[i-1])) tri(X(i), Y(B.lo[i]) + 8, 1, '#22c55e');
+    }
+  }
+  // levels (entry / TP / SL)
+  for (const L of o.levels || []) {
+    const x0 = L.i0 != null ? X(clamp(L.i0, s, e)) - bw / 2 : padL, x1 = L.i1 != null ? X(clamp(L.i1, s, e)) + bw / 2 : W - padR;
+    g.setLineDash([4, 3]); g.strokeStyle = L.col; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x0, Y(L.v)); g.lineTo(x1, Y(L.v)); g.stroke(); g.setLineDash([]);
+    if (L.label) { g.fillStyle = L.col; g.fillText(L.label, x0 + 4, Y(L.v) - 8); }
+  }
+  for (const m of o.marks || []) {
+    if (m.i < s || m.i > e) continue;
+    g.beginPath(); g.arc(X(m.i), Y(m.price), 5, 0, 7); g.fillStyle = m.col; g.fill(); g.strokeStyle = '#0a0e15'; g.lineWidth = 2; g.stroke();
+    if (m.label) { g.fillStyle = m.col; g.fillText(m.label, X(m.i) + 8, Y(m.price) + 12); }
+  }
+  if (o.live) { g.setLineDash([3, 3]); g.strokeStyle = '#f5b70a88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(c[e])); g.lineTo(W - padR, Y(c[e])); g.stroke(); g.setLineDash([]); }
+  g.font = '12px system-ui';
+  const lab = (x, col) => { if (isFinite(x)) { g.fillStyle = col; g.fillText(fp(x), W - padR + 6, clamp(Y(x), 8, pH - 4)); } };
+  lab(B.up[e], '#ef4444'); lab(B.lo[e], '#22c55e'); lab(c[e], '#f5b70a');
+  // time axis
+  g.font = '11px system-ui'; g.fillStyle = '#566173';
+  for (let q = 0; q <= 4; q++) {
+    const i = Math.round(s + q * (e - s) / 4), txt = dt(t[i]), w = g.measureText(txt).width;
+    g.fillText(txt, clamp(X(i) - w / 2, padL, W - padR - w), pH + 6);
+  }
+  // volume
+  let vmax = 0; for (let i = s; i <= e; i++) vmax = Math.max(vmax, v[i]);
+  g.fillStyle = '#8b95a5'; g.fillText('Объём', padL, vTop - 8);
+  for (let i = s; i <= e; i++) {
+    const hh = vmax ? v[i] / vmax * vH : 0;
+    g.fillStyle = c[i] >= op[i] ? 'rgba(34,197,94,.45)' : 'rgba(239,68,68,.45)';
+    g.fillRect(X(i) - Math.max(0.5, bw * 0.35), vTop + vH - hh, Math.max(1, bw * 0.7), hh);
+  }
+  // RSI
+  g.fillStyle = '#8b95a5'; g.fillText('RSI(14)', padL, rTop - 8);
+  const RY = x => rTop + (100 - x) / 100 * rH;
+  g.fillStyle = 'rgba(239,68,68,.06)'; g.fillRect(padL, RY(100), W - padL - padR, RY(70) - RY(100));
+  g.fillStyle = 'rgba(34,197,94,.06)'; g.fillRect(padL, RY(30), W - padL - padR, RY(0) - RY(30));
+  g.strokeStyle = '#334155'; g.lineWidth = 1; g.setLineDash([3, 3]);
+  for (const x of [30, 70]) { g.beginPath(); g.moveTo(padL, RY(x)); g.lineTo(W - padR, RY(x)); g.stroke(); }
+  g.setLineDash([]); g.beginPath(); let st = false;
+  for (let i = s; i <= e; i++) { if (!isFinite(R[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), RY(R[i])); st = true; }
+  g.strokeStyle = '#60a5fa'; g.stroke();
+  if (isFinite(R[e])) { g.fillStyle = '#60a5fa'; g.fillText(R[e].toFixed(0), W - padR + 6, RY(R[e])); }
+  // hover
+  const hi = o.hoverI;
+  if (hi != null && hi >= s && hi <= e) {
+    const x = X(hi);
+    g.strokeStyle = '#475569'; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
+    const pb = (c[hi] - B.lo[hi]) / (B.up[hi] - B.lo[hi]);
+    const txt = [dt(t[hi]), candles ? `O ${fp(op[hi])}  H ${fp(h[hi])}` : '', candles ? `L ${fp(l[hi])}  C ${fp(c[hi])}` : 'цена ' + fp(c[hi]),
+      isFinite(pb) ? `%B ${(pb*100).toFixed(1)}%  ${B.z[hi].toFixed(2)}σ` : '', 'RSI ' + (isFinite(R[hi]) ? R[hi].toFixed(0) : '—')].filter(Boolean);
+    const bx = x > W / 2 ? x - 188 : x + 10;
+    g.font = '12px system-ui'; g.fillStyle = 'rgba(15,22,34,.95)'; g.fillRect(bx, 12, 178, txt.length * 17 + 10);
+    g.fillStyle = '#e5e7eb'; txt.forEach((s2, k) => g.fillText(s2, bx + 8, 22 + k * 17));
+  }
+  return {s, e, padL, bw};
+}
+const hoverIndex = (geo, cv, ev) => geo ? geo.s + Math.floor((ev.clientX - cv.getBoundingClientRect().left - geo.padL) / geo.bw) : null;
+const barAt = (t, time) => { let i = 0; while (i + 1 < t.length && t[i + 1] <= time) i++; return i; };
+
+// ---------- market chart ----------
+let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, chartGeo = null;
 async function loadChart(sym) {
   chartSym = sym || chartSym; save('sr_chart', chartSym);
   const req = ++chartReq, want = chartSym;
-  $('#ctitle').textContent = want.replace(/USDT$/, '/USDT') + ' — загрузка…';
+  if (!chart) $('#ctitle').textContent = pair(want) + ' — загрузка…';
   try {
     const K = await api(`/api/v3/klines?symbol=${want}&interval=${S.tf}&limit=${Math.min(1000, S.candles + S.N + 5)}`);
     if (req !== chartReq) return; // a newer request superseded this one
-    chartK = K;
-    computeChart();
+    chartK = K; computeChart();
   } catch (e) {
     if (req !== chartReq) return;
     $('#ctitle').textContent = `${want} — не найдено на Binance (нужна пара к USDT, например BTC или SOLUSDT)`;
   }
-  document.querySelectorAll('tr.row').forEach(tr => tr.classList.toggle('sel', tr.dataset.sym === chartSym));
+  document.querySelectorAll('tr.row[data-sym]').forEach(tr => tr.classList.toggle('sel', tr.dataset.sym === chartSym));
 }
 function computeChart() {
   if (!chartK) return;
   const d = parse(chartK);
   chart = Object.assign(d, {sym:chartSym, B:bands(d.c, S.N, S.k, S.method), R:rsi(d.c)});
-  const n = d.c.length, i = n - 1, B = chart.B;
+  const i = d.c.length - 1, B = chart.B;
   const pB = (d.c[i] - B.lo[i]) / (B.up[i] - B.lo[i]), hl = halfLife(d.c, B.mid);
-  $('#ctitle').textContent = `${chartSym.replace(/USDT$/, '/USDT')} — ${$('#method').selectedOptions[0].text.split(' (')[0]} (${S.N}, ${S.k}) ${S.tf}`;
-  $('#cstats').innerHTML = `цена <b>${fp(d.c[i])}</b> · позиция <b>${(pB*100).toFixed(1)}%</b> · z <b>${B.z[i].toFixed(2)}σ</b> · верх ${fp(B.up[i])} · центр ${fp(B.mid[i])} · низ ${fp(B.lo[i])} · канал ${((B.up[i]-B.lo[i])/B.mid[i]*100).toFixed(2)}% · RSI <b>${chart.R[i].toFixed(0)}</b> · T½ <b>${isFinite(hl) ? dur(hl*TFMS[S.tf]) : '∞'}</b>`;
+  $('#ctitle').textContent = `${pair(chartSym)} — ${METHOD_NAME[S.method]} (${S.N}, ${S.k}) · ${S.tf}`;
+  $('#cstats').innerHTML = `цена <b>${fp(d.c[i])}</b> · %B <b>${(pB*100).toFixed(1)}%</b> · откл. <b>${B.z[i].toFixed(2)}σ</b> · верх ${fp(B.up[i])} · центр ${fp(B.mid[i])} · низ ${fp(B.lo[i])} · ширина ${((B.up[i]-B.lo[i])/B.mid[i]*100).toFixed(2)}% · RSI <b>${chart.R[i].toFixed(0)}</b> · T½ <b>${isFinite(hl) ? dur(hl*TFMS[S.tf]) : '∞'}</b>`;
   drawChart(); renderDetail();
 }
+const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})), ...J.open.map(p => ({p, who:'мой'}))];
 function drawChart() {
-  const cv = $('#cv'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
-  if (!W) return;
-  cv.width = W * dpr; cv.height = H * dpr;
-  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   if (!chart) return;
-  const {t, h, l, c, B, R} = chart, n = c.length, s = Math.max(0, n - S.candles);
-  const padL = 8, padR = 78, pH = H * 0.74, rTop = pH + 20, rH = H - rTop - 8;
-  const poss = botPositions().filter(x => x.p.sym === chartSym);
-  let mn = Infinity, mx = -Infinity;
-  for (let i = s; i < n; i++) for (const v of [c[i], B.up[i], B.lo[i]]) if (isFinite(v)) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
-  for (const {p: pos} of poss) for (const v of [pos.entry, pos.tp, pos.sl]) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
-  const pad = (mx - mn) * 0.06; mn -= pad; mx += pad;
-  const X = i => padL + (i - s) / Math.max(1, n - 1 - s) * (W - padL - padR);
-  const Y = v => 10 + (mx - v) / (mx - mn) * (pH - 20);
-  const f0 = (() => { for (let i = s; i < n; i++) if (isFinite(B.mid[i])) return i; return n; })();
-  // band fill
-  if (f0 < n) {
-    g.beginPath();
-    for (let i = f0; i < n; i++) g[i === f0 ? 'moveTo' : 'lineTo'](X(i), Y(B.up[i]));
-    for (let i = n - 1; i >= f0; i--) g.lineTo(X(i), Y(B.lo[i]));
-    g.fillStyle = 'rgba(59,130,246,.07)'; g.fill();
+  const levels = [];
+  for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym)) {
+    const i0 = barAt(chart.t, p.time);
+    levels.push({v:p.entry, col:'#a78bfa', label:`${who} бот: ${p.side} ${fp(p.entry)}`, i0},
+                {v:p.tp, col:'#22c55e', label:`тейк ${fp(p.tp)}`, i0}, {v:p.sl, col:'#ef4444', label:`стоп ${fp(p.sl)}`, i0});
   }
-  const line = (arr, col, w = 1.3, dash = []) => { g.beginPath(); g.setLineDash(dash); let st = false;
-    for (let i = s; i < n; i++) { if (!isFinite(arr[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), Y(arr[i])); st = true; }
-    g.strokeStyle = col; g.lineWidth = w; g.stroke(); g.setLineDash([]); };
-  line(B.up, '#ef4444'); line(B.lo, '#22c55e'); line(B.mid, '#64748b', 1, [4, 4]); line(c, '#e5e7eb', 1.2);
-  // band excursion markers (first bar of each excursion)
-  for (let i = Math.max(f0, s, 1); i < n; i++) {
-    if (h[i] >= B.up[i] && !(h[i-1] >= B.up[i-1])) tri(g, X(i), Y(B.up[i]) - 8, -1, '#ef4444');
-    if (l[i] <= B.lo[i] && !(l[i-1] <= B.lo[i-1])) tri(g, X(i), Y(B.lo[i]) + 8, 1, '#22c55e');
-  }
-  g.font = '12px system-ui'; g.textBaseline = 'middle';
-  const hline = (v, col, txt) => { g.setLineDash([3, 3]); g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(v)); g.lineTo(W - padR, Y(v)); g.stroke(); g.setLineDash([]);
-    if (txt) { g.fillStyle = col; g.fillText(txt, padL + 4, Y(v) - 8); } };
-  for (const {p: pos, who} of poss) {
-    hline(pos.entry, '#a78bfa', `${who} бот: вход ${pos.side} ${fp(pos.entry)}`);
-    hline(pos.tp, '#22c55e', `TP ${fp(pos.tp)}`);
-    hline(pos.sl, '#ef4444', `SL ${fp(pos.sl)}`);
-  }
-  hline(c[n-1], '#f5b70a88');
-  const lab = (v, col) => { if (isFinite(v)) { g.fillStyle = col; g.fillText(fp(v), W - padR + 6, clamp(Y(v), 8, pH - 4)); } };
-  lab(B.up[n-1], '#ef4444'); lab(B.lo[n-1], '#22c55e'); lab(c[n-1], '#f5b70a');
-  // time axis: first and last visible bar
-  g.fillStyle = '#566173'; g.font = '11px system-ui';
-  g.fillText(dt(t[s]), padL + 2, pH + 4); const tl = dt(t[n-1]); g.fillText(tl, W - padR - g.measureText(tl).width, pH + 4);
-  g.font = '12px system-ui';
-  // RSI pane
-  g.fillStyle = '#8b95a5'; g.fillText('RSI(14)', padL, rTop - 6);
-  const RY = v => rTop + (100 - v) / 100 * rH;
-  g.fillStyle = 'rgba(239,68,68,.06)'; g.fillRect(padL, RY(100), W - padL - padR, RY(70) - RY(100));
-  g.fillStyle = 'rgba(34,197,94,.06)'; g.fillRect(padL, RY(30), W - padL - padR, RY(0) - RY(30));
-  g.strokeStyle = '#334155'; g.setLineDash([3, 3]);
-  for (const v of [30, 70]) { g.beginPath(); g.moveTo(padL, RY(v)); g.lineTo(W - padR, RY(v)); g.stroke(); }
-  g.setLineDash([]); g.beginPath(); let st = false;
-  for (let i = s; i < n; i++) { if (!isFinite(R[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), RY(R[i])); st = true; }
-  g.strokeStyle = '#60a5fa'; g.lineWidth = 1; g.stroke();
-  if (isFinite(R[n-1])) { g.fillStyle = '#60a5fa'; g.fillText(R[n-1].toFixed(0), W - padR + 6, RY(R[n-1])); }
-  // hover
-  if (hoverI != null && hoverI >= s && hoverI < n) {
-    const i = hoverI, x = X(i);
-    g.strokeStyle = '#475569'; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
-    const pb = (c[i] - B.lo[i]) / (B.up[i] - B.lo[i]);
-    const txt = [dt(t[i]), 'цена ' + fp(c[i]), isFinite(pb) ? `%B ${(pb*100).toFixed(1)}%  z ${B.z[i].toFixed(2)}σ` : '', 'RSI ' + (isFinite(R[i]) ? R[i].toFixed(0) : '—')].filter(Boolean);
-    const bx = x > W / 2 ? x - 178 : x + 10;
-    g.fillStyle = 'rgba(15,22,34,.95)'; g.fillRect(bx, 12, 168, txt.length * 17 + 10);
-    g.fillStyle = '#e5e7eb'; txt.forEach((s2, k) => g.fillText(s2, bx + 8, 22 + k * 17));
-  }
-  chart._X = {s, n, padL, padR, W};
+  chartGeo = renderChart($('#cv'), chart, {from: chart.c.length - S.candles, levels, live:true, hoverI});
 }
-function tri(g, x, y, dir, col) { g.beginPath(); g.moveTo(x, y); g.lineTo(x - 5, y - dir*8); g.lineTo(x + 5, y - dir*8); g.closePath(); g.fillStyle = col; g.fill(); }
 
-// ---------- signal breakdown ----------
+// ---------- signal breakdown (shared by the market panel and the trade card) ----------
+function compsHtml(x, side) {
+  if (!x?.comps) return '';
+  const low = side === 'low' || side === 'LONG';
+  const hl = x.hl == null || !isFinite(x.hl) ? null : x.hl;
+  const list = [
+    ['Глубина прокола', x.comps.D, 25, `тень вышла за полосу на ${(+x.exc).toFixed(2)}σ`],
+    ['Объём', x.comps.V, 25, `×${x.volX?.toFixed(2)} к норме, z ${(+x.volZ).toFixed(1)}`],
+    ['RSI', x.comps.R, 15, `RSI ${(+x.rsi).toFixed(0)} (${low ? 'нужно < 35' : 'нужно > 65'})`],
+    ['Подтверждение', x.comps.C, 20, x.comps.C ? 'разворот подтверждён' : 'нет'],
+    ['Возврат к центру', x.comps.M, 15, hl != null ? `T½ ${hl.toFixed(0)} свечей` : 'тренд'],
+  ];
+  const ck = (ok, txt) => `<span class="${ok ? 'pos' : 'faint'}">${ok ? '✓' : '✗'} ${txt}</span>`;
+  return list.map(([nm, v, w, tip]) => `<div class="comp" title="${tip}"><span class="cn">${nm}</span><span class="cb"><i style="width:${v*100}%"></i></span><span class="cv">${Math.round(v*w)} / ${w}</span></div>`).join('')
+    + (x.checks ? `<div class="checks">${ck(x.checks.closed, 'свеча касания закрыта')}${ck(x.checks.candle, 'разворотная свеча')}${ck(x.checks.inside, 'цена внутри канала')}${ck(x.checks.volume, 'объём выше нормы')}</div>` : '');
+}
 function renderDetail() {
   const el = $('#detail');
   if (!chartK) { el.innerHTML = ''; return; }
-  const r = analyze(chartSym, chartK);
+  const r = M.analyze(chartSym, chartK, S);
   if (!r) { el.innerHTML = '<div class="mute">Мало истории для расчёта канала — уменьшите N.</div>'; return; }
   const name = base(chartSym), pct = (r.pB * 100).toFixed(1) + '%';
   const hlTxt = isFinite(r.hl)
@@ -617,83 +599,39 @@ function renderDetail() {
     : `T½ = ∞: цена сейчас в <b>тренде</b> и не стремится обратно к центру — отскок ловить рискованно.`;
   let verdict;
   if (r.rev) {
-    verdict = `<b>${r.side === 'low' ? '▲ Сигнал LONG' : '▼ Сигнал SHORT'} подтверждён.</b> Оценка <b>${r.score}</b> — ${r.score >= S.minScore ? 'бот войдёт в сделку (если есть свободный слот).' : `ниже порога бота (${S.minScore}), сделки не будет.`}`;
+    verdict = `<b>${r.side === 'low' ? '▲ Сигнал LONG' : '▼ Сигнал SHORT'} подтверждён.</b> Сила <b>${r.score}</b> — ${r.score >= S.minScore ? 'бот войдёт в сделку, если есть свободный слот.' : `ниже порога бота (${S.minScore}), сделки не будет.`}`;
   } else if (r.touch) {
     const miss = [];
     if (!r.checks.closed) miss.push('свеча касания ещё не закрылась');
     if (r.checks.closed && !r.checks.candle) miss.push(`последняя закрытая свеча не ${r.side === 'low' ? 'зелёная' : 'красная'}`);
     if (!r.checks.inside) miss.push('цена ещё не вернулась внутрь канала');
     if (!r.checks.volume) miss.push(`объём не выше нормы (z ${r.volZ.toFixed(1)}, нужно ≥ 1)`);
-    verdict = `${name} ${r.kind === 'out' ? 'сейчас <b>за ' + (r.side === 'low' ? 'нижней' : 'верхней') + ' полосой</b>' : 'недавно касался ' + (r.side === 'low' ? 'нижней' : 'верхней') + ' полосы'} (позиция ${pct}). Разворот <b>не подтверждён</b>: ${miss.join('; ')}. Ждём.`;
+    verdict = `${name} ${r.kind === 'out' ? 'сейчас <b>за ' + (r.side === 'low' ? 'нижней' : 'верхней') + ' полосой</b>' : 'недавно касался ' + (r.side === 'low' ? 'нижней' : 'верхней') + ' полосы'} (%B ${pct}). Разворот <b>не подтверждён</b>: ${miss.join('; ')}. Ждём.`;
   } else if (r.pB > 0.8 || r.pB < 0.2) {
-    verdict = `${name} близко к ${r.pB > 0.5 ? 'верхней' : 'нижней'} полосе (позиция ${pct}), но касания за последние 4 свечи не было.`;
+    verdict = `${name} близко к ${r.pB > 0.5 ? 'верхней' : 'нижней'} полосе (%B ${pct}), но касания за последние 4 свечи не было.`;
   } else {
-    verdict = `${name} в середине канала (позиция ${pct}). Сигналов нет — это нормально, бот просто наблюдает.`;
+    verdict = `${name} в середине канала (%B ${pct}). Сигналов нет — это нормально, бот просто наблюдает.`;
   }
   if (r.squeeze) verdict += ` Волатильность сжата (σ20/σN = ${r.comp.toFixed(2)}) — возможен резкий выход из канала.`;
-  let html = `<div style="font-weight:600;margin-bottom:6px">Разбор сигнала · ${name}</div><div class="verdict">${verdict}</div><div class="mute" style="font-size:12px;margin-bottom:8px">${hlTxt}</div>`;
-  if (r.comps) {
-    const rows2 = [
-      ['Глубина прокола', r.comps.D, 25, `тень вышла за полосу на ${r.exc.toFixed(2)}σ`],
-      ['Объём', r.comps.V, 25, `×${r.volX?.toFixed(2)} к норме, z ${r.volZ.toFixed(1)}`],
-      ['RSI', r.comps.R, 15, `RSI ${r.rsi.toFixed(0)} (${r.side === 'low' ? 'нужно < 35' : 'нужно > 65'})`],
-      ['Подтверждение', r.comps.C, 20, r.rev ? 'разворот подтверждён' : 'нет'],
-      ['Возврат к среднему', r.comps.M, 15, isFinite(r.hl) ? `T½ ${r.hl.toFixed(0)} свечей` : 'тренд'],
-    ];
-    html += rows2.map(([nm, v, w, tip]) => `<div class="comp" title="${tip}"><span class="cn">${nm}</span><span class="cb"><i style="width:${v*100}%"></i></span><span class="cv">${Math.round(v*w)} / ${w}</span></div>`).join('');
-    const ck = (ok, txt) => `<span class="${ok ? 'pos' : 'faint'}">${ok ? '✓' : '✗'} ${txt}</span>`;
-    html += `<div class="checks">${ck(r.checks.closed, 'свеча касания закрыта')}${ck(r.checks.candle, 'разворотная свеча')}${ck(r.checks.inside, 'цена внутри канала')}${ck(r.checks.volume, 'объём выше нормы')}</div>`;
-  }
-  for (const {p: pos, who} of botPositions().filter(x => x.p.sym === chartSym))
-    html += `<div style="margin-top:8px;color:#a78bfa">Открыта позиция (${who} бот): ${pos.side} от ${fp(pos.entry)}, TP ${fp(pos.tp)}, SL ${fp(pos.sl)}.</div>`;
+  let html = `<div class="ptitle">Разбор сигнала · ${name}</div><div class="verdict">${verdict}</div><div class="mute" style="font-size:12px;margin-bottom:8px">${hlTxt}</div>`;
+  html += compsHtml(r, r.side);
+  for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym))
+    html += `<div style="margin-top:8px;color:var(--violet)">Открыта позиция (${who} бот): ${p.side} от ${fp(p.entry)}, тейк ${fp(p.tp)}, стоп ${fp(p.sl)}.</div>`;
   el.innerHTML = html;
 }
 
-// ---------- paper bot ----------
-const FEE = 0.00075;
+// ---------- my bot (browser) ----------
 function runBot() {
   const now = Date.now();
-  for (const p of [...J.open]) {
-    const K = cache[p.sym]; if (!K) continue;
-    const start = Math.floor(p.time / p.tfms) * p.tfms + p.tfms;
-    let exit = null, reason = '';
-    for (const k of K) {
-      if (k[0] < start) continue;
-      const hi = +k[2], lo = +k[3];
-      if (p.side === 'LONG' ? lo <= p.sl : hi >= p.sl) { exit = p.sl; reason = 'стоп'; break; }
-      if (p.side === 'LONG' ? hi >= p.tp : lo <= p.tp) { exit = p.tp; reason = 'тейк'; break; }
-    }
-    const c = +K[K.length-1][4]; p.last = c;
-    if (!exit) {
-      if (p.side === 'LONG' ? c <= p.sl : c >= p.sl) { exit = c; reason = 'стоп'; }
-      else if (p.side === 'LONG' ? c >= p.tp : c <= p.tp) { exit = c; reason = 'тейк'; }
-      else if (now - p.time > 48 * p.tfms) { exit = c; reason = 'тайм-стоп'; }
-    }
-    if (exit) closePos(p, exit, reason, now);
-  }
-  if (J.on) {
-    const cool = s => J.closed.some(x => x.sym === s && now - x.tclose < 4 * TFMS[S.tf]);
-    const cands = rows.filter(r => r.rev && r.score >= S.minScore && !J.open.some(p => p.sym === r.sym) && !cool(r.sym)).sort((a, b) => b.score - a.score);
-    for (const r of cands) {
-      if (J.open.length >= 3) break;
-      const side = r.side === 'low' ? 'LONG' : 'SHORT', e = r.price, sg = side === 'LONG' ? 1 : -1;
-      const tpD = clamp(Math.abs(r.mid - e) / e, 0.01, 0.03), slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
-      if (tpD < 0.8 * slD) continue;
-      const qty = Math.min(J.balance * 0.02 / (e * slD), J.balance / 3 / e);
-      if (!(qty > 0)) continue;
-      J.open.push({id:now + r.sym, sym:r.sym, side, entry:e, last:e, tp:e*(1 + sg*tpD), sl:e*(1 - sg*slD), qty, time:now, tfms:TFMS[S.tf],
-        note:`${r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · оценка ${r.score} · z ${r.z.toFixed(1)}σ · T½ ${isFinite(r.hl) ? r.hl.toFixed(0) + ' св.' : '∞'}`});
-    }
-  }
-  J.checked = now; save('sr_journal', J); renderGuard();
+  const recent = J.closed.filter(x => now - x.tclose < M.COOLDOWN * TFMS[S.tf]).map(x => x.sym);
+  const res = M.botTick({rows, klines:cache, open:J.open, recentSyms:recent, balance:J.balance, S, now, allowEntries:J.on});
+  J.open = [...res.stillOpen, ...res.opened];
+  J.closed = [...res.closed, ...J.closed];
+  J.balance = res.balance; J.checked = now;
+  save('sr_journal', J); renderGuard();
   if (chart) drawChart();
 }
-function closePos(p, exit, reason, now) {
-  const pnl = (p.side === 'LONG' ? exit - p.entry : p.entry - exit) * p.qty - (p.entry + exit) * p.qty * FEE;
-  J.balance += pnl;
-  J.open = J.open.filter(x => x.id !== p.id);
-  J.closed.unshift(Object.assign({}, p, {exit, pnl, tclose:now, note:reason + ' · ' + p.note}));
-}
+
 // ---------- shared bot (read-only from Supabase) ----------
 async function sb(path) {
   const r = await fetch(SB_URL + path, {headers:{apikey:SB_KEY}, cache:'no-store'});
@@ -710,71 +648,139 @@ async function fetchShared() {
     const s = st[0];
     SJ = {balance:s.balance, start:s.start_balance, settings:s.settings, error:s.last_error, scanned:s.scanned,
           checked:s.checked_at ? Date.parse(s.checked_at) : 0, open, closed, on:true};
-  } catch (e) { SJ = SJ || null; if (SJ) SJ.fetchError = String(e.message || e); }
+  } catch (e) { if (SJ) SJ.fetchError = String(e.message || e); }
   renderGuard();
   if (!$('#journal').classList.contains('hidden')) renderJournal();
-  if (chart) drawChart();
-}
-const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})), ...J.open.map(p => ({p, who:'мой'}))];
-
-function stats(D) {
-  const cl = D.closed, win = cl.filter(x => x.pnl > 0).length, pnl = cl.reduce((a, x) => a + x.pnl, 0);
-  const gw = cl.filter(x => x.pnl > 0).reduce((a, x) => a + x.pnl, 0), gl = -cl.filter(x => x.pnl <= 0).reduce((a, x) => a + x.pnl, 0);
-  return {n:cl.length, win, pnl, pf:gl ? gw / gl : null, wr:cl.length ? win / cl.length * 100 : null,
-          pnl24:cl.filter(x => Date.now() - x.tclose < 864e5).reduce((a, x) => a + x.pnl, 0)};
+  if (chart) { drawChart(); renderDetail(); }
 }
 function renderGuard() {
-  const el = $('#guard'), mine = stats(J);
-  const mineTxt = `мой бот: ${J.on ? 'вкл' : 'пауза'}, позиций ${J.open.length}, PnL 24ч ${mine.pnl24 >= 0 ? '+' : ''}${mine.pnl24.toFixed(2)}`;
+  const el = $('#guard'), mine = M.journalStats(J.start, J.closed);
+  const mineTxt = `мой бот: ${J.on ? 'вкл' : 'пауза'}, позиций ${J.open.length}, PnL 24ч ${usd(mine.pnl24)}`;
   if (!SJ) { el.className = 'guard idle'; el.innerHTML = `<b>СТОРОЖ</b> Загружаю состояние общего бота… <span>${mineTxt}</span>`; return; }
-  const age = Date.now() - SJ.checked, s = stats(SJ);
-  const ok = SJ.open.every(p => isFinite(p.tp) && isFinite(p.sl)) && J.open.every(p => isFinite(p.tp) && isFinite(p.sl));
+  const age = Date.now() - SJ.checked, s = M.journalStats(SJ.start, SJ.closed);
+  const ok = [...SJ.open, ...J.open].every(p => isFinite(p.tp) && isFinite(p.sl));
   const stale = age > 5 * 60000;
   el.className = 'guard' + (!ok || stale ? ' bad' : SJ.error ? ' idle' : '');
-  const msg = !ok ? 'Есть позиция без защиты!' : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${SJ.error}` : 'Общий бот работает 24/7, все позиции с тейком и стопом.';
+  const msg = !ok ? 'Есть позиция без тейка или стопа!' : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${SJ.error}` : 'Общий бот работает 24/7, у всех позиций есть тейк и стоп.';
   el.innerHTML = `<b>СТОРОЖ ${ok && !stale ? 'OK' : 'ТРЕВОГА'}</b> ${msg}
-    <span> проверено ${SJ.checked ? new Date(SJ.checked).toLocaleString('ru') : '—'} · позиций ${SJ.open.length} · PnL 24ч ${s.pnl24 >= 0 ? '+' : ''}${s.pnl24.toFixed(2)} USDT · ${mineTxt}</span>`;
+    <span> проверено ${SJ.checked ? new Date(SJ.checked).toLocaleString('ru') : '—'} · позиций ${SJ.open.length} · PnL 24ч ${usd(s.pnl24)} · ${mineTxt}</span>`;
 }
+
+// ---------- journal ----------
 function equitySvg(D) {
-  const pts = [D.start]; [...D.closed].reverse().forEach(x => pts.push(pts[pts.length-1] + x.pnl));
+  const pts = [D.start]; [...D.closed].sort((a, b) => a.tclose - b.tclose).forEach(x => pts.push(pts[pts.length-1] + x.pnl));
   if (pts.length < 2) return '';
-  const mn = Math.min(...pts), mx = Math.max(...pts), W = 160, H = 28;
+  const mn = Math.min(...pts), mx = Math.max(...pts), W = 150, H = 26;
   const d = pts.map((v, i) => `${(i / (pts.length - 1) * W).toFixed(1)},${(H - (mx === mn ? H/2 : (v - mn) / (mx - mn) * H)).toFixed(1)}`).join(' ');
   return `<svg width="${W}" height="${H}" style="display:block;margin-top:4px"><polyline points="${d}" fill="none" stroke="${pts[pts.length-1] >= D.start ? '#22c55e' : '#ef4444'}" stroke-width="1.5"/></svg>`;
 }
+const reasonTag = r => `<span class="tag ${r === 'тейк' ? 'tp' : r === 'стоп' ? 'sl' : 'ts'}">${r || '—'}</span>`;
+const scoreOf = p => p.snap?.score ?? (String(p.note || '').match(/(?:оценка|сила) (\d+)/)?.[1] ?? '—');
 let jSort = 'tclose', jDir = -1;
+const journalData = () => jMode === 'shared' ? SJ : J;
 function renderJournal() {
   document.querySelectorAll('.jm').forEach(b => b.classList.toggle('on', b.dataset.m === jMode));
   $('#jmine').classList.toggle('hidden', jMode !== 'mine');
-  const shared = jMode === 'shared';
-  if (shared && !SJ) { $('#jdesc').textContent = 'Загружаю журнал общего бота…'; $('#jcards').innerHTML = ''; $('#jopen').innerHTML = ''; $('#jclosed').innerHTML = ''; return; }
-  const D = shared ? SJ : J, st = stats(D);
-  const methodName = m => ({log:'лог-канал', classic:'классика', robust:'робастная', ewma:'EWMA'})[m] || m;
-  if (shared) {
-    const s = SJ.settings;
-    $('#jdesc').innerHTML = `Один бот на сервере для всех посетителей, работает круглосуточно — даже когда сайт никто не открывал. Настройки фиксированы: ${methodName(s.method)} (${s.N}, ${s.k}), ${s.tf}, топ-${s.top} пар, мин. оценка ${s.minScore}. Последний прогон: ${SJ.checked ? dt(SJ.checked) : '—'}, пар просканировано ${SJ.scanned ?? '—'}.`;
-  } else {
-    $('#jdesc').innerHTML = `Ваш личный бот: торгует в этом браузере, пока вкладка открыта, на ваших текущих настройках (${methodName(S.method)} (${S.N}, ${S.k}), ${S.tf}, мин. оценка ${S.minScore}). Журнал виден только вам.`;
-  }
+  const D = journalData(), shared = jMode === 'shared';
+  if (!D) { $('#jdesc').textContent = 'Загружаю журнал общего бота…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
+  const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
+  $('#jdesc').innerHTML = shared
+    ? `Один бот на сервере для всех посетителей, работает круглосуточно. Настройки фиксированы: ${METHOD_NAME[set.method]} (${set.N}, ${set.k}), ${set.tf}, топ-${set.top} пар, мин. сила ${set.minScore}. Последний прогон: ${SJ.checked ? dt(SJ.checked) : '—'}, пар просканировано ${SJ.scanned ?? '—'}.`
+    : `Ваш личный бот: торгует в этом браузере, пока вкладка открыта, на ваших текущих настройках — ${METHOD_NAME[S.method]} (${S.N}, ${S.k}), ${S.tf}, мин. сила ${S.minScore}. Журнал виден только вам.`;
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
-  let cmp = '';
-  if (!shared && SJ) { const o = stats(SJ); cmp = ` · общий: ${o.wr == null ? '—' : o.wr.toFixed(1) + '%'}`; }
-  $('#jcards').innerHTML = card('Всего сделок', st.n, `открыто ${D.open.length} из 3`)
-    + card('WIN / LOSE', `<span class="pos">${st.win}</span> / <span class="neg">${st.n - st.win}</span>`, 'прибыльные / убыточные')
-    + card('Winrate', st.wr == null ? '—' : st.wr.toFixed(1) + '%', `profit factor ${st.pf == null ? '—' : st.pf.toFixed(2)}${cmp}`, '', 'Доля прибыльных сделок. Profit factor = сумма прибылей / сумма убытков; больше 1 — система в плюсе')
-    + card('PnL', (st.pnl >= 0 ? '+' : '') + st.pnl.toFixed(2) + ' $', 'за всю историю' + equitySvg(D), st.pnl >= 0 ? 'pos' : 'neg')
-    + card('Баланс', D.balance.toFixed(2) + ' $', `старт ${D.start} $ (виртуальные)`);
+  const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
+  $('#jcards').innerHTML =
+      card('Сделок', st.n, `открыто ${D.open.length} из ${M.MAX_OPEN}`)
+    + card('Winrate', st.wr == null ? '—' : st.wr.toFixed(1) + '%', `<span class="pos">${st.win}</span> прибыльных / <span class="neg">${st.loss}</span> убыточных`, '', 'Доля прибыльных сделок')
+    + card('Средний результат', rr(st.expR), other ? `у общего бота ${rr(other.expR)}` : 'на сделку, после комиссий', cl(st.expR), 'Ожидание: средний R на сделку после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')
+    + card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. прибыль ${usd(st.avgWin)} · ср. убыток ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей / сумма убытков. Больше 1 — система в плюсе')
+    + card('PnL после комиссий', usd(st.net), 'за всю историю' + equitySvg(D), cl(st.net))
+    + card('Комиссии', usd(-st.fees), `PnL до комиссий ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько съела комиссия биржи. Если она больше PnL до комиссий — стратегия работает на биржу')
+    + card('Макс. просадка', st.maxDD.toFixed(2) + '%', `ср. время в сделке ${dur(st.avgHold)}`, st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика до дна')
+    + card('Баланс', '$' + D.balance.toFixed(2), `старт $${D.start} (виртуальные)`);
+  const now = Date.now();
   $('#jopen').innerHTML = D.open.map(p => {
-    const u = (p.side === 'LONG' ? p.last - p.entry : p.entry - p.last) * p.qty;
-    return `<tr class="row" data-sym="${p.sym}"><td>${dt(p.time)}</td><td><b>${base(p.sym)}</b></td><td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(p.last)}</td>
-      <td>${(p.qty * p.entry).toFixed(0)} $</td><td>${fp(p.tp)}</td><td>${fp(p.sl)}</td><td class="${u >= 0 ? 'pos' : 'neg'}">${u >= 0 ? '+' : ''}${u.toFixed(2)} $</td><td class="mute">${p.note}</td></tr>`;
-  }).join('') || '<tr><td colspan="10" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
-  const list = [...D.closed].sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : x - y) * jDir; });
-  $('#jclosed').innerHTML = list.map(x => `<tr><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td><td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td>
-    <td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td>${(x.qty * x.entry).toFixed(0)} $</td><td>${fp(x.tp)}</td><td>${fp(x.sl)}</td>
-    <td class="${x.pnl >= 0 ? 'pos' : 'neg'}">${x.pnl >= 0 ? '+' : ''}${x.pnl.toFixed(2)} $ (${((x.pnl / (x.qty * x.entry)) * 100).toFixed(2)}%)</td><td class="mute">${x.note}</td></tr>`).join('')
-    || '<tr><td colspan="10" class="mute">Сделок пока нет. Пропуск сделок — норма: бот ждёт подтверждённых сигналов.</td></tr>';
+    const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry;
+    const u = sg * (last - p.entry) * p.qty - (p.entry + last) * p.qty * M.FEE, risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
+    return `<tr class="row" data-kind="open" data-id="${p.id}" title="Открыть карточку позиции"><td>${dt(p.time)} <span class="faint">${dur(now - p.time)}</span></td><td><b>${base(p.sym)}</b></td>
+      <td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(last)}</td><td>$${(p.qty * p.entry).toFixed(0)}</td><td>${fp(p.tp)}</td><td>${fp(p.sl)}</td>
+      <td class="${cl(u)}">${usd(u)}</td><td class="${cl(u)}">${rr(risk ? u / risk : null)}</td><td>${scoreOf(p)}</td></tr>`;
+  }).join('') || '<tr><td colspan="11" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
+  const list = D.closed.map(M.normTrade).sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * jDir; });
+  document.querySelectorAll('#jhead th').forEach(th => th.classList.toggle('sorted', th.dataset.s === jSort));
+  $('#jclosed').innerHTML = list.map(x => `<tr class="row" data-kind="closed" data-id="${x.id}" title="Открыть карточку сделки"><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td>
+    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td>$${x.size.toFixed(0)}</td>
+    <td>${reasonTag(x.reason)}</td><td class="mute">${dur(x.hold)}</td><td class="${cl(x.gross)}">${usd(x.gross)}</td><td class="neg">${usd(-x.fee)}</td>
+    <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td></tr>`).join('')
+    || '<tr><td colspan="12" class="mute">Сделок пока нет. Пропуск сделок — норма: бот ждёт подтверждённых сигналов.</td></tr>';
 }
+
+// ---------- trade card ----------
+let tcard = null; // {d, opts}
+async function openTrade(kind, id) {
+  const D = journalData(), who = jMode === 'shared' ? 'общий' : 'мой';
+  const raw = (kind === 'open' ? D.open : D.closed).find(x => String(x.id) === String(id));
+  if (!raw) return;
+  const isOpen = kind === 'open', x = isOpen ? raw : M.normTrade(raw);
+  const set = x.snap?.settings || (jMode === 'shared' ? SJ.settings : S);
+  const tf = x.snap?.settings?.tf || tfOf(x.tfms) || set.tf, tfms = TFMS[tf];
+  const sg = x.side === 'LONG' ? 1 : -1;
+  $('#modal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
+  $('#mtitle').textContent = `${pair(x.sym)} — ${isOpen ? 'открытая позиция' : 'сделка'}`;
+  $('#mmeta').textContent = `${x.side} · ${who} бот · ${isOpen ? 'открыта ' + dt(x.time) : dt(x.time) + ' → ' + dt(x.tclose)} · ${tf}`;
+  // aside
+  const last = isOpen ? (x.last ?? x.entry) : x.exit, risk = x.risk || Math.abs(x.entry - x.sl) * x.qty;
+  const gross = sg * (last - x.entry) * x.qty, fee = (x.entry + last) * x.qty * M.FEE, net = gross - fee;
+  const pct = v => { const p = (v / x.entry - 1) * 100; return (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(2) + '%'; };
+  const row = (k, v, c = '') => `<span>${k}</span><b class="${c}">${v}</b>`;
+  let html = `<div class="kv">
+    ${row('Сторона', x.side, x.side === 'LONG' ? 'pos' : 'neg')}
+    ${row('Открыта', dt(x.time))}
+    ${isOpen ? row('В сделке', dur(Date.now() - x.time)) : row('Закрыта', dt(x.tclose)) + row('Длительность', dur(x.hold))}
+    ${row('Вход', fp(x.entry))}
+    ${row(isOpen ? 'Сейчас' : 'Выход', fp(last))}
+    ${row('Тейк', `${fp(x.tp)} (${pct(x.tp)})`, 'pos')}
+    ${row('Стоп', `${fp(x.sl)} (${pct(x.sl)})`, 'neg')}
+    ${row('Размер позиции', '$' + (x.entry * x.qty).toFixed(2))}
+    ${row('Кол-во монет', (+x.qty).toPrecision(5))}
+    ${row('Риск (1R)', '$' + risk.toFixed(2))}
+    ${isOpen ? '' : row('Причина выхода', reasonTag(x.reason))}
+    ${row(isOpen ? 'PnL до комиссий сейчас' : 'PnL до комиссий', usd(gross), cl(gross))}
+    ${row('Комиссия', usd(-fee), 'neg')}
+    ${row(isOpen ? 'PnL сейчас' : 'PnL после комиссий', usd(net), cl(net))}
+    ${row('Результат', rr(risk ? net / risk : null), cl(net))}
+  </div>`;
+  html += `<h4>Почему бот вошёл</h4>`;
+  if (x.snap) {
+    const s = x.snap;
+    html += `<div class="mute" style="font-size:12px;margin-bottom:6px">Сила сигнала <b style="color:var(--acc)">${s.score}</b> · %B ${(s.pB * 100).toFixed(1)}% · откл. ${(+s.z).toFixed(2)}σ · объём ×${s.volX?.toFixed(2)} · RSI ${(+s.rsi).toFixed(0)} · T½ ${s.hl == null ? '∞' : s.hl.toFixed(0) + ' св.'}</div>` + compsHtml(s, x.side);
+    html += `<div class="faint" style="font-size:12px;margin-top:8px">Настройки на входе: ${METHOD_NAME[s.settings.method]} (${s.settings.N}, ${s.settings.k}), ${s.settings.tf}, мин. сила ${s.settings.minScore}.</div>`;
+  } else {
+    html += `<div class="mute" style="font-size:12px">${x.note || ''}<br>Подробный снимок сигнала не сохранён: сделка открыта до обновления журнала.</div>`;
+  }
+  $('#maside').innerHTML = html;
+  // chart
+  tcard = null; renderChart($('#tcv'), null);
+  const cv = $('#tcv'), g = cv.getContext('2d'); cv.width = cv.clientWidth; cv.height = cv.clientHeight; g.fillStyle = '#8b95a5'; g.font = '13px system-ui'; g.fillText('Загружаю свечи…', 16, 24);
+  try {
+    const start = Math.floor(x.time / tfms) * tfms - (set.N + 120) * tfms, end = isOpen ? Date.now() : x.tclose + 40 * tfms;
+    const K = await api(`/api/v3/klines?symbol=${x.sym}&interval=${tf}&startTime=${start}&limit=${Math.min(1000, Math.ceil((end - start) / tfms) + 1)}`);
+    const d = parse(K); d.B = bands(d.c, set.N, set.k, set.method); d.R = rsi(d.c);
+    const ei = barAt(d.t, x.time), xi = isOpen ? d.c.length - 1 : barAt(d.t, x.tclose);
+    const levels = [
+      {v:x.entry, col:'#a78bfa', label:`вход ${fp(x.entry)}`, i0:ei, i1:xi},
+      {v:x.tp, col:'#22c55e', label:`тейк ${fp(x.tp)}`, i0:ei, i1:xi},
+      {v:x.sl, col:'#ef4444', label:`стоп ${fp(x.sl)}`, i0:ei, i1:xi},
+    ];
+    const marks = [{i:ei, price:x.entry, col:'#a78bfa', label:'вход'}];
+    if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? '#22c55e' : '#ef4444', label:`выход · ${x.reason}`});
+    tcard = {d, opts:{from:Math.max(set.N - 1, ei - 120), levels, marks, live:isOpen, hoverI:null}};
+    tcard.geo = renderChart(cv, d, tcard.opts);
+  } catch (e) {
+    g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = '#ef4444'; g.fillText('Не удалось загрузить свечи: ' + e.message, 16, 24);
+  }
+}
+function closeModal() { $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null; }
 
 // ---------- sound ----------
 let actx = null;
@@ -819,9 +825,12 @@ $('#tb').onclick = e => {
   if (f) { const s = f.dataset.fav; favs.has(s) ? favs.delete(s) : favs.add(s); save('sr_favs', [...favs]); renderTable(); return; }
   const tr = e.target.closest('tr.row'); if (tr) loadChart(tr.dataset.sym);
 };
-$('#jopen').onclick = e => { const tr = e.target.closest('tr.row'); if (tr) { document.querySelector('.tab[data-t=market]').click(); loadChart(tr.dataset.sym); } };
+['#jopen', '#jclosed'].forEach(s => $(s).onclick = e => { const tr = e.target.closest('tr.row'); if (tr) openTrade(tr.dataset.kind, tr.dataset.id); });
+$('#mclose').onclick = closeModal;
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; sortDir = sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1); sortKey = k; renderTable(); });
-document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : -1; jSort = k; renderJournal(); });
+document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : (k === 'sym' || k === 'reason' ? 1 : -1); jSort = k; renderJournal(); });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); });
 document.querySelectorAll('.tab[data-t]').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tab[data-t]').forEach(x => x.classList.toggle('on', x === b));
@@ -830,38 +839,42 @@ document.querySelectorAll('.tab[data-t]').forEach(b => b.onclick = () => {
 });
 $('#snd').onclick = () => { sound = !sound; $('#snd').textContent = sound ? '🔔 Звук вкл' : '🔇 Звук выкл'; if (sound) beep(); };
 $('#boton').onchange = e => { J.on = e.target.checked; save('sr_journal', J); renderGuard(); };
-$('#minsc').oninput = e => { S.minScore = +e.target.value; $('#minscv').textContent = S.minScore; save('sr_settings', S); renderTable(); renderDetail(); };
-$('#jreset').onclick = () => { if (!confirm('Сбросить виртуальный журнал и баланс?')) return; J = {balance:10000, start:10000, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart(); };
+$('#minsc').oninput = e => { S.minScore = +e.target.value; $('#minscv').textContent = S.minScore; save('sr_settings', S); renderTable(); renderDetail(); renderJournal(); };
+$('#jreset').onclick = () => { if (!confirm('Сбросить журнал вашего бота и баланс?')) return; J = {balance:10000, start:10000, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart(); };
 const cv = $('#cv');
-cv.onmousemove = e => { if (!chart?._X) return; const {s, n, padL, padR, W} = chart._X, r = cv.getBoundingClientRect();
-  hoverI = Math.round(s + (e.clientX - r.left - padL) / (W - padL - padR) * (n - 1 - s)); drawChart(); };
+cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); drawChart(); };
 cv.onmouseleave = () => { hoverI = null; drawChart(); };
-window.onresize = drawChart;
+const tcv = $('#tcv');
+tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
+tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
+window.onresize = () => { drawChart(); if (tcard) tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
 
 syncInputs(); renderGuard(); renderJournal(); loadChart(); scan(); fetchShared();
-setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
 setInterval(scan, SCAN_MS);
 setInterval(tickFoot, 1000);
 setInterval(() => { if (!document.hidden) loadChart(); }, SCAN_MS); // keep the chart's last candle fresh
+setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
 
 // ---------- auto-update: reload open tabs when a new version is deployed ----------
-// The journal and settings live in localStorage, so a reload loses nothing.
-const UPDATE_MS = 3 * 60000;
+// Journal and settings live in localStorage, so a reload loses nothing.
+const UPDATE_FILES = [location.pathname, new URL('./supabase/functions/_shared/math.js', location.href).pathname];
 const hashText = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
-const fetchSelf = () => fetch(location.pathname + '?_=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.text() : null).catch(() => null);
+const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.text() : null)))
+  .then(ts => ts.includes(null) ? null : hashText(ts.join('\n'))).catch(() => null);
 let selfHash = null;
-fetchSelf().then(t => { if (t) selfHash = hashText(t); });
+fetchVersion().then(h => { selfHash = h; });
 async function checkUpdate() {
   if (selfHash == null) return;
-  const t = await fetchSelf();
-  if (!t || hashText(t) === selfHash) return;
+  const h = await fetchVersion();
+  if (h == null || h === selfHash) return;
   const el = $('#guard'); el.className = 'guard idle';
   let n = 5;
   const tick = () => { el.innerHTML = `<b>ОБНОВЛЕНИЕ</b> Вышла новая версия сайта — перезагружаю через ${n} с. Журнал и настройки сохранятся.`; if (n-- <= 0) location.reload(); else setTimeout(tick, 1000); };
   tick();
 }
-setInterval(checkUpdate, UPDATE_MS);
+setInterval(checkUpdate, 3 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+window.__sr = {get rows() { return rows; }, get J() { return J; }, get SJ() { return SJ; }, openTrade, M};
 </script>
 </body>
 </html>
