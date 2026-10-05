@@ -55,6 +55,7 @@ svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-
 .phead p{margin:4px 0 0;color:var(--mute);font-size:13px;max-width:900px}
 .sub{color:var(--mute);font-size:13px;margin:4px 0 12px}
 .grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px}
+.grid>*{min-width:0}
 .panel{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:16px}
 .ptitle{font-weight:650;font-size:14px;margin-bottom:10px}.ptitle span{font-weight:400;font-size:12px;color:var(--mute)}
 
@@ -74,8 +75,11 @@ input[type=range]{padding:0;width:120px;accent-color:var(--acc)}
 .ctrl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:10px 0}
 .ctrl label{color:var(--mute);font-size:12px;display:flex;align-items:center;gap:8px}
 .ctrl label b{color:var(--text);min-width:28px;font-weight:600}
-.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.filters>*{flex:1;min-width:110px}
-.search{position:relative}.search input{width:100%;padding-left:32px}.search svg{position:absolute;left:10px;top:9px;color:var(--faint)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}.filters>*{flex:1;min-width:110px}
+.filters>.icon,.filters>.seg{flex:0 0 auto;min-width:0}
+.search{position:relative;display:flex;align-items:center}
+.search input:not([type=checkbox]):not([type=range]){width:100%;padding-left:34px}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
 kbd{font:11px/1 ui-monospace,monospace;color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:2px 5px}
 .seg{display:inline-flex;background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;margin-bottom:14px}
 .seg .tab{height:32px}
@@ -166,7 +170,7 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 .strip{display:flex;gap:1.5px;height:18px;margin:8px 0}.strip i{flex:1;border-radius:2px;background:var(--s3)}.strip i.ok{background:#16a34a}.strip i.err{background:#dc2626}
 
 /* ---------- docs ---------- */
-.doc{max-width:980px;line-height:1.6}.doc h3{color:var(--text);font-size:17px;margin:26px 0 8px}.doc h3:first-child{margin-top:0}
+.doc{line-height:1.6}.doc p,.doc li{max-width:820px}.doc h3{color:var(--text);font-size:17px;margin:26px 0 8px}.doc h3:first-child{margin-top:0}
 .doc code{background:var(--s3);padding:1px 6px;border-radius:5px;font-size:12.5px}
 .doc li{margin:5px 0}
 .gloss{display:grid;grid-template-columns:210px 1fr;gap:8px 18px;font-size:13px}.gloss b{color:var(--text)}.gloss span{color:var(--mute)}
@@ -191,6 +195,25 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 #hdr{display:none}
 .fl{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute)}.fl.inl{flex-direction:row;align-items:center;gap:8px;height:var(--h)}
 .tablewrap:not(.more) .hx{display:none}
+.hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:20px;align-items:center;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin-bottom:12px}
+.hero .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.hero .hv{font-size:36px;font-weight:700;letter-spacing:-.025em;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.hchart{display:flex;justify-content:flex-end}
+.statrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.statrow .card .v{font-size:21px}
+@media(max-width:1100px){.statrow{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.hero{grid-template-columns:1fr;padding:16px}.hero .hv{font-size:30px}.hchart{justify-content:stretch}.statrow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* the coin table adapts to the width of its own panel, not of the window */
+.tpanel{container-type:inline-size}
+@container (max-width:680px){.tpanel .gauge{display:none}.tpanel td,.tpanel th{padding-left:6px;padding-right:6px}}
+@container (max-width:440px){
+  .tpanel .coin i{display:none}.tpanel .tag{padding:3px 6px;font-size:10.5px}
+  .tpanel table{font-size:12.5px}.tpanel td,.tpanel th{padding-left:4px;padding-right:4px}
+  .tpanel .tablewrap{overflow-x:hidden}
+  /* on a phone keep what matters: coin, range, signal, strength (price is in the chart header) */
+  #mhead th:nth-child(1),#tb td:nth-child(1),#mhead th:nth-child(3),#tb td:nth-child(3){display:none}
+}
+.tab .ts{display:none}
 .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .ctitle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:18px;font-weight:700}
 .ctitle .coin i{width:30px;height:30px;font-size:13px}.ctitle .coin b{font-size:18px}
@@ -199,9 +222,10 @@ tr.sel{background:#182033;box-shadow:inset 3px 0 0 var(--acc)}
 .cact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .seg.mini{margin:0;padding:2px;border-radius:9px}.seg.mini .tab{height:30px;padding:0 10px;font-size:13px;border-radius:7px}
 details.dis{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);margin:0 0 12px}
-details.dis>summary{list-style:none;cursor:pointer;padding:14px 16px;display:flex;align-items:center;gap:10px;font-weight:600}
+details.dis>summary{list-style:none;cursor:pointer;padding:14px 44px 14px 16px;display:block;position:relative;font-weight:600;line-height:1.45}
 details.dis>summary::-webkit-details-marker{display:none}
-details.dis>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform .2s}
+details.dis>summary .sdot{margin-right:8px;vertical-align:1px}
+details.dis>summary::after{content:"";position:absolute;right:18px;top:19px;width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform .2s}
 details.dis[open]>summary::after{transform:rotate(-135deg)}
 details.dis>summary .mute{font-weight:400;font-size:13px}
 details.dis>.dbody{padding:0 16px 16px}
@@ -215,7 +239,8 @@ details.dis>.dbody{padding:0 16px 16px}
 
 /* ---------- responsive ---------- */
 @media(max-width:1180px){.form{grid-template-columns:1fr 1fr}.factions{grid-column:1/-1;flex-direction:row}}
-@media(max-width:1100px){.grid,.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1200px){.grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:860px){.brand span.bt{display:none}.pill span.pt{display:none}}
 @media(max-width:700px){
   .topin{gap:10px;padding:0 10px;justify-content:space-between}
@@ -227,12 +252,18 @@ details.dis>.dbody{padding:0 16px 16px}
   .top .tab{flex:1;flex-direction:column;height:auto;gap:3px;padding:6px 2px;font-size:10.5px;min-width:0}
   .top .tab svg.i{width:20px;height:20px}
   .top .tab .badge{display:none}
+  .top .tab .tt.lg{display:none}.top .tab .ts{display:inline}
+  .cards>.card:last-child:nth-child(odd){grid-column:1/-1}
+  .cact .search{flex:1 1 100%}.cact .seg{flex:1}.cact .seg .tab{flex:1}
   body{padding-bottom:72px}
-  #toasts{bottom:84px}
   .wrap{padding:12px 10px 28px}.phead h2{font-size:19px}
   .hm{display:none}
   td,th{padding:8px 5px}
-  .ctrl label{flex:1 1 44%}.filters>*{min-width:44%}
+  .ctrl label{flex:1 1 44%}
+  .filters>*{min-width:0}.filters>.search{flex:1 1 100%!important}.filters>select{flex:1 1 44%}
+  .cact{width:100%}.cact .search{flex:1 1 140px}.cact .search input{width:100%!important}
+  #toasts{top:66px;bottom:auto;left:10px;right:10px;width:auto}
+  #toasts .toast:nth-child(n+3){display:none}
   .modal{padding:0}.mbox{border-radius:0;min-height:100%;border:0}
   .cards{grid-template-columns:repeat(2,1fr)}
   .form{grid-template-columns:1fr}
@@ -270,8 +301,8 @@ details.dis>.dbody{padding:0 16px 16px}
     <button class="tab on" data-t="market"><svg class="i"><use href="#i-market"/></svg><span class="tt">Рынок</span></button>
     <button class="tab" data-t="journal"><svg class="i"><use href="#i-journal"/></svg><span class="tt">Журнал</span></button>
     <button class="tab" data-t="backtest"><svg class="i"><use href="#i-backtest"/></svg><span class="tt">Проверка</span></button>
-    <button class="tab" data-t="help"><svg class="i"><use href="#i-help"/></svg><span class="tt">Как это работает</span></button>
-    <button class="tab" data-t="changes"><svg class="i"><use href="#i-changes"/></svg><span class="tt">Что нового</span><span class="badge" id="ver"></span></button>
+    <button class="tab" data-t="help"><svg class="i"><use href="#i-help"/></svg><span class="tt lg">Как это работает</span><span class="ts">Справка</span></button>
+    <button class="tab" data-t="changes"><svg class="i"><use href="#i-changes"/></svg><span class="tt lg">Что нового</span><span class="ts">Новое</span><span class="badge" id="ver"></span></button>
   </nav>
   <div class="tools">
     <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
@@ -289,7 +320,7 @@ details.dis>.dbody{padding:0 16px 16px}
     <div class="intro hidden" id="intro">
       <div><div class="h">Добро пожаловать</div>
         <ol>
-          <li>Зелёная метка <span class="tag loc">▲ сигнал LONG</span> — монета подешевела сильнее обычного и разворачивается вверх. Красная <span class="tag upc">▼ сигнал SHORT</span> — наоборот.</li>
+          <li>Зелёная метка <span class="tag loc">▲ LONG</span> — монета подешевела сильнее обычного и разворачивается вверх. Красная <span class="tag upc">▼ SHORT</span> — наоборот.</li>
           <li>Нажмите на монету, чтобы увидеть график и почему сигнал сильный или слабый.</li>
           <li>В «Журнале» — как по этим сигналам торгует бот. Деньги виртуальные.</li>
         </ol>
@@ -309,7 +340,7 @@ details.dis>.dbody{padding:0 16px 16px}
         <div class="chead">
           <div style="min-width:0"><div class="ctitle" id="ctitle">—</div><div class="stats" id="cstats"></div></div>
           <div class="cact">
-            <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" list="symlist" placeholder="Другая монета" style="width:150px"><datalist id="symlist"></datalist></div>
+            <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
             <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button></div>
             <button class="icon" id="cset" title="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
           </div>
@@ -339,7 +370,7 @@ details.dis>.dbody{padding:0 16px 16px}
         <div class="detail" id="detail"></div>
       </div>
 
-      <div class="panel">
+      <div class="panel tpanel">
         <div class="filters">
           <div class="search" style="flex:1 1 160px"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
           <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы</button><button class="tab" data-fl="sq">Затишье</button><button class="tab" data-fl="fav" title="Избранное">★</button></div>
@@ -385,7 +416,7 @@ details.dis>.dbody{padding:0 16px 16px}
     </div>
     <div class="sub" id="jdesc"></div>
     <div id="srv"></div>
-    <div class="cards auto" id="jcards"></div>
+    <div id="jcards"></div>
     <div class="ctrl" id="jmine">
       <label><input type="checkbox" id="boton"> Бот торгует (бумажная торговля в браузере, пока вкладка открыта)</label>
       <label title="Бот открывает сделку только при подтверждённом сигнале с силой не ниже этой">Мин. сила сигнала <input type="range" id="minsc" min="40" max="90" step="1"><b id="minscv"></b></label>
@@ -472,9 +503,9 @@ details.dis>.dbody{padding:0 16px 16px}
     <div class="panel doc" style="margin-bottom:12px">
       <h3>Метки в таблице</h3>
       <ul>
-        <li><span class="tag loc">▲ сигнал LONG</span> — монета подешевела сильнее обычного и разворачивается вверх. <span class="tag upc">▼ сигнал SHORT</span> — подорожала и разворачивается вниз.</li>
-        <li><span class="tag uo">за каналом ↑</span> <span class="tag lout">за каналом ↓</span> — цена прямо сейчас за границей, разворота ещё нет.</li>
-        <li><span class="tag up">касание верха</span> <span class="tag lo">касание низа</span> — цена недавно выходила за границу, но подтверждения пока не хватает.</li>
+        <li><span class="tag loc">▲ LONG</span> — монета подешевела сильнее обычного и разворачивается вверх. <span class="tag upc">▼ SHORT</span> — подорожала и разворачивается вниз.</li>
+        <li><span class="tag uo">за границей ↑</span> <span class="tag lout">за границей ↓</span> — цена прямо сейчас за границей диапазона, разворота ещё нет.</li>
+        <li><span class="tag up">касание ↑ 15:45</span> <span class="tag lo">касание ↓</span> — цена недавно выходила за границу (время свечи), но подтверждения пока не хватает.</li>
         <li><span class="tag sq">сжатие</span> — монета вдвое спокойнее обычного; часто это затишье перед резким движением.</li>
       </ul>
       <h3>Два бота</h3>
@@ -678,7 +709,10 @@ function gauge(pB) {
   const col = pB > 0.9 ? 'var(--up)' : pB < 0.1 ? 'var(--lo)' : '#93c5fd';
   return `<span class="gauge"><i style="left:${x}%;background:${col}"></i></span><span style="color:${col}">${(pB*100).toFixed(1)}%</span>`;
 }
-const labelOf = r => r.kind === 'touch' ? `${r.label} ${hm(r.touchTime)}` : r.label;
+// compact labels for the table; the long wording stays in the breakdown and the glossary
+const labelOf = r => r.kind === 'sig' ? (r.side === 'low' ? '▲ LONG' : '▼ SHORT')
+  : r.kind === 'out' ? (r.pB > 1 ? 'за границей ↑' : 'за границей ↓')
+  : r.kind === 'touch' ? `касание ${r.side === 'low' ? '↓' : '↑'} ${hm(r.touchTime)}` : r.label;
 function renderTable() {
   const fz = $('#fz').value, fl = $('#fl').value, q = $('#fs').value.trim().toUpperCase();
   const list = rows.filter(r => {
@@ -801,14 +835,14 @@ function renderChart(cv, d, o = {}) {
   }
   // volume
   let vmax = 0; for (let i = s; i <= e; i++) vmax = Math.max(vmax, v[i]);
-  g.fillStyle = '#8b95a5'; g.fillText('Объём', padL, vTop - 8);
+  g.fillStyle = '#5c6679'; g.fillText('Объём', padL + 2, vTop + 6);
   for (let i = s; i <= e; i++) {
     const hh = vmax ? v[i] / vmax * vH : 0;
     g.fillStyle = c[i] >= op[i] ? 'rgba(34,197,94,.45)' : 'rgba(239,68,68,.45)';
     g.fillRect(X(i) - Math.max(0.5, bw * 0.35), vTop + vH - hh, Math.max(1, bw * 0.7), hh);
   }
   // RSI
-  g.fillStyle = '#8b95a5'; g.fillText('RSI(14)', padL, rTop - 8);
+  g.fillStyle = '#5c6679'; g.fillText('RSI', padL + 2, rTop + 7);
   const RY = x => rTop + (100 - x) / 100 * rH;
   g.fillStyle = 'rgba(239,68,68,.06)'; g.fillRect(padL, RY(100), W - padL - padR, RY(70) - RY(100));
   g.fillStyle = 'rgba(34,197,94,.06)'; g.fillRect(padL, RY(30), W - padL - padR, RY(0) - RY(30));
@@ -915,41 +949,43 @@ function compsHtml(x, side) {
   const low = side === 'low' || side === 'LONG';
   const hl = x.hl == null || !isFinite(x.hl) ? null : x.hl;
   const list = [
-    ['Глубина прокола', x.comps.D, 25, `тень вышла за полосу на ${(+x.exc).toFixed(2)}σ`],
-    ['Объём', x.comps.V, 25, `×${x.volX?.toFixed(2)} к норме, z ${(+x.volZ).toFixed(1)}`],
-    ['RSI', x.comps.R, 15, `RSI ${(+x.rsi).toFixed(0)} (${low ? 'нужно < 35' : 'нужно > 65'})`],
-    ['Подтверждение', x.comps.C, 20, x.comps.C ? 'разворот подтверждён' : 'нет'],
-    ['Возврат к центру', x.comps.M, 15, hl != null ? `T½ ${hl.toFixed(0)} свечей` : 'тренд'],
+    ['Выход за границу', x.comps.D, 25, `насколько далеко цена вышла за границу: ${(+x.exc).toFixed(2)}σ`],
+    ['Объём торгов', x.comps.V, 25, `×${x.volX?.toFixed(2)} к обычному`],
+    [low ? 'Перепроданность' : 'Перекупленность', x.comps.R, 15, `RSI ${(+x.rsi).toFixed(0)} (${low ? 'чем ниже 35, тем лучше' : 'чем выше 65, тем лучше'})`],
+    ['Разворот', x.comps.C, 20, x.comps.C ? 'разворот подтверждён' : 'разворота пока нет'],
+    ['Скорость возврата', x.comps.M, 15, hl != null ? `монета обычно возвращается наполовину за ${hl.toFixed(0)} свечей` : 'монета в тренде'],
   ];
   const ck = (ok, txt) => `<span class="${ok ? 'pos' : 'faint'}">${ok ? '✓' : '✗'} ${txt}</span>`;
-  return list.map(([nm, v, w, tip]) => `<div class="comp" title="${tip}"><span class="cn">${nm}</span><span class="cb"><i style="width:${v*100}%"></i></span><span class="cv">${Math.round(v*w)} / ${w}</span></div>`).join('')
-    + (x.checks ? `<div class="checks">${ck(x.checks.closed, 'свеча касания закрыта')}${ck(x.checks.candle, 'разворотная свеча')}${ck(x.checks.inside, 'цена внутри канала')}${ck(x.checks.volume, 'объём выше нормы')}</div>` : '');
+  return `<div class="faint" style="font-size:12px;margin:2px 0 6px">Из чего сложилась сила сигнала</div>`
+    + list.map(([nm, v, w, tip]) => `<div class="comp" title="${tip}"><span class="cn">${nm}</span><span class="cb"><i style="width:${v*100}%"></i></span><span class="cv">${Math.round(v*w)} / ${w}</span></div>`).join('')
+    + (x.checks ? `<div class="checks">${ck(x.checks.closed, 'свеча закрылась')}${ck(x.checks.candle, 'цена развернулась')}${ck(x.checks.inside, 'вернулась в диапазон')}${ck(x.checks.volume, 'объём выше обычного')}</div>` : '');
 }
 function renderDetail() {
   const el = $('#detail');
   if (!chartK) { el.innerHTML = ''; return; }
   const r = M.analyze(chartSym, chartK, S);
   if (!r) { el.innerHTML = '<div class="mute">Мало истории для расчёта канала — уменьшите N.</div>'; return; }
-  const name = base(chartSym), pct = (r.pB * 100).toFixed(1) + '%';
+  const name = base(chartSym), pct = (r.pB * 100).toFixed(0) + '%';
   const hlTxt = isFinite(r.hl)
-    ? `Отклонения от центра у ${name} обычно наполовину исчезают за <b>${dur(r.hl * TFMS[S.tf])}</b> (${r.hl.toFixed(0)} свечей)${r.hl > 40 ? ' — медленно, возврат к центру ненадёжен' : ''}.`
-    : `T½ = ∞: цена сейчас в <b>тренде</b> и не стремится обратно к центру — отскок ловить рискованно.`;
+    ? `${name} обычно проходит половину пути обратно к своей цене за <b>${dur(r.hl * TFMS[S.tf])}</b>${r.hl > 40 ? ' — это медленно, на быстрый возврат рассчитывать не стоит' : ''}.`
+    : `${name} сейчас в <b>тренде</b> и не стремится вернуться к своей цене — ловить разворот рискованно.`;
+  const edge = r.side === 'low' ? 'нижней' : 'верхней';
   let verdict;
   if (r.rev) {
-    verdict = `<b>${r.side === 'low' ? '▲ Сигнал LONG' : '▼ Сигнал SHORT'} подтверждён.</b> Сила <b>${r.score}</b> — ${r.score >= S.minScore ? 'бот войдёт в сделку, если есть свободный слот.' : `ниже порога бота (${S.minScore}), сделки не будет.`}`;
+    verdict = `<b>${r.side === 'low' ? '▲ Разворот вверх' : '▼ Разворот вниз'} подтверждён.</b> Сила ${r.score} из 100 — ${r.score >= S.minScore ? 'бот войдёт в сделку, если есть свободное место.' : `ниже порога бота (${S.minScore}), сделки не будет.`}`;
   } else if (r.touch) {
     const miss = [];
-    if (!r.checks.closed) miss.push('свеча касания ещё не закрылась');
-    if (r.checks.closed && !r.checks.candle) miss.push(`последняя закрытая свеча не ${r.side === 'low' ? 'зелёная' : 'красная'}`);
-    if (!r.checks.inside) miss.push('цена ещё не вернулась внутрь канала');
-    if (!r.checks.volume) miss.push(`объём не выше нормы (z ${r.volZ.toFixed(1)}, нужно ≥ 1)`);
-    verdict = `${name} ${r.kind === 'out' ? 'сейчас <b>за ' + (r.side === 'low' ? 'нижней' : 'верхней') + ' полосой</b>' : 'недавно касался ' + (r.side === 'low' ? 'нижней' : 'верхней') + ' полосы'} (%B ${pct}). Разворот <b>не подтверждён</b>: ${miss.join('; ')}. Ждём.`;
+    if (!r.checks.closed) miss.push('свеча ещё не закрылась');
+    if (r.checks.closed && !r.checks.candle) miss.push('цена пока не развернулась');
+    if (!r.checks.inside) miss.push('цена ещё за границей');
+    if (!r.checks.volume) miss.push('объём торгов обычный, а нужен повышенный');
+    verdict = `${name} ${r.kind === 'out' ? `сейчас <b>за ${edge} границей</b>` : `недавно выходил за ${edge} границу`}. Разворота пока нет: ${miss.join(', ')}. Ждём.`;
   } else if (r.pB > 0.8 || r.pB < 0.2) {
-    verdict = `${name} близко к ${r.pB > 0.5 ? 'верхней' : 'нижней'} полосе (%B ${pct}), но касания за последние 4 свечи не было.`;
+    verdict = `${name} у ${r.pB > 0.5 ? 'верхней' : 'нижней'} границы диапазона (${pct}), но за неё не выходил.`;
   } else {
-    verdict = `${name} в середине канала (%B ${pct}). Сигналов нет — это нормально, бот просто наблюдает.`;
+    verdict = `${name} в середине своего диапазона (${pct}). Сигналов нет — это нормально, бот просто наблюдает.`;
   }
-  if (r.squeeze) verdict += ` Волатильность сжата (σ20/σN = ${r.comp.toFixed(2)}) — возможен резкий выход из канала.`;
+  if (r.squeeze) verdict += ` Монета сейчас вдвое спокойнее обычного — возможен резкий рывок.`;
   let html = `<div class="ptitle">Разбор сигнала · ${name}</div><div class="verdict">${verdict}</div><div class="mute" style="font-size:12px;margin-bottom:8px">${hlTxt}</div>`;
   html += compsHtml(r, r.side);
   for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym))
@@ -1040,12 +1076,17 @@ function renderServer() {
 }
 
 // ---------- journal ----------
-function equitySvg(D) {
+function equitySvg(D, W = 150, H = 26) {
   const pts = [D.start]; [...D.closed].sort((a, b) => a.tclose - b.tclose).forEach(x => pts.push(pts[pts.length-1] + x.pnl));
   if (pts.length < 2) return '';
-  const mn = Math.min(...pts), mx = Math.max(...pts), W = 150, H = 26;
-  const d = pts.map((v, i) => `${(i / (pts.length - 1) * W).toFixed(1)},${(H - (mx === mn ? H/2 : (v - mn) / (mx - mn) * H)).toFixed(1)}`).join(' ');
-  return `<svg width="${W}" height="${H}" style="display:block;margin-top:4px"><polyline points="${d}" fill="none" stroke="${pts[pts.length-1] >= D.start ? '#22c55e' : '#ef4444'}" stroke-width="1.5"/></svg>`;
+  const mn = Math.min(...pts, D.start), mx = Math.max(...pts, D.start), pad = 3;
+  const Y = v => (pad + (H - 2 * pad) * (1 - (mx === mn ? 0.5 : (v - mn) / (mx - mn)))).toFixed(1);
+  const d = pts.map((v, i) => `${(i / (pts.length - 1) * W).toFixed(1)},${Y(v)}`).join(' ');
+  const col = pts[pts.length-1] >= D.start ? '#22c55e' : '#f0525f';
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="display:block;width:100%;max-width:${W}px;height:${H}px">
+    <line x1="0" x2="${W}" y1="${Y(D.start)}" y2="${Y(D.start)}" stroke="#2c3547" stroke-dasharray="3 3"/>
+    <polyline points="0,${H} ${d} ${W},${H}" fill="${col}" fill-opacity=".08" stroke="none"/>
+    <polyline points="${d}" fill="none" stroke="${col}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
 }
 const reasonTag = r => `<span class="tag ${r === 'тейк' ? 'tp' : r === 'стоп' ? 'sl' : 'ts'}">${r || '—'}</span>`;
 const scoreOf = p => p.snap?.score ?? (String(p.note || '').match(/(?:оценка|сила) (\d+)/)?.[1] ?? '—');
@@ -1063,26 +1104,34 @@ function renderJournal() {
     : `Ваша песочница: бот торгует в этом браузере, пока вкладка открыта, на ваших настройках с вкладки «Рынок». Журнал видите только вы. <span class="faint">Сила от ${S.minScore}, ${S.tf}.</span>`;
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
   const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
+  const chg = D.balance / D.start - 1;
   $('#jcards').innerHTML =
-      card('Сделок', st.n, `открыто ${D.open.length} из ${M.MAX_OPEN}`)
-    + card('Winrate', st.wr == null ? '—' : st.wr.toFixed(1) + '%', `<span class="pos">${st.win}</span> прибыльных / <span class="neg">${st.loss}</span> убыточных`, '', 'Доля прибыльных сделок')
-    + card('Средний результат', rr(st.expR), other ? `у общего бота ${rr(other.expR)}` : 'на сделку, после комиссий', cl(st.expR), 'Ожидание: средний R на сделку после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')
-    + card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. прибыль ${usd(st.avgWin)} · ср. убыток ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей / сумма убытков. Больше 1 — система в плюсе')
-    + card('PnL после комиссий', usd(st.net), 'за всю историю' + equitySvg(D), cl(st.net))
-    + card('Комиссии', usd(-st.fees), `PnL до комиссий ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько съела комиссия биржи. Если она больше PnL до комиссий — стратегия работает на биржу')
-    + card('Макс. просадка', st.maxDD.toFixed(2) + '%', `ср. время в сделке ${dur(st.avgHold)}`, st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика до дна')
-    + card('Баланс', '$' + D.balance.toFixed(2), `старт $${D.start} (виртуальные)`);
+    `<div class="hero">
+       <div><div class="t">Баланс</div>
+         <div class="hv">$${D.balance.toLocaleString('ru', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+         <div class="${cl(st.net)}" style="font-weight:600">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}% <span class="faint" style="font-weight:400">с начала, после комиссий</span></div>
+         <div class="faint" style="font-size:12px;margin-top:6px">Старт $${D.start.toLocaleString('ru')} · деньги виртуальные</div></div>
+       <div class="hchart">${equitySvg(D, 420, 86) || '<span class="faint">кривая появится после первых сделок</span>'}</div>
+     </div>
+     <div class="statrow">
+       ${card('Сделок', st.n, `открыто ${D.open.length} из ${M.MAX_OPEN}`)}
+       ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок')}
+       ${card('Ср. результат', rr(st.expR), other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR), 'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
+       ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), 'прибыли / убытки', st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе')}
+       ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа. Если комиссии больше прибыли до них — стратегия работает на биржу')}
+       ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика')}
+     </div>`;
   const now = Date.now();
   $('#jopen').innerHTML = D.open.map(p => {
     const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry;
     const u = sg * (last - p.entry) * p.qty - (p.entry + last) * p.qty * M.FEE, risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
-    return `<tr class="row" data-kind="open" data-id="${p.id}" title="Открыть карточку позиции"><td>${dt(p.time)} <span class="faint">${dur(now - p.time)}</span></td><td><b>${base(p.sym)}</b></td>
+    return `<tr class="row" data-kind="open" data-id="${p.id}" title="Открыть карточку позиции"><td>${dt(p.time)} <span class="faint">${dur(now - p.time)}</span></td><td>${coin(p.sym)}</td>
       <td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(last)}</td><td class="hm">$${(p.qty * p.entry).toFixed(0)}</td><td class="hm">${fp(p.tp)}</td><td class="hm">${fp(p.sl)}</td>
       <td class="${cl(u)}">${usd(u)}</td><td class="${cl(u)}">${rr(risk ? u / risk : null)}</td><td>${scoreOf(p)}</td></tr>`;
   }).join('') || '<tr><td colspan="11" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
   const list = D.closed.map(M.normTrade).sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * jDir; });
   document.querySelectorAll('#jhead th').forEach(th => th.classList.toggle('sorted', th.dataset.s === jSort));
-  $('#jclosed').innerHTML = list.map(x => `<tr class="row" data-kind="closed" data-id="${x.id}" title="Открыть карточку сделки"><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td>
+  $('#jclosed').innerHTML = list.map(x => `<tr class="row" data-kind="closed" data-id="${x.id}" title="Открыть карточку сделки"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
     <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td></tr>`).join('')
@@ -1118,7 +1167,7 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
     ${row('Тейк', `${fp(x.tp)} (${pct(x.tp)})`, 'pos')}
     ${row('Стоп', `${fp(x.sl)} (${pct(x.sl)})`, 'neg')}
     ${row('Размер позиции', '$' + (x.entry * x.qty).toFixed(2))}
-    ${row('Кол-во монет', (+x.qty).toPrecision(5))}
+    ${row('Кол-во монет', (+x.qty).toLocaleString('ru', {maximumFractionDigits: x.qty >= 100 ? 0 : x.qty >= 1 ? 2 : 6}))}
     ${row('Риск (1R)', '$' + risk.toFixed(2))}
     ${isOpen ? '' : row('Причина выхода', reasonTag(x.reason))}
     ${row(isOpen ? 'PnL до комиссий сейчас' : 'PnL до комиссий', usd(gross), cl(gross))}
@@ -1129,7 +1178,7 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   html += `<h4>Почему бот вошёл</h4>`;
   if (x.snap) {
     const s = x.snap;
-    html += `<div class="mute" style="font-size:12px;margin-bottom:6px">Сила сигнала <b style="color:var(--acc)">${s.score}</b> · %B ${(s.pB * 100).toFixed(1)}% · откл. ${(+s.z).toFixed(2)}σ · объём ×${s.volX?.toFixed(2)} · RSI ${(+s.rsi).toFixed(0)} · T½ ${s.hl == null ? '∞' : s.hl.toFixed(0) + ' св.'}</div>` + compsHtml(s, x.side);
+    html += `<div style="font-size:13px;margin-bottom:6px">Сила сигнала <b style="color:var(--acc)">${s.score}</b> из 100 · объём <b>×${s.volX?.toFixed(1)}</b> к обычному</div>` + compsHtml(s, x.side);
     html += `<div class="faint" style="font-size:12px;margin-top:8px">Настройки на входе: ${METHOD_NAME[s.settings.method]} (${s.settings.N}, ${s.settings.k}), ${s.settings.tf}, мин. сила ${s.settings.minScore}.</div>`;
   } else {
     html += `<div class="mute" style="font-size:12px">${x.note || ''}<br>Подробный снимок сигнала не сохранён: сделка открыта до обновления журнала.</div>`;
@@ -1201,7 +1250,8 @@ function btEstimate() {
   if (btBusy) return;
   const s = btSettings(), days = +$('#btDays').value, bars = days * 864e5 / TFMS[s.tf] + 450;
   const req = Math.ceil(bars / 1000) * s.top;
-  $('#btStatus').textContent = `Будет загружено ≈${req} запросов истории (${s.top} пар × ${Math.round(bars)} свечей) — около ${Math.ceil(req * 0.2 / 60 * 10) / 10} мин при первом запуске, повторные прогоны на тех же данных — мгновенно.`;
+  const sec = Math.max(5, Math.round(req * 0.2 / 5) * 5);
+  $('#btStatus').textContent = `Первая проверка займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.top} монет. Повторные — мгновенно.`;
 }
 async function runBacktest() {
   if (btBusy) return;
@@ -1268,7 +1318,7 @@ function renderBacktest() {
     + ['тейк', 'стоп', 'тайм-стоп', 'конец теста'].filter(z => tr.some(x => x.reason === z)).map(z => groupRow('выход: ' + z, by(x => x.reason, z))).join('')
     + groupRow('1-я половина периода', h1) + groupRow('2-я половина периода', h2) + '</tbody>';
   const list = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
-  $('#btTrades').innerHTML = list.map(x => `<tr class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td>
+  $('#btTrades').innerHTML = list.map(x => `<tr class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
     <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td><td class="hm">${x.snap?.score ?? '—'}</td></tr>`).join('')
@@ -1299,6 +1349,12 @@ function drawEquity() {
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'1.2', date:'5 октября 2026', title:'Шлифовка дизайна', items:[
+    'Журнал: крупный баланс с графиком и ровный ряд главных показателей.',
+    'Таблица монет всегда помещается на экране — на телефоне в ней только главное: монета, диапазон, сигнал и сила.',
+    'Разбор сигнала и карточка сделки — простыми словами, без формул.',
+    'Мелкие исправления: поиск, подписи на графике, навигация на телефоне.',
+  ]},
   {v:'1.1', date:'5 октября 2026', title:'Проще и понятнее', items:[
     'На экране только главное. Настройки графика — под шестерёнкой, дополнительные колонки таблицы — под кнопкой рядом с поиском.',
     'Быстрые фильтры: все монеты, только сигналы, затишье или избранное — в одно касание.',
