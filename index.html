@@ -205,6 +205,7 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
       <label title="Ширина канала в σ">k <input type="number" id="btK" min="1" max="4" step="0.1" style="width:64px"></label>
       <label title="Таймфрейм. 5m не предлагается: слишком много истории">ТФ <select id="btTf"><option>15m</option><option>1h</option><option>4h</option></select></label>
       <label title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:64px"></label>
+      <label title="Фильтр тренда: входить, только если монета быстро возвращается к центру (T½ не больше N свечей). Отсекает сделки против тренда">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">≤ 40 св.</option><option value="20">≤ 20 св.</option></select></label>
       <label title="Сколько последних дней истории прогнать">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option></select></label>
       <label title="Сколько самых ликвидных пар взять">Пар <select id="btTop"><option>20</option><option>50</option><option>100</option></select></label>
       <button id="btMine" title="Подставить настройки с вкладки «Рынок»">Мои настройки</button>
@@ -841,7 +842,7 @@ function closeModal() { $('#modal').classList.add('hidden'); document.body.style
 // ---------- backtest ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const histCache = new Map();
-let lastReq = 0, btRes = null, btBusy = false;
+let lastReq = 0, btRes = null, btBusy = false, btHist = null;
 async function throttled(path) { // keep backtest downloads well under Binance's weight limit (≈300 requests/min)
   const wait = Math.max(0, lastReq + 200 - Date.now()); lastReq = Date.now() + wait;
   if (wait) await sleep(wait);
@@ -862,10 +863,10 @@ async function fetchHistory(sym, tf, startT, endT) {
 }
 function btSettings() {
   return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
-          minScore:clamp(+$('#btMin').value || 0, 0, 100), top:+$('#btTop').value};
+          minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, top:+$('#btTop').value};
 }
 function btFill(s) {
-  $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && s.tf !== '5m' ? s.tf : '15m'; $('#btMin').value = s.minScore;
+  $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && s.tf !== '5m' ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0);
   btEstimate();
 }
 function btEstimate() {
@@ -891,6 +892,7 @@ async function runBacktest() {
     });
     st.textContent = 'Считаю…'; await sleep(30);
     const t0 = performance.now();
+    btHist = {hist, from};
     btRes = M.backtest(hist, s, {start:10000, from});
     btRes.settings = s; btRes.days = days;
     st.textContent = `Готово: ${btRes.pairs} пар, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс. Настройки: ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, мин. сила ${s.minScore}.`;
@@ -967,6 +969,12 @@ function drawEquity() {
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'0.7', date:'05.10.2026', title:'Исследование стратегии на бэктесте', items:[
+    'В бэктест добавлен фильтр тренда «T½ ≤ 20 / 40 свечей»: вход только по монетам, которые быстро возвращаются к центру.',
+    'Прогнано 108 комбинаций настроек (модель, N, k, мин. сила, фильтр T½) на 50 парах за 30 дней (15m). Ни одна не была в плюсе в обеих половинах периода.',
+    'Проверка на «невиденных» данных (предыдущие 30 дней): все «улучшенные» варианты — порог 70, фильтр T½ — оказались хуже текущих настроек. Улучшение было подгонкой под один удачный месяц.',
+    'Вывод: у стратегии «отскок от полосы» в текущем виде нет устойчивого преимущества; подбор параметров его не создаёт. Настройки общего бота не меняются — он остаётся честным эталоном. Следующий шаг — проверять другую идею входа, а не крутить параметры.',
+  ]},
   {v:'0.6', date:'05.10.2026', title:'Бэктест и вкладка обновлений', items:[
     'Новая вкладка «Бэктест»: те же правила, что у ботов, прогоняются на истории Binance за 7–60 дней по 20–100 парам. Вердикт, средний результат в R, комиссии, просадка, кривая баланса.',
     'Разбивка результатов по силе сигнала (проверка, что сильные сигналы действительно лучше), по LONG/SHORT, по причине выхода и по половинам периода (стабильность).',
@@ -1119,7 +1127,7 @@ async function checkUpdate() {
 }
 setInterval(checkUpdate, 3 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
-window.__sr = {get rows() { return rows; }, get J() { return J; }, get SJ() { return SJ; }, openTrade, M};
+window.__sr = {get rows() { return rows; }, get J() { return J; }, get SJ() { return SJ; }, get btHist() { return btHist; }, openTrade, M};
 </script>
 </body>
 </html>

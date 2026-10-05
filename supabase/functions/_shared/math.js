@@ -180,6 +180,8 @@ export function snapshot(r, S) {
 // ---------- trading rules ----------
 export function planEntry(r, balance, S, now) {
   if (!r.rev || r.score < S.minScore) return null;
+  // optional trend filter: trade only coins that revert to the centre fast enough (T½ ≤ maxHL bars)
+  if (S.maxHL && !(isFinite(r.hl) && r.hl <= S.maxHL)) return null;
   const side = r.side === 'low' ? 'LONG' : 'SHORT', sg = side === 'LONG' ? 1 : -1;
   const e = r.price * (1 + sg * SLIP);   // market entry pays slippage
   const tpD = clamp(Math.abs(r.mid - e) / e, 0.01, 0.03), slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
