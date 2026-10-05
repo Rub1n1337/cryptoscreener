@@ -67,35 +67,77 @@ export function parse(K) {
   return { t: K.map(x => x[0]), o: K.map(x => +x[1]), h: K.map(x => +x[2]), l: K.map(x => +x[3]), c: K.map(x => +x[4]), v: K.map(x => +x[5]) };
 }
 
+export function atrSeries(h, l, c, p = 14) {
+  const out = Array(c.length).fill(NaN); let a = NaN;
+  for (let i = 1; i < c.length; i++) {
+    const tr = Math.max(h[i] - l[i], Math.abs(h[i] - c[i-1]), Math.abs(l[i] - c[i-1]));
+    a = i <= p ? (isNaN(a) ? tr : a + (tr - a) / i) : (a*(p-1) + tr)/p;
+    out[i] = a;
+  }
+  return out;
+}
+
 // ---------- signal ----------
-// S = {method, N, k, tf}; the last kline is the forming one
-export function analyze(sym, K, S, now = Date.now()) {
-  const { t, o, h, l, c, v } = parse(K), n = c.length, i = n - 1, p = n - 2;
-  if (n < S.N + 10) return null;
+// prepare() computes the series once; signalAt() evaluates bar i as if it were the current (forming) bar.
+// The live scanner calls signalAt on the last bar, the backtest on every bar — same code, same result.
+export function prepare(K, S) {
+  const d = parse(K), n = d.c.length, c = d.c;
   const B = bands(c, S.N, S.k, S.method);
+  const lr = [NaN]; for (let j = 1; j < n; j++) lr.push(Math.log(c[j] / c[j-1]));
+  const x = c.map((ci, i) => isFinite(B.mid[i]) && B.mid[i] > 0 ? Math.log(ci) - Math.log(B.mid[i]) : NaN);
+  return { ...d, n, B, R: rsi(c), A: atrSeries(d.h, d.l, c), lr, x, S };
+}
+// cheap pre-check used by the backtest: any band touch in the last 5 bars?
+export function touchedAt(P, i) {
+  for (let j = i; j >= i - 4 && j >= 0; j--) if (P.l[j] <= P.B.lo[j] || P.h[j] >= P.B.up[j]) return true;
+  return false;
+}
+function halfLifeAt(P, i) {
+  let num = 0, den = 0, prev = NaN, cnt = 0;
+  for (let j = Math.max(0, i - 149); j <= i; j++) {
+    const xj = P.x[j]; if (!isFinite(xj)) continue;
+    if (cnt++ > 0) { num += xj * prev; den += prev * prev; }
+    prev = xj;
+  }
+  const phi = den ? num / den : 1;
+  return phi > 0 && phi < 1 ? -Math.LN2 / Math.log(phi) : Infinity;
+}
+function sdRange(a, from, to) {
+  let s = 0, n = 0; for (let j = Math.max(1, from); j <= to; j++) { s += a[j]; n++; }
+  if (!n) return 0; const m = s / n; let q = 0;
+  for (let j = Math.max(1, from); j <= to; j++) q += (a[j] - m) ** 2;
+  return Math.sqrt(q / n);
+}
+// S = {method, N, k, tf}
+export function analyze(sym, K, S, now = Date.now()) {
+  if (K.length < S.N + 10) return null;
+  const P = prepare(K, S);
+  return signalAt(P, P.n - 1, sym, now);
+}
+export function signalAt(P, i, sym, now) {
+  const { t, o, h, l, c, v, B, S } = P, p = i - 1;
+  if (i < S.N + 9) return null;
   if (!isFinite(B.mid[i]) || B.up[i] <= B.lo[i]) return null;
   const pB = (c[i] - B.lo[i]) / (B.up[i] - B.lo[i]);
-  const r = rsi(c)[i], hl = halfLife(c, B.mid);
+  const r = P.R[i], hl = halfLifeAt(P, i);
   // squeeze: volatility compression = sigma of log-returns over last 20 bars / sigma over last N bars
-  const lr = []; for (let j = 1; j < n; j++) lr.push(Math.log(c[j] / c[j-1]));
-  const sd = a => { const m = a.reduce((q, x) => q + x, 0) / a.length; return Math.sqrt(a.reduce((q, x) => q + (x - m) ** 2, 0) / a.length); };
-  const vlong = sd(lr.slice(-S.N)), comp = vlong ? sd(lr.slice(-20)) / vlong : 1;
+  const vlong = sdRange(P.lr, i - S.N + 1, i), comp = vlong ? sdRange(P.lr, i - 19, i) / vlong : 1;
   const squeeze = comp < 0.5;
   // volume: the forming bar is projected to a full bar, then robust z-score of ln(volume) vs ~96 earlier bars
   const elapsed = clamp((now - t[i]) / TFMS[S.tf], 0.25, 1);
-  const va = v.slice(); va[i] = v[i] / elapsed;
-  const baseV = v.slice(Math.max(0, n - 100), n - 4).filter(x => x > 0).map(Math.log);
+  const va = j => j === i ? v[i] / elapsed : v[j];
+  const baseV = v.slice(Math.max(0, i - 99), i - 3).filter(x => x > 0).map(Math.log);
   const vm = median(baseV), vmad = 1.4826 * median(baseV.map(x => Math.abs(x - vm))) || 1;
   const vz = x => x > 0 && isFinite(vm) ? (Math.log(x) - vm) / vmad : 0;
 
   let touch = null;
-  for (let j = n - 1; j >= n - 5; j--) {
+  for (let j = i; j >= i - 4; j--) {
     if (l[j] <= B.lo[j]) { touch = { side: 'low', j }; break; }
     if (h[j] >= B.up[j]) { touch = { side: 'up', j }; break; }
   }
   // volume shown: for a touch — the strongest bar since the touch, otherwise the last closed bar
-  let vRef = va[p];
-  if (touch) { vRef = 0; for (let q = touch.j; q <= i; q++) vRef = Math.max(vRef, va[q]); }
+  let vRef = va(p);
+  if (touch) { vRef = 0; for (let q = touch.j; q <= i; q++) vRef = Math.max(vRef, va(q)); }
   const volZ = vz(vRef), volX = isFinite(vm) ? vRef / Math.exp(vm) : null;
 
   let score = null, rev = false, comps = null, checks = null, exc = 0;
@@ -125,7 +167,7 @@ export function analyze(sym, K, S, now = Date.now()) {
   else if (touch) { kind = 'touch'; label = touch.side === 'low' ? 'касание низа' : 'касание верха'; cls = touch.side === 'low' ? 'lo' : 'up'; }
   else if (squeeze) { kind = 'sq'; label = 'сжатие'; cls = 'sq'; }
   return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, rev, score, comps, checks, exc, volX, volZ,
-           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: atr(h, l, c), side: touch?.side };
+           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side };
 }
 
 // what the bot saw at the moment of entry — stored with the trade
@@ -228,3 +270,51 @@ export function journalStats(start, closed) {
   };
 }
 const now = () => Date.now();
+
+// ---------- backtest ----------
+// hist: {sym: klines[]} (closed bars, same tf, warm-up of at least N+100 bars before `from`).
+// Steps bar by bar through time over all pairs with the live rules: a signal is evaluated at the close of a bar,
+// entry at that close (+slippage), exits checked on the following bars (stop first if both are hit), time stop, cooldown, slot limit.
+export function backtest(hist, S, { start = 10000, from = 0 } = {}) {
+  const tfms = TFMS[S.tf], P = {};
+  for (const [sym, K] of Object.entries(hist)) {
+    if (K.length < S.N + 20) continue;
+    const Q = prepare(K, S); Q.idx = new Map(Q.t.map((t, i) => [t, i])); P[sym] = Q;
+  }
+  const times = [...new Set(Object.values(P).flatMap(Q => Q.t))].filter(t => t >= from).sort((a, b) => a - b);
+  let balance = start;
+  const open = [], trades = [], equity = [], lastClose = {};
+  const close = (p, exit, reason, T) => {
+    const t = closeTrade(p, exit, reason, T + tfms - 1);
+    balance += t.pnl; trades.push(t); open.splice(open.indexOf(p), 1); lastClose[p.sym] = T;
+  };
+  for (const T of times) {
+    for (const p of [...open]) {
+      const Q = P[p.sym], j = Q.idx.get(T);
+      if (j == null || j <= p.ei) continue;
+      const sg = p.side === 'LONG' ? 1 : -1;
+      if (p.side === 'LONG' ? Q.l[j] <= p.sl : Q.h[j] >= p.sl) close(p, p.sl * (1 - sg * SLIP), 'стоп', T);
+      else if (p.side === 'LONG' ? Q.h[j] >= p.tp : Q.l[j] <= p.tp) close(p, p.tp, 'тейк', T);
+      else if (j - p.ei >= TIME_STOP) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
+    }
+    if (open.length < MAX_OPEN) {
+      const cands = [];
+      for (const [sym, Q] of Object.entries(P)) {
+        const i = Q.idx.get(T);
+        if (i == null || !touchedAt(Q, i) || open.some(p => p.sym === sym)) continue;
+        if (lastClose[sym] != null && T - lastClose[sym] < COOLDOWN * tfms) continue;
+        const r = signalAt(Q, i, sym, T + tfms);   // bar fully elapsed
+        if (r?.rev && r.score >= S.minScore) { r.i = i; cands.push(r); }
+      }
+      cands.sort((a, b) => b.score - a.score);
+      for (const r of cands) {
+        if (open.length >= MAX_OPEN) break;
+        const p = planEntry(r, balance, S, T + tfms - 1);
+        if (p) { p.ei = r.i; p.id = `${T}${r.sym}`; open.push(p); }
+      }
+    }
+    equity.push([T, balance]);
+  }
+  for (const p of [...open]) { const Q = P[p.sym]; const j = Q.n - 1; close(p, Q.c[j] * (1 - (p.side === 'LONG' ? 1 : -1) * SLIP), 'конец теста', Q.t[j]); }
+  return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: Object.keys(P).length };
+}

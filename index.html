@@ -92,7 +92,9 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
   <div class="tabs">
     <button class="tab on" data-t="market">📡 Рынок</button>
     <button class="tab" data-t="journal">📒 Журнал сделок</button>
+    <button class="tab" data-t="backtest">🧪 Бэктест</button>
     <button class="tab" data-t="help">📘 Инструкция и термины</button>
+    <button class="tab" data-t="changes">📝 Обновления <span class="mute" id="ver"></span></button>
   </div>
 
   <!-- MARKET -->
@@ -191,6 +193,44 @@ tr.row{cursor:pointer}tr.row:hover{background:#151e2d}tr.sel{background:#1a2436}
       </tr></thead><tbody id="jclosed"></tbody></table></div>
     </div>
   </section>
+
+  <!-- BACKTEST -->
+  <section id="backtest" class="hidden">
+    <div class="sub">Бэктест прогоняет те же правила, что у ботов, на истории Binance: сигнал проверяется на закрытии каждой свечи, вход по цене закрытия с проскальзыванием, дальше — тейк, стоп или тайм-стоп, с комиссиями. Так за минуту видно, есть ли у настроек преимущество, вместо недель живой торговли.</div>
+    <div class="ctrl">
+      <label title="Модель канала">Модель <select id="btMethod">
+        <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
+      </select></label>
+      <label title="Длина окна канала, свечей">N <input type="number" id="btN" min="20" max="300" style="width:70px"></label>
+      <label title="Ширина канала в σ">k <input type="number" id="btK" min="1" max="4" step="0.1" style="width:64px"></label>
+      <label title="Таймфрейм. 5m не предлагается: слишком много истории">ТФ <select id="btTf"><option>15m</option><option>1h</option><option>4h</option></select></label>
+      <label title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:64px"></label>
+      <label title="Сколько последних дней истории прогнать">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option></select></label>
+      <label title="Сколько самых ликвидных пар взять">Пар <select id="btTop"><option>20</option><option>50</option><option>100</option></select></label>
+      <button id="btMine" title="Подставить настройки с вкладки «Рынок»">Мои настройки</button>
+      <button id="btShared" title="Подставить фиксированные настройки общего бота">Как у общего бота</button>
+      <button id="btRun" style="border-color:var(--acc);color:var(--acc)">▶ Запустить</button>
+    </div>
+    <div class="mute" id="btStatus" style="margin-bottom:10px"></div>
+    <div id="btOut" class="hidden">
+      <div class="verdict panel" id="btVerdict" style="margin-bottom:12px"></div>
+      <div class="cards auto" id="btCards"></div>
+      <div class="panel"><div class="ptitle">Кривая баланса <span>· после комиссий, по закрытым сделкам</span></div><canvas id="btEq" style="height:240px"></canvas></div>
+      <div class="grid" style="margin-top:12px">
+        <div class="panel"><div class="ptitle">По силе сигнала <span>· работает ли «сила»: у сильных сигналов результат должен быть лучше</span></div><div class="tablewrap"><table id="btScore"></table></div></div>
+        <div class="panel"><div class="ptitle">По стороне, причине выхода и половинам периода <span>· стабильность</span></div><div class="tablewrap"><table id="btSplit"></table></div></div>
+      </div>
+      <div class="panel" style="margin-top:12px"><div class="ptitle">Сделки бэктеста <span>· клик — карточка сделки</span></div>
+        <div class="tablewrap"><table><thead><tr>
+          <th>Закрыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Выход</th><th>Размер</th><th>Причина выхода</th><th>Длит.</th><th>PnL до ком.</th><th>Комиссия</th><th>PnL</th><th>R</th><th>Сила</th>
+        </tr></thead><tbody id="btTrades"></tbody></table></div>
+      </div>
+      <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: пары берутся из сегодняшнего топа по объёму (монеты, которые выпали из топа, не попадают); исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Прошлое не гарантирует будущего.</div>
+    </div>
+  </section>
+
+  <!-- CHANGELOG -->
+  <section id="changes" class="hidden"><div class="panel doc" id="changelog"></div></section>
 
   <!-- HELP -->
   <section id="help" class="hidden"><div class="panel doc">
@@ -437,7 +477,7 @@ function renderChart(cv, d, o = {}) {
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1), e = n - 1;
-  const padL = 8, padR = 78, pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
+  const padL = 8, padR = 96, pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
   const cnt = e - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
   const X = i => padL + (i - s + 0.5) * bw;
   let mn = Infinity, mx = -Infinity;
@@ -477,21 +517,35 @@ function renderChart(cv, d, o = {}) {
       if (l[i] <= B.lo[i] && !(l[i-1] <= B.lo[i-1])) tri(X(i), Y(B.lo[i]) + 8, 1, '#22c55e');
     }
   }
-  // levels (entry / TP / SL)
+  // levels (entry / TP / SL): dashed line over the trade's span, price tag in the right gutter
+  const tags = [];
   for (const L of o.levels || []) {
     const x0 = L.i0 != null ? X(clamp(L.i0, s, e)) - bw / 2 : padL, x1 = L.i1 != null ? X(clamp(L.i1, s, e)) + bw / 2 : W - padR;
-    g.setLineDash([4, 3]); g.strokeStyle = L.col; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x0, Y(L.v)); g.lineTo(x1, Y(L.v)); g.stroke(); g.setLineDash([]);
-    if (L.label) { g.fillStyle = L.col; g.fillText(L.label, x0 + 4, Y(L.v) - 8); }
+    g.setLineDash([4, 3]); g.strokeStyle = L.col; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x0, Y(L.v)); g.lineTo(W - padR, Y(L.v)); g.stroke(); g.setLineDash([]);
+    if (x1 < W - padR) { g.strokeStyle = L.col + '55'; g.beginPath(); g.moveTo(x1, Y(L.v)); g.lineTo(W - padR, Y(L.v)); g.stroke(); } // faded after the exit
+    tags.push({y:Y(L.v), text:`${L.tag || ''} ${fp(L.v)}`.trim(), col:L.col, box:true});
   }
   for (const m of o.marks || []) {
     if (m.i < s || m.i > e) continue;
     g.beginPath(); g.arc(X(m.i), Y(m.price), 5, 0, 7); g.fillStyle = m.col; g.fill(); g.strokeStyle = '#0a0e15'; g.lineWidth = 2; g.stroke();
-    if (m.label) { g.fillStyle = m.col; g.fillText(m.label, X(m.i) + 8, Y(m.price) + 12); }
+    if (m.label) { const w = g.measureText(m.label).width, lx = X(m.i) + 8 + w > W - padR ? X(m.i) - 8 - w : X(m.i) + 8; g.fillStyle = m.col; g.fillText(m.label, lx, Y(m.price) + (m.below ? 14 : -12)); }
   }
   if (o.live) { g.setLineDash([3, 3]); g.strokeStyle = '#f5b70a88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(c[e])); g.lineTo(W - padR, Y(c[e])); g.stroke(); g.setLineDash([]); }
-  g.font = '12px system-ui';
-  const lab = (x, col) => { if (isFinite(x)) { g.fillStyle = col; g.fillText(fp(x), W - padR + 6, clamp(Y(x), 8, pH - 4)); } };
-  lab(B.up[e], '#ef4444'); lab(B.lo[e], '#22c55e'); lab(c[e], '#f5b70a');
+  if (isFinite(B.up[e])) tags.push({y:Y(B.up[e]), text:fp(B.up[e]), col:'#ef4444'});
+  if (isFinite(B.lo[e])) tags.push({y:Y(B.lo[e]), text:fp(B.lo[e]), col:'#22c55e'});
+  tags.push({y:Y(c[e]), text:fp(c[e]), col:'#f5b70a', box:true});
+  // spread tags so they never overlap: sort by y, push down, then shift the stack up if it ran past the bottom
+  tags.sort((a, b) => a.y - b.y);
+  for (let q = 0; q < tags.length; q++) tags[q].ty = Math.max(clamp(tags[q].y, 8, pH - 6), q ? tags[q-1].ty + 15 : 8);
+  const over = tags.length ? tags[tags.length - 1].ty - (pH - 6) : 0;
+  if (over > 0) for (let q = tags.length - 1; q >= 0; q--) tags[q].ty = Math.min(tags[q].ty - over, q < tags.length - 1 ? tags[q+1].ty - 15 : Infinity);
+  g.font = '11px system-ui';
+  for (const tg of tags) {
+    const tx = W - padR + 4, w = g.measureText(tg.text).width + 8;
+    if (tg.box) { g.fillStyle = tg.col + '26'; g.fillRect(tx, tg.ty - 7, w, 14); }
+    if (Math.abs(tg.ty - tg.y) > 2) { g.strokeStyle = tg.col + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(W - padR, tg.y); g.lineTo(tx, tg.ty); g.stroke(); }
+    g.fillStyle = tg.col; g.fillText(tg.text, tx + 4, tg.ty);
+  }
   // time axis
   g.font = '11px system-ui'; g.fillStyle = '#566173';
   for (let q = 0; q <= 4; q++) {
@@ -566,8 +620,8 @@ function drawChart() {
   const levels = [];
   for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym)) {
     const i0 = barAt(chart.t, p.time);
-    levels.push({v:p.entry, col:'#a78bfa', label:`${who} бот: ${p.side} ${fp(p.entry)}`, i0},
-                {v:p.tp, col:'#22c55e', label:`тейк ${fp(p.tp)}`, i0}, {v:p.sl, col:'#ef4444', label:`стоп ${fp(p.sl)}`, i0});
+    levels.push({v:p.entry, col:'#a78bfa', tag:who === 'общий' ? 'общ.' : 'мой', i0},
+                {v:p.tp, col:'#22c55e', tag:'TP', i0}, {v:p.sl, col:'#ef4444', tag:'SL', i0});
   }
   chartGeo = renderChart($('#cv'), chart, {from: chart.c.length - S.candles, levels, live:true, hoverI});
 }
@@ -717,17 +771,19 @@ function renderJournal() {
 
 // ---------- trade card ----------
 let tcard = null; // {d, opts}
-async function openTrade(kind, id) {
-  const D = journalData(), who = jMode === 'shared' ? 'общий' : 'мой';
+function openTrade(kind, id) {
+  const D = journalData();
   const raw = (kind === 'open' ? D.open : D.closed).find(x => String(x.id) === String(id));
-  if (!raw) return;
-  const isOpen = kind === 'open', x = isOpen ? raw : M.normTrade(raw);
-  const set = x.snap?.settings || (jMode === 'shared' ? SJ.settings : S);
+  if (raw) showTrade(raw, {isOpen:kind === 'open', who:jMode === 'shared' ? 'общий бот' : 'мой бот', set:jMode === 'shared' ? SJ.settings : S});
+}
+async function showTrade(raw, {isOpen, who, set: fallback}) {
+  const x = isOpen ? raw : M.normTrade(raw);
+  const set = x.snap?.settings || fallback;
   const tf = x.snap?.settings?.tf || tfOf(x.tfms) || set.tf, tfms = TFMS[tf];
   const sg = x.side === 'LONG' ? 1 : -1;
   $('#modal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
   $('#mtitle').textContent = `${pair(x.sym)} — ${isOpen ? 'открытая позиция' : 'сделка'}`;
-  $('#mmeta').textContent = `${x.side} · ${who} бот · ${isOpen ? 'открыта ' + dt(x.time) : dt(x.time) + ' → ' + dt(x.tclose)} · ${tf}`;
+  $('#mmeta').textContent = `${x.side} · ${who} · ${isOpen ? 'открыта ' + dt(x.time) : dt(x.time) + ' → ' + dt(x.tclose)} · ${tf}`;
   // aside
   const last = isOpen ? (x.last ?? x.entry) : x.exit, risk = x.risk || Math.abs(x.entry - x.sl) * x.qty;
   const gross = sg * (last - x.entry) * x.qty, fee = (x.entry + last) * x.qty * M.FEE, net = gross - fee;
@@ -768,12 +824,12 @@ async function openTrade(kind, id) {
     const d = parse(K); d.B = bands(d.c, set.N, set.k, set.method); d.R = rsi(d.c);
     const ei = barAt(d.t, x.time), xi = isOpen ? d.c.length - 1 : barAt(d.t, x.tclose);
     const levels = [
-      {v:x.entry, col:'#a78bfa', label:`вход ${fp(x.entry)}`, i0:ei, i1:xi},
-      {v:x.tp, col:'#22c55e', label:`тейк ${fp(x.tp)}`, i0:ei, i1:xi},
-      {v:x.sl, col:'#ef4444', label:`стоп ${fp(x.sl)}`, i0:ei, i1:xi},
+      {v:x.entry, col:'#a78bfa', tag:'вход', i0:ei, i1:xi},
+      {v:x.tp, col:'#22c55e', tag:'TP', i0:ei, i1:xi},
+      {v:x.sl, col:'#ef4444', tag:'SL', i0:ei, i1:xi},
     ];
-    const marks = [{i:ei, price:x.entry, col:'#a78bfa', label:'вход'}];
-    if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? '#22c55e' : '#ef4444', label:`выход · ${x.reason}`});
+    const marks = [{i:ei, price:x.entry, col:'#a78bfa', label:'вход', below:sg < 0}];
+    if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? '#22c55e' : '#ef4444', label:`выход · ${x.reason}`, below:sg > 0});
     tcard = {d, opts:{from:Math.max(set.N - 1, ei - 120), levels, marks, live:isOpen, hoverI:null}};
     tcard.geo = renderChart(cv, d, tcard.opts);
   } catch (e) {
@@ -781,6 +837,181 @@ async function openTrade(kind, id) {
   }
 }
 function closeModal() { $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null; }
+
+// ---------- backtest ----------
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const histCache = new Map();
+let lastReq = 0, btRes = null, btBusy = false;
+async function throttled(path) { // keep backtest downloads well under Binance's weight limit (≈300 requests/min)
+  const wait = Math.max(0, lastReq + 200 - Date.now()); lastReq = Date.now() + wait;
+  if (wait) await sleep(wait);
+  return api(path);
+}
+async function fetchHistory(sym, tf, startT, endT) {
+  const key = `${sym}|${tf}|${startT}|${endT}`;
+  if (histCache.has(key)) return histCache.get(key);
+  const tfms = TFMS[tf], out = [];
+  for (let t = startT; t < endT;) {
+    const K = await throttled(`/api/v3/klines?symbol=${sym}&interval=${tf}&startTime=${t}&endTime=${endT - 1}&limit=1000`);
+    if (!K.length) break;
+    out.push(...K); t = K[K.length - 1][0] + tfms;
+    if (K.length < 1000) break;
+  }
+  histCache.set(key, out);
+  return out;
+}
+function btSettings() {
+  return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
+          minScore:clamp(+$('#btMin').value || 0, 0, 100), top:+$('#btTop').value};
+}
+function btFill(s) {
+  $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && s.tf !== '5m' ? s.tf : '15m'; $('#btMin').value = s.minScore;
+  btEstimate();
+}
+function btEstimate() {
+  if (btBusy) return;
+  const s = btSettings(), days = +$('#btDays').value, bars = days * 864e5 / TFMS[s.tf] + 450;
+  const req = Math.ceil(bars / 1000) * s.top;
+  $('#btStatus').textContent = `Будет загружено ≈${req} запросов истории (${s.top} пар × ${Math.round(bars)} свечей) — около ${Math.ceil(req * 0.2 / 60 * 10) / 10} мин при первом запуске, повторные прогоны на тех же данных — мгновенно.`;
+}
+async function runBacktest() {
+  if (btBusy) return;
+  btBusy = true; $('#btRun').disabled = true;
+  const s = btSettings(), days = +$('#btDays').value, tfms = TFMS[s.tf];
+  const st = $('#btStatus');
+  try {
+    st.textContent = 'Беру список пар…';
+    const now = Date.now(), endT = Math.floor(now / 36e5) * 36e5;   // whole hours → reruns hit the cache
+    const from = endT - days * 864e5, startT = from - 450 * tfms;      // 450 bars of warm-up covers N ≤ 300
+    const syms = M.pickSymbols(await api('/api/v3/ticker/24hr'), s.top, [], now);
+    const hist = {}; let done = 0;
+    await pool(syms, 4, async sym => {
+      try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {}
+      st.textContent = `Загружаю историю: ${++done}/${syms.length} пар…`;
+    });
+    st.textContent = 'Считаю…'; await sleep(30);
+    const t0 = performance.now();
+    btRes = M.backtest(hist, s, {start:10000, from});
+    btRes.settings = s; btRes.days = days;
+    st.textContent = `Готово: ${btRes.pairs} пар, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс. Настройки: ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, мин. сила ${s.minScore}.`;
+    renderBacktest();
+  } catch (e) {
+    st.textContent = 'Ошибка: ' + (e.message || e);
+  }
+  btBusy = false; $('#btRun').disabled = false;
+}
+function groupRow(name, list) {
+  const g = M.journalStats(10000, list);
+  return `<tr><td>${name}</td><td>${g.n}</td><td>${g.wr == null ? '—' : g.wr.toFixed(0) + '%'}</td><td class="${cl(g.expR)}">${rr(g.expR)}</td><td>${g.pf == null ? '—' : g.pf.toFixed(2)}</td><td class="${cl(g.net)}">${usd(g.net)}</td></tr>`;
+}
+const groupHead = '<thead><tr><th>Группа</th><th>Сделок</th><th>Winrate</th><th title="Средний результат на сделку в R после комиссий">Ср. результат</th><th>PF</th><th>PnL</th></tr></thead>';
+function renderBacktest() {
+  const r = btRes, tr = r.trades, st = M.journalStats(r.start, tr), s = r.settings;
+  $('#btOut').classList.remove('hidden');
+  const mid = (r.from + r.to) / 2, h1 = tr.filter(x => x.tclose < mid), h2 = tr.filter(x => x.tclose >= mid);
+  const s1 = M.journalStats(r.start, h1), s2 = M.journalStats(r.start, h2);
+  let v;
+  if (st.n < 30) v = `Сделок всего <b>${st.n}</b> — слишком мало для выводов. Увеличьте период или число пар, или снизьте мин. силу.`;
+  else if (st.expR > 0 && s1.expR > 0 && s2.expR > 0) v = `<b class="pos">У настроек есть преимущество:</b> средний результат ${rr(st.expR)} на сделку после комиссий, и он положительный в обеих половинах периода (${rr(s1.expR)} и ${rr(s2.expR)}). Хороший знак, но проверьте и на другом периоде.`;
+  else if (st.expR > 0) v = `<b style="color:var(--acc)">В плюсе, но нестабильно:</b> в целом ${rr(st.expR)} на сделку, а по половинам периода ${rr(s1.expR)} и ${rr(s2.expR)}. Похоже на удачный отрезок, а не на устойчивое преимущество.`;
+  else v = `<b class="neg">На этих настройках стратегия убыточна:</b> ${rr(st.expR)} на сделку после комиссий.${st.gross > 0 ? ` До комиссий она была в плюсе (${usd(st.gross)}), но комиссии (${usd(-st.fees)}) съели всё — нужны более крупные ходы на сделку.` : ''}`;
+  $('#btVerdict').innerHTML = v;
+  const card = (t, val, sub, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${val}</div><div class="s">${sub}</div></div>`;
+  $('#btCards').innerHTML =
+      card('Сделок', st.n, `${(st.n / r.days).toFixed(1)} в день · ${r.pairs} пар`)
+    + card('Winrate', st.wr == null ? '—' : st.wr.toFixed(1) + '%', `<span class="pos">${st.win}</span> / <span class="neg">${st.loss}</span>`)
+    + card('Средний результат', rr(st.expR), 'на сделку, после комиссий', cl(st.expR), 'Главная цифра: больше 0 — у стратегии есть преимущество')
+    + card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. прибыль ${usd(st.avgWin)} · убыток ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg')
+    + card('PnL после комиссий', usd(st.net), `${(st.net / r.start * 100).toFixed(2)}% к старту`, cl(st.net))
+    + card('Комиссии', usd(-st.fees), `PnL до комиссий ${usd(st.gross)}`, 'neg')
+    + card('Макс. просадка', st.maxDD.toFixed(2) + '%', `ср. время в сделке ${dur(st.avgHold)}`, st.maxDD > 10 ? 'neg' : '')
+    + card('Итоговый баланс', '$' + r.balance.toFixed(2), `старт $${r.start}`);
+  // by score bucket
+  const buckets = {};
+  for (const x of tr) { const b = Math.min(90, Math.floor((x.snap?.score ?? 0) / 10) * 10); (buckets[b] ||= []).push(x); }
+  $('#btScore').innerHTML = groupHead + '<tbody>' + (Object.keys(buckets).sort((a, b) => a - b).map(b => groupRow(`сила ${b}–${+b + 9}`, buckets[b])).join('') || '<tr><td colspan="6" class="mute">нет сделок</td></tr>') + '</tbody>';
+  const by = (f, v) => tr.filter(x => f(x) === v);
+  $('#btSplit').innerHTML = groupHead + '<tbody>'
+    + groupRow('LONG', by(x => x.side, 'LONG')) + groupRow('SHORT', by(x => x.side, 'SHORT'))
+    + ['тейк', 'стоп', 'тайм-стоп', 'конец теста'].filter(z => tr.some(x => x.reason === z)).map(z => groupRow('выход: ' + z, by(x => x.reason, z))).join('')
+    + groupRow('1-я половина периода', h1) + groupRow('2-я половина периода', h2) + '</tbody>';
+  const list = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
+  $('#btTrades').innerHTML = list.map(x => `<tr class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td><b>${base(x.sym)}</b></td>
+    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td>$${x.size.toFixed(0)}</td>
+    <td>${reasonTag(x.reason)}</td><td class="mute">${dur(x.hold)}</td><td class="${cl(x.gross)}">${usd(x.gross)}</td><td class="neg">${usd(-x.fee)}</td>
+    <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td><td>${x.snap?.score ?? '—'}</td></tr>`).join('')
+    || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
+  drawEquity();
+}
+function drawEquity() {
+  const cv = $('#btEq'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !btRes) return;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const pts = btRes.equity, padL = 8, padR = 80, top = 10, bot = H - 22;
+  let mn = btRes.start, mx = btRes.start; for (const [, b] of pts) { mn = Math.min(mn, b); mx = Math.max(mx, b); }
+  const pad = (mx - mn) * 0.08 || 10; mn -= pad; mx += pad;
+  const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
+  const X = t => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR), Y = b => top + (mx - b) / (mx - mn) * (bot - top);
+  g.setLineDash([4, 4]); g.strokeStyle = '#475569'; g.beginPath(); g.moveTo(padL, Y(btRes.start)); g.lineTo(W - padR, Y(btRes.start)); g.stroke(); g.setLineDash([]);
+  const last = pts[pts.length - 1][1], col = last >= btRes.start ? '#22c55e' : '#ef4444';
+  g.beginPath(); pts.forEach(([t, b], i) => g[i ? 'lineTo' : 'moveTo'](X(t), Y(b)));
+  g.strokeStyle = col; g.lineWidth = 1.6; g.stroke();
+  g.lineTo(X(t1), Y(btRes.start)); g.lineTo(X(t0), Y(btRes.start)); g.closePath(); g.fillStyle = col + '1a'; g.fill();
+  g.font = '11px system-ui'; g.textBaseline = 'middle';
+  g.fillStyle = '#8b95a5'; g.fillText('$' + btRes.start.toFixed(0), W - padR + 6, Y(btRes.start));
+  g.fillStyle = col; g.fillText('$' + last.toFixed(2), W - padR + 6, clamp(Y(last), 8, bot) + (Math.abs(Y(last) - Y(btRes.start)) < 14 ? 14 : 0));
+  g.fillStyle = '#566173';
+  for (let q = 0; q <= 4; q++) { const t = t0 + q * (t1 - t0) / 4, txt = dt(t), w = g.measureText(txt).width; g.fillText(txt, clamp(X(t) - w / 2, padL, W - padR - w), H - 9); }
+}
+
+// ---------- changelog ----------
+const CHANGELOG = [
+  {v:'0.6', date:'05.10.2026', title:'Бэктест и вкладка обновлений', items:[
+    'Новая вкладка «Бэктест»: те же правила, что у ботов, прогоняются на истории Binance за 7–60 дней по 20–100 парам. Вердикт, средний результат в R, комиссии, просадка, кривая баланса.',
+    'Разбивка результатов по силе сигнала (проверка, что сильные сигналы действительно лучше), по LONG/SHORT, по причине выхода и по половинам периода (стабильность).',
+    'Сделки бэктеста открываются в той же карточке сделки, что и в журнале.',
+    'Математика сигнала разделена на «подготовку рядов» и «сигнал на свече»: живой сканер и бэктест считают одной функцией.',
+    'Подписи цен справа на графиках больше не наезжают друг на друга: метки входа, TP и SL раздвигаются и показываются плашками.',
+    'Эта вкладка «Обновления».',
+  ]},
+  {v:'0.5', date:'05.10.2026', title:'Честный журнал и карточка сделки', items:[
+    'Единый файл математики для сайта и серверного бота — при одинаковых настройках они считают одинаково.',
+    'Журнал: размер позиции, причина выхода, длительность, PnL до и после комиссий, комиссия, результат в R.',
+    'Новые метрики: средний результат (ожидание) в R, profit factor со средней прибылью/убытком, комиссии отдельно, максимальная просадка.',
+    'Учёт проскальзывания 0.05% на входе, стопе и тайм-стопе.',
+    'Карточка сделки: свечной график, канал на настройках входа, точки входа/выхода, линии TP/SL, объём, RSI и «почему бот вошёл» — снимок сигнала в момент входа.',
+    'Единые термины: «сила сигнала», «отклонение, σ», «%B». Словарь из 26 понятий в инструкции.',
+  ]},
+  {v:'0.4', date:'05.10.2026', title:'Общий бот 24/7', items:[
+    'Серверный бот на Supabase: запускается каждую минуту, торгует круглосуточно, журнал один для всех.',
+    'Журнал с двумя режимами: «Общий бот 24/7» и «Мой бот» (песочница в браузере на ваших настройках).',
+    'Плашка «Сторож» следит за общим ботом и краснеет, если он не отвечает дольше 5 минут.',
+  ]},
+  {v:'0.3', date:'05.10.2026', title:'Автообновление', items:[
+    'Открытые вкладки сами перезагружаются при выходе новой версии; журнал и настройки сохраняются.',
+  ]},
+  {v:'0.2', date:'05.10.2026', title:'Исправления и понятность', items:[
+    'Объём незакрытой свечи пересчитывается на полную длительность — свежие касания больше не выглядят «пустыми».',
+    'Метки разделены: подтверждённый сигнал, «за каналом», «касание», «сжатие».',
+    'Блок «Разбор сигнала» под графиком: что выполнено, чего не хватает, из чего сложилась сила.',
+    'Подсказки на заголовках, шкала позиции в канале, линии позиций бота на графике.',
+    'Лог-канал по умолчанию вместо робастного (робастный давал слишком много пар «за каналом»).',
+    'Исправлены потеря настроек во время сканирования и гонка при быстром переключении монет.',
+  ]},
+  {v:'0.1', date:'05.10.2026', title:'Первая версия', items:[
+    'Сканер рынка Binance: термометр рынка, сигналы, сжатия, таблица пар.',
+    'Четыре модели канала: лог-канал, классика, робастная (медиана ± MAD), EWMA.',
+    'Сила сигнала, T½ (скорость возврата к центру), подтверждение объёмом.',
+    'Бумажный бот с тейком и стопом и журнал сделок.',
+  ]},
+];
+function renderChangelog() {
+  $('#ver').textContent = 'v' + CHANGELOG[0].v;
+  $('#changelog').innerHTML = '<h3 style="margin-top:0">История обновлений</h3>' + CHANGELOG.map(c =>
+    `<div style="margin:18px 0"><div style="font-weight:600;font-size:15px"><span class="tag" style="margin-right:8px">v${c.v}</span>${c.title} <span class="mute" style="font-weight:400;font-size:12px">· ${c.date}</span></div>
+     <ul>${c.items.map(i => `<li>${i}</li>`).join('')}</ul></div>`).join('');
+}
 
 // ---------- sound ----------
 let actx = null;
@@ -834,7 +1065,8 @@ document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const 
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); });
 document.querySelectorAll('.tab[data-t]').forEach(b => b.onclick = () => {
   document.querySelectorAll('.tab[data-t]').forEach(x => x.classList.toggle('on', x === b));
-  ['market', 'journal', 'help'].forEach(id => $('#' + id).classList.toggle('hidden', id !== b.dataset.t));
+  ['market', 'journal', 'backtest', 'help', 'changes'].forEach(id => $('#' + id).classList.toggle('hidden', id !== b.dataset.t));
+  if (b.dataset.t === 'backtest' && btRes) drawEquity();
   if (b.dataset.t === 'market') drawChart(); if (b.dataset.t === 'journal') { renderJournal(); fetchShared(); }
 });
 $('#snd').onclick = () => { sound = !sound; $('#snd').textContent = sound ? '🔔 Звук вкл' : '🔇 Звук выкл'; if (sound) beep(); };
@@ -848,6 +1080,19 @@ const tcv = $('#tcv');
 tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
 tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
 window.onresize = () => { drawChart(); if (tcard) tcard.geo = renderChart(tcv, tcard.d, tcard.opts); };
+
+$('#btRun').onclick = runBacktest;
+$('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); };
+$('#btShared').onclick = () => { if (SJ) btFill(SJ.settings); };
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop'].forEach(s => $(s).onchange = btEstimate);
+$('#btTrades').onclick = e => {
+  const tr = e.target.closest('tr.row'); if (!tr || !btRes) return;
+  const x = btRes.trades.find(t => String(t.id) === tr.dataset.id);
+  if (x) showTrade(x, {isOpen:false, who:'бэктест', set:btRes.settings});
+};
+window.addEventListener('resize', () => { if (btRes) drawEquity(); });
+$('#btDays').value = '30'; $('#btTop').value = '50'; btFill(S);
+renderChangelog();
 
 syncInputs(); renderGuard(); renderJournal(); loadChart(); scan(); fetchShared();
 setInterval(scan, SCAN_MS);
