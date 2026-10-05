@@ -74,6 +74,17 @@ async function run() {
 
 // ---------- personal bots (one per browser; config = profiles chosen on the site) ----------
 const PROFILE_DEF = { method: "log", N: 210, k: 3, tf: "15m", minScore: 60, strategy: "revert", rr: 0, risk: 0.02, lev: 1, minWidth: 0, maxHL: 0, longOnly: false, coinErMax: 0 };
+// the config comes from the visitor's browser: every value is re-checked before it drives requests or sizing
+const num = (v: unknown, a: number, b: number, d: number) => { const x = Number(v); return Number.isFinite(x) ? Math.min(b, Math.max(a, x)) : d; };
+const oneOf = <T,>(v: unknown, ok: readonly T[], d: T) => (ok as readonly unknown[]).includes(v) ? v as T : d;
+function cleanSet(s: any = {}) {
+  const D = PROFILE_DEF;
+  return { method: oneOf(s.method, ["log", "classic", "robust", "ewma"], D.method), N: Math.round(num(s.N, 20, 300, D.N)), k: num(s.k, 1, 5, D.k),
+    tf: oneOf(s.tf, ["5m", "15m", "1h", "4h", "1d"], D.tf), minScore: num(s.minScore, 0, 100, D.minScore),
+    strategy: oneOf(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr: num(s.rr, 0, 10, 0), risk: num(s.risk, 0.001, 0.05, D.risk),
+    lev: num(s.lev, 1, 10, 1), minWidth: num(s.minWidth, 0, 30, 0), maxHL: num(s.maxHL, 0, 500, 0), longOnly: s.longOnly === true,
+    coinErMax: num(s.coinErMax, 0, 1, 0), regimeOnly: oneOf(s.regimeOnly, ["any", "flat", "impulse"], "any") };
+}
 const tfOf = (ms: number) => Object.keys(M.TFMS).find((k) => (M.TFMS as any)[k] === ms);
 const effN = (len: number, S: any) => (S.tf === "1d" || S.tf === "1w") ? Math.max(20, Math.min(S.N, len - 20)) : S.N;
 // market regime the same way the site does it: BTC/ETH/SOL on 1h, efficiency ratio over 7 days
@@ -91,21 +102,32 @@ async function majorsRegime() {
   return m;
 }
 async function runUserBots(now: number) {
-  const { data: bots } = await db.from("user_bots").select("id, config, balance").eq("enabled", true).order("created_at").limit(40);
+  // fair queue: the least recently checked bots go first, so with more bots than fit in one run every bot still gets its turn;
+  // bots whose owner hasn't opened the site for 30 days are not scheduled
+  const { data: bots } = await db.from("user_bots").select("id, config, balance").eq("enabled", true)
+    .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
   if (!bots?.length) return 0;
   const reg = await majorsRegime(), ticker = await api("/api/v3/ticker/24hr");
   const kc = new Map<string, Promise<any>>();   // one download per coin + timeframe for all bots
   const getK = (s: string, tf: string) => { const key = s + "|" + tf; if (!kc.has(key)) kc.set(key, api(`/api/v3/klines?symbol=${s}&interval=${tf}&limit=450`).catch(() => null)); return kc.get(key)!; };
   let done = 0;
+  const t0 = Date.now();
   for (const b of bots) {
+    if (Date.now() - t0 > 90_000) break;   // leave room before the function's time limit; the rest go first next minute
     try {
-      const cfg = b.config || {}, profiles = cfg.profiles || [];
-      if (!profiles.length) continue;
+      const cfg = b.config || {}, profiles = Array.isArray(cfg.profiles) ? cfg.profiles : [];
+      if (!profiles.length) {   // still mark it checked, or it would stay first in the queue forever
+        await db.from("user_bots").update({ checked_at: new Date(now).toISOString(), last_error: "нет профилей" }).eq("id", b.id);
+        continue;
+      }
       const byId = (id: string) => profiles.find((p: any) => p.id === id) || profiles[0];
-      const regName = M.regimeOf(reg, { erMax: cfg.erMax ?? 0.15, regimeSrc: "majors" });
+      const erMax = num(cfg.erMax, 0.05, 0.5, 0.15);
+      const regName = M.regimeOf(reg, { erMax, regimeSrc: "majors" });
       const P = cfg.mode === "auto" ? byId(regName === "flat" ? cfg.flat : cfg.impulse) : byId(cfg.active);
-      const S = { ...PROFILE_DEF, ...P.set, regimeSrc: "majors", erMax: cfg.erMax ?? 0.15 };
-      const list: string[] = P.coins?.mode === "list" ? P.coins.list.slice(0, 200) : M.pickSymbols(ticker, Math.min(P.coins?.top || 150, 200), [], now);
+      const S = { ...cleanSet(P.set), regimeSrc: "majors", erMax };
+      const pname = String(P.name ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60);
+      const own = Array.isArray(P.coins?.list) ? P.coins.list.filter((s: unknown) => typeof s === "string" && /^[A-Z0-9]{2,20}USDT$/.test(s)).slice(0, 200) : [];
+      const list: string[] = P.coins?.mode === "list" && own.length ? own : M.pickSymbols(ticker, Math.round(num(P.coins?.top, 20, 200, 150)), [], now);
       const { data: pr } = await db.from("user_positions").select("data").eq("bot_id", b.id);
       const open = (pr ?? []).map((x: any) => x.data);
       const Ks: Record<string, any> = {};
@@ -115,14 +137,14 @@ async function runUserBots(now: number) {
       for (const p of open) exitK[p.sym] = await getK(p.sym, tfOf(p.tfms) || S.tf);
       const { data: rec } = await db.from("user_trades").select("data").eq("bot_id", b.id).gt("tclose", now - M.COOLDOWN * (M.TFMS as any)[S.tf]);
       const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, S, now, market: reg });
-      for (const p of res.opened) { p.note = `«${P.name}» · ${p.note}`; p.snap.profile = P.name; }
+      for (const p of res.opened) { p.note = `«${pname}» · ${p.note}`; p.snap.profile = pname; }
       if (res.closed.length) {
         await db.from("user_trades").insert(res.closed.map((t: any) => ({ bot_id: b.id, id: t.id, tclose: t.tclose, data: t })));
         await db.from("user_positions").delete().eq("bot_id", b.id).in("id", res.closed.map((t: any) => t.id));
       }
       const keep = [...res.stillOpen, ...res.opened];
       if (keep.length) await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p })));
-      await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: P.name,
+      await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: pname,
         regime: reg ? { state: regName, by: reg.by } : null, last_error: null }).eq("id", b.id);
       done++;
     } catch (e) {

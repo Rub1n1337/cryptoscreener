@@ -227,6 +227,41 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--s1)}
 .prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12.5px}
+/* own confirm / prompt dialog */
+.cmdk.dlgwrap{align-items:center;padding:16px;z-index:90}
+.dlgbox{width:min(440px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:16px;box-shadow:var(--shadow);padding:20px}
+.dlgbox h3{margin:0 0 6px;font-size:17px}.dlgbox p{margin:0;color:var(--mute);font-size:14px;line-height:1.5}
+.dlgbox input:not([type=checkbox]):not([type=range]){width:100%;margin-top:14px}
+.dlga{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}.dlga button{height:40px;padding:0 16px}
+button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight:650}button.danger:hover{filter:brightness(1.08);background:var(--up);border-color:var(--up)}
+@media(max-width:560px){.dlga button{flex:1}}
+/* profile form: sticky "unsaved changes" bar */
+.pfbar{position:sticky;bottom:12px;z-index:5;align-items:center!important}
+.pfbar.dirty{background:var(--s2);border:1px solid var(--warn-line);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
+.pfbt{flex:1 1 200px;font-weight:600;font-size:13.5px}.pfbar:not(.dirty) .pfbt{display:none}
+@media(max-width:700px){.pfbar{bottom:80px}}
+@media(max-width:560px){.pfbar.dirty .pfbt{flex-basis:100%}.pfbar button{flex:1}}
+/* events popover under the bell */
+#ntf{position:relative}
+.nbadge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--up);color:#fff;font-size:10px;font-weight:700;line-height:16px;box-shadow:0 0 0 2px var(--bg)}
+.evp{position:fixed;top:64px;right:16px;z-index:45;width:min(380px,calc(100vw - 32px));background:var(--s2);border:1px solid var(--line2);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.evp:not(.open){display:none}
+.evh{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 8px 14px;border-bottom:1px solid var(--line)}
+.evh button{height:32px;font-size:12.5px;background:transparent;border-color:transparent;color:var(--blue)}
+.evl{max-height:min(420px,60vh);overflow:auto;padding:6px}
+.evi{display:flex;gap:10px;align-items:flex-start;width:100%;height:auto;min-height:44px;padding:9px 10px;border:0;background:transparent;text-align:left;justify-content:flex-start;border-radius:10px;font-weight:400}
+.evi:hover{background:var(--s3);border:0}
+.evi>i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:0 0 auto;background:var(--blue)}.evi>i.ok{background:var(--lo)}.evi>i.bad{background:var(--up)}.evi>i.warn{background:var(--acc)}
+.evt{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:12.5px;color:var(--mute)}.evt b{font-size:13px;font-weight:600;color:var(--text)}
+.evi:not(.new) .evt b{font-weight:500;color:var(--mute)}
+.evi.new .evt b::after{content:"новое";margin-left:8px;font-size:10.5px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.04em}
+.evempty{padding:22px 12px;text-align:center;color:var(--mute);font-size:13px}
+.evf{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mute)}.evf button{height:32px;font-size:12.5px;flex:0 0 auto}
+@media(max-width:700px){.evp{top:62px;right:10px;width:calc(100vw - 20px)}}
+/* journal: change chips and the one-line takeaway */
+.dchip{display:inline-block;vertical-align:middle;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:650;letter-spacing:0;font-variant-numeric:tabular-nums}
+.dchip.pos{background:rgba(34,197,94,.12)}.dchip.neg{background:rgba(240,82,95,.12)}
+.insight{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13px;color:var(--text);line-height:1.5}.insight svg{color:var(--blue);margin-top:2px}
 /* live freshness: pulsing dot + ticking "updated N s ago" */
 .live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
 .live i{width:7px;height:7px;border-radius:50%;background:var(--lo);flex:0 0 auto;animation:livep 2.4s infinite}
@@ -311,6 +346,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .cprice{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
 .chead .stats{margin-top:4px;font-size:12.5px}
 .cact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cnt{font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums;margin-left:2px}.tab.on .cnt{color:var(--mute)}
 .seg.mini{margin:0;padding:2px;border-radius:9px}.seg.mini .tab{height:30px;padding:0 10px;font-size:13px;border-radius:7px}
 details.dis{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);margin:0 0 12px}
 details.dis>summary{list-style:none;cursor:pointer;padding:14px 44px 14px 16px;display:block;position:relative;font-weight:600;line-height:1.45}
@@ -400,16 +436,21 @@ details.dis>.dbody{padding:0 16px 16px}
   </nav>
   <div class="tools">
     <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
-    <button class="icon" id="ntf" title="Уведомления браузера о новых сигналах и сделках" aria-label="Уведомления браузера о новых сигналах и сделках"><svg class="i"><use href="#i-bell"/></svg></button>
+    <button class="icon" id="ntf" title="События: новые сигналы и сделки ботов" aria-label="События" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-bell"/></svg></button>
     <button class="pill cmdbtn" id="cmdbtn" title="Быстрый переход: монета, раздел или настройка" aria-label="Быстрый переход"><svg class="i"><use href="#i-search"/></svg><span class="pt">Поиск</span><kbd class="pt">Ctrl K</kbd></button>
     <button class="icon" id="thm" title="Светлая или тёмная тема" aria-label="Переключить тему"><svg class="i"><use href="#i-sun"/></svg></button>
     <button class="icon" id="snd" title="Звук при новом сигнале" aria-label="Звук при новом сигнале"><svg class="i"><use href="#i-mute"/></svg></button>
   </div>
 </div></header>
 <div id="guard" class="guard"><b>СТОРОЖ</b> загрузка…</div>
+<div id="evp" class="evp" role="dialog" aria-label="События"></div>
+<div id="dlg" class="cmdk dlgwrap hidden"><div class="dlgbox" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgD">
+  <h3 id="dlgT"></h3><p id="dlgD"></p><input id="dlgIn" class="hidden" autocomplete="off" spellcheck="false">
+  <div class="dlga"><button id="dlgNo">Отмена</button><button id="dlgOk" class="primary">Готово</button></div>
+</div></div>
 <div id="toasts"></div>
 <div id="cmdk" class="cmdk hidden"><div class="cmdbox" role="dialog" aria-modal="true" aria-label="Быстрый переход">
-  <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><kbd>Esc</kbd></div>
+  <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-label="Быстрый переход" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><kbd>Esc</kbd></div>
   <div id="cmdl" class="cmdl" role="listbox"></div>
   <div class="cmdf"><span>↑↓ выбрать</span><span>Enter открыть</span><span>Esc закрыть</span></div>
 </div></div>
@@ -474,7 +515,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <div class="panel tpanel">
         <div class="filters">
           <div class="search" style="flex:1 1 160px"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
-          <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы</button><button class="tab" data-fl="sq">Затишье</button><button class="tab" data-fl="fav" title="Избранное">★</button></div>
+          <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
           <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
           <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
         </div>
@@ -531,7 +572,7 @@ details.dis>.dbody{padding:0 16px 16px}
       </div>
       <!-- 3. rarely needed -->
       <details class="dis bmore"><summary>Дополнительно <span class="mute">· где работает бот, граница боковика, сброс журнала</span></summary><div class="dbody">
-        <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт. В браузере — только пока открыта эта вкладка; удобно, чтобы быстро проверить новый профиль.</p></div>
+        <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт. В браузере — только пока открыта эта вкладка; удобно, чтобы быстро проверить новый профиль. Если не заходить на сайт 30 дней, серверный бот засыпает — откройте сайт, и он продолжит.</p></div>
           <div class="seg mini" id="bwhere"><button class="tab" data-w="server">На сервере 24/7</button><button class="tab" data-w="browser">В браузере</button></div></div>
         <div class="bopt"><div><b>Когда рынок считается боковиком</b><p>Бот смотрит на BTC, ETH и SOL за 7 дней: насколько цена прошла по прямой относительно всего пути (ER). Если у всех трёх ER ниже порога — боковик, иначе импульс.</p></div>
           <select id="bER"><option value="0.1">ER &lt; 0.10 · строже</option><option value="0.15">ER &lt; 0.15 · обычно</option><option value="0.25">ER &lt; 0.25 · мягче</option></select></div>
@@ -561,7 +602,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <label class="fl" title="Флэт — когда BTC, ETH и SOL все в боковике (порог ER выше, в настройках бота)">Входить <select id="pfReg"><option value="any">в любом рынке</option><option value="flat">только во флэте</option><option value="impulse">только в импульсе</option></select></label>
           <label class="fl inl"><input type="checkbox" id="pfLong"> только LONG</label>
         </div>
-        <div class="row" style="margin-top:12px"><button id="pfSave" class="primary">Сохранить профиль</button><button id="pfCancel">Отмена</button></div>
+        <div class="row pfbar" id="pfBar" style="margin-top:12px"><span class="pfbt" id="pfBarT"></span><button id="pfSave" class="primary">Сохранить профиль</button><button id="pfCancel">Отмена</button></div>
       </div>
     </div>
     <div id="jcards"></div>
@@ -890,6 +931,7 @@ const labelOf = r => r.kind === 'sig' ? (r.side === 'low' ? '▲ LONG' : '▼ SH
   : r.kind === 'out' ? (r.pB > 1 ? 'за границей ↑' : 'за границей ↓')
   : r.kind === 'touch' ? `касание ${r.side === 'low' ? '↓' : '↑'} ${hm(r.touchTime)}` : r.label;
 function renderTable() {
+  $('#cntSig').textContent = rows.filter(r => r.rev).length || ''; $('#cntSq').textContent = rows.filter(r => r.squeeze).length || ''; $('#cntFav').textContent = rows.filter(r => favs.has(r.sym)).length || '';
   const fz = $('#fz').value, fl = $('#fl').value, q = $('#fs').value.trim().toUpperCase();
   const list = rows.filter(r => {
     if (q && !r.sym.includes(q)) return false;
@@ -1234,7 +1276,13 @@ function syncServerBot() {   // push profiles/mode to the server bot (debounced)
 async function fetchServerBot() {
   if (BP.where !== 'server' || !UB) return;
   try {
-    const r = await rpc('ub_get', {p_id:UB.id, p_secret:UB.secret}), b = r.bot;
+    const r = await rpc('ub_get', {p_id:UB.id, p_secret:UB.secret}), b = r.bot, prev = SB_MINE;
+    // the server trades on its own: compare with the previous poll to tell the owner about new trades
+    if (prev) {
+      const seenO = new Set(prev.open.map(p => p.id)), seenC = new Set(prev.closed.map(t => t.id)), toJ = () => { jMode = 'mine'; go('journal'); };
+      for (const p of (r.open || []).filter(p => !seenO.has(p.id))) notifyUser(`Мой бот: ${p.side} ${pair(p.sym)}`, `${p.snap?.profile ? `«${p.snap.profile}» · ` : ''}вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', toJ);
+      for (const t of (r.closed || []).filter(t => !seenC.has(t.id))) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', toJ);
+    }
     SB_MINE = {balance:b.balance, start:b.start_balance, open:r.open || [], closed:r.closed || [], on:b.enabled,
       checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error};
     renderBotPanel();
@@ -1294,13 +1342,15 @@ async function runBot() {
 // ---------- sharing profiles: a link carries one profile; everything is re-validated on the way in ----------
 // (names end up in innerHTML, so they are stripped of markup wherever a profile enters: form, link, storage)
 const num = (v, a, b, d) => { v = +v; return isFinite(v) ? clamp(v, a, b) : d; };
+const near = (v, opts, d) => { v = +v; return isFinite(v) ? opts.reduce((a, b) => Math.abs(b - v) < Math.abs(a - v) ? b : a) : d; };
 function cleanProfile(p) {
   const s = p?.set || {}, D = PROFILE_DEF, c = p?.coins || {};
   const pick = (v, ok, d) => ok.includes(v) ? v : d;
   const set = {method:pick(s.method, ['log', 'classic', 'robust', 'ewma'], D.method), N:Math.round(num(s.N, 20, 300, D.N)), k:num(s.k, 1, 5, D.k),
     tf:pick(s.tf, ['5m', '15m', '1h', '4h', '1d'], D.tf), minScore:Math.round(num(s.minScore, 0, 100, D.minScore)),
-    strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:num(s.rr, 0, 10, 0), risk:num(s.risk, 0.001, 0.05, D.risk),
-    lev:num(s.lev, 1, 10, 1), minWidth:num(s.minWidth, 0, 30, 0), maxHL:num(s.maxHL, 0, 500, 0), coinErMax:num(s.coinErMax, 0, 1, 0),
+    // values offered as lists in the form snap to the nearest option, so editing an imported profile never shows an empty field
+    strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:near(s.rr, [0, 1.5, 2, 3], 0), risk:near(s.risk, [0.005, 0.01, 0.02, 0.03], D.risk),
+    lev:near(s.lev, [1, 2, 3, 5, 10], 1), minWidth:near(s.minWidth, [0, 3, 5, 8], 0), maxHL:near(s.maxHL, [0, 20, 40], 0), coinErMax:near(s.coinErMax, [0, 0.2, 0.3], 0),
     longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any')};
   const list = Array.isArray(c.list) ? c.list.map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{2,20}USDT$/.test(x)).slice(0, 200) : [];
   return {name:cleanName(p?.name), coins:c.mode === 'list' && list.length ? {mode:'list', list} : {mode:'top', top:[20, 50, 100, 150, 200].includes(+c.top) ? +c.top : 150}, set};
@@ -1338,10 +1388,11 @@ $('#pimp').onclick = e => {
 async function shareProfile(p) {
   const url = shareLink(p);
   try { await navigator.clipboard.writeText(url); toast('Ссылка на профиль скопирована', 'отправьте её — у получателя профиль добавится в «Мой бот» одним нажатием', 'ok'); }
-  catch { prompt('Скопируйте ссылку на профиль:', url); }
+  catch { await ask({title:'Ссылка на профиль', text:'Браузер не дал скопировать автоматически — выделите ссылку и скопируйте её сами.', ok:'Готово', input:{value:url}}); }
 }
-function importByLink() {
-  const t = prompt('Вставьте ссылку на профиль'); if (!t) return;
+async function importByLink() {
+  const t = await ask({title:'Добавить профиль по ссылке', text:'Вставьте ссылку, которой с вами поделились.', ok:'Продолжить', input:{placeholder:'https://…#p=…'}});
+  if (!t?.trim()) return;
   const r = parseShared(t);
   if (r.error) toast('Не получилось добавить профиль', r.error, 'warn'); else { showImport(r.p); $('#pimp').scrollIntoView({block:'nearest', behavior:'smooth'}); }
 }
@@ -1439,6 +1490,7 @@ function openForm(p) {
   $('#pfRR').value = String(s.rr); $('#pfRisk').value = String(Math.round(s.risk * 1000) / 10); $('#pfLev').value = String(s.lev);
   $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any';
   $('#bform').classList.remove('hidden'); $('#bform').scrollIntoView({block:'nearest', behavior:'smooth'});
+  formBase = formState(); syncSavebar();
 }
 function saveForm() {
   const listMode = $('#pfCoins').value === 'list', list = parseCoins($('#pfList').value);
@@ -1451,6 +1503,7 @@ function saveForm() {
          regimeOnly:$('#pfReg').value}};
   const i = BP.profiles.findIndex(x => x.id === p.id);
   if (i >= 0) BP.profiles[i] = p; else BP.profiles.push(p);
+  formBase = null; syncSavebar();
   saveBP(); $('#bform').classList.add('hidden'); renderBotPanel(); renderJournal(); syncServerBot();
   toast(`Профиль «${p.name}» сохранён`, i >= 0 ? 'изменения применятся со следующей проверки рынка' : 'нажмите на него в списке профилей, чтобы бот торговал по нему', 'ok');
 }
@@ -1565,6 +1618,31 @@ const reasonTag = r => `<span class="tag ${r === 'тейк' ? 'tp' : r === 'ст
 const scoreOf = p => p.snap?.score ?? (String(p.note || '').match(/(?:оценка|сила) (\d+)/)?.[1] ?? '—');
 let jSort = 'tclose', jDir = -1;
 const journalData = () => jMode === 'shared' ? SJ : (BP.where === 'server' ? SB_MINE : J);
+const plural = (n, f) => f[n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2];
+// ▲/▼ chip for a change: sign and arrow carry the meaning, colour only reinforces it
+const deltaChip = (d, unit, tip) => !isFinite(d) || Math.abs(d) < 0.005 ? '' :
+  `<span class="dchip ${d > 0 ? 'pos' : 'neg'}" title="${tip}">${d > 0 ? '▲' : '▼'} ${Math.abs(d).toFixed(2)}${unit}</span>`;
+// one plain-language takeaway from the closed trades — the reading of the numbers, next to the numbers
+function journalInsight(D, st) {
+  const cl2 = D.closed.map(M.normTrade).filter(x => x.r != null && isFinite(x.r));
+  let txt;
+  if (cl2.length < 10) txt = cl2.length ? `Пока ${cl2.length} ${plural(cl2.length, ['сделка', 'сделки', 'сделок'])} — для выводов мало. Результату можно доверять примерно после 30 сделок.` : '';
+  else {
+    const avg = a => a.reduce((s, x) => s + x.r, 0) / a.length;
+    const L = cl2.filter(x => x.side === 'LONG'), Sh = cl2.filter(x => x.side === 'SHORT');
+    const ts = cl2.filter(x => x.reason === 'тайм-стоп').length / cl2.length;
+    if (L.length >= 5 && Sh.length >= 5 && Math.sign(avg(L)) !== Math.sign(avg(Sh)))
+      txt = `LONG в среднем ${rr(avg(L))}, SHORT ${rr(avg(Sh))} на сделку — ${avg(L) < 0 ? 'лонги' : 'шорты'} тянут результат вниз.`;
+    else if (ts > 0.3) txt = `${Math.round(ts * 100)}% сделок закрываются по тайм-стопу — цена не успевает дойти ни до тейка, ни до стопа.`;
+    else if (st.gross > 0 && st.fees > st.gross) txt = `До комиссий бот в плюсе (${usd(st.gross)}), но комиссии забрали больше (${usd(-st.fees)}).`;
+    else {
+      const best = Object.entries(cl2.reduce((m, x) => (m[x.sym] = (m[x.sym] || 0) + x.pnl, m), {})).sort((a, b) => b[1] - a[1]);
+      const [top, bot] = [best[0], best[best.length - 1]];
+      if (best.length >= 2 && top[1] > 0 && bot[1] < 0) txt = `Больше всего принесла ${pair(top[0])} (${usd(top[1])}), больше всего забрала ${pair(bot[0])} (${usd(bot[1])}).`;
+    }
+  }
+  return txt ? `<div class="insight"><svg class="i"><use href="#i-info"/></svg><span>${txt}</span></div>` : '';
+}
 function renderJournal() {
   document.querySelectorAll('.jm').forEach(b => b.classList.toggle('on', b.dataset.m === jMode));
   $('#jmine').classList.toggle('hidden', jMode !== 'mine');
@@ -1579,12 +1657,18 @@ function renderJournal() {
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
   const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
   const chg = D.balance / D.start - 1;
+  // last 7 days and the last 20 trades, so the cards say which way things are going, not only where they are
+  const wk = D.closed.filter(x => Date.now() - x.tclose < 7 * 864e5), wkNet = wk.reduce((a, x) => a + x.pnl, 0);
+  const recent = [...D.closed].sort((a, b) => b.tclose - a.tclose).slice(0, 20).map(M.normTrade).map(x => x.r).filter(x => x != null && isFinite(x));
+  const recR = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : null;
+  const trend = st.n >= 25 && recR != null && st.expR != null ? deltaChip(recR - st.expR, 'R', `последние 20 сделок: ${rr(recR)}`) : '';
   $('#jcards').innerHTML =
     `<div class="hero">
        <div class="htop">
          <div><div class="t">Баланс · виртуальный</div>
            <div class="hv">$${money(D.balance)}</div>
-           <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">за всё время, после комиссий</span></div></div>
+           <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">за всё время, после комиссий</span>
+             ${wk.length && wk.length < D.closed.length ? `<span class="chip ${wkNet > 0 ? 'pos' : wkNet < 0 ? 'neg' : 'flat'} ${cl(wkNet)}" style="margin-left:10px">${wkNet > 0 ? '▲' : wkNet < 0 ? '▼' : ''} ${usd(wkNet)}</span><span class="faint">за 7 дней · ${wk.length} ${plural(wk.length, ['сделка', 'сделки', 'сделок'])}</span>` : ''}</div></div>
          <div class="hside">
            <div>Старт<b>$${money(D.start)}</b></div>
            <div>Пик<b>$${money(peakOf(D))}</b></div>
@@ -1592,11 +1676,12 @@ function renderJournal() {
          </div>
        </div>
        ${equityChart(D)}
+       ${journalInsight(D, st)}
      </div>
      <div class="statrow">
        ${card('Сделок', st.n, `открыто ${D.open.length} из ${M.MAX_OPEN}`)}
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок')}
-       ${card('Ср. результат', rr(st.expR), other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR), 'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
+       ${card('Ср. результат', rr(st.expR) + trend, other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR),'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), 'прибыли / убытки', st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе')}
        ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа. Если комиссии больше прибыли до них — стратегия работает на биржу')}
        ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика')}
@@ -1864,6 +1949,15 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.1', date:'6 октября 2026', title:'События под колокольчиком', items:[
+    'Колокольчик теперь открывает список событий: новые сигналы, сделки обоих ботов и смена профиля. Непрочитанные отмечены, нажатие ведёт к монете или в журнал. Там же включаются уведомления браузера.',
+    'Если «Мой бот» работает на сервере, о его сделках теперь тоже приходят уведомления.',
+    'В журнале — изменение за 7 дней, сравнение последних 20 сделок со средним и короткий вывод: что тянет результат вниз или что приносит больше всего.',
+    'В форме профиля появляется плашка «Есть несохранённые изменения»; Ctrl+S сохраняет, а уйти, не сохранив, сайт не даст без вопроса.',
+    'Удаление профиля и сброс журнала спрашивают через понятное окно — с тем, что именно произойдёт.',
+    'В быстрых фильтрах рынка видно, сколько монет в каждом: «Сигналы 3», «Затишье 12».',
+    'Серверный бот засыпает, если на сайт не заходить 30 дней, — откройте сайт, и он продолжит. Это нужно, чтобы на всех хватало места.',
+  ]},
   {v:'2.0', date:'6 октября 2026', title:'Быстрый поиск и профили по ссылке', items:[
     'Поиск по всему сайту — кнопка «Поиск» в верхней панели или Ctrl+K: монеты, разделы, профили и отдельные настройки вроде «плечо», «риск», «бэктест». Понимает и неправильную раскладку: «ыщд» найдёт SOL.',
     'Профилем можно поделиться: кнопка «Поделиться» копирует ссылку. Кто её откроет, добавит профиль себе одним нажатием.',
@@ -2065,16 +2159,109 @@ sound = load('sr_sound', false); syncSound();
 // browser notifications (opt-in): new signals, my bot's trades, shared bot's trades
 const ntfOn = () => load('sr_ntf', false) && 'Notification' in window && Notification.permission === 'granted';
 const syncNtf = () => $('#ntf').classList.toggle('on', ntfOn());
-$('#ntf').onclick = async () => {
+async function toggleNtf() {
   if (!('Notification' in window)) { toast('Браузер не поддерживает уведомления', '', 'warn'); return; }
   if (ntfOn()) { save('sr_ntf', false); syncNtf(); toast('Уведомления выключены', '', 'info'); return; }
   const p = await Notification.requestPermission();
   if (p === 'granted') { save('sr_ntf', true); toast('Уведомления включены', 'Пришлём сигналы и сделки, даже когда вкладка свёрнута.', 'ok'); }
   else toast('Уведомления запрещены', 'Разрешите их в настройках сайта в браузере.', 'warn');
   syncNtf();
-};
+}
 syncNtf();
+// ---------- own dialog instead of confirm()/prompt(): says exactly what will happen, follows the theme ----------
+// ask({title, text, ok, danger}) → true/false; with `input` → the typed text or null. Destructive dialogs focus "Отмена".
+function ask({title, text = '', ok = 'Готово', danger = false, input = null}) {
+  return new Promise(res => {
+    const back = document.activeElement, inp = $('#dlgIn'), withInput = input != null;
+    $('#dlgT').textContent = title; $('#dlgD').textContent = text; $('#dlgD').classList.toggle('hidden', !text);
+    $('#dlgOk').textContent = ok; $('#dlgOk').className = danger ? 'danger' : 'primary';
+    inp.classList.toggle('hidden', !withInput); inp.value = input?.value ?? ''; inp.placeholder = input?.placeholder ?? '';
+    $('#dlg').classList.remove('hidden');
+    if (withInput) { inp.focus(); inp.select(); } else (danger ? $('#dlgNo') : $('#dlgOk')).focus();
+    const done = v => {
+      $('#dlg').classList.add('hidden');
+      $('#dlg').onkeydown = $('#dlg').onclick = $('#dlgOk').onclick = $('#dlgNo').onclick = null;
+      back?.focus?.({preventScroll:true}); res(v);
+    };
+    const no = () => done(withInput ? null : false);
+    $('#dlgOk').onclick = () => done(withInput ? inp.value : true);
+    $('#dlgNo').onclick = no;
+    $('#dlg').onclick = e => { if (e.target.id === 'dlg') no(); };
+    $('#dlg').onkeydown = e => {
+      if (e.key === 'Escape') { e.stopPropagation(); no(); }
+      if (e.key === 'Enter' && e.target === inp) { e.preventDefault(); done(inp.value); }
+      if (e.key === 'Tab') {   // keep focus inside the dialog
+        const f = [inp, $('#dlgNo'), $('#dlgOk')].filter(x => !x.classList.contains('hidden'));
+        e.preventDefault(); f[(f.indexOf(document.activeElement) + (e.shiftKey ? -1 : 1) + f.length) % f.length].focus();
+      }
+    };
+  });
+}
+// ---------- profile form: unsaved changes ----------
+// The save row turns into a sticky bar once something changed; Ctrl+S saves; leaving or cancelling asks first.
+const formState = () => [...$('#bform').querySelectorAll('input, select')].map(x => x.type === 'checkbox' ? x.checked : x.value).join('|');
+let formBase = null;
+const formDirty = () => formBase != null && !$('#bform').classList.contains('hidden') && formState() !== formBase;
+function syncSavebar() { const d = formDirty(); $('#pfBar').classList.toggle('dirty', d); $('#pfBarT').textContent = d ? 'Есть несохранённые изменения' : ''; }
+['input', 'change'].forEach(t => $('#bform').addEventListener(t, syncSavebar));
+window.addEventListener('beforeunload', e => { if (formDirty()) { e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS' && !$('#bform').classList.contains('hidden')) { e.preventDefault(); saveForm(); }
+});
+// ---------- events: everything the site told the user, in one list under the bell ----------
+// Toasts vanish after a few seconds; here the last 50 stay, with read state, and a click leads to the coin or the journal.
+let EV = load('sr_events', []), evRead = new Set(load('sr_evread', []));
+const evLink = title => {
+  if (/^Мой бот/.test(title)) return 'j:mine';
+  if (/^Общий бот/.test(title)) return 'j:shared';
+  const m = title.match(/([A-Z0-9]+)\/USDT/); return m ? 'c:' + m[1] + 'USDT' : '';
+};
+const evUnread = () => EV.filter(e => !evRead.has(e.id)).length;
+function addEvent(title, body, kind) {
+  EV = [{id:Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t:Date.now(), title, body, kind, link:evLink(title)}, ...EV].slice(0, 50);
+  save('sr_events', EV); renderBell();
+}
+function renderBell() {
+  const n = evUnread();
+  $('#ntf').innerHTML = `<svg class="i"><use href="#i-bell"/></svg>${n ? `<span class="nbadge">${n > 9 ? '9+' : n}</span>` : ''}`;
+  $('#ntf').setAttribute('aria-label', n ? `События: ${n} ${plural(n, ['новое', 'новых', 'новых'])}` : 'События');
+  if ($('#evp').classList.contains('open')) renderEvents();
+}
+function renderEvents() {
+  const on = ntfOn(), can = 'Notification' in window;
+  $('#evp').innerHTML = `<div class="evh"><b>События</b><button data-ev="all"${evUnread() ? '' : ' disabled'}>Прочитать всё</button></div>
+    <div class="evl">${EV.length ? EV.map(e => `<button class="evi${evRead.has(e.id) ? '' : ' new'}" data-ev="${e.id}"><i class="${e.kind}"></i>
+      <span class="evt"><b>${e.title}</b>${e.body ? `<span>${e.body}</span>` : ''}<span class="faint">${ago(Date.now() - e.t)} назад</span></span></button>`).join('')
+      : '<div class="evempty">Пока тихо. Новые сигналы и сделки ботов появятся здесь.</div>'}</div>
+    <div class="evf"><span>${on ? 'Уведомления браузера включены — придут, даже когда вкладка свёрнута' : 'Получать уведомления, даже когда вкладка свёрнута'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>`;
+}
+const openLink = l => {
+  if (!l) return;
+  if (l.startsWith('c:')) { go('market'); loadChart(l.slice(2)); }
+  else { jMode = l.slice(2); save('sr_jmode', jMode); go('journal'); if (jMode === 'shared') fetchShared(); }
+};
+const evClose = () => { $('#evp').classList.remove('open'); $('#ntf').setAttribute('aria-expanded', 'false'); };
+$('#ntf').onclick = e => {
+  e.stopPropagation();
+  const open = !$('#evp').classList.contains('open');
+  $('#evp').classList.toggle('open', open); $('#ntf').setAttribute('aria-expanded', String(open));
+  if (open) renderEvents();
+};
+$('#evp').onclick = async e => {
+  e.stopPropagation();
+  const id = e.target.closest('[data-ev]')?.dataset.ev; if (!id) return;
+  if (id === 'all') EV.forEach(x => evRead.add(x.id));
+  else if (id === 'ntf') await toggleNtf();
+  else { evRead.add(id); evClose(); openLink(EV.find(x => x.id === id)?.link); }
+  // the read set only keeps ids that are still in the list, so it never grows without bound
+  evRead = new Set([...evRead].filter(x => EV.some(ev => ev.id === x))); save('sr_evread', [...evRead]);
+  renderBell();
+};
+document.addEventListener('click', e => { if (!e.target.closest('#evp')) evClose(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') evClose(); });
+renderBell();
 function notifyUser(title, body, kind = 'info', onClick) {
+  addEvent(title, body, kind);
   toast(title, body, kind, onClick);
   if (ntfOn() && document.hidden) try { const n = new Notification(title, {body, tag:title}); n.onclick = () => { window.focus(); onClick?.(); n.close(); }; } catch {}
 }
@@ -2089,12 +2276,12 @@ $('#bhero').onclick = e => {
   if (k === 'off') setOn(false);
   if (k === 'server') setWhere('server');
   if (k === 'market') { go('market'); document.querySelector('#flseg [data-fl=sig]')?.click(); }
-  if (k === 'use') { BP.mode = 'single'; pickProfile(x); }
+  if (k === 'use') pickProfile(x);
   if (k === 'slot') { BP[x] = y; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); toast(`В ${x === 'flat' ? 'боковике' : 'импульсе'} бот берёт «${profById(y).name}»`, '', 'ok'); }
   if (k === 'auto') { Object.assign(BP, {mode:'auto', flat:x, impulse:y}); saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot();
     toast('Бот сам выбирает профиль по рынку', `боковик — «${profById(x).name}», импульс — «${profById(y).name}»`, 'ok'); }
 };
-const pickProfile = id => { if (BP.active === id) return; BP.active = id; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot();
+const pickProfile = id => { if (BP.active === id && BP.mode === 'single') return; BP.active = id; BP.mode = 'single'; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot();
   toast(`Бот торгует по профилю «${profById(id).name}»`, BP.where === 'server' ? 'сервер подхватит его на следующей проверке — в течение минуты' : 'со следующей проверки рынка', 'ok'); };
 document.querySelectorAll('#bwhere .tab').forEach(b => b.onclick = () => setWhere(b.dataset.w));
 // my bot: profiles panel
@@ -2102,28 +2289,38 @@ document.querySelectorAll('#bmode .tab').forEach(b => b.onclick = () => { BP.mod
 $('#bER').onchange = e => { BP.erMax = +e.target.value; saveBP(); renderBotPanel(); syncServerBot(); runBot(); };
 $('#bnew').onclick = () => openForm(null);
 $('#bimport').onclick = importByLink;
-$('#pfCancel').onclick = () => $('#bform').classList.add('hidden');
+$('#pfCancel').onclick = async () => {
+  if (formDirty() && !(await ask({title:'Не сохранять изменения?', text:'Правки в этом профиле пропадут.', ok:'Не сохранять', danger:true}))) return;
+  formBase = null; syncSavebar(); $('#bform').classList.add('hidden');
+};
 $('#pfSave').onclick = saveForm;
 $('#pfCoins').onchange = () => $('#pfListL').classList.toggle('hidden', $('#pfCoins').value !== 'list');
-$('#blist').onclick = e => {
+$('#blist').onclick = async e => {
   const ed = e.target.closest('[data-pe]'), del = e.target.closest('[data-pd]'), role = e.target.closest('[data-role]'), sh = e.target.closest('[data-ps]');
   if (sh) { shareProfile(profById(sh.dataset.ps)); return; }
   if (role) { BP[role.dataset.role] = role.dataset.id; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); return; }
   if (!ed && !del) { const c = e.target.closest('.prof.pick'); if (c) pickProfile(c.dataset.pick); return; }
-  if (ed) openForm(profById(ed.dataset.pe));
+  if (ed) {
+    if (formDirty() && editId !== ed.dataset.pe && !(await ask({title:'Не сохранять изменения?', text:'Правки в открытом профиле пропадут.', ok:'Не сохранять', danger:true}))) return;
+    openForm(profById(ed.dataset.pe));
+  }
   if (del && BP.profiles.length > 1) {
-    const p = profById(del.dataset.pd);
-    if (!confirm(`Удалить профиль «${p.name}»?`)) return;
+    const p = profById(del.dataset.pd), next = BP.profiles.find(x => x.id !== p.id);
+    const inUse = ['active', 'flat', 'impulse'].some(k => BP[k] === p.id);
+    if (!(await ask({title:`Удалить профиль «${p.name}»?`, ok:'Удалить', danger:true,
+      text:`Сделки в журнале останутся.${inUse ? ` Бот сейчас использует этот профиль — вместо него возьмёт «${next.name}».` : ''}`}))) return;
     BP.profiles = BP.profiles.filter(x => x.id !== p.id);
-    for (const k of ['active', 'flat', 'impulse']) if (BP[k] === p.id) BP[k] = BP.profiles[0].id;
+    for (const k of ['active', 'flat', 'impulse']) if (BP[k] === p.id) BP[k] = next.id;
+    if (editId === p.id) { formBase = null; syncSavebar(); $('#bform').classList.add('hidden'); }   // or saving would bring it back
     saveBP(); renderBotPanel(); renderJournal(); syncServerBot();
   }
 };
 $('#blist').onkeydown = e => { const c = e.target.closest('.prof.pick'); if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pickProfile(c.dataset.pick); } };
 // backtest → bot: keep the tested settings as a profile
-$('#btSave').onclick = () => {
-  const s = btSettings(), name = prompt('Название профиля', `${M.STRATEGIES[s.strategy]} · ${s.tf}${s.rr ? ' · 1:' + s.rr : ''}`);
-  if (!name) return;
+$('#btSave').onclick = async () => {
+  const s = btSettings(), name = await ask({title:'Сохранить как профиль бота', text:'Под этим названием профиль появится в «Мой бот» — там его можно выбрать для торговли.',
+    ok:'Сохранить', input:{value:`${M.STRATEGIES[s.strategy]} · ${s.tf}${s.rr ? ' · 1:' + s.rr : ''}`}});
+  if (!name?.trim()) return;
   const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly} = s;
   BP.profiles.push({id:'p' + Date.now(), name:cleanName(name), coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
     set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly}});
@@ -2131,7 +2328,8 @@ $('#btSave').onclick = () => {
   toast(`Профиль «${cleanName(name)}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
 };
 $('#jreset').onclick = async () => {
-  if (!confirm(BP.where === 'server' ? 'Сбросить журнал серверного бота и баланс?' : 'Сбросить журнал вашего бота и баланс?')) return;
+  if (!(await ask({title:'Сбросить журнал?', ok:'Сбросить', danger:true,
+    text:`Все сделки ${BP.where === 'server' ? 'серверного' : 'вашего'} бота удалятся, баланс вернётся к $10 000. Профили останутся. Отменить это нельзя.`}))) return;
   if (BP.where === 'server' && UB) { await rpc('ub_reset', {p_id:UB.id, p_secret:UB.secret}).catch(e => toast('Не удалось сбросить', String(e.message || e), 'bad')); fetchServerBot(); return; }
   J = {balance:10000, start:10000, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
 };
@@ -2257,7 +2455,7 @@ function cmdBuild(raw) {
   const st = CMD_SETTINGS.filter(s => hit(s.label, s.kw)).map(s => ({...s, id:'s:' + s.label, hint:'настройка'}));
   if (st.length) groups.push(['Настройки', st]);
   const pr = BP.profiles.filter(p => hit(p.name, ['профиль', 'profile'])).map(p => ({id:'p:' + p.id, label:`Профиль «${p.name}»`,
-    hint:p.id === activeProfile().id ? 'сейчас выбран' : 'торговать по нему', run:() => { openMine(); BP.mode = 'single'; pickProfile(p.id); }}));
+    hint:p.id === activeProfile().id ? 'сейчас выбран' : 'торговать по нему', run:() => { openMine(); pickProfile(p.id); }}));
   if (pr.length) groups.push(['Профили', pr]);
   // nothing matched: maybe a coin outside the scanner's list — offer to open its chart
   const sym = qs.find(x => /^[a-z0-9]{2,12}$/.test(x));
@@ -2271,23 +2469,25 @@ function cmdRender() {
   let i = 0;
   $('#cmdl').innerHTML = cmdItems.length
     ? groups.map(([g, items]) => `<div class="cmdg">${g}</div>` + items.map(it => { const n = i++;
-        return `<button class="cmdi${n === cmdIdx ? ' on' : ''}" role="option" aria-selected="${n === cmdIdx}" data-i="${n}" tabindex="-1"><span class="ct">${it.label}</span><span class="ch">${it.hint || ''}</span></button>`; }).join('')).join('')
+        return `<button id="cmdo${n}" class="cmdi${n === cmdIdx ? ' on' : ''}" role="option" aria-selected="${n === cmdIdx}" data-i="${n}" tabindex="-1"><span class="ct">${it.label}</span><span class="ch">${it.hint || ''}</span></button>`; }).join('')).join('')
     : `<div class="cmdempty">Ничего не нашлось. Попробуйте монету (btc, sol) или слово: «плечо», «риск», «бэктест», «профиль».</div>`;
   $('#cmdl .cmdi.on')?.scrollIntoView({block:'nearest'});
+  $('#cmdq').setAttribute('aria-activedescendant', cmdItems.length ? 'cmdo' + cmdIdx : '');
 }
-function cmdOpen() { cmdBack = document.activeElement; $('#cmdk').classList.remove('hidden'); $('#cmdq').value = ''; cmdIdx = 0; cmdRender(); $('#cmdq').focus(); }
-function cmdClose() { $('#cmdk').classList.add('hidden'); cmdBack?.focus?.({preventScroll:true}); }
+function cmdOpen() { cmdBack = document.activeElement; $('#cmdk').classList.remove('hidden'); document.documentElement.style.overflow = 'hidden'; $('#cmdq').value = ''; cmdIdx = 0; cmdRender(); $('#cmdq').focus(); }
+function cmdClose() { $('#cmdk').classList.add('hidden'); document.documentElement.style.overflow = ''; cmdBack?.focus?.({preventScroll:true}); }
 function cmdRun(i) { const it = cmdItems[i]; if (!it) return; cmdClose(); if (/^[cg]:/.test(it.id)) recentAdd(it.id); it.run(); }
 $('#cmdbtn').onclick = cmdOpen;
 if (/Mac|iPhone|iPad/.test(navigator.platform)) $('#cmdbtn kbd').textContent = '⌘K';
 $('#cmdq').oninput = () => { cmdIdx = 0; cmdRender(); };
 $('#cmdq').onkeydown = e => {
   if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && cmdItems.length) { e.preventDefault(); cmdIdx = (cmdIdx + (e.key === 'ArrowDown' ? 1 : -1) + cmdItems.length) % cmdItems.length; cmdRender(); }
+  if (e.key === 'Tab') e.preventDefault();   // focus stays in the dialog: arrows move, Enter opens
   if (e.key === 'Enter') { e.preventDefault(); cmdRun(cmdIdx); }
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cmdClose(); }
 };
 $('#cmdl').onclick = e => { const b = e.target.closest('.cmdi'); if (b) cmdRun(+b.dataset.i); };
-$('#cmdl').onmousemove = e => { const b = e.target.closest('.cmdi'); if (b && +b.dataset.i !== cmdIdx) { cmdIdx = +b.dataset.i; $('#cmdl .cmdi.on')?.classList.remove('on'); b.classList.add('on'); } };
+$('#cmdl').onmousemove = e => { const b = e.target.closest('.cmdi'); if (b && +b.dataset.i !== cmdIdx) { cmdIdx = +b.dataset.i; $('#cmdl .cmdi.on')?.classList.remove('on'); b.classList.add('on'); $('#cmdq').setAttribute('aria-activedescendant', b.id); } };
 $('#cmdk').onclick = e => { if (e.target.id === 'cmdk') cmdClose(); };
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); $('#cmdk').classList.contains('hidden') ? cmdOpen() : cmdClose(); }
@@ -2296,6 +2496,7 @@ document.addEventListener('keydown', e => {
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
 let sharedIn = null;
 if (location.hash.startsWith('#p=')) { sharedIn = parseShared(location.hash); history.replaceState(null, '', '#journal'); jMode = 'mine'; }
+$('#mlive').innerHTML = liveTag(0, 3 * SCAN_MS); tickLive();
 const startPage = readHash();
 syncInputs(); renderGuard(); go(startPage, false); setHash(); loadChart(); scan(); fetchShared();
 if (sharedIn?.p) showImport(sharedIn.p); else if (sharedIn?.error) toast('Не получилось открыть профиль', sharedIn.error, 'warn');
@@ -2313,10 +2514,16 @@ const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + D
   .then(ts => ts.includes(null) ? null : hashText(ts.join('\n'))).catch(() => null);
 let selfHash = null;
 fetchVersion().then(h => { selfHash = h; });
+let updWarned = false;
 async function checkUpdate() {
   if (selfHash == null || IS_DEV) return;
   const h = await fetchVersion();
   if (h == null || h === selfHash) return;
+  // never reload over unsaved edits or an open dialog — ask once instead
+  if (formDirty() || !$('#dlg').classList.contains('hidden')) {
+    if (!updWarned) toast('Вышла новая версия сайта', 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
+    updWarned = true; return;
+  }
   const el = $('#guard'); el.className = 'guard idle';
   let n = 5;
   toast('Вышла новая версия сайта', 'Перезагружаю через 5 секунд — журнал и настройки сохранятся.', 'warn', () => location.reload(), 6000);
