@@ -2,7 +2,7 @@
 // Used by the site (index.html imports it as an ES module) and by the shared bot (Supabase Edge Function).
 // Any change here changes both — the site picks it up on the next Vercel deploy, the bot on the next function deploy.
 
-export const TFMS = { '5m': 3e5, '15m': 9e5, '1h': 36e5, '4h': 144e5 };
+export const TFMS = { '5m': 3e5, '15m': 9e5, '1h': 36e5, '4h': 144e5, '1d': 864e5, '1w': 6048e5 };
 export const STABLE = new Set(['USDC','FDUSD','TUSD','BUSD','DAI','USDP','AEUR','EUR','EURI','USDE','USD1','BFUSD','XUSD','PYUSD','RLUSD','UST','USTC','SUSD']);
 export const FEE = 0.00075;   // exchange fee per side (taker, with BNB discount)
 export const SLIP = 0.0005;   // slippage on market fills: entry, stop and time-stop exits (TP is a limit order — no slippage)
@@ -194,6 +194,8 @@ export function wants(r, S) {
     if (st === 'revert_trend' && !(side === 'LONG' ? r.slope > 0 : r.slope < 0)) side = null;
   }
   if (side === 'SHORT' && S.longOnly) return null;
+  // optional channel-width filter: a wider channel leaves more room for the move back to the centre
+  if (side && S.minWidth && !((r.up - r.lo) / r.mid * 100 >= S.minWidth)) return null;
   // optional trend filter for bounces: only coins that revert to the centre fast enough (T½ ≤ maxHL bars)
   if (side && st !== 'breakout' && S.maxHL && !(isFinite(r.hl) && r.hl <= S.maxHL)) return null;
   return side;
@@ -204,7 +206,8 @@ export function snapshot(r, S) {
   return { score: r.score, comps: r.comps, checks: r.checks, z: r.z, pB: r.pB, rsi: r.rsi, hl: isFinite(r.hl) ? r.hl : null,
            exc: r.exc, volX: r.volX, volZ: r.volZ, mid: r.mid, up: r.up, lo: r.lo, atr: r.atr,
            slope: r.slope, brk: r.brk,
-           settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0 } };
+           settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0,
+                       rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0 } };
 }
 
 // ---------- trading rules ----------
@@ -214,14 +217,18 @@ export function planEntry(r, balance, S, now) {
   const sg = side === 'LONG' ? 1 : -1, brk = (S.strategy || 'revert') === 'breakout';
   const e = r.price * (1 + sg * SLIP);   // market entry pays slippage
   const slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
-  // bounce: take profit at the centre (1–3%); breakout: no natural target, so 2× the stop distance (1–5%)
-  const tpD = brk ? clamp(2 * slD, 0.01, 0.05) : clamp(Math.abs(r.mid - e) / e, 0.01, 0.03);
-  if (tpD < 0.8 * slD) return null;
-  const qty = Math.min(balance * RISK / (e * slD), balance / 3 / e);
+  // take profit: S.rr > 0 — fixed reward:risk (TP = rr × stop distance);
+  // otherwise bounce → the centre (1–3%), breakout → 2× the stop (1–5%)
+  const tpD = S.rr > 0 ? S.rr * slD : brk ? clamp(2 * slD, 0.01, 0.05) : clamp(Math.abs(r.mid - e) / e, 0.01, 0.03);
+  if (!(S.rr > 0) && tpD < 0.8 * slD) return null;
+  // size: lose S.risk of the balance at the stop, but never exceed the leverage cap
+  // (S.lev × balance shared by MAX_OPEN slots; default 1× → each position ≤ ⅓ of the balance)
+  const risk = S.risk ?? RISK, lev = S.lev ?? 1;
+  const qty = Math.min(balance * risk / (e * slD), balance * lev / MAX_OPEN / e);
   if (!(qty > 0)) return null;
   const sl = e * (1 - sg * slD);
   return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf],
-           risk: Math.abs(e - sl) * qty, snap: snapshot(r, S),
+           risk: Math.abs(e - sl) * qty, snap: { ...snapshot(r, S), lev: e * qty / balance, riskPct: Math.abs(e - sl) * qty / balance * 100 },
            note: `${brk ? (sg > 0 ? 'пробой вверх' : 'пробой вниз') : r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · сила ${r.score}` };
 }
 // returns {exit, reason} or null; updates p.last
@@ -301,6 +308,9 @@ export function journalStats(start, closed) {
     expR: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
     pf: gl ? gw / gl : null, maxDD: dd * 100, avgHold: n ? sum(cl, x => x.hold) / n : null,
     pnl24: sum(cl.filter(x => now() - x.tclose < 864e5), x => x.pnl),
+    // how much of the risk the fee takes per trade, and the average position size relative to the balance
+    feeR: n ? sum(cl, x => { const rk = Math.abs(x.entry - x.sl) * x.qty; return rk ? x.fee / rk : 0; }) / n : null,
+    lev: (() => { const l = cl.map(x => x.snap?.lev).filter(v => v > 0); return l.length ? l.reduce((a, b) => a + b, 0) / l.length : null; })(),
   };
 }
 const now = () => Date.now();

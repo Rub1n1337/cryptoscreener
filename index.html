@@ -349,12 +349,12 @@ details.dis>.dbody{padding:0 16px 16px}
           <div style="min-width:0"><div class="ctitle" id="ctitle">—</div><div class="stats" id="cstats"></div></div>
           <div class="cact">
             <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
-            <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button></div>
+            <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button><button class="tab" data-tf="1d" title="Дневные свечи">1д</button><button class="tab" data-tf="1w" title="Недельные свечи">1н</button></div>
             <button class="icon" id="cset" title="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
           </div>
         </div>
         <div class="ctrl hidden" id="sheet">
-          <select id="tf" class="hidden"><option>5m</option><option>15m</option><option>1h</option><option>4h</option></select>
+          <select id="tf" class="hidden"><option>5m</option><option>15m</option><option>1h</option><option>4h</option><option>1d</option><option>1w</option></select>
           <label title="Как считается центр и ширина канала. Подробности — во вкладке «Инструкция»">Модель канала <select id="method">
             <option value="log">Лог-канал (в ln цены)</option>
             <option value="classic">Классика (SMA ± σ)</option>
@@ -454,13 +454,21 @@ details.dis>.dbody{padding:0 16px 16px}
         <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option>
       </select></label>
       <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option></select></label>
-      <label title="Сколько самых ликвидных монет взять">Монет <select id="btTop"><option>20</option><option>50</option><option>100</option></select></label>
+      <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
+      <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
       <button id="btRun" class="primary" style="height:var(--h);padding:0 22px"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
+    </div>
+    <div class="fields" style="align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
+      <span class="faint" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;align-self:center;margin-right:4px">Риск-менеджмент</span>
+      <label title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">RR (тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
+      <label title="RM: какую долю баланса теряем, если сработал стоп">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
+      <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на 3 позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
     </div></div>
-    <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, канал, таймфрейм</span></summary><div class="dbody">
+    <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, фильтры T½ и ширины, канал, таймфрейм</span></summary><div class="dbody">
       <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
         <label class="fl" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:80px"></label>
         <label class="fl" title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
+        <label class="fl" title="Входить, только если ширина канала (от нижней до верхней границы) не меньше заданного процента от цены. Чем шире канал, тем больше ход к центру">Мин. ширина канала <select id="btW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option><option value="12">≥ 12%</option></select></label>
         <label class="fl" title="Модель канала">Модель <select id="btMethod">
           <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
         </select></label>
@@ -477,8 +485,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <span class="mute">Если результат в плюсе только на одном периоде — это случайность, а не преимущество. Проверьте на 30 и на 60 днях.</span></div></div>
     <div id="btOut" class="hidden">
       <div class="banner" id="btVerdict"></div>
-      <div class="cards auto" id="btCards"></div>
-      <div class="panel"><div class="ptitle">Кривая баланса <span>· после комиссий, по закрытым сделкам</span></div><canvas id="btEq" style="height:240px"></canvas></div>
+      <div id="btCards"></div>
       <div class="grid" style="margin-top:12px">
         <div class="panel"><div class="ptitle">По силе сигнала <span>· работает ли «сила»: у сильных сигналов результат должен быть лучше</span></div><div class="tablewrap"><table id="btScore"></table></div></div>
         <div class="panel"><div class="ptitle">По стороне, причине выхода и половинам периода <span>· стабильность</span></div><div class="tablewrap"><table id="btSplit"></table></div></div>
@@ -625,6 +632,8 @@ const dur = ms => ms == null || !isFinite(ms) ? '—' : ms < 36e5 ? Math.round(m
 const base = s => s.replace(/USDT$/, '');
 const pair = s => s.replace(/USDT$/, '/USDT');
 const tfOf = ms => Object.keys(TFMS).find(k => TFMS[k] === ms);
+// on daily/weekly candles most coins have less history than N bars: shrink the window to what exists
+const effN = (len, set = S) => (set.tf === '1d' || set.tf === '1w') ? Math.max(20, Math.min(set.N, len - 20)) : set.N;
 // coin avatar: first letter on a colour derived from the ticker
 const coin = sym => { const b = base(sym); let h = 0; for (const ch of b) h = (h * 31 + ch.charCodeAt(0)) % 360; return `<span class="coin"><i style="--h:${h}">${b.replace(/^1000+/, '')[0] || '?'}</i><b>${b}</b></span>`; };
 // in-app toasts: kind = ok | bad | warn | info; click runs onClick
@@ -664,7 +673,7 @@ async function scan() {
     const list = M.pickSymbols(await api('/api/v3/ticker/24hr'), S.top, J.open.map(p => p.sym), now);
     const limit = Math.min(1000, S.N + 150), res = [], fresh = {}; let done = 0, fails = 0;
     await pool(list, 10, async sym => {
-      try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${limit}`); fresh[sym] = K; const r = M.analyze(sym, K, set); if (r) res.push(r); }
+      try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${limit}`); fresh[sym] = K; const r = M.analyze(sym, K, {...set, N:effN(K.length, set)}); if (r) res.push(r); }
       catch { fails++; }
       if (++done % 10 === 0) foot.textContent = `сканирую ${done}/${list.length}…`;
     });
@@ -764,9 +773,12 @@ function renderChart(cv, d, o = {}) {
   if (!W || !d) return null;
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1), e = clamp(o.to ?? n - 1, s, n - 1);
+  // the view may extend past the last candle (eView > n-1): that is empty space on the right
+  const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1);
+  const eView = Math.max(s + 1, o.to ?? n - 1), e = Math.min(eView, n - 1);
   const padL = 8, padR = 96, pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
-  const cnt = e - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
+  const cnt = eView - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
+  const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i <= e ? t[i] : t[e] + (i - e) * step;
   const X = i => padL + (i - s + 0.5) * bw;
   let mn = Infinity, mx = -Infinity;
   const acc = x => { if (isFinite(x)) { mn = Math.min(mn, x); mx = Math.max(mx, x); } };
@@ -838,7 +850,7 @@ function renderChart(cv, d, o = {}) {
   // time axis
   g.font = '11px system-ui'; g.fillStyle = '#566173';
   for (let q = 0; q <= 4; q++) {
-    const i = Math.round(s + q * (e - s) / 4), txt = dt(t[i]), w = g.measureText(txt).width;
+    const i = Math.round(s + q * (eView - s) / 4), txt = dt(tAt(i)), w = g.measureText(txt).width;
     g.fillText(txt, clamp(X(i) - w / 2, padL, W - padR - w), pH + 6);
   }
   // volume
@@ -880,7 +892,8 @@ const hoverIndex = (geo, cv, ev) => geo ? geo.s + Math.floor((ev.clientX - cv.ge
 function viewRange(n, minFrom, view, defSpan) {
   const room = Math.max(20, n - minFrom);
   const span = clamp(Math.round(view?.span ?? defSpan), Math.min(20, room), room);
-  const endOff = clamp(Math.round(view?.endOff ?? 0), 0, room - span);
+  // negative endOff = empty bars to the right of the last candle (up to half the view); default leaves a small margin
+  const endOff = clamp(Math.round(view?.endOff ?? -span * 0.06), -Math.round(span * 0.5), room - span);
   const to = n - 1 - endOff;
   return {from: to - span + 1, to, span, endOff};
 }
@@ -929,7 +942,8 @@ async function loadChart(sym) {
 function computeChart() {
   if (!chartK) return;
   const d = parse(chartK);
-  chart = Object.assign(d, {sym:chartSym, B:bands(d.c, S.N, S.k, S.method), R:rsi(d.c)});
+  const N = effN(d.c.length);
+  chart = Object.assign(d, {sym:chartSym, N, B:bands(d.c, N, S.k, S.method), R:rsi(d.c)});
   const i = d.c.length - 1, B = chart.B;
   const pB = (d.c[i] - B.lo[i]) / (B.up[i] - B.lo[i]), hl = halfLife(d.c, B.mid);
   const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
@@ -947,7 +961,7 @@ function drawChart() {
     levels.push({v:p.entry, col:'#a78bfa', tag:who === 'общий' ? 'общ.' : 'мой', i0},
                 {v:p.tp, col:'#22c55e', tag:'TP', i0}, {v:p.sl, col:'#ef4444', tag:'SL', i0});
   }
-  const r = viewRange(chart.c.length, S.N - 1, chartView, S.candles);
+  const r = viewRange(chart.c.length, chart.N - 1, chartView, S.candles);
   chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, live:true, hoverI});
 }
 
@@ -971,7 +985,7 @@ function compsHtml(x, side) {
 function renderDetail() {
   const el = $('#detail');
   if (!chartK) { el.innerHTML = ''; return; }
-  const r = M.analyze(chartSym, chartK, S);
+  const r = M.analyze(chartSym, chartK, {...S, N:effN(chartK.length)});
   if (!r) { el.innerHTML = '<div class="mute">Мало истории для расчёта канала — уменьшите N.</div>'; return; }
   const name = base(chartSym), pct = (r.pB * 100).toFixed(0) + '%';
   const hlTxt = isFinite(r.hl)
@@ -1087,10 +1101,10 @@ function renderServer() {
 const money = v => v.toLocaleString('ru', {minimumFractionDigits:2, maximumFractionDigits:2});
 const peakOf = D => { let b = D.start, pk = b; for (const x of [...D.closed].sort((a, b2) => a.tclose - b2.tclose)) { b += x.pnl; pk = Math.max(pk, b); } return pk; };
 // balance over time: a step line — the balance only changes when a trade closes
-function equityChart(D) {
+function equityChart(D, tEnd) {
   const cl2 = [...D.closed].sort((a, b) => a.tclose - b.tclose);
   if (!cl2.length) return `<div class="hempty">График баланса появится после первой закрытой сделки</div>`;
-  const t0 = Math.min(...cl2.map(x => x.time)), t1 = Date.now();
+  const t0 = Math.min(...cl2.map(x => x.time)), t1 = tEnd ?? Date.now();
   const pts = [[t0, D.start]]; let b = D.start;
   for (const x of cl2) { b += x.pnl; pts.push([x.tclose, b]); }
   pts.push([t1, b]);
@@ -1107,7 +1121,7 @@ function equityChart(D) {
       <path d="${d}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
       <span class="hlab" style="top:${ys}%">старт $${money(D.start)}</span>
       <span class="hend" style="top:${ye}%;background:${col}"></span></div>
-    <div class="haxis"><span>${dt(t0)}</span><span>${dt((t0 + t1) / 2)}</span><span>сейчас</span></div>`;
+    <div class="haxis"><span>${dt(t0)}</span><span>${dt((t0 + t1) / 2)}</span><span>${tEnd ? dt(t1) : 'сейчас'}</span></div>`;
 }
 function equitySvg(D, W = 150, H = 26) {
   const pts = [D.start]; [...D.closed].sort((a, b) => a.tclose - b.tclose).forEach(x => pts.push(pts[pts.length-1] + x.pnl));
@@ -1207,7 +1221,9 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
     ${row('Стоп', `${fp(x.sl)} (${pct(x.sl)})`, 'neg')}
     ${row('Размер позиции', '$' + (x.entry * x.qty).toFixed(2))}
     ${row('Кол-во монет', (+x.qty).toLocaleString('ru', {maximumFractionDigits: x.qty >= 100 ? 0 : x.qty >= 1 ? 2 : 6}))}
-    ${row('Риск (1R)', '$' + risk.toFixed(2))}
+    ${row('Риск (1R)', '$' + risk.toFixed(2) + (x.snap?.riskPct ? ` · ${x.snap.riskPct.toFixed(2)}% баланса` : ''))}
+    ${x.snap?.lev ? row('Плечо', x.snap.lev.toFixed(2) + '×') : ''}
+    ${row('Комиссия в R', risk ? '−' + (fee / risk).toFixed(2) + 'R' : '—', 'neg')}
     ${isOpen ? '' : row('Причина выхода', reasonTag(x.reason))}
     ${row(isOpen ? 'PnL до комиссий сейчас' : 'PnL до комиссий', usd(gross), cl(gross))}
     ${row('Комиссия', usd(-fee), 'neg')}
@@ -1275,22 +1291,31 @@ async function fetchHistory(sym, tf, startT, endT) {
   histCache.set(key, out);
   return out;
 }
+// custom coin list: "btc, eth sol" → ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
+const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/[^A-Z0-9]/g, '')).filter(Boolean)
+  .map(x => x.endsWith('USDT') ? x : x + 'USDT'))].slice(0, 300);
 function btSettings() {
+  const custom = $('#btTop').value === 'custom' ? parseCoins($('#btCustom').value) : null;
   return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
-          minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, top:+$('#btTop').value,
-          strategy:$('#btStrat').value, longOnly:$('#btLong').checked};
+          minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, minWidth:+$('#btW').value || 0,
+          top:custom ? custom.length : +$('#btTop').value, custom,
+          strategy:$('#btStrat').value, longOnly:$('#btLong').checked,
+          rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1};
 }
 function btFill(s) {
-  $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && s.tf !== '5m' ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0);
-  $('#btStrat').value = s.strategy || 'revert'; $('#btLong').checked = !!s.longOnly;
+  $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0);
+  $('#btStrat').value = s.strategy || 'revert'; $('#btLong').checked = !!s.longOnly; $('#btW').value = String(s.minWidth || 0);
+  $('#btRR').value = String(s.rr || 0); $('#btRisk').value = String(Math.round((s.risk ?? M.RISK) * 1000) / 10); $('#btLev').value = String(s.lev ?? 1);
   btEstimate();
 }
 function btEstimate() {
   if (btBusy) return;
+  $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom');
   const s = btSettings(), days = +$('#btDays').value, bars = days * 864e5 / TFMS[s.tf] + 450;
+  if (s.custom && !s.custom.length) { $('#btStatus').textContent = 'Впишите монеты через запятую, например: BTC, ETH, SOL.'; return; }
   const req = Math.ceil(bars / 1000) * s.top;
   const sec = Math.max(5, Math.round(req * 0.2 / 5) * 5);
-  $('#btStatus').textContent = `Первая проверка займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.top} монет. Повторные — мгновенно.`;
+  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.top} монет. Повторные — мгновенно.`;
 }
 async function runBacktest() {
   if (btBusy) return;
@@ -1301,7 +1326,8 @@ async function runBacktest() {
     st.textContent = 'Беру список пар…';
     const now = Date.now(), endT = Math.floor(now / 36e5) * 36e5;   // whole hours → reruns hit the cache
     const from = endT - days * 864e5, startT = from - 450 * tfms;      // 450 bars of warm-up covers N ≤ 300
-    const syms = M.pickSymbols(await api('/api/v3/ticker/24hr'), s.top, [], now);
+    if (s.custom && !s.custom.length) throw new Error('список монет пуст');
+    const syms = s.custom || M.pickSymbols(await api('/api/v3/ticker/24hr'), s.top, [], now);
     const hist = {}; let done = 0;
     await pool(syms, 4, async sym => {
       try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {}
@@ -1312,7 +1338,10 @@ async function runBacktest() {
     btHist = {hist, from};
     btRes = M.backtest(hist, s, {start:10000, from});
     btRes.settings = s; btRes.days = days;
-    st.textContent = `Готово: ${btRes.pairs} пар, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс. ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, мин. сила ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}.`;
+    const miss = syms.filter(x => !hist[x]?.length);
+    st.textContent = `Готово: ${btRes.pairs} монет, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
+      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}.`
+      + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
     renderBacktest();
   } catch (e) {
     st.textContent = 'Ошибка: ' + (e.message || e);
@@ -1338,15 +1367,29 @@ function renderBacktest() {
   $('#btVerdict').className = 'banner ' + vk;
   $('#btVerdict').innerHTML = `<svg class="i"><use href="#i-${vk === 'info' ? 'info' : vk}"/></svg><div>${v}</div>`;
   const card = (t, val, sub, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${val}</div><div class="s">${sub}</div></div>`;
+  const D = {start:r.start, balance:r.balance, closed:tr}, chg = r.balance / r.start - 1;
   $('#btCards').innerHTML =
-      card('Сделок', st.n, `${(st.n / r.days).toFixed(1)} в день · ${r.pairs} пар`)
-    + card('Winrate', st.wr == null ? '—' : st.wr.toFixed(1) + '%', `<span class="pos">${st.win}</span> / <span class="neg">${st.loss}</span>`)
-    + card('Средний результат', rr(st.expR), 'на сделку, после комиссий', cl(st.expR), 'Главная цифра: больше 0 — у стратегии есть преимущество')
-    + card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. прибыль ${usd(st.avgWin)} · убыток ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg')
-    + card('PnL после комиссий', usd(st.net), `${(st.net / r.start * 100).toFixed(2)}% к старту`, cl(st.net))
-    + card('Комиссии', usd(-st.fees), `PnL до комиссий ${usd(st.gross)}`, 'neg')
-    + card('Макс. просадка', st.maxDD.toFixed(2) + '%', `ср. время в сделке ${dur(st.avgHold)}`, st.maxDD > 10 ? 'neg' : '')
-    + card('Итоговый баланс', '$' + r.balance.toFixed(2), `старт $${r.start}`);
+    `<div class="hero">
+       <div class="htop">
+         <div><div class="t">Итоговый баланс · ${r.days} дней · ${r.pairs} монет</div>
+           <div class="hv">$${money(r.balance)}</div>
+           <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">после комиссий</span></div></div>
+         <div class="hside">
+           <div>Средний результат<b class="${cl(st.expR)}">${rr(st.expR)}</b></div>
+           <div>Макс. просадка<b>${st.maxDD.toFixed(1)}%</b></div>
+           <div>Сделок<b>${st.n}</b></div>
+         </div>
+       </div>
+       ${equityChart(D, r.to + TFMS[s.tf])}
+     </div>
+     <div class="statrow">
+       ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`)}
+       ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. +${usd(st.avgWin, false)} / ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей / сумма убытков')}
+       ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, 'neg', 'Сколько забрала биржа за все сделки')}
+       ${card('Комиссия в R', st.feeR == null ? '—' : '−' + st.feeR.toFixed(2) + 'R', 'на каждую сделку', st.feeR > 0.1 ? 'neg' : '', 'Какую долю риска сделки съедает комиссия. Чем меньше стоп и чем больше плечо, тем больше эта доля')}
+       ${card('Плечо', st.lev == null ? '—' : st.lev.toFixed(2) + '×', `средний размер позиции к балансу · до ${s.lev}×`, '', 'Размер позиции, делённый на баланс. Комиссия считается от размера позиции')}
+       ${card('Сделок в день', (st.n / r.days).toFixed(1), `в сделке в среднем ${dur(st.avgHold)}`)}
+     </div>`;
   // by score bucket
   const buckets = {};
   for (const x of tr) { const b = Math.min(90, Math.floor((x.snap?.score ?? 0) / 10) * 10); (buckets[b] ||= []).push(x); }
@@ -1364,8 +1407,9 @@ function renderBacktest() {
     || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
   drawEquity();
 }
-function drawEquity() {
-  const cv = $('#btEq'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+function drawEquity() { // legacy canvas curve — the results now use the SVG balance chart in the hero
+  const cv = $('#btEq'); if (!cv) return;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
   if (!W || !btRes) return;
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -1388,6 +1432,14 @@ function drawEquity() {
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'1.4', date:'5 октября 2026', title:'Риск-менеджмент в бэктесте и дневной боллинджер', items:[
+    'Бэктест: свой RR (к центру канала, 1:1.5, 1:2, 1:3), риск на сделку (0.5–3%) и максимальное плечо (1×–10×).',
+    'Бэктест: топ-20/50/100/200 монет или свой список — например «BTC, ETH, SOL».',
+    'Новый фильтр — минимальная ширина канала: чем шире боллинджер, тем больше ход к центру.',
+    'В результатах бэктеста видно плечо и сколько R съедает комиссия на каждой сделке; итог — крупным блоком с графиком баланса.',
+    'Графики на дневных и недельных свечах (1д, 1н).',
+    'График можно сдвинуть за последнюю свечу — справа остаётся место, удобнее смотреть позицию.',
+  ]},
   {v:'1.3', date:'5 октября 2026', title:'Баланс и точные названия', items:[
     'Журнал: новый блок баланса — крупная сумма, изменение, старт и пик, и график баланса на всю ширину со ступенькой на каждой сделке.',
     'T½ снова в таблице монет и в строке под графиком.',
@@ -1566,13 +1618,15 @@ const tcv = $('#tcv');
 tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); drawCard(); };
 tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCard(); };
 window.onresize = () => { drawChart(); drawCard(); };
-attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:S.N - 1, defSpan:S.candles, view:chartView, geo:chartGeo}, set:v => { chartView = v; drawChart(); }});
+attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:S.candles, view:chartView, geo:chartGeo}, set:v => { chartView = v; drawChart(); }});
 attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
 
 $('#btRun').onclick = runBacktest;
 $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); };
 $('#btShared').onclick = () => { if (SJ) btFill(SJ.settings); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev'].forEach(s => $(s).onchange = btEstimate);
+$('#btCustom').oninput = btEstimate;
+$('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });
 $('#btTrades').onclick = e => {
   const tr = e.target.closest('tr.row'); if (!tr || !btRes) return;
   const x = btRes.trades.find(t => String(t.id) === tr.dataset.id);
