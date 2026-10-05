@@ -227,6 +227,26 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--s1)}
 .prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12.5px}
+/* my bot: status, profile picker, extra options */
+.bhero{display:flex;gap:14px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--s2)}
+.bhero.ok{border-color:var(--ok-line)}.bhero.warn{border-color:var(--warn-line)}
+.bh-t{font-size:18px;font-weight:700;display:flex;align-items:center;gap:10px}.bh-t .sdot{width:10px;height:10px}
+.bh-s{color:var(--mute);font-size:13px;margin-top:4px}
+.bh-m{font-size:13px;margin-top:10px;color:var(--mute)}.bh-m b{color:var(--text)}
+.bh-err{font-size:13px;margin-top:8px;color:var(--up)}
+.bh-a{display:flex;gap:8px;flex-wrap:wrap}.bh-a button{height:40px;padding:0 16px}
+.bsec{margin-top:18px}
+.bsech{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.bsech h3{margin:0;font-size:15px}
+.hint{font-size:13px;color:var(--mute);margin:8px 0 10px;max-width:820px}
+.prof.pick{cursor:pointer}.prof.pick:hover{border-color:var(--hover)}
+.prof .radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;background:var(--s1)}
+.prof.on .radio{border-color:var(--acc);background:var(--acc);box-shadow:inset 0 0 0 3px var(--s1)}
+.prof .pplain{font-size:13px;color:var(--text);margin-top:3px}.prof .ptech{font-size:11.5px;color:var(--faint);margin-top:3px}
+.prof .roles{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chipb{height:30px!important;border-radius:999px;font-size:12.5px;padding:0 12px}.chipb.on{background:var(--accbg);border-color:var(--warn-line);color:var(--acc-t)}
+.bmore{margin:16px 0 0}
+.bopt{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.bopt:first-child{border-top:0;padding-top:0}
+.bopt>div{flex:1 1 320px;min-width:0}.bopt b{font-size:14px}.bopt p{margin:3px 0 0;font-size:13px;color:var(--mute);max-width:640px}
 #bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .tablewrap:not(.more) .hx{display:none}
 .hero{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:22px 24px 16px;margin-bottom:12px}
@@ -311,7 +331,7 @@ details.dis>.dbody{padding:0 16px 16px}
   .form{grid-template-columns:1fr}
   .guard{top:62px;right:10px}
 }
-@media(max-width:560px){.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
+@media(max-width:560px){.prof{flex-wrap:wrap}.prof .pa{width:100%}.prof.pick .pa{padding-left:30px}.prof .pa button{flex:1}.bh-a{width:100%}.bh-a button{flex:1}.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
 /* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}}
 </style>
 </head>
@@ -458,25 +478,30 @@ details.dis>.dbody{padding:0 16px 16px}
     <div class="phead"><div><h2>Журнал сделок</h2><p>Результаты бумажной торговли по сигналам сканера. Клик по сделке — её карточка: свечи, вход и выход, и почему бот вошёл.</p></div></div>
     <div class="seg">
       <button class="tab jm" data-m="shared" title="Один бот на сервере для всех посетителей. Работает круглосуточно, даже когда сайт никто не открывал">Общий бот 24/7</button>
-      <button class="tab jm" data-m="mine" title="Ваш личный бот: работает в этом браузере, пока вкладка открыта, на ваших настройках">Мой бот</button>
+      <button class="tab jm" data-m="mine" title="Ваш личный бот: торгует по вашим профилям на виртуальные $10 000">Мой бот</button>
     </div>
     <div class="sub" id="jdesc"></div>
     <div id="srv"></div>
     <div class="panel" id="jmine" style="margin-bottom:12px">
-      <div class="row">
-        <label class="fl inl" title="Включить или поставить на паузу"><input type="checkbox" id="boton"> Бот торгует</label>
-        <div class="seg mini" id="bwhere" title="В браузере — бот работает, пока открыта вкладка. На сервере — торгует круглосуточно, даже когда сайт закрыт"><button class="tab" data-w="browser">В браузере</button><button class="tab" data-w="server">На сервере 24/7</button></div>
-        <div class="seg mini" id="bmode" title="Один профиль — всегда одни настройки. Авто — бот сам выбирает профиль по режиму рынка"><button class="tab" data-m="single">Один профиль</button><button class="tab" data-m="auto">Авто по рынку</button></div>
-        <label class="fl" id="bsingle">Профиль <select id="bprof"></select></label>
-        <label class="fl bauto" title="Профиль, когда BTC, ETH и SOL все в боковике">Во флэте <select id="bflat"></select></label>
-        <label class="fl bauto" title="Профиль, когда хотя бы одна из BTC, ETH, SOL в сильном движении">В импульсе <select id="bimp"></select></label>
-        <label class="fl bauto" title="ER = чистое движение за 7 дней / весь пройденный путь (по часовым свечам). Ниже порога у всех трёх монет — флэт">Флэт, если ER BTC, ETH, SOL <select id="bER"><option value="0.1">&lt; 0.10</option><option value="0.15">&lt; 0.15</option><option value="0.25">&lt; 0.25</option></select></label>
-        <button id="jreset" style="margin-left:auto">Сбросить журнал</button>
+      <!-- 1. what the bot is doing right now, in plain words, with one main action -->
+      <div class="bhero" id="bhero"></div>
+      <!-- 2. which rules it trades by -->
+      <div class="bsec">
+        <div class="bsech"><h3>По какому профилю торговать</h3>
+          <div class="seg mini" id="bmode"><button class="tab" data-m="single">Выбираю сам</button><button class="tab" data-m="auto">Автоматически по рынку</button></div></div>
+        <p class="hint" id="bhint"></p>
+        <div id="blist"></div>
+        <button id="bnew" style="margin-top:8px">+ Новый профиль</button>
       </div>
-      <div class="bstate" id="bstate"></div>
-      <div class="ptitle" style="margin:14px 0 6px">Профили <span>· набор монет и правил, по которым бот ищет сигналы</span></div>
-      <div id="blist"></div>
-      <button id="bnew" style="margin-top:8px">+ Новый профиль</button>
+      <!-- 3. rarely needed -->
+      <details class="dis bmore"><summary>Дополнительно <span class="mute">· где работает бот, граница боковика, сброс журнала</span></summary><div class="dbody">
+        <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт. В браузере — только пока открыта эта вкладка; удобно, чтобы быстро проверить новый профиль.</p></div>
+          <div class="seg mini" id="bwhere"><button class="tab" data-w="server">На сервере 24/7</button><button class="tab" data-w="browser">В браузере</button></div></div>
+        <div class="bopt"><div><b>Когда рынок считается боковиком</b><p>Бот смотрит на BTC, ETH и SOL за 7 дней: насколько цена прошла по прямой относительно всего пути (ER). Если у всех трёх ER ниже порога — боковик, иначе импульс.</p></div>
+          <select id="bER"><option value="0.1">ER &lt; 0.10 · строже</option><option value="0.15">ER &lt; 0.15 · обычно</option><option value="0.25">ER &lt; 0.25 · мягче</option></select></div>
+        <div class="bopt"><div><b>Начать заново</b><p>Удалит все сделки вашего бота и вернёт баланс к $10 000. Профили останутся.</p></div>
+          <button id="jreset">Сбросить журнал</button></div>
+      </div></details>
       <div id="bform" class="hidden">
         <div class="ptitle" id="bformTitle" style="margin-bottom:10px">Профиль</div>
         <div class="row">
@@ -1219,29 +1244,52 @@ async function runBot() {
 }
 // ---------- my bot: panel ----------
 let editId = null;
+// plain-language description of a profile, for people who don't read "лог-канал 210/3"
+const TF_PLAIN = {'5m':'5-минутные свечи', '15m':'15-минутные свечи', '1h':'часовые свечи', '4h':'4-часовые свечи', '1d':'дневные свечи'};
+const profPlain = p => { const s = profSet(p);
+  const idea = s.strategy === 'breakout' ? 'Идёт за сильным движением: входит, когда цена пробила границу канала'
+    : s.strategy === 'switch' ? 'Сам меняет тактику: в боковике ловит отскоки, в росте — пробои'
+    : s.strategy === 'revert_trend' ? 'Ловит отскоки от границы, но только по направлению тренда'
+    : 'Ловит отскоки: цена ушла за границу канала и возвращается к середине';
+  const when = s.regimeOnly === 'flat' ? ' Торгует только в спокойном рынке.' : s.regimeOnly === 'impulse' ? ' Торгует только в сильном движении.' : '';
+  const tfp = TF_PLAIN[s.tf] || s.tf;
+  return `${idea}.${when} ${tfp[0].toUpperCase() + tfp.slice(1)}, ${p.coins.mode === 'list' ? 'монеты: ' + p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}, риск ${(s.risk * 100).toFixed(s.risk < 0.01 ? 1 : 0)}% на сделку.`; };
+const regPlain = r => r === 'flat' ? 'боковик' : r === 'up' ? 'импульс вверх' : r === 'down' ? 'импульс вниз' : '—';
 function renderBotPanel() {
-  const opts = id => BP.profiles.map(p => `<option value="${p.id}"${p.id === id ? ' selected' : ''}>${p.name}</option>`).join('');
-  $('#bprof').innerHTML = opts(BP.active); $('#bflat').innerHTML = opts(BP.flat); $('#bimp').innerHTML = opts(BP.impulse);
-  $('#bER').value = String(BP.erMax); $('#boton').checked = J.on;
+  $('#bER').value = String(BP.erMax);
   document.querySelectorAll('#bmode .tab').forEach(b => b.classList.toggle('on', b.dataset.m === BP.mode));
-  $('#bsingle').classList.toggle('hidden', BP.mode === 'auto');
-  document.querySelectorAll('.bauto').forEach(x => x.classList.toggle('hidden', BP.mode !== 'auto'));
   document.querySelectorAll('#bwhere .tab').forEach(b => b.classList.toggle('on', b.dataset.w === BP.where));
   const srv = BP.where === 'server', act = srv && SB_MINE?.profile ? (BP.profiles.find(p => p.name === SB_MINE.profile) || activeProfile()) : activeProfile();
   const on = srv && SB_MINE ? SB_MINE.on : J.on;
-  let st = `<b>Сейчас работает: «${act.name}»</b> ${srv ? '<span class="tag loc">на сервере 24/7</span>' : '<span class="tag">в браузере, пока вкладка открыта</span>'}${on ? '' : ' <span class="neg">· бот на паузе</span>'}`;
-  if (srv && SB_MINE?.error) st += `<br><span class="neg">Ошибка на сервере: ${SB_MINE.error}</span>`;
   if (srv && SB_MINE?.regime?.by) botRegime = {...M.marketOf(s => SB_MINE.regime.by[s] || null), by:SB_MINE.regime.by};
-  if (botRegime) {
-    const reg = M.regimeOf(botRegime, {erMax:BP.erMax, regimeSrc:'majors'});
-    const ers = M.MAJORS.map(s => `${base(s)} ${botRegime.by?.[s] ? botRegime.by[s].er.toFixed(2) : '—'}`).join(' · ');
-    st += `<br><span class="mute">Рынок: <b style="color:var(--text)">${reg === 'flat' ? 'боковик' : reg === 'up' ? 'импульс вверх' : 'импульс вниз'}</b> (ER за 7 дней: ${ers}; флэт, если у всех трёх меньше ${BP.erMax})${BP.mode === 'auto' ? '' : ' — в режиме «Один профиль» это только для информации'}.</span>`;
-  }
-  if (srv) st += SB_MINE?.checked ? `<br><span class="faint">Сервер проверял рынок в ${hm(SB_MINE.checked)} — каждую минуту</span>` : `<br><span class="faint">Ждём первую проверку сервера — до минуты</span>`;
-  else if (J.checked) st += `<br><span class="faint">Последняя проверка ${hm(J.checked)} · монет с данными ${J.scanned ?? '—'}</span>`;
-  $('#bstate').innerHTML = st;
-  $('#blist').innerHTML = BP.profiles.map(p => `<div class="prof${p.id === act.id ? ' on' : ''}"><div style="min-width:0;flex:1"><b>${p.name}</b>${p.id === act.id ? ' <span class="tag sq">активен</span>' : ''}<div class="ps">${profSummary(p)}</div></div>
-    <div class="pa"><button data-pe="${p.id}">Изменить</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''}>Удалить</button></div></div>`).join('');
+  const reg = botRegime ? M.regimeOf(botRegime, {erMax:BP.erMax, regimeSrc:'majors'}) : null;
+  // status card: one sentence about what is happening + one main button
+  const checked = srv ? SB_MINE?.checked : J.checked;
+  const title = !on ? 'Бот на паузе' : srv ? 'Бот торгует 24/7' : 'Бот торгует в этой вкладке';
+  const sub = !on ? `Новых сделок не открывает. Профиль «${act.name}».`
+    : srv ? `На сервере, даже когда сайт закрыт · профиль «${act.name}»${checked ? ` · проверка рынка в ${hm(checked)}` : ' · первая проверка — в течение минуты'}`
+    : `Профиль «${act.name}». Если закрыть вкладку, бот остановится.`;
+  const ers = botRegime ? M.MAJORS.map(s => `${base(s)} ${botRegime.by?.[s] ? botRegime.by[s].er.toFixed(2) : '—'}`).join(', ') : '';
+  const market = reg ? `<div class="bh-m" title="ER за 7 дней: ${ers}. Боковик — когда у всех трёх меньше ${BP.erMax}">Рынок сейчас: <b>${regPlain(reg)}</b> — ${reg === 'flat' ? 'BTC, ETH и SOL ходят в коридоре' : 'крупные монеты в сильном движении'}.${BP.mode === 'auto' ? ` Поэтому бот взял профиль «${act.name}».` : ''}</div>` : '';
+  const btns = !on ? `<button class="primary" data-act="on">Продолжить торговлю</button>`
+    : srv ? `<button data-act="off">Поставить на паузу</button>`
+    : `<button class="primary" data-act="server">Запустить на сервере 24/7</button><button data-act="off">Пауза</button>`;
+  $('#bhero').className = 'bhero ' + (!on ? 'warn' : srv ? 'ok' : 'warn');
+  $('#bhero').innerHTML = `<div style="min-width:0;flex:1 1 360px"><div class="bh-t"><span class="sdot ${!on ? 'idle' : srv ? '' : 'idle'}"></span>${title}</div><div class="bh-s">${sub}</div>${market}
+    ${srv && SB_MINE?.error ? `<div class="bh-err">Ошибка на сервере: ${SB_MINE.error}</div>` : ''}</div><div class="bh-a">${btns}</div>`;
+  // profile picker
+  $('#bhint').textContent = BP.mode === 'auto'
+    ? 'Бот сам смотрит на рынок и меняет профиль. Отметьте, какой профиль брать в боковике, а какой — в импульсе.'
+    : 'Бот торгует только по выбранному профилю, что бы ни происходило на рынке. Нажмите на профиль, чтобы выбрать его.';
+  const auto = BP.mode === 'auto';
+  $('#blist').innerHTML = BP.profiles.map(p => {
+    const isAct = p.id === act.id;
+    const roles = auto ? `<div class="roles"><button class="chipb${BP.flat === p.id ? ' on' : ''}" data-role="flat" data-id="${p.id}">${BP.flat === p.id ? '✓ ' : ''}для боковика</button><button class="chipb${BP.impulse === p.id ? ' on' : ''}" data-role="impulse" data-id="${p.id}">${BP.impulse === p.id ? '✓ ' : ''}для импульса</button></div>` : '';
+    return `<div class="prof${auto ? '' : ' pick'}${isAct ? ' on' : ''}" data-pick="${p.id}"${auto ? '' : ` role="radio" tabindex="0" aria-checked="${isAct}"`}>
+      ${auto ? '' : '<span class="radio"></span>'}
+      <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-flat1h' && !/проверен/.test(p.name) ? ' <span class="tag lo" title="Бэктест за 12 месяцев, топ-50, 1h: в среднем +0.13R на сделку после комиссий">проверен за год</span>' : ''}
+        <div class="pplain">${profPlain(p)}</div><div class="ptech">${profSummary(p)}</div>${roles}</div>
+      <div class="pa"><button data-pe="${p.id}">Изменить</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
 }
 function openForm(p) {
   editId = p?.id || null; const s = {...PROFILE_DEF, ...(p?.set || {})};
@@ -1267,7 +1315,7 @@ function saveForm() {
   const i = BP.profiles.findIndex(x => x.id === p.id);
   if (i >= 0) BP.profiles[i] = p; else BP.profiles.push(p);
   saveBP(); $('#bform').classList.add('hidden'); renderBotPanel(); renderJournal(); syncServerBot();
-  toast(`Профиль «${p.name}» сохранён`, i >= 0 ? 'изменения применятся со следующей проверки рынка' : 'выберите его в списке «Профиль», чтобы бот торговал по нему', 'ok');
+  toast(`Профиль «${p.name}» сохранён`, i >= 0 ? 'изменения применятся со следующей проверки рынка' : 'нажмите на него в списке профилей, чтобы бот торговал по нему', 'ok');
 }
 
 // ---------- shared bot (read-only from Supabase) ----------
@@ -1389,9 +1437,7 @@ function renderJournal() {
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
     ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. Последняя проверка рынка — ${SJ.checked ? hm(SJ.checked) : '—'}. <span class="faint">Входит при силе сигнала от ${set.minScore}, ${set.tf}.</span>`
-    : BP.where === 'server'
-      ? `Ваш бот торгует на сервере круглосуточно — даже когда сайт закрыт — по выбранному профилю или сам переключает профили по режиму рынка. Журнал видите только вы (ключ хранится в этом браузере).`
-      : `Ваш бот торгует в этом браузере, пока вкладка открыта, по выбранному профилю — или сам переключает профили по режиму рынка. Включите «На сервере 24/7», чтобы он работал всегда.`;
+    : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
   const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
   const chg = D.balance / D.start - 1;
@@ -1680,6 +1726,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'1.9', date:'6 октября 2026', title:'«Мой бот» стал понятнее', items:[
+    'Сверху — что бот делает прямо сейчас: торгует, на паузе или работает только в этой вкладке, по какому профилю и какой сейчас рынок. И одна главная кнопка.',
+    'Профиль выбирается нажатием на карточку. У каждого профиля — простое описание, что он делает.',
+    '«Автоматически по рынку»: отметьте на карточках, какой профиль брать в боковике, а какой — в импульсе.',
+    'Редкие настройки — где работает бот, граница боковика, сброс журнала — убраны в «Дополнительно».',
+  ]},
   {v:'1.8', date:'6 октября 2026', title:'Светлая тема', items:[
     'Светлая тема: переключается кнопкой с солнцем в верхней панели и запоминается.',
     'Таблица монет снова ровная: каждая монета в одной строке.',
@@ -1776,7 +1828,6 @@ function syncInputs() {
   $('#tf').value = S.tf; $('#method').value = S.method; $('#top').value = S.top; $('#mhint').textContent = METHOD_HINT[S.method];
   $('#N').value = S.N; $('#Nv').textContent = S.N; $('#k').value = S.k; $('#kv').textContent = S.k;
   $('#cn').value = S.candles; $('#cnv').textContent = S.candles;
-  $('#boton').checked = J.on;
   document.querySelectorAll('#tfseg .tab').forEach(b => b.classList.toggle('on', b.dataset.tf === S.tf));
 }
 // timeframe segmented control drives the (hidden) #tf select
@@ -1883,20 +1934,23 @@ function notifyUser(title, body, kind = 'info', onClick) {
 }
 $('#guardPill').onclick = e => { e.stopPropagation(); $('#guard').classList.toggle('open'); };
 document.addEventListener('click', e => { if (!e.target.closest('#guard')) $('#guard').classList.remove('open'); });
-$('#boton').onchange = e => { J.on = e.target.checked; save('sr_journal', J); renderGuard(); syncServerBot(); };
+// main button of the status card: pause / resume / move to the server
+const setOn = v => { J.on = v; save('sr_journal', J); if (SB_MINE) SB_MINE.on = v; renderGuard(); renderBotPanel(); syncServerBot(); };
+$('#bhero').onclick = e => { const a = e.target.closest('[data-act]')?.dataset.act; if (a === 'on') setOn(true); if (a === 'off') setOn(false); if (a === 'server') setWhere('server'); };
+const pickProfile = id => { if (BP.active === id) return; BP.active = id; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot();
+  toast(`Бот торгует по профилю «${profById(id).name}»`, BP.where === 'server' ? 'сервер подхватит его на следующей проверке — в течение минуты' : 'со следующей проверки рынка', 'ok'); };
 document.querySelectorAll('#bwhere .tab').forEach(b => b.onclick = () => setWhere(b.dataset.w));
 // my bot: profiles panel
 document.querySelectorAll('#bmode .tab').forEach(b => b.onclick = () => { BP.mode = b.dataset.m; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); });
-$('#bprof').onchange = e => { BP.active = e.target.value; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); };
-$('#bflat').onchange = e => { BP.flat = e.target.value; saveBP(); renderBotPanel(); syncServerBot(); };
-$('#bimp').onchange = e => { BP.impulse = e.target.value; saveBP(); renderBotPanel(); syncServerBot(); };
 $('#bER').onchange = e => { BP.erMax = +e.target.value; saveBP(); renderBotPanel(); syncServerBot(); runBot(); };
 $('#bnew').onclick = () => openForm(null);
 $('#pfCancel').onclick = () => $('#bform').classList.add('hidden');
 $('#pfSave').onclick = saveForm;
 $('#pfCoins').onchange = () => $('#pfListL').classList.toggle('hidden', $('#pfCoins').value !== 'list');
 $('#blist').onclick = e => {
-  const ed = e.target.closest('[data-pe]'), del = e.target.closest('[data-pd]');
+  const ed = e.target.closest('[data-pe]'), del = e.target.closest('[data-pd]'), role = e.target.closest('[data-role]');
+  if (role) { BP[role.dataset.role] = role.dataset.id; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); return; }
+  if (!ed && !del) { const c = e.target.closest('.prof.pick'); if (c) pickProfile(c.dataset.pick); return; }
   if (ed) openForm(profById(ed.dataset.pe));
   if (del && BP.profiles.length > 1) {
     const p = profById(del.dataset.pd);
@@ -1906,6 +1960,7 @@ $('#blist').onclick = e => {
     saveBP(); renderBotPanel(); renderJournal(); syncServerBot();
   }
 };
+$('#blist').onkeydown = e => { const c = e.target.closest('.prof.pick'); if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pickProfile(c.dataset.pick); } };
 // backtest → bot: keep the tested settings as a profile
 $('#btSave').onclick = () => {
   const s = btSettings(), name = prompt('Название профиля', `${M.STRATEGIES[s.strategy]} · ${s.tf}${s.rr ? ' · 1:' + s.rr : ''}`);
@@ -1914,7 +1969,7 @@ $('#btSave').onclick = () => {
   BP.profiles.push({id:'p' + Date.now(), name, coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
     set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly}});
   saveBP(); renderBotPanel(); syncServerBot();
-  toast(`Профиль «${name}» добавлен`, 'Журнал → Мой бот: выберите его, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
+  toast(`Профиль «${name}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
 };
 $('#jreset').onclick = async () => {
   if (!confirm(BP.where === 'server' ? 'Сбросить журнал серверного бота и баланс?' : 'Сбросить журнал вашего бота и баланс?')) return;
