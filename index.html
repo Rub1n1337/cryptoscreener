@@ -82,7 +82,9 @@ svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-
 .phead h2{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .phead p{margin:4px 0 0;color:var(--mute);font-size:13px;max-width:900px}
 .sub{color:var(--mute);font-size:13px;margin:4px 0 12px}
-.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px}
+/* wide mode: the chart takes the whole row, the coin list goes under it */
+body.wide #market .grid{grid-template-columns:minmax(0,1fr)}body.wide #cv{height:min(74vh,820px)}
 .grid>*{min-width:0}
 .panel{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:16px}
 .ptitle{font-weight:650;font-size:14px;margin-bottom:10px}.ptitle span{font-weight:400;font-size:12px;color:var(--mute)}
@@ -133,7 +135,14 @@ kbd{font:11px/1 ui-monospace,monospace;color:var(--faint);border:1px solid var(-
 
 /* ---------- chart ---------- */
 canvas{width:100%;display:block;background:var(--canvas);border-radius:10px;border:1px solid var(--line);touch-action:pan-y}
-#cv{height:480px;cursor:crosshair}
+#cv{height:clamp(440px,60vh,700px);cursor:crosshair}
+.cvwrap{position:relative}canvas:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+/* chart toolbar: zoom, back to the latest candle, reset, wide mode */
+.ctools{position:absolute;top:8px;left:8px;display:flex;gap:4px;z-index:2;opacity:.85;transition:opacity .15s}.cvwrap:hover .ctools,.ctools:focus-within{opacity:1}
+.ctools button{width:34px;height:30px;padding:0;font-size:15px;line-height:1;background:var(--s1);border-color:var(--line2);color:var(--mute)}.ctools button:hover{color:var(--text)}
+@media(max-width:1200px){.ctools [data-z=expand]{display:none}}
+.ctools .ct-latest{display:none}.ctools.away .ct-latest{display:inline-flex;color:var(--acc);border-color:var(--warn-line);width:auto;padding:0 10px;font-size:12.5px;font-weight:600}
+@media (pointer:coarse){.ctools button{width:40px;height:36px}}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--mute);margin-top:8px}
 .legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
 .zoomhint{font-size:11.5px;color:var(--faint);margin-top:6px}
@@ -142,7 +151,7 @@ canvas{width:100%;display:block;background:var(--canvas);border-radius:10px;bord
 /* ---------- tables ---------- */
 .tablewrap{max-height:660px;overflow:auto;border:1px solid var(--line);border-radius:10px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{position:sticky;top:0;z-index:1;background:var(--s1);color:var(--mute);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:10px 8px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;z-index:3;background:var(--s1);color:var(--mute);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:10px 8px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line)}
 th:hover{color:var(--text)}th.sorted{color:var(--acc)}th[data-dir=desc]::after{content:" ↓"}th[data-dir=asc]::after{content:" ↑"}
 td{padding:9px 8px;border-bottom:1px solid var(--row-line);white-space:nowrap}
 tr:last-child td{border-bottom:0}
@@ -576,17 +585,17 @@ details.dis>.dbody{padding:0 16px 16px}
           </select></label>
           <label title="Длина окна: по скольким последним свечам считается канал">N <input type="range" id="N" min="20" max="300" step="1"><b id="Nv"></b></label>
           <label title="Ширина канала в σ. 2 — классические полосы Боллинджера, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="4" step="0.1"><b id="kv"></b></label>
-          <label title="Сколько свечей показать на графике">Свечей <input type="range" id="cn" min="100" max="800" step="10"><b id="cnv"></b></label>
+          <label title="Сколько свечей истории загрузить. Сколько из них видно — меняется колёсиком, кнопками − + или двумя пальцами">История <input type="range" id="cn" min="100" max="800" step="10"><b id="cnv"></b></label>
           <button id="reset" title="Вернуть стандартные настройки">Сбросить</button>
           <div class="mute" style="font-size:12px;flex-basis:100%" id="mhint"></div>
         </div>
-        <canvas id="cv" style="margin-top:12px"></canvas>
+        <div class="cvwrap" style="margin-top:12px"><canvas id="cv" tabindex="0" aria-label="График цены. Стрелки — листать, плюс и минус — масштаб, End — к последней свече"></canvas></div>
         <div class="legend">
           <span><i style="border-color:var(--c-up)"></i>верхняя граница</span>
           <span><i style="border-color:var(--c-mid);border-top-style:dashed"></i>обычная цена</span>
           <span><i style="border-color:var(--c-lo)"></i>нижняя граница</span>
           <span><i style="border-color:var(--c-trade);border-top-style:dashed"></i>сделка бота</span>
-          <span class="faint hint-mouse">колёсико — масштаб · перетаскивание — время · двойной клик — сброс</span><span class="faint hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span>
+          <span class="faint hint-mouse">колёсико или − + — масштаб · перетаскивание или ← → — время · F — во всю ширину · двойной клик — сброс</span><span class="faint hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span>
         </div>
         <div class="detail" id="detail"></div>
       </div>
@@ -846,7 +855,7 @@ details.dis>.dbody{padding:0 16px 16px}
   <div class="mbox">
     <div class="mhead"><h2 id="mtitle">—</h2><span class="mute" id="mmeta"></span><button id="mclose" title="Закрыть (Esc)" aria-label="Закрыть карточку">✕</button></div>
     <div class="mgrid">
-      <div><canvas id="tcv"></canvas>
+      <div><div class="cvwrap"><canvas id="tcv" tabindex="0" aria-label="График сделки. Стрелки — листать, плюс и минус — масштаб"></canvas></div>
         <div class="zoomhint"><span class="hint-mouse">колёсико — масштаб · перетаскивание — прокрутка во времени · двойной клик — сброс</span><span class="hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span></div>
         <div class="legend">
           <span>▮ свечи</span><span><i style="border-color:var(--c-up)"></i>верхняя полоса</span><span><i style="border-color:var(--c-mid);border-top-style:dashed"></i>центр</span><span><i style="border-color:var(--c-lo)"></i>нижняя полоса</span>
@@ -1067,7 +1076,7 @@ function renderChart(cv, d, o = {}) {
   // the right gutter is as wide as the longest price tag, so tags are never cut and no space is wasted
   g.font = '11px system-ui';
   const tagW = Math.max(...[...(o.levels || []).map(L => `${L.tag || ''} ${fp(L.v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1])].map(x => g.measureText(x).width));
-  const padL = 8, padR = clamp(Math.ceil(tagW) + 18, 56, 130), pH = Math.round(H * 0.64), vTop = pH + 24, vH = Math.round(H * 0.1), rTop = vTop + vH + 22, rH = H - rTop - 6;
+  const padL = 8, padR = clamp(Math.ceil(tagW) + 18, 56, 130), pH = Math.round(H * 0.7), vTop = pH + 24, vH = Math.round(H * 0.08), rTop = vTop + vH + 22, rH = H - rTop - 6;
   const cnt = eView - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
   const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i <= e ? t[i] : t[e] + (i - e) * step;
   const X = i => padL + (i - s + 0.5) * bw;
@@ -1077,6 +1086,12 @@ function renderChart(cv, d, o = {}) {
   for (const L of o.levels || []) acc(L.v);
   const pad = (mx - mn) * 0.06 || mx * 0.01; mn -= pad; mx += pad;
   const Y = x => 8 + (mx - x) / (mx - mn) * (pH - 16);
+  // price scale: round levels across the plot; their labels are drawn later, only where no price tag sits
+  const raw = (mx - mn) / 5, mag = raw > 0 ? 10 ** Math.floor(Math.log10(raw)) : 0, stepP = mag ? [1, 2, 2.5, 5, 10].find(m => m * mag >= raw) * mag : 0;
+  const gridV = []; if (stepP) for (let v = Math.ceil(mn / stepP) * stepP; v <= mx && gridV.length < 12; v += stepP) gridV.push(v);
+  g.strokeStyle = PC.grid; g.lineWidth = 1; g.globalAlpha = 0.5; g.setLineDash([2, 4]);
+  for (const v of gridV) { g.beginPath(); g.moveTo(padL, Y(v)); g.lineTo(W - padR, Y(v)); g.stroke(); }
+  g.setLineDash([]); g.globalAlpha = 1;
   g.font = '11px system-ui'; g.textBaseline = 'middle';
   // channel
   let f0 = s; while (f0 <= e && !isFinite(B.mid[f0])) f0++;
@@ -1089,6 +1104,13 @@ function renderChart(cv, d, o = {}) {
   const line = (arr, col, w = 1.3, dash = []) => { g.beginPath(); g.setLineDash(dash); let st = false;
     for (let i = s; i <= e; i++) { if (!isFinite(arr[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), Y(arr[i])); st = true; }
     g.strokeStyle = col; g.lineWidth = w; g.stroke(); g.setLineDash([]); };
+  // position zones: green from entry to take profit, red from entry to stop
+  for (const z of o.zones || []) {
+    const x0 = Math.max(padL, X(clamp(z.i0, s, eView)) - bw / 2), x1 = Math.min(W - padR, z.i1 != null ? X(clamp(z.i1, s, eView)) + bw / 2 : W - padR);
+    if (x1 <= x0) continue;
+    g.fillStyle = PC.lo + '1f'; g.fillRect(x0, Math.min(Y(z.entry), Y(z.tp)), x1 - x0, Math.abs(Y(z.tp) - Y(z.entry)));
+    g.fillStyle = PC.up + '1f'; g.fillRect(x0, Math.min(Y(z.entry), Y(z.sl)), x1 - x0, Math.abs(Y(z.sl) - Y(z.entry)));
+  }
   line(B.up, PC.up); line(B.lo, PC.lo); line(B.mid, PC.mid, 1, [4, 4]);
   // price
   if (candles) {
@@ -1131,7 +1153,8 @@ function renderChart(cv, d, o = {}) {
   for (let q = 0; q < tags.length; q++) tags[q].ty = Math.max(clamp(tags[q].y, 8, pH - 6), q ? tags[q-1].ty + 15 : 8);
   const over = tags.length ? tags[tags.length - 1].ty - (pH - 6) : 0;
   if (over > 0) for (let q = tags.length - 1; q >= 0; q--) tags[q].ty = Math.min(tags[q].ty - over, q < tags.length - 1 ? tags[q+1].ty - 15 : Infinity);
-  g.font = '11px system-ui';
+  g.font = '11px system-ui'; g.fillStyle = PC.axis;
+  for (const v of gridV) if (!tags.some(tg => Math.abs(tg.ty - Y(v)) < 11)) g.fillText(fp(v), W - padR + 8, Y(v));
   for (const tg of tags) {
     const tx = W - padR + 4, w = g.measureText(tg.text).width + 8;
     if (tg.box) { g.fillStyle = tg.col + '26'; g.fillRect(tx, tg.ty - 7, w, 14); }
@@ -1172,9 +1195,19 @@ function renderChart(cv, d, o = {}) {
     const pb = (c[hi] - B.lo[hi]) / (B.up[hi] - B.lo[hi]);
     const txt = [dt(t[hi]), candles ? `O ${fp(op[hi])}  H ${fp(h[hi])}` : '', candles ? `L ${fp(l[hi])}  C ${fp(c[hi])}` : 'цена ' + fp(c[hi]),
       isFinite(pb) ? `%B ${(pb*100).toFixed(1)}%  ${B.z[hi].toFixed(2)}σ` : '', 'RSI ' + (isFinite(R[hi]) ? R[hi].toFixed(0) : '—')].filter(Boolean);
-    const bx = x > W / 2 ? x - 188 : x + 10;
-    g.font = '12px system-ui'; g.fillStyle = PC.tip; g.fillRect(bx, 12, 178, txt.length * 17 + 10);
-    g.fillStyle = PC.price; txt.forEach((s2, k) => g.fillText(s2, bx + 8, 22 + k * 17));
+    // tooltip sits below the toolbar (top-left corner) and flips to the other side of the cursor near the right edge
+    const bx = x > W / 2 ? x - 188 : x + 10, by = 46;
+    g.font = '12px system-ui'; g.fillStyle = PC.tip; g.fillRect(bx, by, 178, txt.length * 17 + 10);
+    g.fillStyle = PC.price; txt.forEach((s2, k) => g.fillText(s2, bx + 8, by + 10 + k * 17));
+    // crosshair: the price under the cursor on the right scale, the bar's time on the time axis
+    const hy = o.hoverY;
+    if (hy != null && hy >= 8 && hy <= pH - 8) {
+      const price = mx - (hy - 8) / (pH - 16) * (mx - mn), lbl = fp(price), lw = g.measureText(lbl).width + 10;
+      g.setLineDash([3, 3]); g.strokeStyle = PC.cross; g.beginPath(); g.moveTo(padL, hy); g.lineTo(W - padR, hy); g.stroke(); g.setLineDash([]);
+      g.fillStyle = PC.cross; g.fillRect(W - padR + 2, hy - 9, lw, 18); g.fillStyle = PC.canvas; g.fillText(lbl, W - padR + 7, hy);
+    }
+    const tl = dt(t[hi]), tw = g.measureText(tl).width + 10, tx = clamp(x - tw / 2, padL, W - padR - tw);
+    g.fillStyle = PC.cross; g.fillRect(tx, pH - 2, tw, 17); g.fillStyle = PC.canvas; g.fillText(tl, tx + 5, pH + 6);
   }
   return {s, e, padL, bw};
 }
@@ -1222,11 +1255,43 @@ function attachZoom(cv, api) {
   }, {passive:false});
   cv.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; if (!e.touches.length) drag = null; });
   cv.addEventListener('dblclick', () => api.set(null));
+  // the same actions as buttons (for people who don't know about the wheel) and keys
+  const ctl = {
+    zoom: f => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:Math.round(clamp(r.span * f, 20, st.n - st.minFrom)), endOff:r.endOff}); },
+    pan: k => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:r.span, endOff:r.endOff + Math.round(r.span * k)}); },
+    latest: () => { const st = api.state(); if (!st?.geo) return; api.set({span:range(st).span}); },   // keep the zoom, default right margin
+    reset: () => api.set(null),
+  };
+  const bar = document.createElement('div'); bar.className = 'ctools';
+  bar.innerHTML = `<button data-z="out" title="Отдалить (−)" aria-label="Отдалить">−</button><button data-z="in" title="Приблизить (+)" aria-label="Приблизить">+</button>`
+    + `<button data-z="reset" title="Обычный вид (0 или двойной клик)" aria-label="Обычный вид">⟲</button>`
+    + (api.expand ? `<button data-z="expand" title="Развернуть график на всю ширину (F)" aria-label="Развернуть график">⤢</button>` : '')
+    + `<button data-z="latest" class="ct-latest" title="К последней свече (End)">к последней свече →</button>`;
+  cv.parentElement.appendChild(bar);
+  // "to the latest candle" shows up only when the view has been scrolled into the past
+  const sync = () => { const st = api.state(); bar.classList.toggle('away', !!st?.geo && range(st).endOff > 2); };
+  const set0 = api.set; api.set = v => { set0(v); sync(); };
+  bar.onclick = e => {
+    const z = e.target.closest('[data-z]')?.dataset.z;
+    if (z === 'in') ctl.zoom(1 / 1.4); if (z === 'out') ctl.zoom(1.4); if (z === 'latest') ctl.latest(); if (z === 'reset') ctl.reset();
+    if (z === 'expand') api.expand();
+  };
+  cv.addEventListener('mousedown', () => cv.focus({preventScroll:true}));
+  cv.addEventListener('keydown', e => {
+    const k = e.key;
+    if (k === 'ArrowLeft') ctl.pan(0.15); else if (k === 'ArrowRight') ctl.pan(-0.15);
+    else if (k === '+' || k === '=') ctl.zoom(1 / 1.4); else if (k === '-' || k === '_') ctl.zoom(1.4);
+    else if (k === 'End') ctl.latest(); else if (k === '0') ctl.reset();
+    else if ((k === 'f' || k === 'F' || k === 'а' || k === 'А') && api.expand) bar.querySelector('[data-z=expand]').click();
+    else return;
+    e.preventDefault();
+  });
+  return {sync};
 }
 const barAt = (t, time) => { let i = 0; while (i + 1 < t.length && t[i + 1] <= time) i++; return i; };
 
 // ---------- market chart ----------
-let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, chartGeo = null, chartView = null;
+let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, hoverY = null, chartGeo = null, chartView = null, zm = null;
 async function loadChart(sym) {
   if (sym && sym !== chartSym) chartView = null;
   chartSym = sym || chartSym; save('sr_chart', chartSym);
@@ -1260,16 +1325,20 @@ function computeChart() {
 // my bot's positions live in the browser or, in server mode, in the server journal
 const myOpen = () => BP.where === 'server' ? (SB_MINE?.open || []) : J.open;
 const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})), ...myOpen().map(p => ({p, who:'мой'}))];
+// by default show as many candles as fit as real candles (≈5 px each), within the history the user loads
+const chartDefSpan = () => Math.min(S.candles, Math.max(80, Math.round($('#cv').clientWidth / 5)));
 function drawChart() {
   if (!chart) return;
-  const levels = [];
+  const levels = [], zones = [];
   for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym)) {
     const i0 = barAt(chart.t, p.time);
     levels.push({v:p.entry, col:PC.trade, tag:who === 'общий' ? 'общ.' : 'мой', i0},
                 {v:p.tp, col:PC.lo, tag:'TP', i0}, {v:p.sl, col:PC.up, tag:'SL', i0});
+    zones.push({i0, entry:p.entry, tp:p.tp, sl:p.sl});
   }
-  const r = viewRange(chart.c.length, chart.N - 1, chartView, S.candles);
-  chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, live:true, hoverI});
+  const r = viewRange(chart.c.length, chart.N - 1, chartView, chartDefSpan());
+  chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, zones, live:true, hoverI, hoverY});
+  zm?.sync();   // show or hide «к последней свече»
 }
 
 // ---------- signal breakdown (shared by the market panel and the trade card) ----------
@@ -1304,7 +1373,10 @@ function renderDetail() {
     // the bots trade by their own settings: promise an entry only when the chart shows exactly what the shared bot sees
     const bs = SJ?.settings, same = bs && bs.tf === S.tf && bs.method === S.method && bs.N === S.N && bs.k === S.k;
     verdict = `<b>${r.side === 'low' ? '▲ Разворот вверх' : '▼ Разворот вниз'} подтверждён.</b> Сила ${r.score} из 100 — `
-      + (same ? (r.score >= bs.minScore ? 'общий бот войдёт в сделку, если у него есть свободное место.' : `ниже порога общего бота (${bs.minScore}), он не войдёт.`)
+      + (same ? (r.score < bs.minScore ? `ниже порога общего бота (${bs.minScore}), он не войдёт.`
+          : SJ.open.some(p => p.sym === chartSym) ? 'общий бот уже в сделке по этой монете.'
+          : SJ.open.length >= M.MAX_OPEN ? `сигнал проходит, но у общего бота заняты все ${M.MAX_OPEN} места — войдёт, когда одно освободится.`
+          : 'общий бот войдёт в сделку на ближайшей проверке рынка.')
         : `${r.score >= 60 ? 'сильный сигнал' : 'слабый сигнал'}. Боты торгуют по своим настройкам${bs ? ` (общий — ${bs.tf}, k = ${bs.k})` : ''}, поэтому могут его не взять.`);
   } else if (r.touch) {
     const miss = [];
@@ -1883,7 +1955,7 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
     const marks = [{i:ei, price:x.entry, col:PC.trade, label:'вход', below:sg < 0}];
     if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? PC.lo : PC.up, label:`выход · ${x.reason}`, below:sg > 0});
     const from0 = Math.max(set.N - 1, ei - 120);
-    tcard = {d, minFrom:set.N - 1, defSpan:d.c.length - from0, view:null, opts:{levels, marks, live:isOpen, hoverI:null}};
+    tcard = {d, minFrom:set.N - 1, defSpan:d.c.length - from0, view:null, opts:{levels, marks, zones:[{i0:ei, i1:xi, entry:x.entry, tp:x.tp, sl:x.sl}], live:isOpen, hoverI:null}};
     drawCard();
   } catch (e) {
     g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = PC.up; g.fillText('Не удалось загрузить свечи: ' + e.message, 16, 24);
@@ -2066,6 +2138,15 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.5', date:'6 октября 2026', title:'Удобный график', items:[
+    'График стал больше: на компьютере он шире списка монет и выше, цена занимает большую часть высоты. Кнопка ⤢ (или клавиша F) разворачивает его на всю ширину — список уходит под него, выбор запоминается.',
+    'По умолчанию видно столько свечей, сколько помещается настоящими свечами, а не линией. Отдалить — колёсиком, кнопкой − или двумя пальцами; сколько истории загружать — в настройках («История»).',
+    'Шкала цены с сеткой справа; перекрестие показывает цену под курсором и время свечи.',
+    'Кнопки на графике: − и + (масштаб), ⟲ (обычный вид) и «к последней свече →», когда вы ушли в прошлое. С клавиатуры: ← → листать, + − масштаб, End — к последней свече, 0 — сброс.',
+    'Открытая позиция подсвечена на графике: зелёная зона — от входа до тейка, красная — от входа до стопа. Так же в карточке сделки.',
+    'Разбор сигнала знает, что общий бот уже в сделке по этой монете или что все его места заняты.',
+    'Исправлено: точка из строки таблицы больше не залезает на заголовок при прокрутке.',
+  ]},
   {v:'2.4', date:'6 октября 2026', title:'Результат — на первом месте', items:[
     '«Мой бот»: выбор профиля свёрнут в строку «Профиль · сейчас «…»» — баланс и сделки видны сразу, без прокрутки через настройки. Пока сделок нет, строка раскрыта. Сменить профиль можно и ссылкой «сменить» в карточке бота.',
     'Таблица монет по умолчанию ставит подтверждённые сигналы по силе — самые сильные сверху.',
@@ -2540,10 +2621,10 @@ $('#jreset').onclick = async () => {
   J = {balance:10000, start:10000, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
 };
 const cv = $('#cv');
-cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); drawChart(); };
-cv.onmouseleave = () => { hoverI = null; drawChart(); };
+cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); hoverY = e.clientY - cv.getBoundingClientRect().top; drawChart(); };
+cv.onmouseleave = () => { hoverI = null; hoverY = null; drawChart(); };
 const tcv = $('#tcv');
-tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); drawCard(); };
+tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); tcard.opts.hoverY = e.clientY - tcv.getBoundingClientRect().top; drawCard(); };
 tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCard(); };
 // numeric columns (prices, %, $, R) are right-aligned; dates and text stay left
 const isNum = s => /^[+−-]?[$×]?\d/.test(s) && !/^\d\d\.\d\d/.test(s) && !/^\d\d:\d\d/.test(s);
@@ -2574,7 +2655,15 @@ function applyTheme(t) {
 }
 $('#thm').onclick = () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
 if (document.documentElement.dataset.theme === 'light') applyTheme('light');
-attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:S.candles, view:chartView, geo:chartGeo}, set:v => { chartView = v; drawChart(); }});
+// wide mode: the chart takes the whole row (remembered); the coin list moves under it
+const setWide = on => {
+  document.body.classList.toggle('wide', on); save('sr_wide', on);
+  const b = $('#cv').parentElement.querySelector('[data-z=expand]'); if (b) { b.textContent = on ? '⤡' : '⤢'; b.title = on ? 'Вернуть график рядом со списком (F)' : 'Развернуть график на всю ширину (F)'; }
+  requestAnimationFrame(drawChart);
+};
+zm = attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:chartDefSpan(), view:chartView, geo:chartGeo},
+  set:v => { chartView = v; drawChart(); }, expand:() => setWide(!document.body.classList.contains('wide'))});
+if (load('sr_wide', false)) setWide(true);
 attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
 
 $('#btRun').onclick = runBacktest;
