@@ -257,7 +257,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
   .intro{padding:12px 14px;gap:10px;font-size:13px}.intro .h{font-size:14px}.intro ol li:not(:first-child){display:none}.intro ol{padding-left:16px}.intro button{height:36px}
   .cards>.card{flex:0 0 auto;min-width:112px;padding:9px 12px}.cards .card .s,.cards .meter{display:none}
   .cards .card .t{font-size:10px}.cards .card .v{font-size:17px;margin:2px 0 0}
-  #market .grid{display:flex;flex-direction:column;gap:12px}
+  #market .grid{display:flex;flex-direction:column;align-items:stretch;gap:12px}
   #market .tpanel{order:-1;padding:10px}
   /* the search + quick filters stay under the header while scrolling the list */
   .tpanel>.filters:first-child{position:sticky;top:59px;z-index:6;background:var(--s1);margin:-10px -10px 8px;padding:10px;border-radius:var(--r) var(--r) 0 0}
@@ -458,7 +458,7 @@ details.dis>.dbody{padding:0 16px 16px}
 
 /* ---------- responsive ---------- */
 @media(max-width:1180px){.form{grid-template-columns:1fr 1fr}.factions{grid-column:1/-1;flex-direction:row}}
-@media(max-width:1200px){.grid{grid-template-columns:1fr}}
+@media(max-width:1200px){.grid{grid-template-columns:1fr;align-items:stretch}}
 @media(max-width:1100px){.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:860px){.brand span.bt{display:none}.pill .pt{display:none}}
 @media(max-width:700px){
@@ -2191,6 +2191,7 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 // ---------- changelog ----------
 const CHANGELOG = [
   {v:'2.6', date:'6 октября 2026', title:'Свои уровни и второй таймфрейм', items:[
+    'Исправлено: на телефоне снова виден список монет — в прошлом обновлении он сжимался в узкую полоску.',
     'Свои уровни на графике: кнопка «— уровень» (или L), затем нажмите на нужную цену. Когда цена пересечёт уровень, придёт уведомление. Уровни хранятся для каждой монеты; удалить — крестиком под графиком или правым кликом по линии.',
     'Второй таймфрейм: кнопка «2 ТФ» (или T) показывает ту же монету на старшем таймфрейме — по умолчанию 15м → 4ч, 1ч → 1д. В режиме «во всю ширину» графики стоят рядом.',
     'В карточке короткой сделки подписи «вход» и «выход» больше не налезают друг на друга.',
