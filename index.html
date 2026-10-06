@@ -368,7 +368,9 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .bh-m{font-size:13px;margin-top:10px;color:var(--mute)}.bh-m b{color:var(--text)}
 .bh-err{font-size:13px;margin-top:8px;color:var(--up)}
 .bh-a{display:flex;gap:8px;flex-wrap:wrap}.bh-a button{height:40px;padding:0 16px}
-.bsec{margin-top:18px}
+.bsec{margin:14px 0 0}.bsec .dbody{padding-top:4px}
+.linkbtn{display:inline;height:auto;padding:0;border:0;background:none;color:var(--blue);font:inherit;font-weight:500;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}.linkbtn:hover{background:none;border:0;text-decoration-style:solid}
+#bprof{scroll-margin-top:70px}
 .bsech{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.bsech h3{margin:0;font-size:15px}
 .hint{font-size:13px;color:var(--mute);margin:8px 0 10px;max-width:820px}
 .prof.pick{cursor:pointer}.prof.pick:hover{border-color:var(--hover)}
@@ -393,7 +395,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .hlab{position:absolute;left:0;transform:translateY(-130%);font-size:11px;color:var(--faint);pointer-events:none}
 .hend{position:absolute;right:0;width:9px;height:9px;margin:-4.5px -4.5px 0 0;border-radius:50%;box-shadow:0 0 0 4px var(--ring)}
 .haxis{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:8px}
-.hempty{height:110px;display:grid;place-items:center;color:var(--faint);border:1px dashed var(--line2);border-radius:10px;font-size:13px}
+.hempty{min-height:72px;padding:14px;text-align:center;display:grid;place-items:center;color:var(--faint);border:1px dashed var(--line2);border-radius:10px;font-size:13px}
 .statrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}
 .statrow .card .v{font-size:21px}
 @media(max-width:1100px){.statrow{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -640,13 +642,13 @@ details.dis>.dbody{padding:0 16px 16px}
       <div class="pimp hidden" id="pimp"></div>
       <div class="bhero" id="bhero"></div>
       <!-- 2. which rules it trades by -->
-      <div class="bsec">
-        <div class="bsech"><h3>По какому профилю торговать</h3>
+      <details class="dis bsec" id="bprof"><summary>Профиль <span class="mute" id="bprofSum"></span></summary><div class="dbody">
+        <div class="bsech"><h3>Как выбирать профиль</h3>
           <div class="seg mini" id="bmode"><button class="tab" data-m="single">Выбираю сам</button><button class="tab" data-m="auto">Автоматически по рынку</button></div></div>
         <p class="hint" id="bhint"></p>
         <div id="blist"></div>
         <div class="row" style="margin-top:8px;gap:8px"><button id="bnew">+ Новый профиль</button><button id="bimport" title="Добавить профиль, которым с вами поделились">Добавить по ссылке</button></div>
-      </div>
+      </div></details>
       <!-- 3. rarely needed -->
       <details class="dis bmore"><summary>Дополнительно <span class="mute">· где работает бот, граница боковика, сброс журнала</span></summary><div class="dbody">
         <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт. В браузере — только пока открыта эта вкладка; удобно, чтобы быстро проверить новый профиль. Если не заходить на сайт 30 дней, серверный бот засыпает — откройте сайт, и он продолжит.</p></div>
@@ -1030,7 +1032,8 @@ function renderTable() {
     return true;
   });
   const kindRank = {sig:4, out:3, touch:2, sq:1, '':0};
-  const key = r => sortKey === 'ext' ? (favs.has(r.sym) ? 1e3 : 0) + (r.rev ? 100 : 0) + Math.abs(r.pB - 0.5)
+  // default order: favourites, then confirmed signals by strength, then the coins furthest from the middle of their range
+  const key = r => sortKey === 'ext' ? (favs.has(r.sym) ? 1e3 : 0) + (r.rev ? 100 + (r.score || 0) / 10 : 0) + Math.min(Math.abs(r.pB - 0.5), 5) / 10
     : sortKey === 'fav' ? (favs.has(r.sym) ? 1 : 0) : sortKey === 'vol' ? (r.volX ?? -1) : sortKey === 'score' ? (r.score ?? -1)
     : sortKey === 'label' ? kindRank[r.kind] : sortKey === 'hl' ? (isFinite(r.hl) ? -r.hl : -1e9) : r[sortKey];
   list.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sortDir; });
@@ -1548,6 +1551,7 @@ function idleReason(act, reg, srv) {
       <div class="acts"><button data-act="mkt:${act.id}">Показать рынок глазами профиля</button></div></div>`;
   return '';
 }
+let bprofInit = false;
 function renderBotPanel() {
   $('#bER').value = String(BP.erMax);
   document.querySelectorAll('#bmode .tab').forEach(b => b.classList.toggle('on', b.dataset.m === BP.mode));
@@ -1559,9 +1563,10 @@ function renderBotPanel() {
   // status card: one sentence about what is happening + one main button
   const checked = srv ? SB_MINE?.checked : J.checked;
   const title = !on ? 'Бот на паузе' : srv ? 'Бот торгует 24/7' : 'Бот торгует в этой вкладке';
-  const sub = !on ? `Новых сделок не открывает. Профиль «${act.name}».`
-    : srv ? `На сервере, даже когда сайт закрыт · профиль «${act.name}»`
-    : `Профиль «${act.name}». Если закрыть вкладку, бот остановится.`;
+  const chg = ` <button class="linkbtn" data-act="prof">сменить</button>`;
+  const sub = !on ? `Новых сделок не открывает. Профиль «${act.name}»${chg}.`
+    : srv ? `На сервере, даже когда сайт закрыт · профиль «${act.name}»${chg}`
+    : `Профиль «${act.name}»${chg}. Если закрыть вкладку, бот остановится.`;
   const live = on ? `<div style="margin-top:6px">${liveTag(checked, 3 * 60e3, 'проверка рынка')}</div>` : '';
   const why = on ? idleReason(act, reg, srv) : '';
   const ers = botRegime ? M.MAJORS.map(s => `${base(s)} ${botRegime.by?.[s] ? botRegime.by[s].er.toFixed(2) : '—'}`).join(', ') : '';
@@ -1573,7 +1578,10 @@ function renderBotPanel() {
   $('#bhero').innerHTML = `<div style="min-width:0;flex:1 1 360px"><div class="bh-t"><span class="sdot ${!on ? 'idle' : srv ? '' : 'idle'}"></span>${title}</div><div class="bh-s">${sub}</div>${live}${market}
     ${srv && SB_MINE?.error ? `<div class="bh-err">Ошибка на сервере: ${SB_MINE.error}</div>` : ''}${why}</div><div class="bh-a">${btns}</div>`;
   tickLive();
-  // profile picker
+  // profile picker: a folded row once there are trades to look at (open while there are none); the user's choice is remembered
+  const D0 = srv ? SB_MINE : J;
+  $('#bprofSum').textContent = `· сейчас «${act.name}»${BP.mode === 'auto' ? ' · автоматически по рынку' : ''} · всего ${BP.profiles.length}`;
+  if (!bprofInit && (D0 || !srv)) { bprofInit = Date.now(); $('#bprof').open = load('sr_bprof', null) ?? !(D0?.closed?.length); }
   $('#bhint').textContent = BP.mode === 'auto'
     ? 'Бот сам смотрит на рынок и меняет профиль. Отметьте, какой профиль брать в боковике, а какой — в импульсе.'
     : 'Бот торгует только по выбранному профилю, что бы ни происходило на рынке. Нажмите на профиль, чтобы выбрать его.';
@@ -1690,7 +1698,7 @@ const peakOf = D => { let b = D.start, pk = b; for (const x of [...D.closed].sor
 // balance over time: a step line — the balance only changes when a trade closes
 function equityChart(D, tEnd) {
   const cl2 = [...D.closed].sort((a, b) => a.tclose - b.tclose);
-  if (!cl2.length) return `<div class="hempty">График баланса появится после первой закрытой сделки</div>`;
+  if (!cl2.length) return `<div class="hempty">Закрытых сделок пока нет — здесь появится график баланса и итоги: winrate, средний результат, комиссии, просадка.</div>`;
   const t0 = Math.min(...cl2.map(x => x.time)), t1 = tEnd ?? Date.now();
   const pts = [[t0, D.start]]; let b = D.start;
   for (const x of cl2) { b += x.pnl; pts.push([x.tclose, b]); }
@@ -1786,14 +1794,14 @@ function renderJournal() {
        ${equityChart(D)}
        ${journalInsight(D, st)}
      </div>
-     <div class="statrow">
+     ${st.n ? `<div class="statrow">
        ${card('Сделок', st.n, `открыто ${D.open.length} из ${M.MAX_OPEN}`)}
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок')}
        ${card('Ср. результат', rr(st.expR) + trend, other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR),'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), 'прибыли / убытки', st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе')}
        ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа. Если комиссии больше прибыли до них — стратегия работает на биржу')}
        ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика')}
-     </div>`;
+     </div>` : ''}`;
   const now = Date.now();
   $('#jopen').innerHTML = D.open.map(p => {
     const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry;
@@ -2007,14 +2015,14 @@ function renderBacktest() {
        </div>
        ${equityChart(D, r.to + TFMS[s.tf])}
      </div>
-     <div class="statrow">
+     ${st.n ? `<div class="statrow">
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`)}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. +${usd(st.avgWin, false)} / ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей / сумма убытков')}
        ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, 'neg', 'Сколько забрала биржа за все сделки')}
        ${card('Комиссия в R', st.feeR == null ? '—' : '−' + st.feeR.toFixed(2) + 'R', 'на каждую сделку', st.feeR > 0.1 ? 'neg' : '', 'Какую долю риска сделки съедает комиссия. Чем меньше стоп и чем больше плечо, тем больше эта доля')}
        ${card('Плечо', st.lev == null ? '—' : st.lev.toFixed(2) + '×', `средний размер позиции к балансу · до ${s.lev}×`, '', 'Размер позиции, делённый на баланс. Комиссия считается от размера позиции')}
        ${card('Сделок в день', (st.n / r.days).toFixed(1), `в сделке в среднем ${dur(st.avgHold)}`)}
-     </div>`;
+     </div>` : ''}`;
   // by score bucket
   const buckets = {};
   for (const x of tr) { const b = Math.min(90, Math.floor((x.snap?.score ?? 0) / 10) * 10); (buckets[b] ||= []).push(x); }
@@ -2058,6 +2066,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.4', date:'6 октября 2026', title:'Результат — на первом месте', items:[
+    '«Мой бот»: выбор профиля свёрнут в строку «Профиль · сейчас «…»» — баланс и сделки видны сразу, без прокрутки через настройки. Пока сделок нет, строка раскрыта. Сменить профиль можно и ссылкой «сменить» в карточке бота.',
+    'Таблица монет по умолчанию ставит подтверждённые сигналы по силе — самые сильные сверху.',
+    'На компьютере по таблице монет можно ходить стрелками ↑ ↓ — график переключается следом.',
+    'Пока у бота нет закрытых сделок, вместо пустых показателей — одна понятная строка.',
+    '«Что нового»: последние три версии, остальные — под «Ранние обновления».',
+  ]},
   {v:'2.3', date:'6 октября 2026', title:'Удобно на телефоне', items:[
     'Рынок на телефоне начинается со списка монет — он виден сразу, без прокрутки через график. Поиск и фильтры остаются под рукой при прокрутке.',
     'Нажмите на монету — график откроется на весь экран. Назад к списку — кнопкой «Монеты» или жестом «назад», и список останется на том же месте.',
@@ -2254,7 +2269,15 @@ $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 // table rows open with Enter / Space, like a click
-document.addEventListener('keydown', e => { const tr = e.target.closest?.('tr.row'); if (tr && e.target === tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); } });
+document.addEventListener('keydown', e => {
+  const tr = e.target.closest?.('tr.row'); if (!tr || e.target !== tr) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tr.click(); }
+  // arrows walk the rows; in the coin table the chart follows the selection
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const nx = e.key === 'ArrowDown' ? tr.nextElementSibling : tr.previousElementSibling;
+    if (nx?.matches('tr.row')) { e.preventDefault(); nx.focus(); if (tr.closest('#tb') && !isPhone()) loadChart(nx.dataset.sym); }
+  }
+});
 document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; sortDir = sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1); sortKey = k; renderTable(); });
 document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : (k === 'sym' || k === 'reason' ? 1 : -1); jSort = k; renderJournal(); });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
@@ -2446,6 +2469,7 @@ $('#bhero').onclick = e => {
   if (k === 'on') setOn(true);
   if (k === 'off') setOn(false);
   if (k === 'server') setWhere('server');
+  if (k === 'prof') { $('#bprof').open = true; save('sr_bprof', true); $('#bprof').scrollIntoView({block:'start', behavior:'smooth'}); }
   if (k === 'mkt') {   // the market tab switches to the profile's timeframe and channel, so its signals are the ones the bot weighs
     const ps = profSet(profById(x));
     Object.assign(S, {tf:ps.tf, method:ps.method, N:ps.N, k:ps.k}); save('sr_settings', S); syncInputs();
@@ -2463,6 +2487,8 @@ document.querySelectorAll('#bwhere .tab').forEach(b => b.onclick = () => setWher
 // my bot: profiles panel
 document.querySelectorAll('#bmode .tab').forEach(b => b.onclick = () => { BP.mode = b.dataset.m; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); });
 $('#bER').onchange = e => { BP.erMax = +e.target.value; saveBP(); renderBotPanel(); syncServerBot(); runBot(); };
+// only the user's own toggles are remembered, not the initial open/close done by renderBotPanel
+$('#bprof').addEventListener('toggle', () => { if (bprofInit && Date.now() - bprofInit > 300) save('sr_bprof', $('#bprof').open); });
 $('#bnew').onclick = () => openForm(null);
 $('#bimport').onclick = importByLink;
 $('#pfCancel').onclick = async () => {
