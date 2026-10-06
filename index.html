@@ -82,7 +82,7 @@ svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-
 .phead h2{margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em}
 .phead p{margin:4px 0 0;color:var(--mute);font-size:13px;max-width:900px}
 .sub{color:var(--mute);font-size:13px;margin:4px 0 12px}
-.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;align-items:start}
 /* wide mode: the chart takes the whole row, the coin list goes under it */
 body.wide #market .grid{grid-template-columns:minmax(0,1fr)}body.wide #cv{height:min(74vh,820px)}
 .grid>*{min-width:0}
@@ -141,6 +141,14 @@ canvas{width:100%;display:block;background:var(--canvas);border-radius:10px;bord
 .ctools{position:absolute;top:8px;left:8px;display:flex;gap:4px;z-index:2;opacity:.85;transition:opacity .15s}.cvwrap:hover .ctools,.ctools:focus-within{opacity:1}
 .ctools button{width:34px;height:30px;padding:0;font-size:15px;line-height:1;background:var(--s1);border-color:var(--line2);color:var(--mute)}.ctools button:hover{color:var(--text)}
 @media(max-width:1200px){.ctools [data-z=expand]{display:none}}
+.ctools button.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}.ctools .ct-txt{width:auto;padding:0 9px;font-size:12.5px;font-weight:600}
+#cv.picking,#cv2.picking{cursor:copy}
+/* second timeframe: under the main chart, side by side with it in wide mode */
+.cpair{display:grid;gap:12px}body.wide .cpair.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#cv2{height:clamp(300px,40vh,460px);cursor:crosshair}body.wide .cpair.two #cv2{height:min(74vh,820px)}
+body.wide .cpair.two .tf2{display:flex;flex-direction:column}body.wide .cpair.two .tf2 .cvwrap{flex:1}
+.tf2head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px;font-size:13px;font-weight:600}.tf2head .mute{font-weight:400;font-size:12.5px}
+.ulv{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:12.5px}.ulv:empty{display:none}
 .ctools .ct-latest{display:none}.ctools.away .ct-latest{display:inline-flex;color:var(--acc);border-color:var(--warn-line);width:auto;padding:0 10px;font-size:12.5px;font-weight:600}
 @media (pointer:coarse){.ctools button{width:40px;height:36px}}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--mute);margin-top:8px}
@@ -260,6 +268,8 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
   body.sheet #cv{height:52vh}
   #cpanel .cact .search{display:none}#cpanel .cact .seg{flex:1}
   #snd,#refresh{display:none}
+  /* chart toolbar above the canvas, not over it */
+  .cvwrap{display:flex;flex-direction:column-reverse}.ctools{position:static;opacity:1;margin-bottom:6px;flex-wrap:wrap}
   .tpanel>.filters:first-child .seg{flex:1 1 auto;min-width:0}.tpanel>.filters:first-child .seg .tab{flex:1;padding:0 8px}
 }
 /* ---------- phone: trade tables become cards (coin, side and result first; details under them) ---------- */
@@ -589,7 +599,12 @@ details.dis>.dbody{padding:0 16px 16px}
           <button id="reset" title="Вернуть стандартные настройки">Сбросить</button>
           <div class="mute" style="font-size:12px;flex-basis:100%" id="mhint"></div>
         </div>
-        <div class="cvwrap" style="margin-top:12px"><canvas id="cv" tabindex="0" aria-label="График цены. Стрелки — листать, плюс и минус — масштаб, End — к последней свече"></canvas></div>
+        <div class="cpair" id="cpair" style="margin-top:12px">
+          <div class="cvwrap"><canvas id="cv" tabindex="0" aria-label="График цены. Стрелки — листать, плюс и минус — масштаб, End — к последней свече, L — свой уровень, T — второй таймфрейм"></canvas></div>
+          <div id="tf2box" class="tf2 hidden"><div class="tf2head"><span>Второй таймфрейм</span><div class="seg mini" id="tf2seg"><button class="tab" data-tf2="15m">15м</button><button class="tab" data-tf2="1h">1ч</button><button class="tab" data-tf2="4h">4ч</button><button class="tab" data-tf2="1d">1д</button><button class="tab" data-tf2="1w">1н</button></div><span class="mute" id="tf2stat"></span></div>
+            <div class="cvwrap"><canvas id="cv2" tabindex="0" aria-label="График монеты на втором таймфрейме"></canvas></div></div>
+        </div>
+        <div class="ulv" id="ulv"></div>
         <div class="legend">
           <span><i style="border-color:var(--c-up)"></i>верхняя граница</span>
           <span><i style="border-color:var(--c-mid);border-top-style:dashed"></i>обычная цена</span>
@@ -799,6 +814,13 @@ details.dis>.dbody{padding:0 16px 16px}
       </ul>
       <h3>Уведомления</h3>
       <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они придут, даже когда вкладка свёрнута. Рядом — кнопка звука.</p>
+      <h3>График</h3>
+      <ul>
+        <li><b>Масштаб и время:</b> колёсико или кнопки − + в углу графика, перетаскивание или стрелки ← →; на телефоне — два пальца и свайп. ⟲ — обычный вид, «к последней свече →» — вернуться к текущему моменту.</li>
+        <li><b>Свой уровень:</b> кнопка «— уровень» (или клавиша L), затем нажмите на нужную цену. Когда цена пересечёт уровень, придёт уведомление. Удалить — крестиком под графиком или правым кликом по линии.</li>
+        <li><b>Второй таймфрейм:</b> кнопка «2 ТФ» (или T) показывает ту же монету на старшем таймфрейме. В режиме ⤢ (F) графики стоят рядом.</li>
+        <li><b>Позиции ботов:</b> зелёная зона — от входа до тейка, красная — от входа до стопа.</li>
+      </ul>
       <h3>Быстрый поиск</h3>
       <p>Кнопка «Поиск» или <kbd>Ctrl</kbd> + <kbd>K</kbd>: наберите монету (btc, sol), раздел или настройку — например «плечо», «риск», «бэктест» — и нажмите Enter.</p>
       <p class="mute" style="font-size:13px">Сервис учебный: торговля бумажная, ордера на биржу не отправляются. Это не инвестиционный совет.</p>
@@ -958,6 +980,7 @@ async function scan() {
     });
     if (!scanQueued) { // settings changed during the scan → results are stale, the queued scan replaces them
       const prevSig = new Set(rows.filter(r => r.rev).map(r => r.sym));
+      const prevPx = new Map(rows.map(r => [r.sym, r.price]));   // for the user's level-crossing alerts
       rows = res; cache = fresh; lastScan = Date.now();
       const newSig = prevScanDone ? rows.filter(r => r.rev && r.score >= S.minScore && !prevSig.has(r.sym)) : [];
       if (newSig.length) {
@@ -965,6 +988,7 @@ async function scan() {
         const r0 = newSig[0];
         notifyUser(`${r0.side === 'low' ? '▲ LONG' : '▼ SHORT'} ${pair(r0.sym)} — новый сигнал`, `сила ${r0.score}${newSig.length > 1 ? ` · ещё ${newSig.length - 1}` : ''} · клик — открыть график`, 'warn', () => { openCoin(r0.sym); });
       }
+      for (const r of rows) if (ULV[r.sym]) checkLevels(r.sym, prevPx.get(r.sym), r.price);
       prevScanDone = true; scanErr = null;
       runBot();
       renderCards(); renderTable(); renderJournal(); renderDetail();
@@ -1075,7 +1099,7 @@ function renderChart(cv, d, o = {}) {
   const eView = Math.max(s + 1, o.to ?? n - 1), e = Math.min(eView, n - 1);
   // the right gutter is as wide as the longest price tag, so tags are never cut and no space is wasted
   g.font = '11px system-ui';
-  const tagW = Math.max(...[...(o.levels || []).map(L => `${L.tag || ''} ${fp(L.v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1])].map(x => g.measureText(x).width));
+  const tagW = Math.max(...[...(o.levels || []).map(L => `${L.tag || ''} ${fp(L.v)}`), ...(o.ulevels || []).map(v => `ур. ${fp(v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1])].map(x => g.measureText(x).width));
   const padL = 8, padR = clamp(Math.ceil(tagW) + 18, 56, 130), pH = Math.round(H * 0.7), vTop = pH + 24, vH = Math.round(H * 0.08), rTop = vTop + vH + 22, rH = H - rTop - 6;
   const cnt = eView - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
   const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i <= e ? t[i] : t[e] + (i - e) * step;
@@ -1085,7 +1109,9 @@ function renderChart(cv, d, o = {}) {
   for (let i = s; i <= e; i++) { acc(B.up[i]); acc(B.lo[i]); if (candles) { acc(h[i]); acc(l[i]); } else acc(c[i]); }
   for (const L of o.levels || []) acc(L.v);
   const pad = (mx - mn) * 0.06 || mx * 0.01; mn -= pad; mx += pad;
-  const Y = x => 8 + (mx - x) / (mx - mn) * (pH - 16);
+  // the price pane starts below the toolbar (top-left corner) where there is one over the canvas
+  const T0 = o.top ?? 8, ph = pH - T0 - 8;
+  const Y = x => T0 + (mx - x) / (mx - mn) * ph;
   // price scale: round levels across the plot; their labels are drawn later, only where no price tag sits
   const raw = (mx - mn) / 5, mag = raw > 0 ? 10 ** Math.floor(Math.log10(raw)) : 0, stepP = mag ? [1, 2, 2.5, 5, 10].find(m => m * mag >= raw) * mag : 0;
   const gridV = []; if (stepP) for (let v = Math.ceil(mn / stepP) * stepP; v <= mx && gridV.length < 12; v += stepP) gridV.push(v);
@@ -1138,10 +1164,24 @@ function renderChart(cv, d, o = {}) {
     if (x1 < W - padR) { g.strokeStyle = L.col + '55'; g.beginPath(); g.moveTo(x1, Y(L.v)); g.lineTo(W - padR, Y(L.v)); g.stroke(); } // faded after the exit
     tags.push({y:Y(L.v), text:`${L.tag || ''} ${fp(L.v)}`.trim(), col:L.col, box:true});
   }
+  // entry / exit marks; their labels step away from each other when a short trade puts them on top of one another
+  const placed = [];
   for (const m of o.marks || []) {
     if (m.i < s || m.i > e) continue;
     g.beginPath(); g.arc(X(m.i), Y(m.price), 5, 0, 7); g.fillStyle = m.col; g.fill(); g.strokeStyle = PC.canvas; g.lineWidth = 2; g.stroke();
-    if (m.label) { const w = g.measureText(m.label).width, lx = X(m.i) + 8 + w > W - padR ? X(m.i) - 8 - w : X(m.i) + 8; g.fillStyle = m.col; g.fillText(m.label, lx, Y(m.price) + (m.below ? 14 : -12)); }
+    if (!m.label) continue;
+    const w = g.measureText(m.label).width, lx = X(m.i) + 8 + w > W - padR ? X(m.i) - 8 - w : X(m.i) + 8, dir = m.below ? 1 : -1;
+    let ly = Y(m.price) + (m.below ? 14 : -12);
+    for (let k = 0; k < 6 && placed.some(p => lx < p.x + p.w + 4 && p.x < lx + w + 4 && Math.abs(p.y - ly) < 13); k++) ly += dir * 14;
+    placed.push({x:lx, y:ly, w});
+    g.fillStyle = PC.tip; g.fillRect(lx - 3, ly - 7, w + 6, 14);   // a backing so the label reads over candles
+    g.fillStyle = m.col; g.fillText(m.label, lx, ly);
+  }
+  // the user's own horizontal levels: solid line across the view, price tag in the gutter
+  for (const v of o.ulevels || []) {
+    if (!(v >= mn && v <= mx)) continue;
+    g.strokeStyle = PC.rsi; g.lineWidth = 1.2; g.beginPath(); g.moveTo(padL, Y(v)); g.lineTo(W - padR, Y(v)); g.stroke();
+    tags.push({y:Y(v), text:`ур. ${fp(v)}`, col:PC.rsi, box:true});
   }
   const cur = o.live ? c[n - 1] : c[e];
   if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = PC.acc + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
@@ -1150,7 +1190,7 @@ function renderChart(cv, d, o = {}) {
   tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur), col:PC.acc, box:true});
   // spread tags so they never overlap: sort by y, push down, then shift the stack up if it ran past the bottom
   tags.sort((a, b) => a.y - b.y);
-  for (let q = 0; q < tags.length; q++) tags[q].ty = Math.max(clamp(tags[q].y, 8, pH - 6), q ? tags[q-1].ty + 15 : 8);
+  for (let q = 0; q < tags.length; q++) tags[q].ty = Math.max(clamp(tags[q].y, T0, pH - 6), q ? tags[q-1].ty + 15 : T0);
   const over = tags.length ? tags[tags.length - 1].ty - (pH - 6) : 0;
   if (over > 0) for (let q = tags.length - 1; q >= 0; q--) tags[q].ty = Math.min(tags[q].ty - over, q < tags.length - 1 ? tags[q+1].ty - 15 : Infinity);
   g.font = '11px system-ui'; g.fillStyle = PC.axis;
@@ -1201,17 +1241,19 @@ function renderChart(cv, d, o = {}) {
     g.fillStyle = PC.price; txt.forEach((s2, k) => g.fillText(s2, bx + 8, by + 10 + k * 17));
     // crosshair: the price under the cursor on the right scale, the bar's time on the time axis
     const hy = o.hoverY;
-    if (hy != null && hy >= 8 && hy <= pH - 8) {
-      const price = mx - (hy - 8) / (pH - 16) * (mx - mn), lbl = fp(price), lw = g.measureText(lbl).width + 10;
+    if (hy != null && hy >= T0 && hy <= pH - 8) {
+      const price = mx - (hy - T0) / ph * (mx - mn), lbl = fp(price), lw = g.measureText(lbl).width + 10;
       g.setLineDash([3, 3]); g.strokeStyle = PC.cross; g.beginPath(); g.moveTo(padL, hy); g.lineTo(W - padR, hy); g.stroke(); g.setLineDash([]);
       g.fillStyle = PC.cross; g.fillRect(W - padR + 2, hy - 9, lw, 18); g.fillStyle = PC.canvas; g.fillText(lbl, W - padR + 7, hy);
     }
     const tl = dt(t[hi]), tw = g.measureText(tl).width + 10, tx = clamp(x - tw / 2, padL, W - padR - tw);
     g.fillStyle = PC.cross; g.fillRect(tx, pH - 2, tw, 17); g.fillStyle = PC.canvas; g.fillText(tl, tx + 5, pH + 6);
   }
-  return {s, e, padL, bw};
+  return {s, e, padL, padR, bw, mn, mx, pH, W, T0, ph};   // enough to turn a pointer position back into a bar and a price
 }
 const hoverIndex = (geo, cv, ev) => geo ? geo.s + Math.floor((ev.clientX - cv.getBoundingClientRect().left - geo.padL) / geo.bw) : null;
+// the price under a pointer, or null outside the price pane
+const priceAt = (geo, cv, ev) => { if (!geo) return null; const y = ev.clientY - cv.getBoundingClientRect().top; return y >= geo.T0 && y <= geo.pH - 8 ? geo.mx - (y - geo.T0) / geo.ph * (geo.mx - geo.mn) : null; };
 
 // ---------- zoom & pan: view = {span, endOff} — bars visible, bars hidden on the right; null = default ----------
 function viewRange(n, minFrom, view, defSpan) {
@@ -1236,14 +1278,15 @@ function attachZoom(cv, api) {
   }, {passive:false});
   const down = x => { const st = api.state(); if (!st?.geo) return; const r = range(st); drag = {x, endOff:r.endOff, span:r.span, bw:st.geo.bw}; };
   const move = x => { if (!drag) return false; api.set({span:drag.span, endOff:drag.endOff + Math.round((x - drag.x) / drag.bw)}); return true; };
-  cv.addEventListener('mousedown', e => { down(e.clientX); cv.style.cursor = 'grabbing'; });
+  // api.pick(e) gets the first say on a press (e.g. placing a level); when it takes it, there is no drag
+  cv.addEventListener('mousedown', e => { if (e.button !== 0 || api.pick?.(e)) return; down(e.clientX); cv.style.cursor = 'grabbing'; });
   window.addEventListener('mousemove', e => { if (move(e.clientX)) e.preventDefault(); });
   window.addEventListener('mouseup', () => { drag = null; cv.style.cursor = ''; });
   // touch: one finger pans, two fingers pinch-zoom (the canvas allows only vertical page scroll, so the browser doesn't zoom the page)
   let pinch = null;
   const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
   cv.addEventListener('touchstart', e => {
-    if (e.touches.length === 1) down(e.touches[0].clientX);
+    if (e.touches.length === 1 && !api.pick?.(e.touches[0])) down(e.touches[0].clientX);
     if (e.touches.length === 2) { const st = api.state(); if (!st?.geo) return; const r = range(st); pinch = {d:dist(e.touches), span:r.span, endOff:r.endOff}; drag = null; }
   }, {passive:true});
   cv.addEventListener('touchmove', e => {
@@ -1265,7 +1308,7 @@ function attachZoom(cv, api) {
   const bar = document.createElement('div'); bar.className = 'ctools';
   bar.innerHTML = `<button data-z="out" title="Отдалить (−)" aria-label="Отдалить">−</button><button data-z="in" title="Приблизить (+)" aria-label="Приблизить">+</button>`
     + `<button data-z="reset" title="Обычный вид (0 или двойной клик)" aria-label="Обычный вид">⟲</button>`
-    + (api.expand ? `<button data-z="expand" title="Развернуть график на всю ширину (F)" aria-label="Развернуть график">⤢</button>` : '')
+    + (api.tools || '') + (api.expand ? `<button data-z="expand" title="Развернуть график на всю ширину (F)" aria-label="Развернуть график">⤢</button>` : '')
     + `<button data-z="latest" class="ct-latest" title="К последней свече (End)">к последней свече →</button>`;
   cv.parentElement.appendChild(bar);
   // "to the latest candle" shows up only when the view has been scrolled into the past
@@ -1275,6 +1318,7 @@ function attachZoom(cv, api) {
     const z = e.target.closest('[data-z]')?.dataset.z;
     if (z === 'in') ctl.zoom(1 / 1.4); if (z === 'out') ctl.zoom(1.4); if (z === 'latest') ctl.latest(); if (z === 'reset') ctl.reset();
     if (z === 'expand') api.expand();
+    else if (z && !['in', 'out', 'latest', 'reset'].includes(z) && api.onTool) api.onTool(z, e.target.closest('[data-z]'));
   };
   cv.addEventListener('mousedown', () => cv.focus({preventScroll:true}));
   cv.addEventListener('keydown', e => {
@@ -1283,7 +1327,7 @@ function attachZoom(cv, api) {
     else if (k === '+' || k === '=') ctl.zoom(1 / 1.4); else if (k === '-' || k === '_') ctl.zoom(1.4);
     else if (k === 'End') ctl.latest(); else if (k === '0') ctl.reset();
     else if ((k === 'f' || k === 'F' || k === 'а' || k === 'А') && api.expand) bar.querySelector('[data-z=expand]').click();
-    else return;
+    else if (!api.key?.(k.toLowerCase())) return;
     e.preventDefault();
   });
   return {sync};
@@ -1291,9 +1335,9 @@ function attachZoom(cv, api) {
 const barAt = (t, time) => { let i = 0; while (i + 1 < t.length && t[i + 1] <= time) i++; return i; };
 
 // ---------- market chart ----------
-let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, hoverY = null, chartGeo = null, chartView = null, zm = null;
+let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, hoverY = null, chartGeo = null, chartView = null, zm = null, lastPx = {};
 async function loadChart(sym) {
-  if (sym && sym !== chartSym) chartView = null;
+  if (sym && sym !== chartSym) { chartView = null; chart2View = null; }
   chartSym = sym || chartSym; save('sr_chart', chartSym);
   if (page === 'market') setHash();
   const req = ++chartReq, want = chartSym;
@@ -1307,6 +1351,7 @@ async function loadChart(sym) {
     $('#ctitle').textContent = /HTTP 400/.test(e.message) ? `${pair(want)} — такой пары нет на Binance. Нужна монета к USDT, например BTC или SOL.` : `${pair(want)} — не удалось загрузить график (${e.message || 'нет связи'}). Попробуем снова через минуту.`;
   }
   document.querySelectorAll('tr.row[data-sym]').forEach(tr => tr.classList.toggle('sel', tr.dataset.sym === chartSym));
+  renderLv(); loadTf2();
 }
 function computeChart() {
   if (!chartK) return;
@@ -1314,6 +1359,9 @@ function computeChart() {
   const N = effN(d.c.length);
   chart = Object.assign(d, {sym:chartSym, N, B:bands(d.c, N, S.k, S.method), R:rsi(d.c)});
   const i = d.c.length - 1, B = chart.B;
+  // levels on a coin the scanner doesn't cover are checked here, on each chart refresh
+  if (lastPx.sym === chartSym && !rows.some(r => r.sym === chartSym)) checkLevels(chartSym, lastPx.p, d.c[i]);
+  lastPx = {sym:chartSym, p:d.c[i]};
   const pB = (d.c[i] - B.lo[i]) / (B.up[i] - B.lo[i]), hl = halfLife(d.c, B.mid);
   const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
   const fav = favs.has(chartSym);
@@ -1326,6 +1374,8 @@ function computeChart() {
 const myOpen = () => BP.where === 'server' ? (SB_MINE?.open || []) : J.open;
 const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})), ...myOpen().map(p => ({p, who:'мой'}))];
 // by default show as many candles as fit as real candles (≈5 px each), within the history the user loads
+// room for the toolbar over the top-left of the canvas; on phones the toolbar sits above the canvas instead
+const chartTop = () => matchMedia('(max-width:700px)').matches ? 8 : 44;
 const chartDefSpan = () => Math.min(S.candles, Math.max(80, Math.round($('#cv').clientWidth / 5)));
 function drawChart() {
   if (!chart) return;
@@ -1337,7 +1387,8 @@ function drawChart() {
     zones.push({i0, entry:p.entry, tp:p.tp, sl:p.sl});
   }
   const r = viewRange(chart.c.length, chart.N - 1, chartView, chartDefSpan());
-  chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, zones, live:true, hoverI, hoverY});
+  chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, zones, ulevels:lvOf(chartSym), live:true, hoverI, hoverY, top:chartTop()});
+  drawChart2();   // the second timeframe follows every redraw (theme, positions, levels)
   zm?.sync();   // show or hide «к последней свече»
 }
 
@@ -1964,7 +2015,7 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
 function drawCard() {
   if (!tcard) return;
   const r = viewRange(tcard.d.c.length, tcard.minFrom, tcard.view, tcard.defSpan);
-  tcard.opts.from = r.from; tcard.opts.to = r.to;
+  tcard.opts.from = r.from; tcard.opts.to = r.to; tcard.opts.top = chartTop();
   tcard.geo = renderChart($('#tcv'), tcard.d, tcard.opts);
 }
 function closeModal() { $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null; }
@@ -2018,7 +2069,8 @@ function btEstimate() {
   if (s.custom && !s.custom.length) { $('#btStatus').textContent = 'Впишите монеты через запятую, например: BTC, ETH, SOL.'; return; }
   const req = Math.ceil(bars / 1000) * s.top;
   const sec = Math.max(5, Math.round(req * 0.2 / 5) * 5);
-  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.top} монет. Повторные — мгновенно.`;
+  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.top} монет. Повторные — мгновенно.`
+    + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '');
 }
 async function runBacktest() {
   if (btBusy) return;
@@ -2138,6 +2190,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.6', date:'6 октября 2026', title:'Свои уровни и второй таймфрейм', items:[
+    'Свои уровни на графике: кнопка «— уровень» (или L), затем нажмите на нужную цену. Когда цена пересечёт уровень, придёт уведомление. Уровни хранятся для каждой монеты; удалить — крестиком под графиком или правым кликом по линии.',
+    'Второй таймфрейм: кнопка «2 ТФ» (или T) показывает ту же монету на старшем таймфрейме — по умолчанию 15м → 4ч, 1ч → 1д. В режиме «во всю ширину» графики стоят рядом.',
+    'В карточке короткой сделки подписи «вход» и «выход» больше не налезают друг на друга.',
+    'Бэктест подсказывает, как сделать долгий запуск быстрее.',
+    'В справке — раздел про управление графиком; в быстром поиске — «уровень», «второй таймфрейм», «развернуть график».',
+  ]},
   {v:'2.5', date:'6 октября 2026', title:'Удобный график', items:[
     'График стал больше: на компьютере он шире списка монет и выше, цена занимает большую часть высоты. Кнопка ⤢ (или клавиша F) разворачивает его на всю ширину — список уходит под него, выбор запоминается.',
     'По умолчанию видно столько свечей, сколько помещается настоящими свечами, а не линией. Отдалить — колёсиком, кнопкой − или двумя пальцами; сколько истории загружать — в настройках («История»).',
@@ -2662,8 +2721,102 @@ const setWide = on => {
   requestAnimationFrame(drawChart);
 };
 zm = attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:chartDefSpan(), view:chartView, geo:chartGeo},
-  set:v => { chartView = v; drawChart(); }, expand:() => setWide(!document.body.classList.contains('wide'))});
+  set:v => { chartView = v; drawChart(); }, expand:() => setWide(!document.body.classList.contains('wide')),
+  tools:`<button data-z="level" class="ct-txt" title="Провести свой уровень (L): нажмите на график на нужной цене" aria-label="Свой уровень">— уровень</button>`
+    + `<button data-z="tf2" class="ct-txt" title="Второй таймфрейм рядом (T)" aria-label="Второй таймфрейм">2 ТФ</button>`,
+  onTool:z => { if (z === 'level') setLevelMode(!levelMode); if (z === 'tf2') setTf2(!tf2On); },
+  key:k => { if (k === 'l' || k === 'д') { setLevelMode(!levelMode); return true; } if (k === 't' || k === 'е') { setTf2(!tf2On); return true; } return false; },
+  pick:e => pickLevel(e, chartGeo, $('#cv'))});
 if (load('sr_wide', false)) setWide(true);
+// ---------- the user's own levels: per coin, kept in this browser; crossing one sends a notification ----------
+let ULV = load('sr_lv', {}), levelMode = false;
+const lvOf = sym => ULV[sym] || [];
+function renderLv() {
+  const L = lvOf(chartSym);
+  $('#ulv').innerHTML = L.length ? `<span class="faint">Ваши уровни ${base(chartSym)}:</span>`
+    + L.map((v, i) => `<button class="chipb" data-ulv="${i}" title="Удалить уровень" aria-label="Удалить уровень ${fp(v)}">${fp(v)} ✕</button>`).join('') : '';
+}
+function setLv(L) { if (L.length) ULV[chartSym] = L; else delete ULV[chartSym]; save('sr_lv', ULV); renderLv(); drawChart(); }
+function setLevelMode(on) {
+  levelMode = on;
+  document.querySelectorAll('#cv, #cv2').forEach(c => c.classList.toggle('picking', on));
+  document.querySelectorAll('[data-z=level]').forEach(b => b.classList.toggle('on', on));
+  if (on) toast('Нажмите на график на нужной цене', 'появится ваш уровень; когда цена его пересечёт — придёт уведомление. Нажать рядом с уровнем — удалить его', 'info', null, 5000);
+}
+// a press in level mode: next to an existing level (within 6 px) removes it, elsewhere adds one
+function pickLevel(e, geo, canvas) {
+  if (!levelMode) return false;
+  const p = priceAt(geo, canvas, e); if (p == null) return true;
+  const px = v => Math.abs(v - p) / (geo.mx - geo.mn) * geo.ph, L = [...lvOf(chartSym)], i = L.findIndex(v => px(v) < 6);
+  if (i >= 0) L.splice(i, 1); else if (L.length < 10) L.push(+p.toPrecision(5)); else toast('Не больше 10 уровней на монету', '', 'warn');
+  setLv(L.sort((a, b) => b - a)); setLevelMode(false);
+  return true;
+}
+// right-click next to a level removes it, without entering level mode
+function dropLevelAt(e, geo, canvas) {
+  const p = priceAt(geo, canvas, e); if (p == null) return;
+  const L = [...lvOf(chartSym)], i = L.findIndex(v => Math.abs(v - p) / (geo.mx - geo.mn) * geo.ph < 6);
+  if (i >= 0) { e.preventDefault(); L.splice(i, 1); setLv(L); }
+}
+$('#ulv').onclick = e => { const b = e.target.closest('[data-ulv]'); if (!b) return; const L = [...lvOf(chartSym)]; L.splice(+b.dataset.ulv, 1); setLv(L); };
+$('#cv').addEventListener('contextmenu', e => dropLevelAt(e, chartGeo, $('#cv')));
+$('#cv2').addEventListener('contextmenu', e => dropLevelAt(e, chart2Geo, $('#cv2')));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && levelMode) setLevelMode(false); });
+// crossing check: called with the previous and the new price of a coin
+function checkLevels(sym, prev, now) {
+  if (!(prev > 0) || !(now > 0) || prev === now) return;
+  for (const v of lvOf(sym)) if ((prev - v) * (now - v) < 0) {
+    if (sound) beep();
+    notifyUser(`${pair(sym)} пересекла ваш уровень ${fp(v)}`, `цена ${fp(prev)} → ${fp(now)} · ${now > v ? 'снизу вверх' : 'сверху вниз'}`, 'warn', () => openCoin(sym));
+  }
+}
+
+// ---------- second timeframe next to the main chart ----------
+const TF_NEXT = {'5m':'1h', '15m':'4h', '1h':'1d', '4h':'1d', '1d':'1w', '1w':'1d'};
+let tf2On = load('sr_tf2', false), tf2Pref = load('sr_tf2tf', null), chart2 = null, chart2View = null, chart2Geo = null, hover2 = null, hover2Y = null, tf2Req = 0, zm2 = null;
+const tf2Now = () => tf2Pref && tf2Pref !== S.tf ? tf2Pref : TF_NEXT[S.tf];   // never the same timeframe as the main chart
+async function loadTf2() {
+  if (!tf2On) return;
+  const tf = tf2Now(), want = chartSym, req = ++tf2Req;
+  document.querySelectorAll('#tf2seg .tab').forEach(b => b.classList.toggle('on', b.dataset.tf2 === tf));
+  try {
+    const K = await api(`/api/v3/klines?symbol=${want}&interval=${tf}&limit=${Math.min(1000, S.N + 400)}`);
+    if (req !== tf2Req) return;
+    const d = parse(K), N = tf === '1d' || tf === '1w' ? Math.max(20, Math.min(S.N, d.c.length - 20)) : S.N;
+    if (d.c.length < N + 10) { chart2 = null; $('#tf2stat').textContent = `на ${tf} у монеты мало истории для канала`; renderChart($('#cv2'), null); return; }
+    chart2 = Object.assign(d, {sym:want, tf, N, B:bands(d.c, N, S.k, S.method), R:rsi(d.c)});
+    const i = d.c.length - 1, pB = (d.c[i] - chart2.B.lo[i]) / (chart2.B.up[i] - chart2.B.lo[i]);
+    $('#tf2stat').textContent = `· ${(pB * 100).toFixed(0)}% диапазона на ${tf}`;
+    drawChart2();
+  } catch { if (req === tf2Req) $('#tf2stat').textContent = '· не удалось загрузить'; }
+}
+const chart2DefSpan = () => chart2 ? Math.min(chart2.c.length - chart2.N, Math.max(60, Math.round($('#cv2').clientWidth / 5))) : 100;
+function drawChart2() {
+  if (!tf2On || !chart2 || chart2.sym !== chartSym) return;
+  const levels = [], zones = [];
+  for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym)) {
+    const i0 = barAt(chart2.t, p.time);
+    levels.push({v:p.entry, col:PC.trade, tag:who === 'общий' ? 'общ.' : 'мой', i0}, {v:p.tp, col:PC.lo, tag:'TP', i0}, {v:p.sl, col:PC.up, tag:'SL', i0});
+    zones.push({i0, entry:p.entry, tp:p.tp, sl:p.sl});
+  }
+  const r = viewRange(chart2.c.length, chart2.N - 1, chart2View, chart2DefSpan());
+  chart2Geo = renderChart($('#cv2'), chart2, {from:r.from, to:r.to, levels, zones, ulevels:lvOf(chartSym), live:true, hoverI:hover2, hoverY:hover2Y, top:chartTop()});
+  zm2?.sync();
+}
+function setTf2(on) {
+  tf2On = on; save('sr_tf2', on);
+  $('#tf2box').classList.toggle('hidden', !on); $('#cpair').classList.toggle('two', on);
+  document.querySelectorAll('[data-z=tf2]').forEach(b => b.classList.toggle('on', on));
+  if (on) { chart2View = null; loadTf2(); }
+  requestAnimationFrame(() => { drawChart(); drawChart2(); });   // in wide mode the main chart gets narrower
+}
+document.querySelectorAll('#tf2seg .tab').forEach(b => b.onclick = () => { tf2Pref = b.dataset.tf2; save('sr_tf2tf', tf2Pref); chart2View = null; loadTf2(); });
+const cv2 = $('#cv2');
+cv2.onmousemove = e => { hover2 = hoverIndex(chart2Geo, cv2, e); hover2Y = e.clientY - cv2.getBoundingClientRect().top; drawChart2(); };
+cv2.onmouseleave = () => { hover2 = null; hover2Y = null; drawChart2(); };
+zm2 = attachZoom(cv2, {state:() => chart2 && {n:chart2.c.length, minFrom:chart2.N - 1, defSpan:chart2DefSpan(), view:chart2View, geo:chart2Geo},
+  set:v => { chart2View = v; drawChart2(); }, pick:e => pickLevel(e, chart2Geo, cv2)});
+if (tf2On) setTf2(true);
 attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
 
 $('#btRun').onclick = runBacktest;
@@ -2722,6 +2875,9 @@ const CMD_SETTINGS = [
   {label:'Уведомления браузера', kw:['уведомлен', 'notification', 'колокол', 'push'], run:() => focusEl('#ntf')},
   {label:'Звук сигнала', kw:['звук', 'sound', 'beep'], run:() => $('#snd').click()},
   {label:'Светлая или тёмная тема', kw:['тема', 'theme', 'светл', 'тёмн', 'темн', 'dark', 'light'], run:() => $('#thm').click()},
+  {label:'Провести свой уровень на графике', kw:['уровень', 'level', 'линия', 'line', 'алерт', 'alert', 'оповещ'], run:() => { go('market'); if (isPhone()) openSheet(); setLevelMode(true); }},
+  {label:'Второй таймфрейм рядом', kw:['второй', 'таймфрейм', 'два', '2 тф', 'mtf', 'старш'], run:() => { go('market'); if (isPhone()) openSheet(); if (!tf2On) setTf2(true); focusEl('#cv2'); }},
+  {label:'Развернуть график на всю ширину', kw:['развернуть', 'шире', 'весь экран', 'fullscreen', 'wide', 'график'], run:() => { go('market'); setWide(true); focusEl('#cv'); }},
 ];
 let cmdItems = [], cmdIdx = 0, cmdBack = null;
 const recentGet = () => load('sr_recent', []);
