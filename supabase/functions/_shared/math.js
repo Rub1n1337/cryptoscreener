@@ -248,7 +248,7 @@ export function snapshot(r, S) {
            slope: r.slope, brk: r.brk, er: r.er, mkt: r.mkt ?? null, regime: regimeOf(r.mkt, S),
            settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0,
                        rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0, erMax: S.erMax ?? 0.15,
-                       regimeOnly: S.regimeOnly || (S.flatOnly ? 'flat' : 'any'), regimeSrc: S.regimeSrc || 'btc', coinErMax: S.coinErMax || 0 } };
+                       regimeOnly: S.regimeOnly || (S.flatOnly ? 'flat' : 'any'), regimeSrc: S.regimeSrc || 'btc', coinErMax: S.coinErMax || 0, timeStop: S.timeStop ?? TIME_STOP } };
 }
 
 // ---------- trading rules ----------
@@ -268,7 +268,7 @@ export function planEntry(r, balance, S, now) {
   const qty = Math.min(balance * risk / (e * slD), balance * lev / MAX_OPEN / e);
   if (!(qty > 0)) return null;
   const sl = e * (1 - sg * slD);
-  return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf],
+  return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf], ts: S.timeStop ?? TIME_STOP,
            risk: Math.abs(e - sl) * qty, snap: { ...snapshot(r, S), lev: e * qty / balance, riskPct: Math.abs(e - sl) * qty / balance * 100 },
            note: `${brk ? (sg > 0 ? 'пробой вверх' : 'пробой вниз') : r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · сила ${r.score}` };
 }
@@ -286,7 +286,9 @@ export function checkExit(p, K, now) {
   const c = +K[K.length - 1][4]; p.last = c;
   if (p.side === 'LONG' ? c <= p.sl : c >= p.sl) return { exit: c * (1 - sg * SLIP), reason: 'стоп' };
   if (p.side === 'LONG' ? c >= p.tp : c <= p.tp) return { exit: p.tp, reason: 'тейк' };
-  if (now - p.time > TIME_STOP * p.tfms) return { exit: c * (1 - sg * SLIP), reason: 'тайм-стоп' };
+  // time stop in bars, set per position at entry (S.timeStop; 0 = off); older positions without it use the default
+  const ts = p.ts ?? TIME_STOP;
+  if (ts > 0 && now - p.time > ts * p.tfms) return { exit: c * (1 - sg * SLIP), reason: 'тайм-стоп' };
   return null;
 }
 export function closeTrade(p, exit, reason, now) {
@@ -388,7 +390,7 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
       const sg = p.side === 'LONG' ? 1 : -1;
       if (p.side === 'LONG' ? Q.l[j] <= p.sl : Q.h[j] >= p.sl) close(p, p.sl * (1 - sg * SLIP), 'стоп', T);
       else if (p.side === 'LONG' ? Q.h[j] >= p.tp : Q.l[j] <= p.tp) close(p, p.tp, 'тейк', T);
-      else if (j - p.ei >= TIME_STOP) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
+      else if (p.ts > 0 && j - p.ei >= p.ts) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
     }
     if (open.length < MAX_OPEN) {
       const cands = [], mkt = BTC ? marketOf(s => regAt(s, T)) : null;

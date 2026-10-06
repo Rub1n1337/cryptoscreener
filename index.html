@@ -703,6 +703,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <label class="fl">Фильтр T½ <select id="pfHL"><option value="0">выкл</option><option value="40">T½ ≤ 40</option><option value="20">T½ ≤ 20</option></select></label>
           <label class="fl">Тренд монеты <select id="pfCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
           <label class="fl" title="Флэт — когда BTC, ETH и SOL все в боковике (порог ER выше, в настройках бота)">Входить <select id="pfReg"><option value="any">в любом рынке</option><option value="flat">только во флэте</option><option value="impulse">только в импульсе</option></select></label>
+          <label class="fl" title="Закрыть сделку по рынку, если за это число свечей не сработали ни тейк, ни стоп">Тайм-стоп <select id="pfTS"><option value="0">выкл — ждать тейк или стоп</option><option value="24">24 свечи</option><option value="48">48 свечей</option><option value="96">96 свечей</option></select></label>
           <label class="fl inl"><input type="checkbox" id="pfLong"> только LONG</label>
         </div>
         <div class="row pfbar" id="pfBar" style="margin-top:12px"><span class="pfbt" id="pfBarT"></span><button id="pfSave" class="primary">Сохранить профиль</button><button id="pfCancel">Отмена</button></div>
@@ -748,6 +749,7 @@ details.dis>.dbody{padding:0 16px 16px}
         <label class="fl" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:80px"></label>
         <label class="fl" title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
         <label class="fl" title="Входить, только если ширина канала (от нижней до верхней границы) не меньше заданного процента от цены. Чем шире канал, тем больше ход к центру">Мин. ширина канала <select id="btW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option><option value="12">≥ 12%</option></select></label>
+        <label class="fl" title="Закрыть сделку по рынку, если за это число свечей не сработали ни тейк, ни стоп">Тайм-стоп <select id="btTS"><option value="0">выкл</option><option value="24">24 свечи</option><option value="48">48 свечей</option><option value="96">96 свечей</option></select></label>
         <label class="fl" title="Модель канала">Модель <select id="btMethod">
           <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
         </select></label>
@@ -835,7 +837,7 @@ details.dis>.dbody{padding:0 16px 16px}
         <b>T½</b><span>За сколько монета обычно проходит половину пути обратно к своей цене. ∞ — монета в тренде.</span>
         <b>LONG / SHORT</b><span>Ставка на рост / на падение.</span>
         <b>Тейк и стоп</b><span>Цена фиксации прибыли и цена ограничения убытка. Задаются сразу при входе.</span>
-        <b>Тайм-стоп</b><span>Выход по рынку, если за 48 свечей не сработали ни тейк, ни стоп.</span>
+        <b>Тайм-стоп</b><span>Выход по рынку, если за N свечей не сработали ни тейк, ни стоп (по умолчанию 48). Освобождает место для свежего сигнала, когда цена «застряла». В профиле можно выключить или поменять.</span>
         <b>Риск, 1R</b><span>Сколько потеряем, если сработает стоп. Бот рискует 2% баланса на сделку.</span>
         <b>R</b><span>Итог сделки в рисках: +1.5R — заработали в полтора раза больше, чем рисковали; −1R — полный стоп.</span>
         <b>Средний результат</b><span>Средний R на сделку после комиссий. Больше нуля — у стратегии есть преимущество. Главная цифра журнала.</span>
@@ -863,7 +865,7 @@ details.dis>.dbody{padding:0 16px 16px}
         <li>Вход по рынку при силе ≥ порога (у общего бота 60). Не больше 3 позиций, повтор по той же монете — не раньше чем через 4 свечи.</li>
         <li>Тейк — у обычной цены, 1–3% хода; стоп — 1.5·ATR(14), 0.8–2.5%. Если тейк меньше 0.8 стопа — сделка пропускается.</li>
         <li>Размер позиции — чтобы стоп стоил 2% баланса, но не больше трети баланса.</li>
-        <li>Если за одну свечу задеты и тейк, и стоп — считаем стоп. Через 48 свечей — выход по рынку.</li>
+        <li>Если за одну свечу задеты и тейк, и стоп — считаем стоп. Тайм-стоп: через N свечей (по умолчанию 48, настраивается в профиле, можно выключить) — выход по рынку.</li>
       </ul>
     </div></details>
   </section>
@@ -1452,7 +1454,7 @@ function renderDetail() {
 // ---------- my bot (browser): profiles ----------
 // A profile = which coins + which rules. "Auto" picks the flat or the impulse profile from the BTC/ETH/SOL regime.
 const cleanName = s => String(s || '').replace(/[<>&"'`]/g, '').trim().slice(0, 60) || 'Профиль';
-const PROFILE_DEF = {method:'log', N:210, k:3, tf:'15m', minScore:60, strategy:'revert', rr:0, risk:0.02, lev:1, minWidth:0, maxHL:0, longOnly:false, coinErMax:0, regimeOnly:'any'};
+const PROFILE_DEF = {method:'log', N:210, k:3, tf:'15m', minScore:60, strategy:'revert', rr:0, risk:0.02, lev:1, minWidth:0, maxHL:0, longOnly:false, coinErMax:0, regimeOnly:'any', timeStop:48};
 const PRESETS = [
   {id:'p-flat1h', name:'Боковик · 1h (проверен за год)', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'1h', rr:2, risk:0.01, lev:3, regimeOnly:'flat'}},
   {id:'p-flat', name:'Боковик · 15m', coins:{mode:'top', top:150}, set:{...PROFILE_DEF}},
@@ -1471,6 +1473,7 @@ const profSummary = p => { const s = profSet(p);
   return `${s.tf} · ${METHOD_NAME[s.method]} ${s.N}/${s.k} · ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · сила ≥ ${s.minScore} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}×`
     + (s.minWidth ? ` · ширина ≥ ${s.minWidth}%` : '') + (s.maxHL ? ` · T½ ≤ ${s.maxHL}` : '') + (s.coinErMax ? ` · без трендовых монет` : '')
     + (s.regimeOnly === 'flat' ? ' · только когда BTC, ETH, SOL во флэте' : s.regimeOnly === 'impulse' ? ' · только в импульсе' : '')
+    + (s.timeStop ? ` · тайм-стоп ${s.timeStop} свечей` : ' · без тайм-стопа')
     + ` · ${p.coins.mode === 'list' ? p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}`; };
 let botRegime = null, botBusy = false, tickerCache = null, botProfile = null;
 // regime: BTC/ETH/SOL on hourly candles, efficiency ratio over 7 days
@@ -1584,7 +1587,7 @@ function cleanProfile(p) {
     // values offered as lists in the form snap to the nearest option, so editing an imported profile never shows an empty field
     strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:near(s.rr, [0, 1.5, 2, 3], 0), risk:near(s.risk, [0.005, 0.01, 0.02, 0.03], D.risk),
     lev:near(s.lev, [1, 2, 3, 5, 10], 1), minWidth:near(s.minWidth, [0, 3, 5, 8], 0), maxHL:near(s.maxHL, [0, 20, 40], 0), coinErMax:near(s.coinErMax, [0, 0.2, 0.3], 0),
-    longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any')};
+    longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any'), timeStop:near(s.timeStop ?? 48, [0, 24, 48, 96], 48)};
   const list = Array.isArray(c.list) ? c.list.map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{2,20}USDT$/.test(x)).slice(0, 200) : [];
   return {name:cleanName(p?.name), coins:c.mode === 'list' && list.length ? {mode:'list', list} : {mode:'top', top:[20, 50, 100, 150, 200].includes(+c.top) ? +c.top : 150}, set};
 }
@@ -1639,8 +1642,9 @@ const profPlain = p => { const s = profSet(p);
     : s.strategy === 'revert_trend' ? 'Ловит отскоки от границы, но только по направлению тренда'
     : 'Ловит отскоки: цена ушла за границу канала и возвращается к середине';
   const when = s.regimeOnly === 'flat' ? ' Торгует только в спокойном рынке.' : s.regimeOnly === 'impulse' ? ' Торгует только в сильном движении.' : '';
+  const hold = s.timeStop ? '' : ' Держит сделку до тейка или стопа.';
   const tfp = TF_PLAIN[s.tf] || s.tf;
-  return `${idea}.${when} ${tfp[0].toUpperCase() + tfp.slice(1)}, ${p.coins.mode === 'list' ? 'монеты: ' + p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}, риск ${(s.risk * 100).toFixed(s.risk < 0.01 ? 1 : 0)}% на сделку.`; };
+  return `${idea}.${when}${hold} ${tfp[0].toUpperCase() + tfp.slice(1)}, ${p.coins.mode === 'list' ? 'монеты: ' + p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}, риск ${(s.risk * 100).toFixed(s.risk < 0.01 ? 1 : 0)}% на сделку.`; };
 const regPlain = r => r === 'flat' ? 'боковик' : r === 'up' ? 'импульс вверх' : r === 'down' ? 'импульс вниз' : '—';
 // why the bot isn't opening trades right now — in words, with the one action that changes it
 const allowsReg = (p, r) => { const x = profSet(p);
@@ -1727,7 +1731,7 @@ function openForm(p) {
   $('#pfListL').classList.toggle('hidden', $('#pfCoins').value !== 'list');
   $('#pfTf').value = s.tf; $('#pfMethod').value = s.method; $('#pfN').value = s.N; $('#pfK').value = s.k; $('#pfStrat').value = s.strategy; $('#pfMin').value = s.minScore;
   $('#pfRR').value = String(s.rr); $('#pfRisk').value = String(Math.round(s.risk * 1000) / 10); $('#pfLev').value = String(s.lev);
-  $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any';
+  $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any'; $('#pfTS').value = String(s.timeStop ?? 48);
   $('#bform').classList.remove('hidden'); $('#bform').scrollIntoView({block:'nearest', behavior:'smooth'});
   formBase = formState(); syncSavebar();
 }
@@ -1739,7 +1743,7 @@ function saveForm() {
     set:{method:$('#pfMethod').value, N:clamp(+$('#pfN').value || 210, 20, 300), k:clamp(+$('#pfK').value || 3, 1, 5), tf:$('#pfTf').value,
          minScore:clamp(+$('#pfMin').value || 0, 0, 100), strategy:$('#pfStrat').value, rr:+$('#pfRR').value || 0, risk:(+$('#pfRisk').value || 2) / 100,
          lev:+$('#pfLev').value || 1, minWidth:+$('#pfW').value || 0, maxHL:+$('#pfHL').value || 0, coinErMax:+$('#pfCoinER').value || 0, longOnly:$('#pfLong').checked,
-         regimeOnly:$('#pfReg').value}};
+         regimeOnly:$('#pfReg').value, timeStop:+$('#pfTS').value}};
   const i = BP.profiles.findIndex(x => x.id === p.id);
   if (i >= 0) BP.profiles[i] = p; else BP.profiles.push(p);
   formBase = null; syncSavebar();
@@ -2052,14 +2056,15 @@ function btSettings() {
           top:custom ? custom.length : +$('#btTop').value, custom,
           strategy:$('#btStrat').value, longOnly:$('#btLong').checked,
           rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1,
-          erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0};
+          erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value};
 }
 function btFill(s) {
   $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0);
   $('#btStrat').value = s.strategy || 'revert'; $('#btLong').checked = !!s.longOnly; $('#btW').value = String(s.minWidth || 0);
   $('#btRR').value = String(s.rr || 0); $('#btRisk').value = String(Math.round((s.risk ?? M.RISK) * 1000) / 10); $('#btLev').value = String(s.lev ?? 1);
   $('#btER').value = String(s.erMax ?? 0.15); $('#btReg').value = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
-  $('#btSrc').value = s.regimeSrc || 'majors';   // the bot always reads the regime from BTC+ETH+SOL $('#btCoinER').value = String(s.coinErMax || 0);
+  $('#btSrc').value = s.regimeSrc || 'majors';   // the bot always reads the regime from BTC+ETH+SOL
+  $('#btTS').value = String(s.timeStop ?? 48); $('#btCoinER').value = String(s.coinErMax || 0);
   btEstimate();
 }
 function btEstimate() {
@@ -2096,7 +2101,7 @@ async function runBacktest() {
     btRes.settings = s; btRes.days = days;
     const miss = traded.filter(x => !hist[x]?.length);
     st.textContent = `Готово: ${btRes.pairs} монет, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
-      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}.`
+      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
     renderBacktest();
     if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
@@ -2190,6 +2195,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.7', date:'7 октября 2026', title:'Тайм-стоп — настройка профиля', items:[
+    'Тайм-стоп теперь можно выключить или поменять в профиле и в бэктесте: выкл, 24, 48 или 96 свечей. По умолчанию — 48, как раньше.',
+    'Зачем он нужен: годовой бэктест «Боковик · 1h» без тайм-стопа — +0.03R на сделку, и одна сделка висела 237 дней, занимая место бота. С тайм-стопом 48 свечей — +0.05R, с 24 — та же доходность при самой низкой просадке (16%). 96 свечей — хуже всех.',
+    'В описании профиля видно, какой у него тайм-стоп или что его нет.',
+  ]},
   {v:'2.6', date:'6 октября 2026', title:'Свои уровни и второй таймфрейм', items:[
     'Исправлено: на телефоне снова виден список монет — в прошлом обновлении он сжимался в узкую полоску.',
     'Свои уровни на графике: кнопка «— уровень» (или L), затем нажмите на нужную цену. Когда цена пересечёт уровень, придёт уведомление. Уровни хранятся для каждой монеты; удалить — крестиком под графиком или правым кликом по линии.',
@@ -2668,9 +2678,9 @@ $('#btSave').onclick = async () => {
   const name = await ask({title:'Сохранить как профиль бота', text:'Под этим названием профиль появится в «Мой бот» — там его можно выбрать для торговли.' + diff,
     ok:'Сохранить', input:{value:`${M.STRATEGIES[s.strategy]} · ${s.tf}${s.rr ? ' · 1:' + s.rr : ''}`}});
   if (!name?.trim()) return;
-  const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly} = s;
+  const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop} = s;
   BP.profiles.push({id:'p' + Date.now(), name:cleanName(name), coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
-    set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly}});
+    set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop}});
   saveBP(); renderBotPanel(); syncServerBot();
   toast(`Профиль «${cleanName(name)}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
 };

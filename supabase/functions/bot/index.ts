@@ -83,7 +83,8 @@ function cleanSet(s: any = {}) {
     tf: oneOf(s.tf, ["5m", "15m", "1h", "4h", "1d"], D.tf), minScore: num(s.minScore, 0, 100, D.minScore),
     strategy: oneOf(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr: num(s.rr, 0, 10, 0), risk: num(s.risk, 0.001, 0.05, D.risk),
     lev: num(s.lev, 1, 10, 1), minWidth: num(s.minWidth, 0, 30, 0), maxHL: num(s.maxHL, 0, 500, 0), longOnly: s.longOnly === true,
-    coinErMax: num(s.coinErMax, 0, 1, 0), regimeOnly: oneOf(s.regimeOnly, ["any", "flat", "impulse"], "any") };
+    coinErMax: num(s.coinErMax, 0, 1, 0), regimeOnly: oneOf(s.regimeOnly, ["any", "flat", "impulse"], "any"),
+    timeStop: oneOf(s.timeStop === undefined ? 48 : Number(s.timeStop), [0, 24, 48, 96], 48) };
 }
 const tfOf = (ms: number) => Object.keys(M.TFMS).find((k) => (M.TFMS as any)[k] === ms);
 const effN = (len: number, S: any) => (S.tf === "1d" || S.tf === "1w") ? Math.max(20, Math.min(S.N, len - 20)) : S.N;
