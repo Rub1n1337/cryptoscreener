@@ -10,6 +10,7 @@ export const MAX_OPEN = 3;    // max simultaneous positions
 export const RISK = 0.02;     // share of balance lost if the stop is hit
 export const TIME_STOP = 48;  // bars until a forced market exit
 export const COOLDOWN = 4;    // bars before re-entering the same coin
+export const MIN_ROOM = 0.8;    // a bounce needs at least this × the stop distance left to the centre (see planEntry)
 
 export const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 export const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
@@ -258,9 +259,13 @@ export function planEntry(r, balance, S, now) {
   const sg = side === 'LONG' ? 1 : -1, brk = modeOf(r, S).startsWith('breakout');
   const e = r.price * (1 + sg * SLIP);   // market entry pays slippage
   const slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
+  // a bounce is a bet on the way back to the centre: when the price has already covered most of it (a wick touched the band
+  // and the next candle fell straight to the middle), there is nothing left to earn — skip unless at least minRoom × the stop remains
+  const room = sg * (r.mid - e) / e;
+  if (!brk && room < (S.minRoom ?? MIN_ROOM) * slD) return null;
   // take profit: S.rr > 0 — fixed reward:risk (TP = rr × stop distance);
-  // otherwise bounce → the centre (1–3%), breakout → 2× the stop (1–5%)
-  const tpD = S.rr > 0 ? S.rr * slD : brk ? clamp(2 * slD, 0.01, 0.05) : clamp(Math.abs(r.mid - e) / e, 0.01, 0.03);
+  // otherwise bounce → exactly the centre (at most 3%; no artificial floor that would put it past the centre), breakout → 2× the stop (1–5%)
+  const tpD = S.rr > 0 ? S.rr * slD : brk ? clamp(2 * slD, 0.01, 0.05) : Math.min(room, 0.03);
   if (!(S.rr > 0) && tpD < 0.8 * slD) return null;
   // size: lose S.risk of the balance at the stop, but never exceed the leverage cap
   // (S.lev × balance shared by MAX_OPEN slots; default 1× → each position ≤ ⅓ of the balance)
