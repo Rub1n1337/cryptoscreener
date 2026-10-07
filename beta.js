@@ -2,12 +2,19 @@
 // Everything comes straight from Binance spot in the browser: candles over REST + the kline stream, the order book as a
 // REST snapshot kept current by the depth diff stream, trades from the aggTrade stream. Nothing is stored on a server yet,
 // so the liquidity heatmap accumulates from the moment the tab is opened.
+// Up to four charts (panes) can be shown at once; each has its own coin, timeframe, history range and streams.
+// The toolbar, the order book ladder and the note under the charts belong to the active pane (blue outline).
 import * as M from './supabase/functions/_shared/math.js';
 
 let K = null;                       // toolkit from index.html (renderChart, attachZoom, api, fp, …)
 const $ = s => document.querySelector(s);
-const TFMS = {'1m': 6e4, '5m': 3e5, '15m': 9e5, '1h': 36e5};
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const TFMS = {'1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 144e5, '1d': 864e5};
+const TFL = {'1m': '1м', '5m': '5м', '15m': '15м', '30m': '30м', '1h': '1ч', '4h': '4ч', '1d': '1д'};
+const RANGES = [[0, 'авто', 'авто'], [1, '1 день', '1д'], [3, '3 дня', '3д'], [7, '7 дней', '7д'], [30, '30 дней', '30д'], [90, '90 дней', '90д'], [180, '180 дней', '180д'], [365, '1 год', '1г']];
+const MAXBARS = 5000;               // candles loaded per chart at most (5 requests)
 const WS = 'wss://stream.binance.com:9443/stream?streams=';
+const DEF_SYMS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
 // ---------- indicator catalogue (the picker mirrors the "Индикаторы" window of order-flow terminals) ----------
 const CATS = [
@@ -34,7 +41,7 @@ const CATS = [
     {id:'vwap', name:'VWAP по дню', hint:'средняя цена с учётом объёма с начала суток (UTC)'},
   ]},
   {name:'Цена и построения', items:[
-    {id:'bb', name:'Канал Боллинджера', hint:'лог-канал 210/3, как на рынке'},
+    {id:'bb', name:'Канал Боллинджера', hint:'лог-канал, как на рынке (длина и ширина — в ⚙)'},
     {id:'rsi', name:'RSI', hint:'нижняя панель, если не выбраны дельта или CVD'},
     {id:'fib', name:'Уровни Фибоначчи', hint:'два клика по графику', soon:true},
   ]},
@@ -43,10 +50,11 @@ const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls'
 let sel, hidden;                    // chosen indicators, and chosen-but-hidden ones (the eye)
 const on = id => sel.has(id) && !hidden.has(id);
 // per-indicator settings (the gear next to a chosen indicator); values live in cfg and are saved in localStorage
+const stepParam = {k:'stepX', name:'Шаг цены: уровни склеиваются в строки по', min:0.5, max:10, step:0.5, def:1, u:v => { const p = act(); return p?.base ? '$' + niceNum(p.base * v) : v + '×'; }};
 const PARAMS = {
-  dom:[{k:'domRange', name:'Глубина стакана', min:0.5, max:5, step:0.5, def:3, u:v => '±' + v + '%'}],
+  dom:[stepParam, {k:'domRange', name:'Глубина стакана', min:0.5, max:5, step:0.5, def:3, u:v => '±' + v + '%'}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
-  heat:[{k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
+  heat:[stepParam, {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
   walls:[{k:'wallX', name:'Стена — во сколько раз больше обычного уровня', min:2, max:20, step:1, def:5, u:v => v + '×'},
     {k:'wallMin', name:'И не меньше', min:5e3, max:2e6, step:5e3, def:2e4, u:v => '$' + fmtUsd(v)},
     {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
@@ -58,46 +66,338 @@ const PARAMS = {
   bb:[{k:'bbN', name:'Длина канала', min:20, max:300, step:10, def:210, u:v => v + ' свечей'},
     {k:'bbK', name:'Ширина канала', min:1.5, max:4, step:0.5, def:3, u:v => v + 'σ'}],
 };
-let cfg = {}, cfgOpen = null;
-const C = k => cfg[k] ?? Object.values(PARAMS).flat().find(p => p.k === k).def;
+const ALLP = Object.values(PARAMS).flat();
+let cfg = {};
+const C = k => cfg[k] ?? ALLP.find(p => p.k === k).def;
 
-// ---------- state ----------
-const st = {sym:null, tf:'1m', d:null, view:null, geo:null, hoverI:null, hoverY:null, list:'fav'};
-let ws = null, wsTimer = null, book = null, heat = new Map(), heatSym = null, heatMs = 0, step = 0, trades = [], tradeUsd = [], dirty = true, loopOn = false, lastDom = 0;
+// ---------- formatting ----------
+const fmtUsd = v => { const a = Math.abs(v), s = v < 0 ? '−' : ''; return s + (a >= 1e9 ? (a / 1e9).toFixed(2) + 'B' : a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : a >= 1e3 ? Math.round(a / 1e3) + 'K' : Math.round(a)); };
+const niceNum = v => v >= 1 ? +v.toFixed(2) + '' : v.toPrecision(2);
+const durTxt = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + ' мин' : m < 1440 ? (m / 60).toFixed(m < 600 ? 1 : 0) + ' ч' : (m / 1440).toFixed(1) + ' д'; };
+// price buckets of a "nice" size ≈ share of the price, fixed per coin so heatmap columns line up over time
+const niceStep = (p, share) => { const raw = p * share, m = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].find(x => x * m >= raw) * m; };
+const maxDays = tf => Math.floor((MAXBARS - C('bbN') - 30) * TFMS[tf] / 864e5 * 10) / 10;
 
-// ---------- candles ----------
-async function loadCandles() {
-  const want = st.sym + '|' + st.tf;
-  const k = await K.api(`/api/v3/klines?symbol=${st.sym}&interval=${st.tf}&limit=500`);
-  if (want !== st.sym + '|' + st.tf) return;
-  st.d = M.parse(k); st.d.qv = k.map(x => +x[7]); st.d.tbq = k.map(x => +x[10]);   // quote volume and taker-buy quote volume
-  calc(); dirty = true;
+// ---------- drawings (Smart VWAP anchors, text notes): per coin, saved, with undo / redo ----------
+let drawings = {}, undoS = [], redoS = [];
+const drw = sym => drawings[sym] || [];
+function mutate(sym, fn) {
+  undoS.push({sym, prev:JSON.stringify(drw(sym))}); if (undoS.length > 100) undoS.shift(); redoS = [];
+  const a = drw(sym).slice(); fn(a); drawings[sym] = a; K.save('sr_bdraw', drawings); redrawAll();
 }
-// indicators that only need candles: channel, RSI, delta, CVD, VWAP
-function calc() {
-  const d = st.d; if (!d) return;
-  const N = Math.max(20, Math.min(C('bbN'), d.c.length - 30));
-  d.N = N; d.B = M.bands(d.c, N, C('bbK'), 'log'); d.R = M.rsi(d.c);
-  d.delta = d.qv.map((v, i) => 2 * d.tbq[i] - v);   // market buys − market sells, in $
-  let cum = 0; d.cvd = d.delta.map(x => cum += x);
-  let day = -1, pv = 0, vv = 0;
-  d.vwap = d.c.map((c, i) => { const dd = Math.floor(d.t[i] / 864e5); if (dd !== day) { day = dd; pv = 0; vv = 0; } const tp = (d.h[i] + d.l[i] + c) / 3; pv += tp * d.v[i]; vv += d.v[i]; return vv ? pv / vv : NaN; });
+function undoRedo(from, to) {
+  const h = from.pop(); if (!h) { K.toast(from === undoS ? 'Нечего отменять' : 'Нечего повторять', '', 'info'); return; }
+  to.push({sym:h.sym, prev:JSON.stringify(drw(h.sym))}); drawings[h.sym] = JSON.parse(h.prev); K.save('sr_bdraw', drawings); redrawAll();
 }
-function onKline(k) {   // live candle from the stream: update the forming bar or start a new one
-  const d = st.d; if (!d) return;
-  const T = k.t, i = d.t.length - 1, row = [T, +k.o, +k.h, +k.l, +k.c, +k.v, 0, +k.q, 0, 0, +k.Q];
-  if (T === d.t[i]) { d.o[i] = row[1]; d.h[i] = row[2]; d.l[i] = row[3]; d.c[i] = row[4]; d.v[i] = row[5]; d.qv[i] = row[7]; d.tbq[i] = row[10]; }
-  else if (T > d.t[i]) { d.t.push(T); d.o.push(row[1]); d.h.push(row[2]); d.l.push(row[3]); d.c.push(row[4]); d.v.push(row[5]); d.qv.push(row[7]); d.tbq.push(row[10]); }
-  calc(); dirty = true;
+const undo = () => undoRedo(undoS, redoS), redo = () => undoRedo(redoS, undoS);
+
+// ---------- panes ----------
+let panes = [], active = 0, layout = 1, link = true, hoverT = null, tool = null, ruler = null, loopOn = false, lastDom = 0;
+const act = () => panes[active];
+const redrawAll = () => panes.forEach(p => p.dirty = true);
+
+class Pane {
+  constructor(conf) {
+    Object.assign(this, {sym:conf.sym, tf:TFMS[conf.tf] ? conf.tf : '5m', range:conf.range || 0, d:null, view:null, geo:null, hoverI:null, hoverY:null,
+      ws:null, wsTimer:null, book:null, heat:new Map(), heatKey:'', heatMs:0, base:0, fine:0, trades:[], tradeUsd:[], dirty:true, req:0, dead:false});
+    const el = this.el = document.createElement('div'); el.className = 'bpane';
+    el.innerHTML = '<div class="bph"><b></b><span></span></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
+    $('#bPanes').appendChild(el); this.cv = el.querySelector('canvas');
+    el.addEventListener('pointerdown', () => setActive(panes.indexOf(this)), true);
+    const cv = this.cv;
+    cv.addEventListener('mousemove', e => {
+      this.hoverI = K.hoverIndex(this.geo, cv, e); this.hoverY = e.clientY - cv.getBoundingClientRect().top; this.dirty = true;
+      if (link && this.d && this.hoverI != null) { hoverT = {src:this, t:this.d.t[clamp(this.hoverI, 0, this.d.t.length - 1)]}; panes.forEach(q => { if (q !== this) q.dirty = true; }); }
+      if (ruler?.live && ruler.pane === this) { const pt = this.pointAt(e); if (pt) ruler.b = pt; }
+    });
+    cv.addEventListener('mouseleave', () => { this.hoverI = this.hoverY = null; hoverT = null; redrawAll(); });
+    cv.addEventListener('touchmove', e => { if (ruler?.live && ruler.pane === this) { e.preventDefault(); const pt = this.pointAt(e.touches[0]); if (pt) { ruler.b = pt; this.dirty = true; } } }, {passive:false});
+    const tools = `<button data-z="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка">↔</button>`
+      + `<button data-z="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи" class="ct-txt">V</button>`
+      + `<button data-z="note" title="Текстовая заметка (T)" aria-label="Заметка" class="ct-txt">T</button>`
+      + `<button data-z="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить">↶</button><button data-z="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить">↷</button>`
+      + `<button data-z="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения">⌫</button>`;
+    this.zs = K.attachZoom(cv, {
+      state:() => !this.dead && this.d && this.geo && {n:this.d.c.length, minFrom:this.d.N - 1, defSpan:this.defSpan(), view:this.view, geo:this.geo},
+      set:v => this.setView(v, true), tools, onTool:z => toolClick(z, this), pick:e => this.pick(e),
+      key:k => { const t = {r:'ruler', 'к':'ruler', v:'avwap', 'м':'avwap', t:'note', 'е':'note'}[k]; if (!t) return false; setTool(tool === t ? null : t); return true; }});
+    this.label();
+  }
+  label() { this.el.querySelector('.bph b').textContent = K.base(this.sym); this.el.querySelector('.bph span').textContent = TFL[this.tf] + (this.range ? ' · ' + RANGES.find(r => r[0] === this.range)[2] : ''); }
+  defSpan() {
+    const avail = this.d.c.length - this.d.N;
+    return this.range ? clamp(Math.round(this.range * 864e5 / TFMS[this.tf]), 20, avail) : Math.min(avail, Math.max(60, Math.round(this.cv.clientWidth / 6)));
+  }
+  // zoom / pan; when charts move together, the others get the same time window (whatever their timeframe)
+  setView(v, spread) {
+    this.view = v; this.dirty = true;
+    if (!spread || !link || !this.d) return;
+    const tf = TFMS[this.tf], n = this.d.c.length;
+    for (const q of panes) {
+      if (q === this || !q.d) continue;
+      if (!v) { q.view = null; } else {
+        const qtf = TFMS[q.tf], right = this.d.t[n - 1] - v.endOff * tf;
+        q.view = {span:Math.max(20, Math.round(v.span * tf / qtf)), endOff:Math.round((q.d.t[q.d.c.length - 1] - right) / qtf)};
+      }
+      q.dirty = true; q.zs.sync();
+    }
+  }
+  pointAt(e) {
+    if (!this.geo || !this.d) return null;
+    const p = K.priceAt(this.geo, this.cv, e); if (p == null) return null;
+    const n = this.d.c.length, i = clamp(K.hoverIndex(this.geo, this.cv, e), 0, n - 1);
+    return {i, t:this.d.t[i], p};
+  }
+  // a press on the chart: tools take it first; otherwise a finished ruler is cleared and the press pans the chart
+  pick(e) {
+    if (!tool) { if (ruler && !ruler.live) { ruler = null; redrawAll(); } return false; }
+    const pt = this.pointAt(e); if (!pt) return true;
+    if (tool === 'ruler') { ruler = {pane:this, a:pt, b:pt, live:true}; this.dirty = true; return true; }
+    if (tool === 'avwap') { mutate(this.sym, a => a.push({type:'avwap', t:pt.t})); setTool(null); K.toast('VWAP от свечи добавлен', `${K.base(this.sym)} · с ${K.dt(pt.t)}. Убрать — ↶ или ⌫.`, 'ok'); return true; }
+    if (tool === 'note') { const x = e.clientX, y = e.clientY; setTool(null); setTimeout(() => notePop(this, pt, x, y)); return true; }
+    return true;
+  }
+
+  // ---------- candles ----------
+  async load() {
+    const req = ++this.req, tf = TFMS[this.tf];
+    const want = this.range ? Math.ceil(this.range * 864e5 / tf) + C('bbN') + 30 : 500, total = clamp(want, 300, MAXBARS);
+    let rows = [], end = null;
+    while (rows.length < total) {   // Binance gives at most 1000 candles per request: page backwards
+      const lim = Math.min(1000, total - rows.length);
+      const k = await K.api(`/api/v3/klines?symbol=${this.sym}&interval=${this.tf}&limit=${lim}${end ? '&endTime=' + end : ''}`);
+      if (req !== this.req) return false;
+      if (!k.length) break;
+      rows = k.concat(rows); end = k[0][0] - 1; if (k.length < lim) break;
+    }
+    if (!rows.length) throw new Error('нет свечей');
+    const d = M.parse(rows); d.qv = rows.map(x => +x[7]); d.tbq = rows.map(x => +x[10]);   // quote volume and taker-buy quote volume
+    this.d = d; calc(d); this.dirty = true; return true;
+  }
+  onKline(k) {   // live candle from the stream: update the forming bar or start a new one
+    const d = this.d; if (!d) return;
+    const T = k.t, i = d.t.length - 1, v = [+k.o, +k.h, +k.l, +k.c, +k.v, +k.q, +k.Q];
+    if (T === d.t[i]) { [d.o[i], d.h[i], d.l[i], d.c[i], d.v[i], d.qv[i], d.tbq[i]] = v; }
+    else if (T > d.t[i]) { d.t.push(T); d.o.push(v[0]); d.h.push(v[1]); d.l.push(v[2]); d.c.push(v[3]); d.v.push(v[4]); d.qv.push(v[5]); d.tbq.push(v[6]); }
+    calc(d); this.dirty = true;
+  }
+
+  // ---------- order book: snapshot + diff stream (Binance's documented sync procedure) ----------
+  async loadBook(buffer) {
+    const snap = await K.api(`/api/v3/depth?symbol=${this.sym}&limit=5000`);
+    const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false};
+    for (const ev of buffer) applyDepth(b, ev);
+    return b;
+  }
+  mid() {
+    const b = this.book; if (!b) return this.d ? this.d.c[this.d.c.length - 1] : null;
+    let bb = 0, ba = Infinity; for (const p of b.bids.keys()) if (p > bb) bb = p; for (const p of b.asks.keys()) if (p < ba) ba = p;
+    return isFinite(ba) && bb ? (bb + ba) / 2 : null;
+  }
+  get step() { return this.base * C('stepX'); }
+  buckets(range, step = this.step) {   // {key: usd} for bids and asks within ±range of the middle
+    const m = this.mid(); if (!this.book || !m || !step) return null;
+    const bid = new Map(), ask = new Map();
+    for (const [p, q] of this.book.bids) if (p >= m * (1 - range)) { const k = Math.round(p / step); bid.set(k, (bid.get(k) || 0) + p * q); }
+    for (const [p, q] of this.book.asks) if (p <= m * (1 + range)) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); }
+    return {m, bid, ask, step};
+  }
+  // every second the current book is folded into the bar it belongs to (max per fine bucket), building the heatmap
+  sampleHeat() {
+    if (!this.book?.ok || !this.d) return;
+    this.heatMs += 1000;
+    const bk = this.buckets(0.04, this.fine); if (!bk) return;
+    const tf = TFMS[this.tf], bar = Math.floor(Date.now() / tf) * tf;
+    let col = this.heat.get(bar); if (!col) this.heat.set(bar, col = new Map());
+    for (const src of [bk.bid, bk.ask]) for (const [k, v] of src) if (v > (col.get(k) || 0)) col.set(k, v);
+    if (this.heat.size > 1500) this.heat.delete(this.heat.keys().next().value);
+  }
+  walls() {   // the strongest buckets on each side, several times the typical bucket
+    const bk = this.buckets(C('domRange') / 100); if (!bk) return [];
+    const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;
+    const pick = (m, side) => [...m].filter(([, v]) => v >= med * C('wallX') && v >= C('wallMin')).sort((a, b) => b[1] - a[1]).slice(0, C('wallN')).map(([k, v]) => ({price:k * bk.step, usd:v, side}));
+    return [...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')];
+  }
+  imbalance(range = C('imbRange') / 100) {
+    const bk = this.buckets(range); if (!bk) return null;
+    const b = [...bk.bid.values()].reduce((a, x) => a + x, 0), a = [...bk.ask.values()].reduce((s, x) => s + x, 0);
+    return b + a ? {bid:b, ask:a, share:b / (a + b)} : null;
+  }
+  onTrade(x) {   // big market buys / sells: the top N% of recent trades
+    const usd = +x.p * +x.q;
+    this.tradeUsd.push(usd); if (this.tradeUsd.length > 2000) this.tradeUsd.shift();
+    const s = [...this.tradeUsd].sort((a, b) => a - b), thr = Math.max(C('bubMin'), s[Math.floor(s.length * (1 - C('bubPct') / 100))] || 0);
+    if (usd >= thr) { this.trades.push({T:x.T, p:+x.p, usd, sell:x.m}); if (this.trades.length > 600) this.trades.shift(); this.dirty = true; }
+  }
+
+  // ---------- stream ----------
+  connect() {
+    this.disconnect();
+    const s = this.sym.toLowerCase(), buffer = [];
+    const ws = this.ws = new WebSocket(WS + [`${s}@depth@100ms`, `${s}@aggTrade`, `${s}@kline_${this.tf}`].join('/'));
+    this.book = null;
+    const resync = async () => { this.book = null; try { const b = await this.loadBook(buffer.splice(0)); if (ws === this.ws) this.book = b; } catch {} };
+    ws.onmessage = e => {
+      const {stream, data} = JSON.parse(e.data);
+      if (stream.endsWith('@aggTrade')) return this.onTrade(data);
+      if (stream.includes('@kline_')) return this.onKline(data.k);
+      if (!this.book) { buffer.push(data); if (buffer.length > 3000) buffer.shift(); return; }
+      if (!applyDepth(this.book, data)) { buffer.push(data); resync(); }
+    };
+    ws.onopen = resync;
+    ws.onclose = () => { if (!loopOn || this.dead) return; clearTimeout(this.wsTimer); this.wsTimer = setTimeout(() => this.connect(), 3000); };   // reconnect while the tab is open
+  }
+  disconnect() { clearTimeout(this.wsTimer); if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; } }
+  live() { return this.ws?.readyState === 1 && this.book?.ok; }
+  async restart() {
+    this.view = null; this.d = null; this.trades = []; this.tradeUsd = []; this.label();
+    const key = this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
+    if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }
+    try { if (!await this.load()) return; } catch (e) { K.toast('Не удалось загрузить свечи', `${this.sym}: ${e.message || e}`, 'bad'); return; }
+    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); }
+    if (loopOn) this.connect();
+  }
+  destroy() { this.dead = true; this.disconnect(); this.el.remove(); }
+
+  // ---------- drawing ----------
+  draw() {
+    const d = this.d; if (!d) return;
+    const n = d.c.length, r = K.viewRange(n, d.N - 1, this.view, this.defSpan()), PC = K.PC;
+    let lo = Infinity, hi = -Infinity;
+    for (let i = Math.max(0, r.from); i <= Math.min(n - 1, r.to); i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
+    const W = this.walls().filter(w => w.price >= lo * 0.998 && w.price <= hi * 1.002);   // only walls inside the visible range, so they don't squash the candles
+    const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:`стена ${fmtUsd(w.usd)}`})) : [];
+    const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
+    const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd} : null;
+    // the crosshair of the chart under the mouse is mirrored on the others at the same time
+    let hI = this.hoverI, hY = this.hoverY;
+    if (ruler?.pane === this) hI = null;   // the candle tooltip would cover the ruler's label
+    else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; }
+    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, live:true, hoverI:hI, hoverY:hY, top:44, sub, priceSub:this.countdown(),
+      under:(g, G) => { if (on('heat')) this.drawHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
+      over:(g, G) => {
+        if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, 'VWAP', [6, 3]);
+        if (on('bubbles')) this.drawBubbles(g, G);
+        this.drawDrawings(g, G);
+        if (ruler?.pane === this) this.drawRuler(g, G);
+      }});
+    if (this === act()) { if (on('dom')) this.drawDom(); this.note(W); }
+  }
+  // time left until the current candle closes; shown inside the live price tag (as on order-flow terminals)
+  countdown() {
+    const d = this.d, left = d.t[d.t.length - 1] + TFMS[this.tf] - Date.now(); if (left <= 0) return '';
+    const s = Math.floor(left / 1000), dd = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
+    return dd ? `${dd}д ${hh}ч` : (hh ? hh + ':' + String(mm).padStart(2, '0') : mm) + ':' + String(ss).padStart(2, '0');
+  }
+  drawHeat(g, G) {   // fine buckets are summed into the display step
+    const d = this.d, step = this.step; if (!step || !this.fine) return;
+    const cols = [];
+    for (let i = G.s; i <= G.e; i++) {
+      const col = this.heat.get(d.t[i]); if (!col) continue;
+      const agg = new Map(); for (const [k, v] of col) { const kk = Math.round(k * this.fine / step); agg.set(kk, (agg.get(kk) || 0) + v); }
+      cols.push([i, agg]);
+    }
+    const vals = cols.flatMap(([, a]) => [...a.values()]); if (!vals.length) return;
+    vals.sort((a, b) => a - b); const top = vals[Math.floor(vals.length * (1 - C('heatCut') / 100))] || vals[vals.length - 1];
+    const h = Math.max(1, Math.abs(G.Y(0) - G.Y(step)));
+    for (const [i, agg] of cols) {
+      const x = G.X(i) - G.bw / 2;
+      for (const [k, v] of agg) { const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
+    }
+  }
+  drawProfile(g, G) {   // volume by price over the visible bars, drawn from the right edge of the plot
+    const d = this.d, rows = C('vpRows'), lo = G.mn, hi = G.mx, sz = (hi - lo) / rows, vp = Array(rows).fill(0);
+    for (let i = G.s; i <= G.e; i++) {
+      const a = Math.max(0, Math.floor((d.l[i] - lo) / sz)), b = Math.min(rows - 1, Math.floor((d.h[i] - lo) / sz)), share = d.v[i] / (b - a + 1);
+      for (let k = a; k <= b; k++) vp[k] += share;
+    }
+    const max = Math.max(...vp), poc = vp.indexOf(max), wMax = (G.W - G.padL - G.padR) * C('vpW') / 100, x1 = G.W - G.padR;
+    if (on('vp')) for (let k = 0; k < rows; k++) {
+      const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz), w = vp[k] / max * wMax;
+      g.fillStyle = k === poc ? K.PC.acc + '55' : K.PC.mid + '33'; g.fillRect(x1 - w, y0, w, Math.max(1, y1 - y0 - 1));
+    }
+    if (on('poc')) { const y = G.Y(lo + (poc + 0.5) * sz); g.strokeStyle = K.PC.acc; g.lineWidth = 1.2; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(G.padL, y); g.lineTo(x1, y); g.stroke(); g.setLineDash([]); g.fillStyle = K.PC.acc; g.fillText('POC', G.padL + 4, y - 7); }
+  }
+  drawBubbles(g, G) {
+    const d = this.d, tf = TFMS[this.tf], first = d.t[G.s], last = d.t[G.e] + tf;
+    const vis = this.trades.filter(x => x.T >= first && x.T < last); if (!vis.length) return;
+    const base = Math.min(...vis.map(x => x.usd));
+    for (const x of vis) {
+      const i = K.barAt(d.t, x.T), cx = G.X(i) - G.bw / 2 + (x.T - d.t[i]) / tf * G.bw, cy = G.Y(x.p);
+      if (cy < G.T0 || cy > G.pH) continue;
+      const r = Math.min(18, Math.max(3, Math.sqrt(x.usd / base) * 3.5));
+      g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fillStyle = (x.sell ? K.PC.up : K.PC.lo) + '73'; g.fill();
+      g.strokeStyle = x.sell ? K.PC.up : K.PC.lo; g.lineWidth = 1; g.stroke();
+    }
+  }
+  drawDrawings(g, G) {
+    const d = this.d, PC = K.PC;
+    for (const x of drw(this.sym)) {
+      if (x.type === 'avwap') {   // VWAP accumulated from the chosen candle on
+        if (x.t < d.t[0]) continue;
+        const i0 = K.barAt(d.t, x.t), arr = Array(d.c.length).fill(NaN); let pv = 0, vv = 0;
+        for (let i = i0; i < d.c.length; i++) { pv += (d.h[i] + d.l[i] + d.c[i]) / 3 * d.v[i]; vv += d.v[i]; arr[i] = vv ? pv / vv : NaN; }
+        drawLine(g, G, arr, PC.trade, 'VWAP ' + K.dt(x.t));
+        if (i0 >= G.s && i0 <= G.e) { g.beginPath(); g.arc(G.X(i0), G.Y(arr[i0]), 3.5, 0, 7); g.fillStyle = PC.trade; g.fill(); }
+      } else if (x.type === 'note') {
+        if (x.t < d.t[0] || x.t > d.t[d.c.length - 1]) continue;
+        const i = K.barAt(d.t, x.t); if (i < G.s || i > G.e) continue;
+        const cx = G.X(i), cy = G.Y(x.p); if (cy < G.T0 || cy > G.pH) continue;
+        const col = PC[x.col] || PC.acc; g.font = '600 12px system-ui'; g.textBaseline = 'middle';
+        const w = g.measureText(x.text).width, lx = cx + 8 + w > G.W - G.padR ? cx - 14 - w : cx + 8;
+        g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fillStyle = col; g.fill();
+        g.fillStyle = PC.tip; g.fillRect(lx - 4, cy - 9, w + 8, 18); g.strokeStyle = col; g.lineWidth = 1; g.strokeRect(lx - 4, cy - 9, w + 8, 18);
+        g.fillStyle = col; g.fillText(x.text, lx, cy); g.font = '11px system-ui';
+      }
+    }
+  }
+  drawRuler(g, G) {   // a box from A to B with the move in %, in $, in candles and in time
+    const {a, b} = ruler, d = this.d, PC = K.PC, x0 = G.X(a.i), x1 = G.X(b.i), y0 = G.Y(a.p), y1 = G.Y(b.p);
+    const up = b.p >= a.p, col = up ? PC.lo : PC.up, bars = b.i - a.i, pct = (b.p / a.p - 1) * 100;
+    g.fillStyle = col + '22'; g.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0) || 1, Math.abs(y1 - y0) || 1);
+    g.strokeStyle = col; g.lineWidth = 1.2; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); g.setLineDash([]);
+    const l1 = `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}%  (${pct >= 0 ? '+' : '−'}${K.fp(Math.abs(b.p - a.p))})`, l2 = `${Math.abs(bars)} свеч. · ${durTxt(Math.abs(bars) * TFMS[this.tf])}`;
+    g.font = '600 12px system-ui'; const w = Math.max(g.measureText(l1).width, g.measureText(l2).width) + 16;
+    const bx = clamp(x1 - w / 2, G.padL, G.W - G.padR - w), by = clamp(up ? y1 - 46 : y1 + 8, G.T0, G.pH - 40);
+    g.fillStyle = col; g.fillRect(bx, by, w, 38); g.fillStyle = PC.canvas; g.textBaseline = 'middle';
+    g.fillText(l1, bx + 8, by + 11); g.font = '11px system-ui'; g.fillText(l2, bx + 8, by + 27);
+  }
+  drawDom() {   // the ladder: asks above, bids below, bar length = $ at that level; imbalance strip on top
+    const now = performance.now(); if (now - lastDom < 200) return; lastDom = now;
+    const cv = $('#bdom'), dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
+    cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const PC = K.PC; g.font = '11px system-ui'; g.textBaseline = 'middle';
+    const bk = this.buckets(C('domRange') / 100);
+    if (!bk) { g.fillStyle = PC.mute; g.fillText('Загружаю стакан…', 10, 20); return; }
+    const im = this.imbalance(), top = on('imb') ? 34 : 8, rowH = 16, rowsN = Math.floor((H - top - 6) / rowH), half = rowsN >> 1, mk = Math.round(bk.m / bk.step);
+    if (im && on('imb')) {
+      const w = W - 16, bw = w * im.share;
+      g.fillStyle = PC.lo; g.fillRect(8, 8, bw, 8); g.fillStyle = PC.up; g.fillRect(8 + bw, 8, w - bw, 8);
+      g.fillStyle = PC.mute; g.fillText(`покупатели ${Math.round(im.share * 100)}% · продавцы ${Math.round((1 - im.share) * 100)}%`, 8, 25);
+    }
+    const lv = []; for (let j = -half; j <= half; j++) { const k = mk - j; lv.push({k, ask:bk.ask.get(k) || 0, bid:bk.bid.get(k) || 0}); }
+    const max = Math.max(1, ...lv.map(x => Math.max(x.ask, x.bid)));
+    lv.forEach((x, j) => {
+      const y = top + j * rowH, v = x.ask || x.bid, isAsk = x.ask >= x.bid, w = v / max * (W - 70);
+      if (v) { g.fillStyle = (isAsk ? PC.up : PC.lo) + (v / max > 0.5 ? 'cc' : '66'); g.fillRect(W - 4 - w, y + 1, w, rowH - 2); }
+      g.fillStyle = x.k === mk ? PC.acc : PC.axis; g.fillText(K.fp(x.k * bk.step).replace('$', ''), 4, y + rowH / 2);
+      if (v) { g.fillStyle = PC.price; const t = fmtUsd(v), tw = g.measureText(t).width; g.fillText(t, W - 8 - tw, y + rowH / 2); }
+    });
+    const ym = top + half * rowH + rowH / 2; g.strokeStyle = PC.acc; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(0, ym); g.lineTo(W, ym); g.stroke(); g.setLineDash([]);
+  }
+  // one line of plain words under the charts (active one): walls near the price, who is stronger in the book, the channel
+  note(W) {
+    const d = this.d, m = this.mid(); if (!d || !m) { $('#bNote').innerHTML = ''; return; }
+    const parts = layout > 1 ? [`<b>${K.base(this.sym)} · ${TFL[this.tf]}</b>`] : [], i = d.c.length - 1, up = d.B.up[i], lo = d.B.lo[i];
+    const near = side => W.filter(w => w.side === side).sort((a, b) => Math.abs(a.price - m) - Math.abs(b.price - m))[0];
+    const a = near('ask'), b = near('bid');
+    if (a) parts.push(`стена продаж <b>${K.fp(a.price)}</b> (+${((a.price / m - 1) * 100).toFixed(2)}%, ${fmtUsd(a.usd)})${isFinite(up) && Math.abs(a.price - up) < (up - lo) * 0.1 ? ' — <b>у верхней границы канала</b>' : ''}`);
+    if (b) parts.push(`стена покупок <b>${K.fp(b.price)}</b> (−${((1 - b.price / m) * 100).toFixed(2)}%, ${fmtUsd(b.usd)})${isFinite(lo) && Math.abs(b.price - lo) < (up - lo) * 0.1 ? ' — <b>у нижней границы канала</b>' : ''}`);
+    const im = this.imbalance(); if (im) parts.push(`в стакане ±${C('imbRange')}% ${im.share >= 0.5 ? 'перевес покупателей' : 'перевес продавцов'} <b>${Math.round(Math.max(im.share, 1 - im.share) * 100)}%</b>`);
+    $('#bNote').innerHTML = parts.length > (layout > 1 ? 1 : 0) ? parts.map(p => `<span>${p}</span>`).join('') : '<span>Стакан загружается…</span>';
+  }
 }
 
-// ---------- order book: snapshot + diff stream (Binance's documented sync procedure) ----------
-async function loadBook(buffer) {
-  const snap = await K.api(`/api/v3/depth?symbol=${st.sym}&limit=5000`);
-  const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false};
-  for (const ev of buffer) applyDepth(b, ev);
-  return b;
-}
 function applyDepth(b, ev) {
   if (ev.u <= b.id) return true;                        // already in the snapshot
   if (!b.ok) { if (ev.U > b.id + 1) return false; b.ok = true; }   // the first event must straddle the snapshot
@@ -106,182 +406,132 @@ function applyDepth(b, ev) {
   for (const [p, q] of ev.a) +q ? b.asks.set(+p, +q) : b.asks.delete(+p);
   b.id = ev.u; return true;
 }
-const mid = () => { if (!book) return st.d ? st.d.c[st.d.c.length - 1] : null; let bb = 0, ba = Infinity; for (const p of book.bids.keys()) if (p > bb) bb = p; for (const p of book.asks.keys()) if (p < ba) ba = p; return isFinite(ba) && bb ? (bb + ba) / 2 : null; };
-// price buckets of a "nice" size ≈ 0.05% of the price, fixed per coin so heatmap columns line up over time
-const niceStep = p => { const raw = p * 0.0005, m = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].find(x => x * m >= raw) * m; };
-function buckets(range = 0.03) {   // {key: usd} for bids and asks within ±range of the middle
-  const m = mid(); if (!book || !m) return null;
-  const bid = new Map(), ask = new Map();
-  for (const [p, q] of book.bids) if (p >= m * (1 - range)) { const k = Math.round(p / step); bid.set(k, (bid.get(k) || 0) + p * q); }
-  for (const [p, q] of book.asks) if (p <= m * (1 + range)) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); }
-  return {m, bid, ask};
+// indicators that only need candles: channel, RSI, delta, CVD, VWAP
+function calc(d) {
+  const N = Math.max(20, Math.min(C('bbN'), d.c.length - 30));
+  d.N = N; d.B = M.bands(d.c, N, C('bbK'), 'log'); d.R = M.rsi(d.c);
+  d.delta = d.qv.map((v, i) => 2 * d.tbq[i] - v);   // market buys − market sells, in $
+  let cum = 0; d.cvd = d.delta.map(x => cum += x);
+  let day = -1, pv = 0, vv = 0;
+  d.vwap = d.c.map((c, i) => { const dd = Math.floor(d.t[i] / 864e5); if (dd !== day) { day = dd; pv = 0; vv = 0; } const tp = (d.h[i] + d.l[i] + c) / 3; pv += tp * d.v[i]; vv += d.v[i]; return vv ? pv / vv : NaN; });
 }
-// every second the current book is folded into the bar it belongs to (max per bucket), building the heatmap
-function sampleHeat() {
-  heatMs += 1000;
-  if (!book?.ok || !st.d) return;
-  const bk = buckets(0.04); if (!bk) return;
-  const tf = TFMS[st.tf], bar = Math.floor(Date.now() / tf) * tf;
-  let col = heat.get(bar); if (!col) heat.set(bar, col = new Map());
-  for (const src of [bk.bid, bk.ask]) for (const [k, v] of src) if (v > (col.get(k) || 0)) col.set(k, v);
-  if (heat.size > 1500) heat.delete(heat.keys().next().value);
-  dirty = true;
-}
-
-// ---------- trades: big market buys / sells ----------
-function onTrade(x) {
-  const usd = +x.p * +x.q;
-  tradeUsd.push(usd); if (tradeUsd.length > 2000) tradeUsd.shift();
-  const s = [...tradeUsd].sort((a, b) => a - b), thr = Math.max(C('bubMin'), s[Math.floor(s.length * (1 - C('bubPct') / 100))] || 0);   // the top N% of recent trades
-  if (usd >= thr) { trades.push({T:x.T, p:+x.p, usd, sell:x.m}); if (trades.length > 600) trades.shift(); dirty = true; }
-}
-
-// ---------- stream ----------
-function connect() {
-  disconnect();
-  const s = st.sym.toLowerCase(), url = WS + [`${s}@depth@100ms`, `${s}@aggTrade`, `${s}@kline_${st.tf}`].join('/');
-  const buffer = []; book = null;
-  ws = new WebSocket(url);
-  ws.onmessage = e => {
-    const {stream, data} = JSON.parse(e.data);
-    if (stream.endsWith('@aggTrade')) return onTrade(data);
-    if (stream.includes('@kline_')) return onKline(data.k);
-    if (!book) { buffer.push(data); return; }
-    if (!applyDepth(book, data)) resync(buffer);
-  };
-  ws.onopen = async () => { setLive('ok'); try { book = await loadBook(buffer.splice(0)); } catch { setLive('bad'); } };
-  ws.onclose = () => { if (!loopOn) return; setLive('bad'); clearTimeout(wsTimer); wsTimer = setTimeout(connect, 3000); };   // reconnect while the tab is open
-  const resync = async buf => { book = null; try { book = await loadBook(buf.splice(0)); } catch { setLive('bad'); } };
-}
-function disconnect() { clearTimeout(wsTimer); if (ws) { ws.onclose = null; ws.close(); ws = null; } }
-function setLive(s) {
-  const mins = Math.floor(heatMs / 6e4);   // how long the heatmap has been collecting (only while the tab is open)
-  $('#bLive').innerHTML = `<span class="live${s === 'ok' ? '' : ' stale'}"><i></i><span>${s === 'ok' ? `стакан и сделки вживую · карта копится ${mins ? mins + ' мин' : 'с этой минуты'}` : 'нет связи с Binance — переподключаюсь'}</span></span>`;
-}
-
-// ---------- drawing ----------
 // heatmap scale comes from the CSS tokens --heat-0..3 (cold → hot)
 let HEAT = null;
 const rgb = h => { h = h.replace('#', ''); if (h.length === 3) h = [...h].map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
 function heatColor(x) {
-  HEAT ||= [0, 1, 2, 3].map(i => rgb(getComputedStyle(document.documentElement).getPropertyValue('--heat-' + i).trim() || '#888888'));   // 0..1 → dark blue → cyan → yellow → orange
+  HEAT ||= [0, 1, 2, 3].map(i => rgb(getComputedStyle(document.documentElement).getPropertyValue('--heat-' + i).trim() || '#888888'));
   const t = Math.min(0.999, Math.max(0, x)) * (HEAT.length - 1), i = Math.floor(t), f = t - i, a = HEAT[i], b = HEAT[i + 1];
   return `rgba(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')},${(0.18 + 0.7 * x).toFixed(2)})`;
 }
-const fmtUsd = v => { const a = Math.abs(v), s = v < 0 ? '−' : ''; return s + (a >= 1e9 ? (a / 1e9).toFixed(2) + 'B' : a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : a >= 1e3 ? Math.round(a / 1e3) + 'K' : Math.round(a)); };
-function walls() {   // the strongest buckets on each side, at least 5× the typical bucket
-  const bk = buckets(C('domRange') / 100); if (!bk) return [];
-  const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;
-  const pick = (m, side) => [...m].filter(([, v]) => v >= med * C('wallX') && v >= C('wallMin')).sort((a, b) => b[1] - a[1]).slice(0, C('wallN')).map(([k, v]) => ({price:k * step, usd:v, side}));
-  return [...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')];
-}
-function imbalance(range = C('imbRange') / 100) {
-  const bk = buckets(range); if (!bk) return null;
-  const b = [...bk.bid.values()].reduce((a, x) => a + x, 0), a = [...bk.ask.values()].reduce((s, x) => s + x, 0);
-  return b + a ? {bid:b, ask:a, share:b / (a + b)} : null;
-}
-function draw() {
-  const d = st.d; if (!d) return;
-  const cv = $('#bcv'), n = d.c.length, defSpan = Math.min(n - d.N, Math.max(60, Math.round(cv.clientWidth / 6)));
-  const r = K.viewRange(n, d.N - 1, st.view, defSpan);
-  const PC = K.PC; let lo = Infinity, hi = -Infinity;
-  for (let i = Math.max(0, r.from); i <= Math.min(n - 1, r.to); i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
-  const W = walls().filter(w => w.price >= lo * 0.998 && w.price <= hi * 1.002);   // only walls inside the visible range, so they don't squash the candles
-  const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:`стена ${fmtUsd(w.usd)}`})) : [];
-  const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
-  const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd} : null;
-  st.geo = K.renderChart(cv, {...d, B}, {from:r.from, to:r.to, levels, live:true, hoverI:st.hoverI, hoverY:st.hoverY, top:44, sub, priceSub:countdown(),
-    under:(g, G) => { if (on('heat')) drawHeat(g, G); if (on('vp') || on('poc')) drawProfile(g, G); },
-    over:(g, G) => { if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, [6, 3]); if (on('bubbles')) drawBubbles(g, G); }});
-  if (on('dom')) drawDom(); note(W);
-}
-// time left until the current candle closes; shown inside the live price tag (as on order-flow terminals)
-function countdown() {
-  const d = st.d, left = d.t[d.t.length - 1] + TFMS[st.tf] - Date.now(); if (left <= 0) return '';
-  const s = Math.floor(left / 1000), hh = Math.floor(s / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
-  return (hh ? hh + ':' + String(mm).padStart(2, '0') : mm) + ':' + String(ss).padStart(2, '0');
-}
-function drawHeat(g, G) {
-  const d = st.d, tf = TFMS[st.tf]; if (!step) return;
-  const vals = []; for (let i = G.s; i <= G.e; i++) { const col = heat.get(d.t[i]); if (col) for (const v of col.values()) vals.push(v); }
-  if (!vals.length) return;
-  vals.sort((a, b) => a - b); const top = vals[Math.floor(vals.length * (1 - C('heatCut') / 100))] || vals[vals.length - 1];
-  const h = Math.max(1, Math.abs(G.Y(0) - G.Y(step)));
-  for (let i = G.s; i <= G.e; i++) {
-    const col = heat.get(d.t[i]); if (!col) continue;
-    const x = G.X(i) - G.bw / 2;
-    for (const [k, v] of col) { const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
-  }
-}
-function drawProfile(g, G) {   // volume by price over the visible bars, drawn from the right edge of the plot
-  const d = st.d, rows = C('vpRows'), lo = G.mn, hi = G.mx, sz = (hi - lo) / rows, vp = Array(rows).fill(0);
-  for (let i = G.s; i <= G.e; i++) {
-    const a = Math.max(0, Math.floor((d.l[i] - lo) / sz)), b = Math.min(rows - 1, Math.floor((d.h[i] - lo) / sz)), share = d.v[i] / (b - a + 1);
-    for (let k = a; k <= b; k++) vp[k] += share;
-  }
-  const max = Math.max(...vp), poc = vp.indexOf(max), wMax = (G.W - G.padL - G.padR) * C('vpW') / 100, x1 = G.W - G.padR;
-  if (on('vp')) for (let k = 0; k < rows; k++) {
-    const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz), w = vp[k] / max * wMax;
-    g.fillStyle = k === poc ? K.PC.acc + '55' : K.PC.mid + '33'; g.fillRect(x1 - w, y0, w, Math.max(1, y1 - y0 - 1));
-  }
-  if (on('poc')) { const y = G.Y(lo + (poc + 0.5) * sz); g.strokeStyle = K.PC.acc; g.lineWidth = 1.2; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(G.padL, y); g.lineTo(x1, y); g.stroke(); g.setLineDash([]); g.fillStyle = K.PC.acc; g.fillText('POC', G.padL + 4, y - 7); }
-}
-function drawLine(g, G, arr, col, dash = []) {
+function drawLine(g, G, arr, col, label, dash = []) {
   g.beginPath(); g.setLineDash(dash); let s0 = false;
   for (let i = G.s; i <= G.e; i++) { if (!isFinite(arr[i])) continue; g[s0 ? 'lineTo' : 'moveTo'](G.X(i), G.Y(arr[i])); s0 = true; }
   g.strokeStyle = col; g.lineWidth = 1.4; g.stroke(); g.setLineDash([]);
-  const v = arr[G.e]; if (isFinite(v)) { g.fillStyle = col; g.fillText('VWAP', G.X(G.e) + 6, G.Y(v)); }
+  const v = arr[G.e]; if (isFinite(v) && label) { g.font = '11px system-ui'; g.textBaseline = 'middle'; g.fillStyle = col; const w = g.measureText(label).width; g.fillText(label, Math.min(G.X(G.e) + 6, G.W - G.padR - w - 4), G.Y(v) - 9); }
 }
-function drawBubbles(g, G) {
-  const d = st.d, tf = TFMS[st.tf], first = d.t[G.s], last = d.t[G.e] + tf;
-  const vis = trades.filter(x => x.T >= first && x.T < last); if (!vis.length) return;
-  const base = Math.min(...vis.map(x => x.usd));
-  for (const x of vis) {
-    const i = K.barAt(d.t, x.T), cx = G.X(i) - G.bw / 2 + (x.T - d.t[i]) / tf * G.bw, cy = G.Y(x.p);
-    if (cy < G.T0 || cy > G.pH) continue;
-    const r = Math.min(18, Math.max(3, Math.sqrt(x.usd / base) * 3.5));
-    g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fillStyle = (x.sell ? K.PC.up : K.PC.lo) + '73'; g.fill();
-    g.strokeStyle = x.sell ? K.PC.up : K.PC.lo; g.lineWidth = 1; g.stroke();
-  }
+
+// ---------- active pane, layout, tools ----------
+function setActive(i) {
+  if (i < 0 || i === active) return;
+  active = i; K.save('sr_bact', i); lastDom = 0;
+  panes.forEach((p, k) => p.el.classList.toggle('on', k === i)); syncBar(); renderList(); redrawAll();
 }
-function drawDom() {   // the ladder: asks above, bids below, bar length = $ at that level; imbalance strip on top
-  const now = performance.now(); if (now - lastDom < 200) return; lastDom = now;
-  const cv = $('#bdom'), dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
-  cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const PC = K.PC; g.font = '11px system-ui'; g.textBaseline = 'middle';
-  const bk = buckets(C('domRange') / 100);
-  if (!bk) { g.fillStyle = PC.mute; g.fillText('Загружаю стакан…', 10, 20); return; }
-  const im = imbalance(), top = on('imb') ? 34 : 8, rowH = 16, rowsN = Math.floor((H - top - 6) / rowH), half = rowsN >> 1, mk = Math.round(bk.m / step);
-  if (im && on('imb')) {
-    const w = W - 16, bw = w * im.share;
-    g.fillStyle = PC.lo; g.fillRect(8, 8, bw, 8); g.fillStyle = PC.up; g.fillRect(8 + bw, 8, w - bw, 8);
-    g.fillStyle = PC.mute; g.fillText(`покупатели ${Math.round(im.share * 100)}% · продавцы ${Math.round((1 - im.share) * 100)}%`, 8, 25);
+function syncBar() {
+  const p = act(); if (!p) return;
+  $('#bTfL').textContent = TFL[p.tf]; $('#bRangeL').textContent = RANGES.find(r => r[0] === p.range)[2];
+  $('#bSym').placeholder = K.base(p.sym);
+  document.querySelectorAll('#bLay .tab').forEach(b => b.classList.toggle('on', +b.dataset.lay === layout));
+  $('#bLink').setAttribute('aria-pressed', link); $('#bLink').classList.toggle('hidden', layout === 1);
+}
+const savePanes = () => K.save('sr_bpanes', panes.map(p => ({sym:p.sym, tf:p.tf, range:p.range})));
+function setLayout(n) {
+  layout = n; K.save('sr_blay', n); $('#bPanes').dataset.lay = n;
+  const saved = K.load('sr_bpanes', []);
+  while (panes.length > n) panes.pop().destroy();
+  while (panes.length < n) {
+    const used = new Set(panes.map(p => p.sym)), conf = saved[panes.length] || {sym:DEF_SYMS.find(s => !used.has(s)) || 'BTCUSDT', tf:act()?.tf || '5m'};
+    const p = new Pane(conf); panes.push(p); if (loopOn) p.restart();
   }
-  const lv = []; for (let j = -half; j <= half; j++) { const k = mk - j; lv.push({k, ask:bk.ask.get(k) || 0, bid:bk.bid.get(k) || 0}); }
-  const max = Math.max(1, ...lv.map(x => Math.max(x.ask, x.bid)));
-  lv.forEach((x, j) => {
-    const y = top + j * rowH, v = x.ask || x.bid, isAsk = x.ask >= x.bid, w = v / max * (W - 70);
-    if (v) { g.fillStyle = (isAsk ? PC.up : PC.lo) + (v / max > 0.5 ? 'cc' : '66'); g.fillRect(W - 4 - w, y + 1, w, rowH - 2); }
-    g.fillStyle = x.k === mk ? PC.acc : PC.axis; g.fillText(K.fp(x.k * step).replace('$', ''), 4, y + rowH / 2);
-    if (v) { g.fillStyle = PC.price; const t = fmtUsd(v), tw = g.measureText(t).width; g.fillText(t, W - 8 - tw, y + rowH / 2); }
+  if (active >= n) active = 0;
+  panes.forEach((p, k) => p.el.classList.toggle('on', k === active));
+  savePanes(); syncBar(); redrawAll(); requestAnimationFrame(redrawAll);
+}
+function setTool(t) {
+  tool = t; if (t !== 'ruler' && ruler?.live) ruler = null;
+  document.querySelectorAll('#bPanes .ctools [data-z]').forEach(b => { if (['ruler', 'avwap', 'note'].includes(b.dataset.z)) b.classList.toggle('on', b.dataset.z === t); });
+  panes.forEach(p => p.el.classList.toggle('tool', !!t));
+  if (t) K.toast({ruler:'Линейка', avwap:'VWAP от свечи', note:'Заметка'}[t], {ruler:'Зажмите и протяните по графику.', avwap:'Нажмите на свечу, от которой считать VWAP.', note:'Нажмите на место для заметки.'}[t], 'info');
+  redrawAll();
+}
+function toolClick(z, p) {
+  setActive(panes.indexOf(p));
+  if (['ruler', 'avwap', 'note'].includes(z)) setTool(tool === z ? null : z);
+  if (z === 'undo') undo(); if (z === 'redo') redo();
+  if (z === 'clear') { if (!drw(p.sym).length) { K.toast('Построений нет', `На ${K.base(p.sym)} нечего убирать.`, 'info'); return; } mutate(p.sym, a => a.length = 0); K.toast('Построения убраны', 'Вернуть — ↶ (Ctrl+Z).', 'ok'); }
+}
+
+// ---------- popovers (timeframe, history, indicator settings, note): small panels next to their button, the chart stays visible ----------
+let popFor = null, popAt = 0;
+function openPop(anchor, html, cls = '') {
+  const pop = $('#bPop'), host = $('.bmain').getBoundingClientRect(), a = anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : anchor;
+  pop.className = 'bpop ' + cls; pop.innerHTML = html;
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = clamp(a.left - host.left, 8, host.width - w - 8) + 'px';
+  pop.style.top = clamp(a.bottom - host.top + 6, 8, Math.max(8, host.height - h - 8)) + 'px';
+  popFor = anchor.getBoundingClientRect ? anchor : null; popAt = performance.now();
+  pop.querySelector('textarea, [data-tf].on, [data-range].on, input')?.focus({preventScroll:true});
+}
+const closePop = () => { $('#bPop').classList.add('hidden'); popFor = null; };
+const head = t => `<h4>${t}<button data-close aria-label="Закрыть">✕</button></h4>`;
+function tfPop() {
+  const p = act();
+  openPop($('#bTfBtn'), head('Таймфрейм') + `<div class="pgrid">${Object.keys(TFMS).map(tf => `<button data-tf="${tf}" class="${tf === p.tf ? 'on' : ''}">${TFL[tf]}</button>`).join('')}</div>`
+    + `<p class="phint">${layout > 1 ? 'Для выделенного графика. ' : ''}Тепловая карта копится заново для каждой пары «монета + таймфрейм».</p>`);
+}
+function rangePop() {
+  const p = act(), mx = maxDays(p.tf);
+  openPop($('#bRangeBtn'), head('Сколько истории показать') + `<div class="pgrid">${RANGES.map(([k, l]) => `<button data-range="${k}" class="${k === p.range ? 'on' : ''}"${k > mx ? ` disabled title="На ${TFL[p.tf]} — не больше ${mx} дн."` : ''}>${l}</button>`).join('')}</div>`
+    + `<p class="phint">«Авто» — по ширине экрана. На мелких таймфреймах длинная история недоступна: грузим до ${MAXBARS} свечей (на ${TFL[p.tf]} это ~${mx} дн.).</p>`);
+}
+function cfgPop(id) {
+  const it = ITEMS.find(x => x.id === id), P = PARAMS[id];
+  openPop($('#bIndBtn'), head('⚙ ' + it.name) + `<div class="sel-cfg">${P.map(p => `<label><span>${p.name}<b data-v="${p.k}">${p.u(C(p.k))}</b></span><input type="range" data-k="${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${C(p.k)}"></label>`).join('')}</div>`
+    + `<div class="pact"><button data-back>← Все индикаторы</button><button data-def="${id}">По умолчанию</button></div>`, 'cfg');
+}
+const COLS = [['acc', 'жёлтый'], ['lo', 'зелёный'], ['up', 'красный'], ['rsi', 'синий'], ['trade', 'фиолетовый']];
+let noteDraft = null;
+function notePop(p, pt, x, y) {
+  noteDraft = {p, pt, col:K.load('sr_bnotec', 'acc')};
+  openPop({left:x, bottom:y, top:y}, head('Заметка на графике') + `<textarea id="bNoteT" maxlength="80" placeholder="Например: отбой от стены"></textarea>`
+    + `<div class="pcols" role="radiogroup" aria-label="Цвет">${COLS.map(([c, n]) => `<button data-col="${c}" style="background:var(--c-${c})" aria-label="${n}" class="${c === noteDraft.col ? 'on' : ''}"></button>`).join('')}</div>`
+    + `<div class="pact"><button data-close>Отмена</button><button class="primary" data-save>Добавить</button></div>`);
+}
+function saveNote() {
+  const text = $('#bNoteT').value.trim(); if (!text || !noteDraft) { $('#bNoteT').focus(); return; }
+  const {p, pt, col} = noteDraft; K.save('sr_bnotec', col);
+  mutate(p.sym, a => a.push({type:'note', t:pt.t, p:pt.p, text, col})); closePop(); noteDraft = null;
+}
+function wirePop() {
+  const pop = $('#bPop');
+  pop.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const p = act(), ds = b.dataset;
+    if ('close' in ds) closePop();
+    if (ds.tf) { p.tf = ds.tf; if (p.range > maxDays(p.tf)) p.range = 0; savePanes(); syncBar(); closePop(); p.restart(); }
+    if (ds.range != null && ds.range !== '') { p.range = +ds.range; savePanes(); syncBar(); closePop(); p.restart(); }
+    if ('back' in ds) { closePop(); openInd(); }
+    if (ds.def) { for (const q of PARAMS[ds.def]) delete cfg[q.k]; applyCfg(); cfgPop(ds.def); }
+    if (ds.col) { noteDraft.col = ds.col; pop.querySelectorAll('[data-col]').forEach(x => x.classList.toggle('on', x === b)); }
+    if ('save' in ds) saveNote();
   });
-  const ym = top + half * rowH + rowH / 2; g.strokeStyle = PC.acc; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(0, ym); g.lineTo(W, ym); g.stroke(); g.setLineDash([]);
-}
-// one line of plain words under the chart: walls near the price, who is stronger in the book, the channel
-function note(W) {
-  const d = st.d, m = mid(); if (!d || !m) { $('#bNote').innerHTML = ''; return; }
-  const parts = [], i = d.c.length - 1, up = d.B.up[i], lo = d.B.lo[i];
-  const near = (side) => W.filter(w => w.side === side).sort((a, b) => Math.abs(a.price - m) - Math.abs(b.price - m))[0];
-  const a = near('ask'), b = near('bid');
-  if (a) parts.push(`стена продаж <b>${K.fp(a.price)}</b> (+${((a.price / m - 1) * 100).toFixed(2)}%, ${fmtUsd(a.usd)})${isFinite(up) && Math.abs(a.price - up) < (up - lo) * 0.1 ? ' — <b>у верхней границы канала</b>' : ''}`);
-  if (b) parts.push(`стена покупок <b>${K.fp(b.price)}</b> (−${((1 - b.price / m) * 100).toFixed(2)}%, ${fmtUsd(b.usd)})${isFinite(lo) && Math.abs(b.price - lo) < (up - lo) * 0.1 ? ' — <b>у нижней границы канала</b>' : ''}`);
-  const im = imbalance(); if (im) parts.push(`в стакане ±1% ${im.share >= 0.5 ? 'перевес покупателей' : 'перевес продавцов'} <b>${Math.round(Math.max(im.share, 1 - im.share) * 100)}%</b>`);
-  $('#bNote').innerHTML = parts.length ? parts.map(p => `<span>${p}</span>`).join('') : '<span>Стакан загружается…</span>';
-}
-function loop() {
-  if (!loopOn) return;
-  if (dirty) { dirty = false; draw(); }
-  requestAnimationFrame(loop);
+  // sliders: the chart follows while dragging
+  pop.addEventListener('input', e => {
+    const k = e.target.dataset?.k; if (!k) return;
+    cfg[k] = +e.target.value; const q = ALLP.find(x => x.k === k);
+    pop.querySelectorAll(`[data-v="${k}"]`).forEach(b => b.textContent = q.u(cfg[k])); applyCfg();
+  });
+  pop.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'bNoteT' && !e.shiftKey) { e.preventDefault(); saveNote(); } });
+  document.addEventListener('mousedown', e => { if (performance.now() - popAt > 400 && !pop.classList.contains('hidden') && !pop.contains(e.target) && !popFor?.contains(e.target)) closePop(); });
 }
 
 // ---------- side list: favourites, leaders, signals (from the market scan) ----------
@@ -291,15 +541,17 @@ function spark(cl) {
   const pts = cl.map((v, i) => `${(i / (cl.length - 1) * 64).toFixed(1)},${(24 - (mx === mn ? 12 : (v - mn) / (mx - mn) * 22) - 1).toFixed(1)}`).join(' ');
   return `<svg viewBox="0 0 64 26" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? K.PC.lo : K.PC.up}" stroke-width="1.5"/></svg>`;
 }
+let listMode = 'fav';
 function renderList() {
   const rows = K.rows; if (!rows.length) { $('#bList').innerHTML = '<div class="mute" style="padding:12px;font-size:13px">Загружаю монеты…</div>'; return; }
+  const cur = act()?.sym;
   // change over the last 24 h of the market scan's candles (whatever its timeframe is)
   const bars = k => k.length > 1 ? Math.max(1, Math.round(864e5 / (k[1][0] - k[0][0]))) : 1;
   const ch = r => { const k = K.cache[r.sym]; if (!k) return 0; const b = Math.min(bars(k), k.length - 1); return b > 0 ? +k[k.length - 1][4] / +k[k.length - 1 - b][4] - 1 : 0; };
   const item = r => { const c = ch(r), k = K.cache[r.sym];
-    return `<button class="bli${r.sym === st.sym ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : 'спот'}</span></span>${spark(k?.slice(-bars(k) - 1).map(x => +x[4]))}
+    return `<button class="bli${r.sym === cur ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : 'спот'}</span></span>${spark(k?.slice(-bars(k) - 1).map(x => +x[4]))}
       <span class="bp">${K.fp(r.price)}<span class="${c > 0 ? 'pos' : c < 0 ? 'neg' : ''}">${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(c * 100).toFixed(2)}%</span></span></button>`; };
-  if (st.list === 'lead') {
+  if (listMode === 'lead') {
     const s = [...rows].map(r => [r, ch(r)]).sort((a, b) => b[1] - a[1]);
     const up = s.filter(x => x[1] > 0).slice(0, 8).map(x => x[0]), dn = s.filter(x => x[1] < 0).reverse().slice(0, 8).map(x => x[0]);
     $('#bList').innerHTML = `<div class="bl-h pos">▲ Лидеры роста · 24 ч</div>${up.map(item).join('') || '<div class="faint bl-e">Растущих монет нет</div>'}`
@@ -307,9 +559,9 @@ function renderList() {
     return;
   }
   let list;
-  if (st.list === 'fav') { list = rows.filter(r => K.favs.has(r.sym)); if (!list.length) list = rows.filter(r => M.MAJORS.includes(r.sym)); }
+  if (listMode === 'fav') { list = rows.filter(r => K.favs.has(r.sym)); if (!list.length) list = rows.filter(r => M.MAJORS.includes(r.sym)); }
   else list = rows.filter(r => r.rev).sort((a, b) => b.score - a.score);
-  $('#bList').innerHTML = (st.list === 'fav' && !rows.some(r => K.favs.has(r.sym)) ? '<div class="faint" style="padding:4px 10px 8px;font-size:12px">Избранного пока нет — звёздочка у монеты на «Рынке». Пока BTC, ETH, SOL.</div>' : '')
+  $('#bList').innerHTML = (listMode === 'fav' && !rows.some(r => K.favs.has(r.sym)) ? '<div class="faint" style="padding:4px 10px 8px;font-size:12px">Избранного пока нет — звёздочка у монеты на «Рынке». Пока BTC, ETH, SOL.</div>' : '')
     + (list.map(item).join('') || '<div class="mute" style="padding:12px;font-size:13px">Сейчас подтверждённых сигналов нет.</div>');
 }
 
@@ -326,57 +578,61 @@ function renderInd() {
       + items.map(it => `<div class="ind-it${sel.has(it.id) ? ' on' : ''}${it.soon ? ' soon' : ''}"><span class="ii">${IC}</span><span class="it"><b>${it.name}</b><span>${it.soon ? 'скоро · ' : ''}${it.hint}</span></span>`
         + (it.soon ? '' : `<button data-tog="${it.id}" aria-label="${sel.has(it.id) ? 'Убрать' : 'Добавить'} ${it.name}">${sel.has(it.id) ? '✓' : '+'}</button>`) + '</div>').join('') + '</details>';
   }).join('') || '<div class="mute" style="padding:12px">Ничего не нашлось.</div>';
-  $('#bSel').innerHTML = [...sel].map(id => { const it = ITEMS.find(x => x.id === id), P = PARAMS[id], op = cfgOpen === id;
-    return `<div class="sel-it${op ? ' open' : ''}"><span class="${hidden.has(id) ? 'off' : ''}">${it.name}</span>`
+  $('#bSel').innerHTML = [...sel].map(id => { const it = ITEMS.find(x => x.id === id);
+    return `<div class="sel-it"><span class="${hidden.has(id) ? 'off' : ''}">${it.name}</span>`
       + `<button data-eye="${id}" aria-label="${hidden.has(id) ? 'Показать' : 'Скрыть'} ${it.name}" title="${hidden.has(id) ? 'Показать' : 'Скрыть'}">${hidden.has(id) ? '◌' : '◉'}</button>`
-      + (P ? `<button data-cfg="${id}" aria-label="Настройки: ${it.name}" title="Настройки" aria-expanded="${op}">⚙</button>` : '')
-      + `<button data-tog="${id}" aria-label="Убрать ${it.name}">✕</button>`
-      + (P && op ? `<div class="sel-cfg">${P.map(p => `<label><span>${p.name}<b data-v="${p.k}">${p.u(C(p.k))}</b></span><input type="range" data-k="${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${C(p.k)}"></label>`).join('')}<button class="sel-def" data-def="${id}">По умолчанию</button></div>` : '')
-      + '</div>'; }).join('')
+      + (PARAMS[id] ? `<button data-cfg="${id}" aria-label="Настройки: ${it.name}" title="Настройки — откроются рядом с графиком">⚙</button>` : '')
+      + `<button data-tog="${id}" aria-label="Убрать ${it.name}">✕</button></div>`; }).join('')
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
   $('#bDomWrap').classList.toggle('hidden', !on('dom'));
 }
-function applyCfg() { K.save('sr_bcfg', cfg); calc(); lastDom = 0; dirty = true; }
-function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); dirty = true; requestAnimationFrame(() => { dirty = true; }); }
+function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); lastDom = 0; redrawAll(); }
+function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); redrawAll(); requestAnimationFrame(redrawAll); }
+const openInd = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
+const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
-  $('#bIndBtn').onclick = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
-  const close = () => $('#bInd').classList.add('hidden');
-  $('#bIndClose').onclick = close; $('#bInd').onclick = e => { if (e.target.id === 'bInd') close(); };
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  $('#bIndBtn').onclick = () => { closePop(); openInd(); };
+  $('#bIndClose').onclick = closeInd; $('#bInd').onclick = e => { if (e.target.id === 'bInd') closeInd(); };
   $('#bIndQ').oninput = renderInd;
   $('#bIndClear').onclick = () => { sel.clear(); hidden.clear(); saveInd(); };
   $('#bInd').addEventListener('click', e => {
-    const t = e.target.closest('[data-tog]')?.dataset.tog, eye = e.target.closest('[data-eye]')?.dataset.eye;
+    const t = e.target.closest('[data-tog]')?.dataset.tog, eye = e.target.closest('[data-eye]')?.dataset.eye, cf = e.target.closest('[data-cfg]')?.dataset.cfg;
     if (t) { sel.has(t) ? (sel.delete(t), hidden.delete(t)) : sel.add(t); if (t === 'delta' && sel.has('delta')) sel.delete('cvd'); if (t === 'cvd' && sel.has('cvd')) sel.delete('delta'); saveInd(); }
     if (eye) { hidden.has(eye) ? hidden.delete(eye) : hidden.add(eye); saveInd(); }
-    const cf = e.target.closest('[data-cfg]')?.dataset.cfg, df = e.target.closest('[data-def]')?.dataset.def;
-    if (cf) { cfgOpen = cfgOpen === cf ? null : cf; renderInd(); }
-    if (df) { for (const p of PARAMS[df]) delete cfg[p.k]; applyCfg(); renderInd(); }
+    if (cf) { closeInd(); setTimeout(() => cfgPop(cf)); }
   });
-  // sliders: the chart follows while dragging; the list isn't re-rendered so the drag isn't interrupted
-  $('#bInd').addEventListener('input', e => {
-    const k = e.target.dataset?.k; if (!k) return;
-    cfg[k] = +e.target.value; const p = Object.values(PARAMS).flat().find(x => x.k === k);
-    document.querySelectorAll(`#bSel [data-v="${k}"]`).forEach(b => b.textContent = p.u(cfg[k])); applyCfg();
-  });
-  document.querySelectorAll('#bTf .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bTf .tab').forEach(x => x.classList.toggle('on', x === b)); st.tf = b.dataset.tf; K.save('sr_btf', st.tf); restart(); });
-  document.querySelectorAll('#bListTabs .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bListTabs .tab').forEach(x => x.classList.toggle('on', x === b)); st.list = b.dataset.bl; renderList(); });
+  $('#bTfBtn').onclick = () => popFor === $('#bTfBtn') ? closePop() : tfPop();
+  $('#bRangeBtn').onclick = () => popFor === $('#bRangeBtn') ? closePop() : rangePop();
+  document.querySelectorAll('#bLay .tab').forEach(b => b.onclick = () => setLayout(+b.dataset.lay));
+  $('#bLink').onclick = () => { link = !link; K.save('sr_blink', link); syncBar(); hoverT = null; if (link) act().setView(act().view, true); redrawAll(); };
+  document.querySelectorAll('#bListTabs .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bListTabs .tab').forEach(x => x.classList.toggle('on', x === b)); listMode = b.dataset.bl; renderList(); });
   $('#bList').onclick = e => { const b = e.target.closest('[data-sym]'); if (b) setSym(b.dataset.sym); };
   $('#bSym').onkeydown = e => { if (e.key !== 'Enter') return; let v = e.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!v) return; if (!v.endsWith('USDT')) v += 'USDT'; e.target.value = ''; setSym(v); };
-  const cv = $('#bcv');
-  cv.onmousemove = e => { st.hoverI = K.hoverIndex(st.geo, cv, e); st.hoverY = e.clientY - cv.getBoundingClientRect().top; dirty = true; };
-  cv.onmouseleave = () => { st.hoverI = null; st.hoverY = null; dirty = true; };
-  K.attachZoom(cv, {state:() => st.d && st.geo && {n:st.d.c.length, minFrom:st.d.N - 1, defSpan:Math.min(st.d.c.length - st.d.N, Math.max(60, Math.round(cv.clientWidth / 6))), view:st.view, geo:st.geo}, set:v => { st.view = v; dirty = true; }});
-  window.addEventListener('resize', () => { dirty = true; });
+  // the ruler is finished on release, wherever the mouse is
+  window.addEventListener('mouseup', () => { if (ruler?.live) { ruler.live = false; setTool(null); } });
+  window.addEventListener('touchend', () => { if (ruler?.live) { ruler.live = false; setTool(null); } });
+  document.addEventListener('keydown', e => {
+    if (!loopOn) return;
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+    if (e.key === 'Escape') { closeInd(); closePop(); if (tool) setTool(null); if (ruler) { ruler = null; redrawAll(); } return; }
+    if (typing || !(e.ctrlKey || e.metaKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'z' || k === 'я') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+    if (k === 'y' || k === 'н') { e.preventDefault(); redo(); }
+  });
+  window.addEventListener('resize', redrawAll);
+  wirePop();
 }
-function setSym(sym) { if (sym === st.sym) return; st.sym = sym; K.save('sr_bsym', sym); restart(); renderList(); }
-async function restart() {
-  st.view = null; st.d = null; trades = []; tradeUsd = [];
-  if (heatSym !== st.sym + st.tf) { heat = new Map(); heatSym = st.sym + st.tf; heatMs = 0; step = 0; }
-  $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(st.sym);
-  try { await loadCandles(); } catch (e) { K.toast('Не удалось загрузить свечи', `${st.sym}: ${e.message || e}`, 'bad'); return; }
-  if (!step) step = niceStep(st.d.c[st.d.c.length - 1]);
-  if (loopOn) connect();
+function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.sym = sym; savePanes(); p.restart(); renderList(); }
+function setLive() {
+  const p = act(); if (!p) return;
+  const ok = p.live(), mins = Math.floor(p.heatMs / 6e4), all = panes.filter(q => q.live()).length;
+  $('#bLive').innerHTML = `<span class="live${ok ? '' : ' stale'}"><i></i><span>${ok ? `стакан и сделки вживую${layout > 1 ? ` · ${all} из ${layout} графиков` : ''} · карта ${K.base(p.sym)} копится ${mins ? mins + ' мин' : 'с этой минуты'}` : 'нет связи с Binance — переподключаюсь'}</span></span>`;
+}
+function loop() {
+  if (!loopOn) return;
+  for (const p of panes) if (p.dirty) { p.dirty = false; p.draw(); }
+  requestAnimationFrame(loop);
 }
 
 // ---------- public: called by index.html when the Beta tab opens / closes ----------
@@ -386,15 +642,17 @@ export function open(kit) {
   if (!wired) {
     wired = true;
     sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'bb'])); hidden = new Set(K.load('sr_bhide', [])); cfg = K.load('sr_bcfg', {}) || {};
-    st.tf = K.load('sr_btf', '1m'); st.sym = K.load('sr_bsym', 'BTCUSDT');
-    document.querySelectorAll('#bTf .tab').forEach(b => b.classList.toggle('on', b.dataset.tf === st.tf));
+    drawings = K.load('sr_bdraw', {}) || {}; link = K.load('sr_blink', true); active = K.load('sr_bact', 0);
+    // older single-chart settings become the first pane
+    if (!K.load('sr_bpanes', null)) K.save('sr_bpanes', [{sym:K.load('sr_bsym', 'BTCUSDT'), tf:K.load('sr_btf', '5m'), range:0}]);
     wire(); renderInd();
+    setLayout(K.load('sr_blay', 1));
   }
   if (loopOn) return;
   loopOn = true; renderList();
-  sampler = setInterval(() => { sampleHeat(); dirty = true; setLive(ws?.readyState === 1 && book?.ok ? 'ok' : 'bad'); renderList(); }, 1000);
-  if (st.d) connect(); else restart();
+  sampler = setInterval(() => { panes.forEach(p => { p.sampleHeat(); p.dirty = true; }); setLive(); renderList(); }, 1000);
+  for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
 // leaving the tab closes the streams (no traffic in the background); the heatmap collected so far stays in memory
-export function pause() { if (!loopOn) return; loopOn = false; clearInterval(sampler); disconnect(); }
+export function pause() { if (!loopOn) return; loopOn = false; clearInterval(sampler); panes.forEach(p => p.disconnect()); closePop(); if (tool) setTool(null); }
