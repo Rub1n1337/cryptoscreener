@@ -101,7 +101,7 @@ class Pane {
     Object.assign(this, {sym:conf.sym, tf:TFMS[conf.tf] ? conf.tf : '5m', range:conf.range || 0, d:null, view:null, geo:null, hoverI:null, hoverY:null,
       ws:null, wsTimer:null, book:null, heat:new Map(), heatKey:'', heatMs:0, base:0, fine:0, trades:[], tradeUsd:[], dirty:true, req:0, dead:false});
     const el = this.el = document.createElement('div'); el.className = 'bpane';
-    el.innerHTML = '<div class="bph"><b></b><span></span></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
+    el.innerHTML = '<div class="bph"><b></b><span class="tfl"></span><span class="bpx"></span></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
     $('#bPanes').appendChild(el); this.cv = el.querySelector('canvas');
     el.addEventListener('pointerdown', () => setActive(panes.indexOf(this)), true);
     const cv = this.cv;
@@ -112,18 +112,13 @@ class Pane {
     });
     cv.addEventListener('mouseleave', () => { this.hoverI = this.hoverY = null; hoverT = null; redrawAll(); });
     cv.addEventListener('touchmove', e => { if (ruler?.live && ruler.pane === this) { e.preventDefault(); const pt = this.pointAt(e.touches[0]); if (pt) { ruler.b = pt; this.dirty = true; } } }, {passive:false});
-    const tools = `<button data-z="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка">↔</button>`
-      + `<button data-z="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи" class="ct-txt">V</button>`
-      + `<button data-z="note" title="Текстовая заметка (T)" aria-label="Заметка" class="ct-txt">T</button>`
-      + `<button data-z="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить">↶</button><button data-z="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить">↷</button>`
-      + `<button data-z="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения">⌫</button>`;
     this.zs = K.attachZoom(cv, {
       state:() => !this.dead && this.d && this.geo && {n:this.d.c.length, minFrom:this.d.N - 1, defSpan:this.defSpan(), view:this.view, geo:this.geo},
-      set:v => this.setView(v, true), tools, onTool:z => toolClick(z, this), pick:e => this.pick(e),
+      set:v => this.setView(v, true), pick:e => this.pick(e),
       key:k => { const t = {r:'ruler', 'к':'ruler', v:'avwap', 'м':'avwap', t:'note', 'е':'note'}[k]; if (!t) return false; setTool(tool === t ? null : t); return true; }});
     this.label();
   }
-  label() { this.el.querySelector('.bph b').textContent = K.base(this.sym); this.el.querySelector('.bph span').textContent = TFL[this.tf] + (this.range ? ' · ' + RANGES.find(r => r[0] === this.range)[2] : ''); }
+  label() { this.el.querySelector('.bph b').textContent = K.base(this.sym); this.el.querySelector('.bph .tfl').textContent =TFL[this.tf] + (this.range ? ' · ' + RANGES.find(r => r[0] === this.range)[2] : ''); }
   defSpan() {
     const avail = this.d.c.length - this.d.N;
     return this.range ? clamp(Math.round(this.range * 864e5 / TFMS[this.tf]), 20, avail) : Math.min(avail, Math.max(60, Math.round(this.cv.clientWidth / 6)));
@@ -153,7 +148,7 @@ class Pane {
     if (!tool) { if (ruler && !ruler.live) { ruler = null; redrawAll(); } return false; }
     const pt = this.pointAt(e); if (!pt) return true;
     if (tool === 'ruler') { ruler = {pane:this, a:pt, b:pt, live:true}; this.dirty = true; return true; }
-    if (tool === 'avwap') { mutate(this.sym, a => a.push({type:'avwap', t:pt.t})); setTool(null); K.toast('VWAP от свечи добавлен', `${K.base(this.sym)} · с ${K.dt(pt.t)}. Убрать — ↶ или ⌫.`, 'ok'); return true; }
+    if (tool === 'avwap') { mutate(this.sym, a => a.push({type:'avwap', t:pt.t})); setTool(null); return true; }
     if (tool === 'note') { const x = e.clientX, y = e.clientY; setTool(null); setTimeout(() => notePop(this, pt, x, y)); return true; }
     return true;
   }
@@ -269,18 +264,29 @@ class Pane {
     const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:`стена ${fmtUsd(w.usd)}`})) : [];
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd} : null;
-    // the crosshair of the chart under the mouse is mirrored on the others at the same time
-    let hI = this.hoverI, hY = this.hoverY;
+    // the crosshair of the chart under the mouse is mirrored on the others at the same time (just the line and the time)
+    let hI = this.hoverI, hY = this.hoverY, mirror = false;
     if (ruler?.pane === this) hI = null;   // the candle tooltip would cover the ruler's label
-    else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; }
-    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, live:true, hoverI:hI, hoverY:hY, top:44, sub, priceSub:this.countdown(),
+    else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; mirror = true; }
+    // VWAP lines get their value as a tag on the price scale (a text label next to the line collided with the price tags)
+    const e = Math.min(n - 1, r.to), av = drw(this.sym).filter(x => x.type === 'avwap' && x.t >= d.t[0]).map(x => ({x, arr:avwap(d, x.t)}));
+    const tags = [...(on('vwap') && isFinite(d.vwap[e]) ? [{v:d.vwap[e], text:'VWAP ' + K.fp(d.vwap[e]), col:PC.acc}] : []),
+      ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:'VWAP⚓ ' + K.fp(a.arr[e]), col:PC.trade}))];
+    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:44, sub, priceSub:this.countdown(), fitPrice:true, thin:true,
+      hoverExtra:i => [`объём $${fmtUsd(d.qv[i])} · дельта ${d.delta[i] >= 0 ? '+' : ''}${fmtUsd(d.delta[i])}`],
       under:(g, G) => { if (on('heat')) this.drawHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
       over:(g, G) => {
-        if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, 'VWAP', [6, 3]);
+        if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, [6, 3]);
+        for (const a of av) this.drawAvwap(g, G, a);
         if (on('bubbles')) this.drawBubbles(g, G);
-        this.drawDrawings(g, G);
+        this.drawNotes(g, G);
         if (ruler?.pane === this) this.drawRuler(g, G);
+        if (on('heat') && this.heatMs < 15 * 6e4) {   // the heatmap only has what was collected while the tab was open: say so
+          const m = Math.floor(this.heatMs / 6e4), t = this.book?.ok ? `карта копится · ${m} мин` : 'стакан загружается…';
+          g.font = '11px system-ui'; g.textBaseline = 'middle'; g.fillStyle = PC.mute; g.fillText(t, Math.max(G.padL + 4, G.X(G.e) - G.bw - 8 - g.measureText(t).width), G.T0 + 8);
+        }
       }});
+    this.el.querySelector('.bpx').textContent = K.fp(d.c[n - 1]);
     if (this === act()) { if (on('dom')) this.drawDom(); this.note(W); }
   }
   // time left until the current candle closes; shown inside the live price tag (as on order-flow terminals)
@@ -302,7 +308,7 @@ class Pane {
     const h = Math.max(1, Math.abs(G.Y(0) - G.Y(step)));
     for (const [i, agg] of cols) {
       const x = G.X(i) - G.bw / 2;
-      for (const [k, v] of agg) { const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
+      for (const [k, v] of agg) { if (v < top * 0.12) continue; const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
     }
   }
   drawProfile(g, G) {   // volume by price over the visible bars, drawn from the right edge of the plot
@@ -325,30 +331,27 @@ class Pane {
     for (const x of vis) {
       const i = K.barAt(d.t, x.T), cx = G.X(i) - G.bw / 2 + (x.T - d.t[i]) / tf * G.bw, cy = G.Y(x.p);
       if (cy < G.T0 || cy > G.pH) continue;
-      const r = Math.min(18, Math.max(3, Math.sqrt(x.usd / base) * 3.5));
-      g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fillStyle = (x.sell ? K.PC.up : K.PC.lo) + '73'; g.fill();
+      const r = Math.min(13, Math.max(2.5, Math.sqrt(x.usd / base) * 3));
+      g.beginPath(); g.arc(cx, cy, r, 0, 7); g.fillStyle = (x.sell ? K.PC.up : K.PC.lo) + '40'; g.fill();
       g.strokeStyle = x.sell ? K.PC.up : K.PC.lo; g.lineWidth = 1; g.stroke();
     }
   }
-  drawDrawings(g, G) {
+  drawAvwap(g, G, {x, arr}) {   // VWAP accumulated from the chosen candle on, with a dot at the anchor
+    const d = this.d, i0 = K.barAt(d.t, x.t), PC = K.PC;
+    drawLine(g, G, arr, PC.trade);
+    const y0 = G.Y(arr[i0]); if (i0 >= G.s && i0 <= G.e && y0 >= G.T0 && y0 <= G.pH) { g.beginPath(); g.arc(G.X(i0), y0, 4, 0, 7); g.fillStyle = PC.trade; g.fill(); g.strokeStyle = PC.canvas; g.lineWidth = 1.5; g.stroke(); }
+  }
+  drawNotes(g, G) {
     const d = this.d, PC = K.PC;
     for (const x of drw(this.sym)) {
-      if (x.type === 'avwap') {   // VWAP accumulated from the chosen candle on
-        if (x.t < d.t[0]) continue;
-        const i0 = K.barAt(d.t, x.t), arr = Array(d.c.length).fill(NaN); let pv = 0, vv = 0;
-        for (let i = i0; i < d.c.length; i++) { pv += (d.h[i] + d.l[i] + d.c[i]) / 3 * d.v[i]; vv += d.v[i]; arr[i] = vv ? pv / vv : NaN; }
-        drawLine(g, G, arr, PC.trade, 'VWAP ' + K.dt(x.t));
-        if (i0 >= G.s && i0 <= G.e) { g.beginPath(); g.arc(G.X(i0), G.Y(arr[i0]), 3.5, 0, 7); g.fillStyle = PC.trade; g.fill(); }
-      } else if (x.type === 'note') {
-        if (x.t < d.t[0] || x.t > d.t[d.c.length - 1]) continue;
-        const i = K.barAt(d.t, x.t); if (i < G.s || i > G.e) continue;
-        const cx = G.X(i), cy = G.Y(x.p); if (cy < G.T0 || cy > G.pH) continue;
-        const col = PC[x.col] || PC.acc; g.font = '600 12px system-ui'; g.textBaseline = 'middle';
-        const w = g.measureText(x.text).width, lx = cx + 8 + w > G.W - G.padR ? cx - 14 - w : cx + 8;
-        g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fillStyle = col; g.fill();
-        g.fillStyle = PC.tip; g.fillRect(lx - 4, cy - 9, w + 8, 18); g.strokeStyle = col; g.lineWidth = 1; g.strokeRect(lx - 4, cy - 9, w + 8, 18);
-        g.fillStyle = col; g.fillText(x.text, lx, cy); g.font = '11px system-ui';
-      }
+      if (x.type !== 'note' || x.t < d.t[0] || x.t > d.t[d.c.length - 1]) continue;
+      const i = K.barAt(d.t, x.t); if (i < G.s || i > G.e) continue;
+      const cx = G.X(i), cy = G.Y(x.p); if (cy < G.T0 || cy > G.pH) continue;
+      const col = PC[x.col] || PC.acc; g.font = '600 12px system-ui'; g.textBaseline = 'middle';
+      const w = g.measureText(x.text).width, lx = cx + 10 + w > G.W - G.padR ? cx - 14 - w : cx + 10;
+      g.beginPath(); g.arc(cx, cy, 3.5, 0, 7); g.fillStyle = col; g.fill();
+      g.fillStyle = PC.tip; g.fillRect(lx - 5, cy - 10, w + 10, 20); g.fillStyle = col; g.fillRect(lx - 5, cy - 10, 3, 20);
+      g.fillStyle = PC.price; g.fillText(x.text, lx + 1, cy); g.font = '11px system-ui';
     }
   }
   drawRuler(g, G) {   // a box from A to B with the move in %, in $, in candles and in time
@@ -421,14 +424,15 @@ const rgb = h => { h = h.replace('#', ''); if (h.length === 3) h = [...h].map(c 
 function heatColor(x) {
   HEAT ||= [0, 1, 2, 3].map(i => rgb(getComputedStyle(document.documentElement).getPropertyValue('--heat-' + i).trim() || '#888888'));
   const t = Math.min(0.999, Math.max(0, x)) * (HEAT.length - 1), i = Math.floor(t), f = t - i, a = HEAT[i], b = HEAT[i + 1];
-  return `rgba(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')},${(0.18 + 0.7 * x).toFixed(2)})`;
+  return `rgba(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')},${(0.1 + 0.55 * x * x).toFixed(2)})`;   // faint for thin levels, so candles stay readable
 }
-function drawLine(g, G, arr, col, label, dash = []) {
+function drawLine(g, G, arr, col, dash = []) {
+  g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();   // stay inside the price pane
   g.beginPath(); g.setLineDash(dash); let s0 = false;
   for (let i = G.s; i <= G.e; i++) { if (!isFinite(arr[i])) continue; g[s0 ? 'lineTo' : 'moveTo'](G.X(i), G.Y(arr[i])); s0 = true; }
-  g.strokeStyle = col; g.lineWidth = 1.4; g.stroke(); g.setLineDash([]);
-  const v = arr[G.e]; if (isFinite(v) && label) { g.font = '11px system-ui'; g.textBaseline = 'middle'; g.fillStyle = col; const w = g.measureText(label).width; g.fillText(label, Math.min(G.X(G.e) + 6, G.W - G.padR - w - 4), G.Y(v) - 9); }
+  g.strokeStyle = col; g.lineWidth = 1.4; g.stroke(); g.setLineDash([]); g.restore();
 }
+const avwap = (d, t) => { const i0 = K.barAt(d.t, t), arr = Array(d.c.length).fill(NaN); let pv = 0, vv = 0; for (let i = i0; i < d.c.length; i++) { pv += (d.h[i] + d.l[i] + d.c[i]) / 3 * d.v[i]; vv += d.v[i]; arr[i] = vv ? pv / vv : NaN; } return arr; };
 
 // ---------- active pane, layout, tools ----------
 function setActive(i) {
@@ -443,31 +447,41 @@ function syncBar() {
   document.querySelectorAll('#bLay .tab').forEach(b => b.classList.toggle('on', +b.dataset.lay === layout));
   $('#bLink').setAttribute('aria-pressed', link); $('#bLink').classList.toggle('hidden', layout === 1);
 }
-const savePanes = () => K.save('sr_bpanes', panes.map(p => ({sym:p.sym, tf:p.tf, range:p.range})));
+const savePanes = () => K.save('sr_bpanes', pool.map(p => ({sym:p.sym, tf:p.tf, range:p.range})));
+// panes are kept (hidden, streams closed) when the layout shrinks, so switching back is instant and the heatmap survives
+let pool = [];
 function setLayout(n) {
-  layout = n; K.save('sr_blay', n); $('#bPanes').dataset.lay = n;
+  K.save('sr_blay', n); if (n > 2 && matchMedia('(max-width:700px)').matches) n = 2;   // four charts don't fit a phone (the choice is kept for the computer)
+  layout = n; $('#bPanes').dataset.lay = n;
   const saved = K.load('sr_bpanes', []);
-  while (panes.length > n) panes.pop().destroy();
-  while (panes.length < n) {
-    const used = new Set(panes.map(p => p.sym)), conf = saved[panes.length] || {sym:DEF_SYMS.find(s => !used.has(s)) || 'BTCUSDT', tf:act()?.tf || '5m'};
-    const p = new Pane(conf); panes.push(p); if (loopOn) p.restart();
+  for (let i = 0; i < Math.max(n, pool.length); i++) {
+    if (i < n && !pool[i]) {
+      const used = new Set(pool.map(p => p.sym)), conf = saved[i] || {sym:DEF_SYMS.find(s => !used.has(s)) || 'BTCUSDT', tf:pool[0]?.tf || '5m'};
+      pool[i] = new Pane(conf);
+    }
+    const p = pool[i], show = i < n; if (!p) continue;
+    p.el.classList.toggle('hidden', !show);
+    if (!show) p.disconnect(); else if (loopOn && !p.ws) p.d ? p.connect() : p.restart();
   }
+  panes = pool.slice(0, n);
   if (active >= n) active = 0;
   panes.forEach((p, k) => p.el.classList.toggle('on', k === active));
   savePanes(); syncBar(); redrawAll(); requestAnimationFrame(redrawAll);
 }
+// drawing tools: chosen in the toolbar, applied to whichever chart is clicked; a chip above the charts says what to do
+const TOOL_HINT = {ruler:'Линейка: зажмите и протяните по графику', avwap:'VWAP от свечи: нажмите на свечу, от которой считать', note:'Заметка: нажмите на место на графике'};
 function setTool(t) {
   tool = t; if (t !== 'ruler' && ruler?.live) ruler = null;
-  document.querySelectorAll('#bPanes .ctools [data-z]').forEach(b => { if (['ruler', 'avwap', 'note'].includes(b.dataset.z)) b.classList.toggle('on', b.dataset.z === t); });
+  document.querySelectorAll('#bTools [data-tool]').forEach(b => { b.classList.toggle('on', b.dataset.tool === t); b.setAttribute('aria-pressed', b.dataset.tool === t); });
   panes.forEach(p => p.el.classList.toggle('tool', !!t));
-  if (t) K.toast({ruler:'Линейка', avwap:'VWAP от свечи', note:'Заметка'}[t], {ruler:'Зажмите и протяните по графику.', avwap:'Нажмите на свечу, от которой считать VWAP.', note:'Нажмите на место для заметки.'}[t], 'info');
+  const h = $('#bToolHint'); h.classList.toggle('hidden', !t);
+  if (t) h.innerHTML = `<span>${TOOL_HINT[t]}</span><button data-tcancel>Отмена · Esc</button>`;
   redrawAll();
 }
-function toolClick(z, p) {
-  setActive(panes.indexOf(p));
-  if (['ruler', 'avwap', 'note'].includes(z)) setTool(tool === z ? null : z);
+function toolAct(z) {
+  const p = act();
   if (z === 'undo') undo(); if (z === 'redo') redo();
-  if (z === 'clear') { if (!drw(p.sym).length) { K.toast('Построений нет', `На ${K.base(p.sym)} нечего убирать.`, 'info'); return; } mutate(p.sym, a => a.length = 0); K.toast('Построения убраны', 'Вернуть — ↶ (Ctrl+Z).', 'ok'); }
+  if (z === 'clear') { if (!drw(p.sym).length) { K.toast('Построений нет', `На ${K.base(p.sym)} нечего убирать.`, 'info'); return; } mutate(p.sym, a => a.length = 0); K.toast('Построения убраны', 'Вернуть — ↶ или Ctrl+Z.', 'ok'); }
 }
 
 // ---------- popovers (timeframe, history, indicator settings, note): small panels next to their button, the chart stays visible ----------
@@ -601,6 +615,8 @@ function wire() {
     if (eye) { hidden.has(eye) ? hidden.delete(eye) : hidden.add(eye); saveInd(); }
     if (cf) { closeInd(); setTimeout(() => cfgPop(cf)); }
   });
+  $('#bTools').onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.tool) setTool(tool === b.dataset.tool ? null : b.dataset.tool); if (b.dataset.act) toolAct(b.dataset.act); };
+  $('#bToolHint').onclick = e => { if (e.target.closest('[data-tcancel]')) setTool(null); };
   $('#bTfBtn').onclick = () => popFor === $('#bTfBtn') ? closePop() : tfPop();
   $('#bRangeBtn').onclick = () => popFor === $('#bRangeBtn') ? closePop() : rangePop();
   document.querySelectorAll('#bLay .tab').forEach(b => b.onclick = () => setLayout(+b.dataset.lay));
