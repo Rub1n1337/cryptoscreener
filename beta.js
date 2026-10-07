@@ -15,7 +15,7 @@ const CATS = [
     {id:'dom', name:'Биржевой стакан', hint:'bid/ask по уровням рядом с графиком'},
     {id:'imb', name:'Дисбаланс стакана', hint:'покупатели против продавцов у цены'},
     {id:'heat', name:'Тепловая карта ликвидности', hint:'плотность лимитных заявок во времени'},
-    {id:'walls', name:'Стены в стакане', hint:'уровни, где заявок в 5× больше обычного'},
+    {id:'walls', name:'Стены в стакане', hint:'уровни, где заявок намного больше обычного (порог — в ⚙)'},
     {id:'bubbles', name:'Пузыри крупных сделок', hint:'крупные рыночные покупки и продажи'},
     {id:'flow', name:'Поток ликвидности', hint:'как быстро ставят и снимают заявки', soon:true},
   ]},
@@ -42,6 +42,24 @@ const CATS = [
 const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'cvd', 'vp', 'vwap'];
 let sel, hidden;                    // chosen indicators, and chosen-but-hidden ones (the eye)
 const on = id => sel.has(id) && !hidden.has(id);
+// per-indicator settings (the gear next to a chosen indicator); values live in cfg and are saved in localStorage
+const PARAMS = {
+  dom:[{k:'domRange', name:'Глубина стакана', min:0.5, max:5, step:0.5, def:3, u:v => '±' + v + '%'}],
+  imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
+  heat:[{k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
+  walls:[{k:'wallX', name:'Стена — во сколько раз больше обычного уровня', min:2, max:20, step:1, def:5, u:v => v + '×'},
+    {k:'wallMin', name:'И не меньше', min:5e3, max:2e6, step:5e3, def:2e4, u:v => '$' + fmtUsd(v)},
+    {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
+  bubbles:[{k:'bubPct', name:'Показывать самые крупные сделки', min:0.2, max:5, step:0.1, def:1.5, u:v => v + '% от всех'},
+    {k:'bubMin', name:'И не меньше', min:1e3, max:1e6, step:1e3, def:5e3, u:v => '$' + fmtUsd(v)}],
+  vp:[{k:'vpRows', name:'Строк в профиле', min:20, max:150, step:10, def:60, u:v => v},
+    {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
+  poc:[{k:'vpRows', name:'Строк в профиле (общая с профилем)', min:20, max:150, step:10, def:60, u:v => v}],
+  bb:[{k:'bbN', name:'Длина канала', min:20, max:300, step:10, def:210, u:v => v + ' свечей'},
+    {k:'bbK', name:'Ширина канала', min:1.5, max:4, step:0.5, def:3, u:v => v + 'σ'}],
+};
+let cfg = {}, cfgOpen = null;
+const C = k => cfg[k] ?? Object.values(PARAMS).flat().find(p => p.k === k).def;
 
 // ---------- state ----------
 const st = {sym:null, tf:'1m', d:null, view:null, geo:null, hoverI:null, hoverY:null, list:'fav'};
@@ -58,8 +76,8 @@ async function loadCandles() {
 // indicators that only need candles: channel, RSI, delta, CVD, VWAP
 function calc() {
   const d = st.d; if (!d) return;
-  const N = Math.max(20, Math.min(210, d.c.length - 30));
-  d.N = N; d.B = M.bands(d.c, N, 3, 'log'); d.R = M.rsi(d.c);
+  const N = Math.max(20, Math.min(C('bbN'), d.c.length - 30));
+  d.N = N; d.B = M.bands(d.c, N, C('bbK'), 'log'); d.R = M.rsi(d.c);
   d.delta = d.qv.map((v, i) => 2 * d.tbq[i] - v);   // market buys − market sells, in $
   let cum = 0; d.cvd = d.delta.map(x => cum += x);
   let day = -1, pv = 0, vv = 0;
@@ -114,7 +132,7 @@ function sampleHeat() {
 function onTrade(x) {
   const usd = +x.p * +x.q;
   tradeUsd.push(usd); if (tradeUsd.length > 2000) tradeUsd.shift();
-  const s = [...tradeUsd].sort((a, b) => a - b), thr = Math.max(5000, s[Math.floor(s.length * 0.985)] || 0);   // top ~1.5% of recent trades
+  const s = [...tradeUsd].sort((a, b) => a - b), thr = Math.max(C('bubMin'), s[Math.floor(s.length * (1 - C('bubPct') / 100))] || 0);   // the top N% of recent trades
   if (usd >= thr) { trades.push({T:x.T, p:+x.p, usd, sell:x.m}); if (trades.length > 600) trades.shift(); dirty = true; }
 }
 
@@ -152,12 +170,12 @@ function heatColor(x) {
 }
 const fmtUsd = v => { const a = Math.abs(v), s = v < 0 ? '−' : ''; return s + (a >= 1e9 ? (a / 1e9).toFixed(2) + 'B' : a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : a >= 1e3 ? Math.round(a / 1e3) + 'K' : Math.round(a)); };
 function walls() {   // the strongest buckets on each side, at least 5× the typical bucket
-  const bk = buckets(0.03); if (!bk) return [];
+  const bk = buckets(C('domRange') / 100); if (!bk) return [];
   const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;
-  const pick = (m, side) => [...m].filter(([, v]) => v >= med * 5 && v >= 20000).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => ({price:k * step, usd:v, side}));
+  const pick = (m, side) => [...m].filter(([, v]) => v >= med * C('wallX') && v >= C('wallMin')).sort((a, b) => b[1] - a[1]).slice(0, C('wallN')).map(([k, v]) => ({price:k * step, usd:v, side}));
   return [...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')];
 }
-function imbalance(range = 0.01) {
+function imbalance(range = C('imbRange') / 100) {
   const bk = buckets(range); if (!bk) return null;
   const b = [...bk.bid.values()].reduce((a, x) => a + x, 0), a = [...bk.ask.values()].reduce((s, x) => s + x, 0);
   return b + a ? {bid:b, ask:a, share:b / (a + b)} : null;
@@ -172,16 +190,22 @@ function draw() {
   const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:`стена ${fmtUsd(w.usd)}`})) : [];
   const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
   const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd} : null;
-  st.geo = K.renderChart(cv, {...d, B}, {from:r.from, to:r.to, levels, live:true, hoverI:st.hoverI, hoverY:st.hoverY, top:44, sub,
+  st.geo = K.renderChart(cv, {...d, B}, {from:r.from, to:r.to, levels, live:true, hoverI:st.hoverI, hoverY:st.hoverY, top:44, sub, priceSub:countdown(),
     under:(g, G) => { if (on('heat')) drawHeat(g, G); if (on('vp') || on('poc')) drawProfile(g, G); },
     over:(g, G) => { if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, [6, 3]); if (on('bubbles')) drawBubbles(g, G); }});
   if (on('dom')) drawDom(); note(W);
+}
+// time left until the current candle closes; shown inside the live price tag (as on order-flow terminals)
+function countdown() {
+  const d = st.d, left = d.t[d.t.length - 1] + TFMS[st.tf] - Date.now(); if (left <= 0) return '';
+  const s = Math.floor(left / 1000), hh = Math.floor(s / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
+  return (hh ? hh + ':' + String(mm).padStart(2, '0') : mm) + ':' + String(ss).padStart(2, '0');
 }
 function drawHeat(g, G) {
   const d = st.d, tf = TFMS[st.tf]; if (!step) return;
   const vals = []; for (let i = G.s; i <= G.e; i++) { const col = heat.get(d.t[i]); if (col) for (const v of col.values()) vals.push(v); }
   if (!vals.length) return;
-  vals.sort((a, b) => a - b); const top = vals[Math.floor(vals.length * 0.97)] || vals[vals.length - 1];
+  vals.sort((a, b) => a - b); const top = vals[Math.floor(vals.length * (1 - C('heatCut') / 100))] || vals[vals.length - 1];
   const h = Math.max(1, Math.abs(G.Y(0) - G.Y(step)));
   for (let i = G.s; i <= G.e; i++) {
     const col = heat.get(d.t[i]); if (!col) continue;
@@ -190,12 +214,12 @@ function drawHeat(g, G) {
   }
 }
 function drawProfile(g, G) {   // volume by price over the visible bars, drawn from the right edge of the plot
-  const d = st.d, rows = 60, lo = G.mn, hi = G.mx, sz = (hi - lo) / rows, vp = Array(rows).fill(0);
+  const d = st.d, rows = C('vpRows'), lo = G.mn, hi = G.mx, sz = (hi - lo) / rows, vp = Array(rows).fill(0);
   for (let i = G.s; i <= G.e; i++) {
     const a = Math.max(0, Math.floor((d.l[i] - lo) / sz)), b = Math.min(rows - 1, Math.floor((d.h[i] - lo) / sz)), share = d.v[i] / (b - a + 1);
     for (let k = a; k <= b; k++) vp[k] += share;
   }
-  const max = Math.max(...vp), poc = vp.indexOf(max), wMax = (G.W - G.padL - G.padR) * 0.22, x1 = G.W - G.padR;
+  const max = Math.max(...vp), poc = vp.indexOf(max), wMax = (G.W - G.padL - G.padR) * C('vpW') / 100, x1 = G.W - G.padR;
   if (on('vp')) for (let k = 0; k < rows; k++) {
     const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz), w = vp[k] / max * wMax;
     g.fillStyle = k === poc ? K.PC.acc + '55' : K.PC.mid + '33'; g.fillRect(x1 - w, y0, w, Math.max(1, y1 - y0 - 1));
@@ -225,7 +249,7 @@ function drawDom() {   // the ladder: asks above, bids below, bar length = $ at 
   const cv = $('#bdom'), dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
   cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const PC = K.PC; g.font = '11px system-ui'; g.textBaseline = 'middle';
-  const bk = buckets(0.03);
+  const bk = buckets(C('domRange') / 100);
   if (!bk) { g.fillStyle = PC.mute; g.fillText('Загружаю стакан…', 10, 20); return; }
   const im = imbalance(), top = on('imb') ? 34 : 8, rowH = 16, rowsN = Math.floor((H - top - 6) / rowH), half = rowsN >> 1, mk = Math.round(bk.m / step);
   if (im && on('imb')) {
@@ -269,16 +293,24 @@ function spark(cl) {
 }
 function renderList() {
   const rows = K.rows; if (!rows.length) { $('#bList').innerHTML = '<div class="mute" style="padding:12px;font-size:13px">Загружаю монеты…</div>'; return; }
-  const ch = r => { const k = K.cache[r.sym]; if (!k || k.length < 97) return 0; return +k[k.length - 1][4] / +k[k.length - 97][4] - 1; };
+  // change over the last 24 h of the market scan's candles (whatever its timeframe is)
+  const bars = k => k.length > 1 ? Math.max(1, Math.round(864e5 / (k[1][0] - k[0][0]))) : 1;
+  const ch = r => { const k = K.cache[r.sym]; if (!k) return 0; const b = Math.min(bars(k), k.length - 1); return b > 0 ? +k[k.length - 1][4] / +k[k.length - 1 - b][4] - 1 : 0; };
+  const item = r => { const c = ch(r), k = K.cache[r.sym];
+    return `<button class="bli${r.sym === st.sym ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : 'спот'}</span></span>${spark(k?.slice(-bars(k) - 1).map(x => +x[4]))}
+      <span class="bp">${K.fp(r.price)}<span class="${c > 0 ? 'pos' : c < 0 ? 'neg' : ''}">${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(c * 100).toFixed(2)}%</span></span></button>`; };
+  if (st.list === 'lead') {
+    const s = [...rows].map(r => [r, ch(r)]).sort((a, b) => b[1] - a[1]);
+    const up = s.filter(x => x[1] > 0).slice(0, 8).map(x => x[0]), dn = s.filter(x => x[1] < 0).reverse().slice(0, 8).map(x => x[0]);
+    $('#bList').innerHTML = `<div class="bl-h pos">▲ Лидеры роста · 24 ч</div>${up.map(item).join('') || '<div class="faint bl-e">Растущих монет нет</div>'}`
+      + `<div class="bl-h neg">▼ Лидеры падения · 24 ч</div>${dn.map(item).join('') || '<div class="faint bl-e">Падающих монет нет</div>'}`;
+    return;
+  }
   let list;
   if (st.list === 'fav') { list = rows.filter(r => K.favs.has(r.sym)); if (!list.length) list = rows.filter(r => M.MAJORS.includes(r.sym)); }
-  else if (st.list === 'lead') list = [...rows].sort((a, b) => Math.abs(ch(b)) - Math.abs(ch(a))).slice(0, 30);
   else list = rows.filter(r => r.rev).sort((a, b) => b.score - a.score);
   $('#bList').innerHTML = (st.list === 'fav' && !rows.some(r => K.favs.has(r.sym)) ? '<div class="faint" style="padding:4px 10px 8px;font-size:12px">Избранного пока нет — звёздочка у монеты на «Рынке». Пока BTC, ETH, SOL.</div>' : '')
-    + (list.map(r => { const c = ch(r), k = K.cache[r.sym];
-      return `<button class="bli${r.sym === st.sym ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : 'спот'}</span></span>${spark(k?.slice(-96).map(x => +x[4]))}
-        <span class="bp">${K.fp(r.price)}<span class="${c > 0 ? 'pos' : c < 0 ? 'neg' : ''}">${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(c * 100).toFixed(2)}%</span></span></button>`; }).join('')
-    || '<div class="mute" style="padding:12px;font-size:13px">Сейчас подтверждённых сигналов нет.</div>');
+    + (list.map(item).join('') || '<div class="mute" style="padding:12px;font-size:13px">Сейчас подтверждённых сигналов нет.</div>');
 }
 
 // ---------- indicator picker ----------
@@ -294,10 +326,17 @@ function renderInd() {
       + items.map(it => `<div class="ind-it${sel.has(it.id) ? ' on' : ''}${it.soon ? ' soon' : ''}"><span class="ii">${IC}</span><span class="it"><b>${it.name}</b><span>${it.soon ? 'скоро · ' : ''}${it.hint}</span></span>`
         + (it.soon ? '' : `<button data-tog="${it.id}" aria-label="${sel.has(it.id) ? 'Убрать' : 'Добавить'} ${it.name}">${sel.has(it.id) ? '✓' : '+'}</button>`) + '</div>').join('') + '</details>';
   }).join('') || '<div class="mute" style="padding:12px">Ничего не нашлось.</div>';
-  $('#bSel').innerHTML = [...sel].map(id => { const it = ITEMS.find(x => x.id === id); return `<div class="sel-it"><span class="${hidden.has(id) ? 'off' : ''}">${it.name}</span><button data-eye="${id}" aria-label="${hidden.has(id) ? 'Показать' : 'Скрыть'} ${it.name}" title="${hidden.has(id) ? 'Показать' : 'Скрыть'}">${hidden.has(id) ? '◌' : '◉'}</button><button data-tog="${id}" aria-label="Убрать ${it.name}">✕</button></div>`; }).join('')
+  $('#bSel').innerHTML = [...sel].map(id => { const it = ITEMS.find(x => x.id === id), P = PARAMS[id], op = cfgOpen === id;
+    return `<div class="sel-it${op ? ' open' : ''}"><span class="${hidden.has(id) ? 'off' : ''}">${it.name}</span>`
+      + `<button data-eye="${id}" aria-label="${hidden.has(id) ? 'Показать' : 'Скрыть'} ${it.name}" title="${hidden.has(id) ? 'Показать' : 'Скрыть'}">${hidden.has(id) ? '◌' : '◉'}</button>`
+      + (P ? `<button data-cfg="${id}" aria-label="Настройки: ${it.name}" title="Настройки" aria-expanded="${op}">⚙</button>` : '')
+      + `<button data-tog="${id}" aria-label="Убрать ${it.name}">✕</button>`
+      + (P && op ? `<div class="sel-cfg">${P.map(p => `<label><span>${p.name}<b data-v="${p.k}">${p.u(C(p.k))}</b></span><input type="range" data-k="${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${C(p.k)}"></label>`).join('')}<button class="sel-def" data-def="${id}">По умолчанию</button></div>` : '')
+      + '</div>'; }).join('')
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
   $('#bDomWrap').classList.toggle('hidden', !on('dom'));
 }
+function applyCfg() { K.save('sr_bcfg', cfg); calc(); lastDom = 0; dirty = true; }
 function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); dirty = true; requestAnimationFrame(() => { dirty = true; }); }
 function wire() {
   $('#bIndBtn').onclick = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
@@ -310,6 +349,15 @@ function wire() {
     const t = e.target.closest('[data-tog]')?.dataset.tog, eye = e.target.closest('[data-eye]')?.dataset.eye;
     if (t) { sel.has(t) ? (sel.delete(t), hidden.delete(t)) : sel.add(t); if (t === 'delta' && sel.has('delta')) sel.delete('cvd'); if (t === 'cvd' && sel.has('cvd')) sel.delete('delta'); saveInd(); }
     if (eye) { hidden.has(eye) ? hidden.delete(eye) : hidden.add(eye); saveInd(); }
+    const cf = e.target.closest('[data-cfg]')?.dataset.cfg, df = e.target.closest('[data-def]')?.dataset.def;
+    if (cf) { cfgOpen = cfgOpen === cf ? null : cf; renderInd(); }
+    if (df) { for (const p of PARAMS[df]) delete cfg[p.k]; applyCfg(); renderInd(); }
+  });
+  // sliders: the chart follows while dragging; the list isn't re-rendered so the drag isn't interrupted
+  $('#bInd').addEventListener('input', e => {
+    const k = e.target.dataset?.k; if (!k) return;
+    cfg[k] = +e.target.value; const p = Object.values(PARAMS).flat().find(x => x.k === k);
+    document.querySelectorAll(`#bSel [data-v="${k}"]`).forEach(b => b.textContent = p.u(cfg[k])); applyCfg();
   });
   document.querySelectorAll('#bTf .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bTf .tab').forEach(x => x.classList.toggle('on', x === b)); st.tf = b.dataset.tf; K.save('sr_btf', st.tf); restart(); });
   document.querySelectorAll('#bListTabs .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bListTabs .tab').forEach(x => x.classList.toggle('on', x === b)); st.list = b.dataset.bl; renderList(); });
@@ -337,14 +385,14 @@ export function open(kit) {
   K = kit;
   if (!wired) {
     wired = true;
-    sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'bb'])); hidden = new Set(K.load('sr_bhide', []));
+    sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'bb'])); hidden = new Set(K.load('sr_bhide', [])); cfg = K.load('sr_bcfg', {}) || {};
     st.tf = K.load('sr_btf', '1m'); st.sym = K.load('sr_bsym', 'BTCUSDT');
     document.querySelectorAll('#bTf .tab').forEach(b => b.classList.toggle('on', b.dataset.tf === st.tf));
     wire(); renderInd();
   }
   if (loopOn) return;
   loopOn = true; renderList();
-  sampler = setInterval(() => { sampleHeat(); setLive(ws?.readyState === 1 && book?.ok ? 'ok' : 'bad'); renderList(); }, 1000);
+  sampler = setInterval(() => { sampleHeat(); dirty = true; setLive(ws?.readyState === 1 && book?.ok ? 'ok' : 'bad'); renderList(); }, 1000);
   if (st.d) connect(); else restart();
   requestAnimationFrame(loop);
 }

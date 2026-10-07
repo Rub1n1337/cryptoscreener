@@ -286,6 +286,12 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .ind-it.soon{opacity:.55}.ind-it.soon .ii{background:var(--s3);color:var(--mute)}
 .sel-it{display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;font-size:13px}.sel-it span{flex:1}.sel-it button{width:30px;height:30px;padding:0;background:transparent;border-color:transparent}
 .sel-it .off{opacity:.45}
+.sel-it{flex-wrap:wrap}.sel-it.open{border-color:var(--blue)}.sel-it.open [data-cfg]{color:var(--blue)}
+.sel-cfg{flex:1 1 100%;display:grid;gap:12px;padding:8px 2px 2px;border-top:1px solid var(--line);margin-top:2px}
+.sel-cfg label{display:grid;gap:6px;font-size:12px;color:var(--mute)}.sel-cfg label>span{display:flex;justify-content:space-between;gap:8px}.sel-cfg b{color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sel-cfg input[type=range]{width:100%;accent-color:var(--blue);height:24px}
+.sel-it .sel-def{width:auto;height:32px;padding:0 12px;justify-self:start;border:1px solid var(--line);background:var(--s2);font-size:12px}
+.bl-h{padding:12px 10px 6px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.bl-e{padding:4px 10px 8px;font-size:12.5px}
 @media(max-width:1100px){.bgrid{grid-template-columns:1fr}.blist{max-height:none}}
 @media(max-width:700px){.bbar .bsym{flex:1 1 100%}#bMkt{display:none}.bbar .ind-btn{margin-left:auto}@media(max-width:420px){.ib-t{display:none}}.bchart{grid-template-columns:1fr}.bdomwrap{width:auto}#bdom{width:100%;height:220px}#bcv{height:58vh}.ind-body{grid-template-columns:1fr}.ind-sel{border-left:0;border-top:1px solid var(--line)}.indbox{max-height:92vh}}
 /* ---------- motion: short, soft, and off for people who asked their system for less motion ---------- */
@@ -1209,7 +1215,7 @@ function renderChart(cv, d, o = {}) {
   const eView = Math.max(s + 1, o.to ?? n - 1), e = Math.min(eView, n - 1);
   // the right gutter is as wide as the longest price tag, so tags are never cut and no space is wasted
   g.font = '11px system-ui';
-  const tagW = Math.max(...[...(o.levels || []).map(L => `${L.tag || ''} ${fp(L.v)}`), ...(o.ulevels || []).map(v => `ур. ${fp(v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1])].map(x => g.measureText(x).width));
+  const tagW = Math.max(...[...(o.levels || []).map(L => `${L.tag || ''} ${fp(L.v)}`), ...(o.ulevels || []).map(v => `ур. ${fp(v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1]) + (o.priceSub ? ' · ' + o.priceSub : '')].map(x => g.measureText(x).width));
   const padL = 8, padR = clamp(Math.ceil(tagW) + 18, 56, 130), pH = Math.round(H * 0.7), vTop = pH + 24, vH = Math.round(H * 0.08), rTop = vTop + vH + 22, rH = H - rTop - 6;
   const cnt = eView - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= 3;
   const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i <= e ? t[i] : t[e] + (i - e) * step;
@@ -1299,7 +1305,7 @@ function renderChart(cv, d, o = {}) {
   if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = PC.acc + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
   if (isFinite(B.up[e])) tags.push({y:Y(B.up[e]), text:fp(B.up[e]), col:PC.up});
   if (isFinite(B.lo[e])) tags.push({y:Y(B.lo[e]), text:fp(B.lo[e]), col:PC.lo});
-  tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur), col:PC.acc, box:true});
+  tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur) + (o.live && o.priceSub ? ' · ' + o.priceSub : ''), col:PC.acc, box:true});   // priceSub: e.g. time left in the candle
   // spread tags so they never overlap: sort by y, push down, then shift the stack up if it ran past the bottom
   tags.sort((a, b) => a.y - b.y);
   for (let q = 0; q < tags.length; q++) tags[q].ty = Math.max(clamp(tags[q].y, T0, pH - 6), q ? tags[q-1].ty + 15 : T0);
