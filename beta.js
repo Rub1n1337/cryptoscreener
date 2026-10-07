@@ -51,7 +51,7 @@ const CATS = [
 ];
 const LOWER = ['delta', 'cvd', 'rsi'];   // one lower pane: choosing one of these replaces the other
 const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'cvd', 'vp', 'vwap'];
-let sel, hidden;                    // chosen indicators, and chosen-but-hidden ones (the eye)
+let sel, hidden, labels = true;      // chosen indicators, chosen-but-hidden ones (the eye), text labels on the chart
 const on = id => sel.has(id) && !hidden.has(id);
 // per-indicator settings (the gear next to a chosen indicator); values live in cfg and are saved in localStorage
 const stepParam = {k:'stepX', name:'Шаг цены: уровни склеиваются в строки по', min:0.5, max:10, step:0.5, def:1, u:v => { const p = act(); return p?.base ? '$' + niceNum(p.base * v) : v + '×'; }};
@@ -124,8 +124,8 @@ class Pane {
     this.zs = K.attachZoom(cv, {
       state:() => !this.dead && this.d && this.geo && {n:this.d.c.length, minFrom:this.d.N - 1, defSpan:this.defSpan(), view:this.view, geo:this.geo},
       set:v => { this.setView(v, true); if (v === null) this.setY(null); }, pick:e => this.pick(e),
-      tools:'<button data-z="yauto" class="ct-txt ct-yauto" title="Вернуть автомасштаб цены (двойной клик по шкале)" aria-label="Автомасштаб цены">A</button>',
-      onTool:z => { if (z === 'yauto') this.setY(null); },
+      tools:'<button data-z="yauto" class="ct-txt ct-yauto" title="Вернуть автомасштаб цены (двойной клик по шкале)" aria-label="Автомасштаб цены">A</button><button data-z="help" class="ct-txt" title="Как управлять графиком" aria-label="Как управлять графиком">?</button>',
+      onTool:(z, b) => { if (z === 'yauto') this.setY(null); if (z === 'help') popFor === b ? closePop() : helpPop(b); },
       key:k => { const t = {r:'ruler', 'к':'ruler', v:'avwap', 'м':'avwap', t:'note', 'е':'note', p:'frvp', 'з':'frvp'}[k]; if (k === 'a' || k === 'ф') { this.setY(null); return true; } if (!t) return false; setTool(tool === t ? null : t); return true; }});
     // the price scale: drag it up / down to stretch / squash the candles, wheel over it does the same;
     // once the scale is manual, dragging the chart also moves it up and down; "A" or a double click goes back to auto
@@ -324,7 +324,7 @@ class Pane {
     if (this.yr) { lo = this.yr.mn; hi = this.yr.mx; }   // a manual price scale decides what is visible
     const sl = this.yr ? 0 : 0.002, W = this.walls().filter(w => w.price >= lo * (1 - sl) && w.price <= hi * (1 + sl));   // only walls inside the visible range, so they don't squash the candles
     const narrow = this.cv.clientWidth < 520;   // on narrow charts a wall tag is just its size (the colour tells the side)
-    const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
+    const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
     const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd}
@@ -336,9 +336,9 @@ class Pane {
     else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; mirror = true; }
     // VWAP lines get their value as a tag on the price scale (a text label next to the line collided with the price tags)
     const e = Math.min(n - 1, r.to), av = drw(this.sym).filter(x => x.type === 'avwap' && x.t >= d.t[0]).map(x => ({x, arr:avwap(d, x.t)}));
-    const tags = [...(on('vwap') && isFinite(d.vwap[e]) ? [{v:d.vwap[e], text:'VWAP ' + K.fp(d.vwap[e]), col:PC.acc, pin:true}] : []),
-      ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:'VWAP⚓ ' + K.fp(a.arr[e]), col:PC.trade, pin:true})),
-      ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:'dPOC ' + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
+    const tags = [...(on('vwap') && isFinite(d.vwap[e]) ? [{v:d.vwap[e], text:(labels ? 'VWAP ' : '') + K.fp(d.vwap[e]), col:PC.acc, pin:true}] : []),
+      ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
+      ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:(labels ? 'dPOC ' : '') + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
     const cw = this.cv.clientWidth; this.rc = on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0;   // the order book column at the price scale
     this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:44, sub, priceSub:this.countdown(), fitPrice:true, thin:true,
       rightCol:this.rc, yRange:this.yr, crossPct:true,
@@ -353,7 +353,7 @@ class Pane {
         if (on('bubbles')) this.drawBubbles(g, G);
         this.drawNotes(g, G);
         if (ruler?.pane === this) this.drawRuler(g, G);
-        if (on('heat') && this.heatMs < 15 * 6e4) {   // the heatmap only has what was collected while the tab was open: say so
+        if (labels && on('heat') && this.heatMs < 15 * 6e4) {   // the heatmap only has what was collected while the tab was open: say so
           const m = Math.floor(this.heatMs / 6e4), t = this.book?.ok ? `карта копится · ${m} мин` : 'стакан загружается…';
           g.font = '11px system-ui'; g.textBaseline = 'middle'; g.fillStyle = PC.mute; g.fillText(t, Math.max(G.padL + 4, G.X(G.e) - G.bw - 8 - g.measureText(t).width), G.T0 + 8);
         }
@@ -400,7 +400,7 @@ class Pane {
       const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz), w = vp[k] / max * wMax;
       g.fillStyle = k === poc ? K.PC.acc + '55' : K.PC.mid + '33'; g.fillRect(x1 - w, y0, w, Math.max(1, y1 - y0 - 1));
     }
-    if (on('poc')) { const y = G.Y(lo + (poc + 0.5) * sz); g.strokeStyle = K.PC.acc; g.lineWidth = 1.2; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(G.padL, y); g.lineTo(x1, y); g.stroke(); g.setLineDash([]); g.fillStyle = K.PC.acc; g.fillText('POC', G.padL + 4, y - 7); }
+    if (on('poc')) { const y = G.Y(lo + (poc + 0.5) * sz); g.strokeStyle = K.PC.acc; g.lineWidth = 1.2; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(G.padL, y); g.lineTo(x1, y); g.stroke(); g.setLineDash([]); if (labels) { g.fillStyle = K.PC.acc; g.fillText('POC', G.padL + 4, y - 7); } }
   }
   drawBubbles(g, G) {
     const d = this.d, tf = TFMS[this.tf], first = d.t[G.s], last = d.t[G.e] + tf;
@@ -629,6 +629,20 @@ function openPop(anchor, html, cls = '') {
 }
 const closePop = () => { $('#bPop').classList.add('hidden'); popFor = null; };
 const head = t => `<h4>${t}<button data-close aria-label="Закрыть">✕</button></h4>`;
+// a cheat sheet of chart gestures, behind the "?" on every chart
+function helpPop(btn) {
+  const row = (k, t) => `<div class="hk"><b>${k}</b><span>${t}</span></div>`;
+  openPop(btn, head('Как управлять графиком') + '<div class="hks">'
+    + row('Колёсико / щипок', 'масштаб по времени')
+    + row('Тянуть график', 'листать историю; после ручного масштаба цены — и вверх-вниз')
+    + row('Тянуть шкалу цены', 'растянуть или сжать свечи; колёсико над шкалой — то же')
+    + row('A · двойной клик', 'вернуть автомасштаб цены · всё сразу')
+    + row('← → · + −', 'листать · масштаб (график в фокусе)')
+    + row('R · V · T · P', 'линейка · VWAP от свечи · заметка · профиль участка')
+    + row('Ctrl+Z · Esc', 'отменить · выйти из инструмента')
+    + row('Клик по заметке', 'изменить или удалить; так же VWAP и профиль')
+    + '</div>', 'help');
+}
 function tfPop() {
   const p = act();
   openPop($('#bTfBtn'), head('Таймфрейм') + `<div class="pgrid">${Object.keys(TFMS).map(tf => `<button data-tf="${tf}" class="${tf === p.tf ? 'on' : ''}">${TFL[tf]}</button>`).join('')}</div>`
@@ -766,6 +780,7 @@ function wire() {
   $('#bIndClose').onclick = closeInd; $('#bInd').onclick = e => { if (e.target.id === 'bInd') closeInd(); };
   $('#bIndQ').oninput = renderInd;
   $('#bIndClear').onclick = () => { sel.clear(); hidden.clear(); saveInd(); };
+  $('#bLabels').checked = labels; $('#bLabels').onchange = e => { labels = e.target.checked; K.save('sr_blabels', labels); redrawAll(); };
   $('#bInd').addEventListener('click', e => {
     const t = e.target.closest('[data-tog]')?.dataset.tog, eye = e.target.closest('[data-eye]')?.dataset.eye, cf = e.target.closest('[data-cfg]')?.dataset.cfg;
     if (t) { sel.has(t) ? (sel.delete(t), hidden.delete(t)) : sel.add(t); if (LOWER.includes(t) && sel.has(t)) LOWER.forEach(x => x !== t && sel.delete(x)); saveInd(); }
@@ -826,7 +841,7 @@ export function open(kit) {
   K = kit;
   if (!wired) {
     wired = true;
-    sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'bb'])); hidden = new Set(K.load('sr_bhide', [])); cfg = K.load('sr_bcfg', {}) || {};
+    sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'bb'])); hidden = new Set(K.load('sr_bhide', [])); labels = K.load('sr_blabels', true); cfg = K.load('sr_bcfg', {}) || {};
     drawings = K.load('sr_bdraw', {}) || {}; link = K.load('sr_blink', true); active = K.load('sr_bact', 0);
     // older single-chart settings become the first pane
     if (!K.load('sr_bpanes', null)) K.save('sr_bpanes', [{sym:K.load('sr_bsym', 'BTCUSDT'), tf:K.load('sr_btf', '5m'), range:0}]);

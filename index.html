@@ -273,6 +273,8 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12.5px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre button{flex:1}}
 .ctools .ct-yauto{display:none}.ctools .ct-yauto.show{display:inline-flex;color:var(--acc);border-color:var(--warn-line)}
 .bcv:focus,.bcv:focus-visible{outline:none}
+.bpop.help{width:min(380px,calc(100vw - 32px))}.hks{display:grid;gap:7px}.hk{display:grid;grid-template-columns:128px 1fr;gap:10px;font-size:12.5px;line-height:1.35}.hk b{font-weight:650}.hk span{color:var(--mute)}
+.ind-lbl{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--mute);margin:-2px 0 10px;cursor:pointer}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
 .btools .tab{min-width:34px;padding:0 9px;font-weight:700}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue);color:#fff}
 .bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin .16s ease-out}
@@ -938,7 +940,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <div class="ind-h"><b>Индикаторы <span class="ind-n" id="bIndN2">0</span></b><button class="icon" id="bIndClose" aria-label="Закрыть">✕</button></div>
       <div class="ind-quick"><div class="cmdg">Быстрый выбор</div><div id="bQuick" class="ind-chips"></div></div>
       <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="bIndQ" placeholder="Найти индикатор…" autocomplete="off"></div>
-      <div class="ind-body"><div id="bCats" class="ind-cats"></div><div class="ind-sel"><div class="ind-selh"><b>Выбрано · <span id="bIndN3">0</span></b><button id="bIndClear">Очистить</button></div><div id="bSel"></div></div></div>
+      <div class="ind-body"><div id="bCats" class="ind-cats"></div><div class="ind-sel"><div class="ind-selh"><b>Выбрано · <span id="bIndN3">0</span></b><button id="bIndClear">Очистить</button></div><label class="ind-lbl" title="Текст у стен, VWAP, POC и подсказки на графике"><input type="checkbox" id="bLabels" checked> подписи на графике</label><div id="bSel"></div></div></div>
     </div></div>
   </section>
 
