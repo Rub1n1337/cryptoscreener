@@ -523,6 +523,10 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
   #mhead th:nth-child(3),#tb td:nth-child(3){display:none}
 }
 .tab .ts{display:none}
+/* mid widths (laptops, tablets): the header keeps every tab whole — short labels first, then icons only for the extras */
+@media(min-width:701px) and (max-width:1380px){.top .tab .tt.lg{display:none}.top .tab .ts{display:inline}.cmdbtn kbd{display:none}}
+@media(min-width:701px) and (max-width:1120px){#ver{font-size:0;padding:0;background:none;min-width:0}#ver:not(.fresh){display:none}.top .tab[data-t=help] .ts,.top .tab[data-t=changes] .ts,.cmdbtn .pt{display:none}.top .tab[data-t=help],.top .tab[data-t=changes]{padding:0 10px}}
+@media(min-width:701px) and (max-width:900px){.top .tab .tt{display:none}.top .tab{padding:0 10px}.top .tab.on .tt{display:inline}}
 .chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .ctitle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:18px;font-weight:700}
 .ctitle .coin i{width:30px;height:30px;font-size:13px}.ctitle .coin b{font-size:18px}
@@ -620,12 +624,12 @@ details.dis>.dbody{padding:0 16px 16px}
     <span class="bt">Sigma Radar</span><small id="hdr"></small>
   </a>
   <nav class="tabs">
-    <button class="tab on" data-t="market"><svg class="i"><use href="#i-market"/></svg><span class="tt">Рынок</span></button>
-    <button class="tab" data-t="journal"><svg class="i"><use href="#i-journal"/></svg><span class="tt">Журнал</span></button>
-    <button class="tab" data-t="backtest"><svg class="i"><use href="#i-backtest"/></svg><span class="tt">Бэктест</span></button>
-    <button class="tab" data-t="beta"><svg class="i"><use href="#i-layers"/></svg><span class="tt">Бета</span></button>
-    <button class="tab" data-t="help"><svg class="i"><use href="#i-help"/></svg><span class="tt lg">Как это работает</span><span class="ts">Справка</span></button>
-    <button class="tab" data-t="changes"><svg class="i"><use href="#i-changes"/></svg><span class="tt lg">Что нового</span><span class="ts">Новое</span><span class="badge" id="ver"></span></button>
+    <button class="tab on" data-t="market" title="Рынок" aria-label="Рынок"><svg class="i"><use href="#i-market"/></svg><span class="tt">Рынок</span></button>
+    <button class="tab" data-t="journal" title="Журнал" aria-label="Журнал"><svg class="i"><use href="#i-journal"/></svg><span class="tt">Журнал</span></button>
+    <button class="tab" data-t="backtest" title="Бэктест" aria-label="Бэктест"><svg class="i"><use href="#i-backtest"/></svg><span class="tt">Бэктест</span></button>
+    <button class="tab" data-t="beta" title="Бета" aria-label="Бета"><svg class="i"><use href="#i-layers"/></svg><span class="tt">Бета</span></button>
+    <button class="tab" data-t="help" title="Как это работает" aria-label="Как это работает"><svg class="i"><use href="#i-help"/></svg><span class="tt lg">Как это работает</span><span class="ts">Справка</span></button>
+    <button class="tab" data-t="changes" title="Что нового" aria-label="Что нового"><svg class="i"><use href="#i-changes"/></svg><span class="tt lg">Что нового</span><span class="ts">Новое</span><span class="badge" id="ver"></span></button>
   </nav>
   <div class="tools">
     <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей" aria-label="Состояние ботов"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
