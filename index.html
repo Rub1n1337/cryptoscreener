@@ -270,6 +270,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bpane.tool .bcv{cursor:copy}
 .bbar-r{margin-left:auto;display:flex;gap:8px;align-items:center}
 .pick-btn{gap:6px;font-weight:600}.pick-btn .i{width:15px;height:15px}.pick-btn[aria-pressed=true]{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
+.btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12.5px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre button{flex:1}}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
 .btools .tab{min-width:34px;padding:0 9px;font-weight:700}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue);color:#fff}
 .bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin .16s ease-out}
@@ -554,7 +555,7 @@ details.dis>.dbody{padding:0 16px 16px}
 /* ---------- responsive ---------- */
 @media(max-width:1180px){.form{grid-template-columns:1fr 1fr}.factions{grid-column:1/-1;flex-direction:row}}
 @media(max-width:1200px){.grid{grid-template-columns:1fr;align-items:stretch}}
-@media(max-width:1100px){.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1100px){.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(6,1fr)}.cards>.card{grid-column:span 2}.cards>.card:nth-child(-n+2){grid-column:span 3}}
 @media(max-width:860px){.brand span.bt{display:none}.pill .pt{display:none}}
 @media(max-width:700px){
   .topin{gap:10px;padding:0 10px;justify-content:space-between}
@@ -837,6 +838,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
       <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
       <button id="btRun" class="primary" style="height:var(--h);padding:0 22px"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
+      <div class="btpre" role="group" aria-label="Подставить готовые настройки"><span class="faint">Подставить:</span><button id="btShared" title="Те же правила, по которым торгует общий бот — проверить их на истории">правила общего бота</button><button id="btMine" title="Канал и таймфрейм с вкладки «Рынок»">настройки «Рынка»</button></div>
     </div>
     <div class="fields" style="align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
       <span class="faint" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;align-self:center;margin-right:4px">Риск-менеджмент</span>
@@ -862,8 +864,6 @@ details.dis>.dbody{padding:0 16px 16px}
         <label class="fl" title="Не ловить отскок на монете, которая сама в сильном тренде (ER монеты за ~7 дней выше порога)">Тренд монеты <select id="btCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
         <label class="fl inl" title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
         <button id="btSave" title="Сохранить текущие настройки бэктеста как профиль «Моего бота»">Сохранить как профиль бота</button>
-        <button id="btShared" title="Подставить настройки общего бота">Как у общего бота</button>
-        <button id="btMine" title="Подставить настройки с вкладки «Рынок»">Мои настройки</button>
       </div>
     </div></details>
     <div class="mute" id="btStatus" style="margin-bottom:14px;font-size:13px"></div>
@@ -3016,8 +3016,8 @@ if (tf2On) setTf2(true);
 attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
 
 $('#btRun').onclick = runBacktest;
-$('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); };
-$('#btShared').onclick = () => { if (SJ) btFill(SJ.settings); };
+$('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); toast('Подставлены настройки «Рынка»', `${S.tf}, канал ${S.N}/${S.k}, топ-50 монет. Нажмите «Запустить».`, 'ok'); };
+$('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } btFill(SJ.settings); const tp = String(SJ.settings.top || 50); if ([...$('#btTop').options].some(o => o.value === tp)) { $('#btTop').value = tp; btEstimate(); } toast('Подставлены правила общего бота', profPlain({coins:{mode:'top', top:SJ.settings.top || 150}, set:SJ.settings}) + ' Нажмите «Запустить».', 'ok'); };
 ['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER'].forEach(s => $(s).onchange = btEstimate);
 $('#btCustom').oninput = btEstimate;
 $('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });
