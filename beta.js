@@ -27,8 +27,8 @@ const CATS = [
     {id:'flow', name:'Поток ликвидности', hint:'как быстро ставят и снимают заявки', soon:true},
   ]},
   {name:'Поток сделок', items:[
-    {id:'delta', name:'Дельта объёма', hint:'покупки − продажи по рынку, по свечам'},
-    {id:'cvd', name:'CVD', hint:'накопленная дельта объёма'},
+    {id:'delta', name:'Дельта объёма', hint:'нижняя панель: покупки − продажи по рынку, по свечам'},
+    {id:'cvd', name:'CVD', hint:'нижняя панель: накопленная дельта объёма'},
   ]},
   {name:'Кластерный анализ', items:[
     {id:'fp', name:'Таблицы кластеров', hint:'объём по ценам внутри свечи', soon:true},
@@ -42,10 +42,11 @@ const CATS = [
   ]},
   {name:'Цена и построения', items:[
     {id:'bb', name:'Канал Боллинджера', hint:'лог-канал, как на рынке (длина и ширина — в ⚙)'},
-    {id:'rsi', name:'RSI', hint:'нижняя панель, если не выбраны дельта или CVD'},
+    {id:'rsi', name:'RSI', hint:'нижняя панель: перекупленность и перепроданность'},
     {id:'fib', name:'Уровни Фибоначчи', hint:'два клика по графику', soon:true},
   ]},
 ];
+const LOWER = ['delta', 'cvd', 'rsi'];   // one lower pane: choosing one of these replaces the other
 const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'cvd', 'vp', 'vwap'];
 let sel, hidden;                    // chosen indicators, and chosen-but-hidden ones (the eye)
 const on = id => sel.has(id) && !hidden.has(id);
@@ -88,6 +89,7 @@ function mutate(sym, fn) {
 function undoRedo(from, to) {
   const h = from.pop(); if (!h) { K.toast(from === undoS ? 'Нечего отменять' : 'Нечего повторять', '', 'info'); return; }
   to.push({sym:h.sym, prev:JSON.stringify(drw(h.sym))}); drawings[h.sym] = JSON.parse(h.prev); K.save('sr_bdraw', drawings); redrawAll();
+  if (!panes.some(p => p.sym === h.sym)) K.toast(from === undoS ? 'Отменено' : 'Повторено', `Изменение было на ${K.base(h.sym)} — сейчас эта монета не на экране.`, 'info');
 }
 const undo = () => undoRedo(undoS, redoS), redo = () => undoRedo(redoS, undoS);
 
@@ -104,9 +106,11 @@ class Pane {
     el.innerHTML = '<div class="bph"><b></b><span class="tfl"></span><span class="bpx"></span></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
     $('#bPanes').appendChild(el); this.cv = el.querySelector('canvas');
     el.addEventListener('pointerdown', () => setActive(panes.indexOf(this)), true);
+    el.addEventListener('focusin', () => setActive(panes.indexOf(this)));   // Tab to a chart makes it the active one too
     const cv = this.cv;
     cv.addEventListener('mousemove', e => {
       this.hoverI = K.hoverIndex(this.geo, cv, e); this.hoverY = e.clientY - cv.getBoundingClientRect().top; this.dirty = true;
+      if (!e.buttons) cv.style.cursor = !tool && this.hitAt(e) ? 'pointer' : '';
       if (link && this.d && this.hoverI != null) { hoverT = {src:this, t:this.d.t[clamp(this.hoverI, 0, this.d.t.length - 1)]}; panes.forEach(q => { if (q !== this) q.dirty = true; }); }
       if (ruler?.live && ruler.pane === this) { const pt = this.pointAt(e); if (pt) ruler.b = pt; }
     });
@@ -137,6 +141,10 @@ class Pane {
       q.dirty = true; q.zs.sync();
     }
   }
+  hitAt(e) {
+    const r = this.cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    return (this.hits || []).find(h => x >= h.x0 && x <= h.x1 && y >= h.y0 && y <= h.y1);
+  }
   pointAt(e) {
     if (!this.geo || !this.d) return null;
     const p = K.priceAt(this.geo, this.cv, e); if (p == null) return null;
@@ -145,7 +153,11 @@ class Pane {
   }
   // a press on the chart: tools take it first; otherwise a finished ruler is cleared and the press pans the chart
   pick(e) {
-    if (!tool) { if (ruler && !ruler.live) { ruler = null; redrawAll(); } return false; }
+    if (!tool) {
+      const h = this.hitAt(e); if (h) { const x = e.clientX, y = e.clientY; setTimeout(() => objPop(this, h.obj, x, y)); return true; }
+      if (ruler && !ruler.live) { ruler = null; redrawAll(); }
+      return false;
+    }
     const pt = this.pointAt(e); if (!pt) return true;
     if (tool === 'ruler') { ruler = {pane:this, a:pt, b:pt, live:true}; this.dirty = true; return true; }
     if (tool === 'avwap') { mutate(this.sym, a => a.push({type:'avwap', t:pt.t})); setTool(null); return true; }
@@ -199,6 +211,8 @@ class Pane {
   }
   // every second the current book is folded into the bar it belongs to (max per fine bucket), building the heatmap
   sampleHeat() {
+    // the big-trade threshold (top N% of recent trades) is refreshed here once a second, not sorted on every trade
+    if (this.tradeUsd.length >= 50) { const s = [...this.tradeUsd].sort((a, b) => a - b); this.thr = s[Math.floor(s.length * (1 - C('bubPct') / 100))]; }
     if (!this.book?.ok || !this.d) return;
     this.heatMs += 1000;
     const bk = this.buckets(0.04, this.fine); if (!bk) return;
@@ -221,8 +235,7 @@ class Pane {
   onTrade(x) {   // big market buys / sells: the top N% of recent trades
     const usd = +x.p * +x.q;
     this.tradeUsd.push(usd); if (this.tradeUsd.length > 2000) this.tradeUsd.shift();
-    const s = [...this.tradeUsd].sort((a, b) => a - b), thr = Math.max(C('bubMin'), s[Math.floor(s.length * (1 - C('bubPct') / 100))] || 0);
-    if (usd >= thr) { this.trades.push({T:x.T, p:+x.p, usd, sell:x.m}); if (this.trades.length > 600) this.trades.shift(); this.dirty = true; }
+    if (usd >= Math.max(C('bubMin'), this.thr || Infinity)) { this.trades.push({T:x.T, p:+x.p, usd, sell:x.m}); if (this.trades.length > 600) this.trades.shift(); this.dirty = true; }
   }
 
   // ---------- stream ----------
@@ -245,12 +258,23 @@ class Pane {
   disconnect() { clearTimeout(this.wsTimer); if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; } }
   live() { return this.ws?.readyState === 1 && this.book?.ok; }
   async restart() {
-    this.view = null; this.d = null; this.trades = []; this.tradeUsd = []; this.label();
+    // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
+    this.disconnect(); this.book = null; this.view = null; this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
+    if (ruler?.pane === this) ruler = null;
     const key = this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
     if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }
-    try { if (!await this.load()) return; } catch (e) { K.toast('Не удалось загрузить свечи', `${this.sym}: ${e.message || e}`, 'bad'); return; }
+    this.dirty = true;
+    try { if (!await this.load()) return; }
+    catch (e) {
+      // a mistyped coin: go back to the previous one instead of leaving an empty chart (and saving it)
+      const bad = this.sym, back = this.prevSym; this.prevSym = null;
+      K.toast(back ? `Монеты ${K.base(bad)} нет на споте Binance` : 'Не удалось загрузить свечи', back ? `Вернул ${K.base(back)}. Пишите тикер, например SOL или PEPE.` : `${bad}: ${e.message || e}`, 'bad');
+      if (back) { this.sym = back; savePanes(); renderList(); this.restart(); }
+      return;
+    }
+    this.prevSym = null;
     if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); }
-    if (loopOn) this.connect();
+    if (loopOn && !this.el.classList.contains('hidden')) this.connect();
   }
   destroy() { this.dead = true; this.disconnect(); this.el.remove(); }
 
@@ -263,8 +287,11 @@ class Pane {
     const W = this.walls().filter(w => w.price >= lo * 0.998 && w.price <= hi * 1.002);   // only walls inside the visible range, so they don't squash the candles
     const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:`стена ${fmtUsd(w.usd)}`})) : [];
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
-    const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd} : null;
+    // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
+    const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd}
+      : on('rsi') ? null : {label:'Нижняя панель пуста — «Индикаторы»: дельта, CVD или RSI', values:[], kind:'line'};
     // the crosshair of the chart under the mouse is mirrored on the others at the same time (just the line and the time)
+    this.hits = [];   // clickable drawings (notes, VWAP anchors), filled while drawing
     let hI = this.hoverI, hY = this.hoverY, mirror = false;
     if (ruler?.pane === this) hI = null;   // the candle tooltip would cover the ruler's label
     else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; mirror = true; }
@@ -339,7 +366,7 @@ class Pane {
   drawAvwap(g, G, {x, arr}) {   // VWAP accumulated from the chosen candle on, with a dot at the anchor
     const d = this.d, i0 = K.barAt(d.t, x.t), PC = K.PC;
     drawLine(g, G, arr, PC.trade);
-    const y0 = G.Y(arr[i0]); if (i0 >= G.s && i0 <= G.e && y0 >= G.T0 && y0 <= G.pH) { g.beginPath(); g.arc(G.X(i0), y0, 4, 0, 7); g.fillStyle = PC.trade; g.fill(); g.strokeStyle = PC.canvas; g.lineWidth = 1.5; g.stroke(); }
+    const y0 = G.Y(arr[i0]); if (i0 >= G.s && i0 <= G.e && y0 >= G.T0 && y0 <= G.pH) { g.beginPath(); g.arc(G.X(i0), y0, 4, 0, 7); g.fillStyle = PC.trade; g.fill(); g.strokeStyle = PC.canvas; g.lineWidth = 1.5; g.stroke(); this.hits.push({x0:G.X(i0) - 9, x1:G.X(i0) + 9, y0:y0 - 9, y1:y0 + 9, obj:x}); }
   }
   drawNotes(g, G) {
     const d = this.d, PC = K.PC;
@@ -352,6 +379,7 @@ class Pane {
       g.beginPath(); g.arc(cx, cy, 3.5, 0, 7); g.fillStyle = col; g.fill();
       g.fillStyle = PC.tip; g.fillRect(lx - 5, cy - 10, w + 10, 20); g.fillStyle = col; g.fillRect(lx - 5, cy - 10, 3, 20);
       g.fillStyle = PC.price; g.fillText(x.text, lx + 1, cy); g.font = '11px system-ui';
+      this.hits.push({x0:Math.min(cx - 6, lx - 5), x1:Math.max(cx + 6, lx + w + 5), y0:cy - 11, y1:cy + 11, obj:x});
     }
   }
   drawRuler(g, G) {   // a box from A to B with the move in %, in $, in candles and in time
@@ -514,16 +542,32 @@ function cfgPop(id) {
 }
 const COLS = [['acc', 'жёлтый'], ['lo', 'зелёный'], ['up', 'красный'], ['rsi', 'синий'], ['trade', 'фиолетовый']];
 let noteDraft = null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
+const colsHtml = cur => `<div class="pcols" role="radiogroup" aria-label="Цвет">${COLS.map(([c, n]) => `<button data-col="${c}" style="background:var(--c-${c})" aria-label="${n}" class="${c === cur ? 'on' : ''}"></button>`).join('')}</div>`;
 function notePop(p, pt, x, y) {
   noteDraft = {p, pt, col:K.load('sr_bnotec', 'acc')};
   openPop({left:x, bottom:y, top:y}, head('Заметка на графике') + `<textarea id="bNoteT" maxlength="80" placeholder="Например: отбой от стены"></textarea>`
-    + `<div class="pcols" role="radiogroup" aria-label="Цвет">${COLS.map(([c, n]) => `<button data-col="${c}" style="background:var(--c-${c})" aria-label="${n}" class="${c === noteDraft.col ? 'on' : ''}"></button>`).join('')}</div>`
-    + `<div class="pact"><button data-close>Отмена</button><button class="primary" data-save>Добавить</button></div>`);
+    + colsHtml(noteDraft.col) + `<div class="pact"><button data-close>Отмена</button><button class="primary" data-save>Добавить</button></div>`);
+}
+// a press on an existing note or VWAP anchor opens it: change the text / colour, or delete
+function objPop(p, obj, x, y) {
+  noteDraft = {p, edit:obj, col:obj.col};
+  const at = {left:x, bottom:y, top:y};
+  if (obj.type === 'note') openPop(at, head('Заметка') + `<textarea id="bNoteT" maxlength="80">${esc(obj.text)}</textarea>` + colsHtml(obj.col)
+    + `<div class="pact"><button data-del>Удалить</button><button class="primary" data-save>Сохранить</button></div>`);
+  else openPop(at, head('VWAP от свечи') + `<p class="phint" style="margin:0">Считается с ${K.dt(obj.t)} — средняя цена с учётом объёма от этой свечи.</p><div class="pact"><button data-del>Удалить</button></div>`);
 }
 function saveNote() {
   const text = $('#bNoteT').value.trim(); if (!text || !noteDraft) { $('#bNoteT').focus(); return; }
-  const {p, pt, col} = noteDraft; K.save('sr_bnotec', col);
-  mutate(p.sym, a => a.push({type:'note', t:pt.t, p:pt.p, text, col})); closePop(); noteDraft = null;
+  const {p, pt, col, edit} = noteDraft; K.save('sr_bnotec', col);
+  if (edit) mutate(p.sym, a => { const i = a.indexOf(edit); if (i >= 0) a[i] = {...edit, text, col}; });
+  else mutate(p.sym, a => a.push({type:'note', t:pt.t, p:pt.p, text, col}));
+  closePop(); noteDraft = null;
+}
+function delObj() {
+  const {p, edit} = noteDraft || {}; if (!edit) return;
+  mutate(p.sym, a => { const i = a.indexOf(edit); if (i >= 0) a.splice(i, 1); }); closePop(); noteDraft = null;
+  K.toast(edit.type === 'note' ? 'Заметка удалена' : 'VWAP удалён', 'Вернуть — ↶ или Ctrl+Z.', 'ok');
 }
 function wirePop() {
   const pop = $('#bPop');
@@ -537,6 +581,7 @@ function wirePop() {
     if (ds.def) { for (const q of PARAMS[ds.def]) delete cfg[q.k]; applyCfg(); cfgPop(ds.def); }
     if (ds.col) { noteDraft.col = ds.col; pop.querySelectorAll('[data-col]').forEach(x => x.classList.toggle('on', x === b)); }
     if ('save' in ds) saveNote();
+    if ('del' in ds) delObj();
   });
   // sliders: the chart follows while dragging
   pop.addEventListener('input', e => {
@@ -556,27 +601,35 @@ function spark(cl) {
   return `<svg viewBox="0 0 64 26" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? K.PC.lo : K.PC.up}" stroke-width="1.5"/></svg>`;
 }
 let listMode = 'fav';
+// the list is rebuilt every second; the DOM is touched only when something changed (keeps hover and scroll calm)
+let lastList = '', suggestN = 0;
+const setList = html => { if (html !== lastList) { lastList = html; $('#bList').innerHTML = html; } };
+function fillSuggest(rows) {   // the coin search suggests the coins of the market scan
+  if (rows.length === suggestN) return; suggestN = rows.length;
+  $('#bSymList').innerHTML = rows.map(r => `<option value="${K.base(r.sym)}">`).join('');
+}
 function renderList() {
-  const rows = K.rows; if (!rows.length) { $('#bList').innerHTML = '<div class="mute" style="padding:12px;font-size:13px">Загружаю монеты…</div>'; return; }
-  const cur = act()?.sym;
+  const rows = K.rows; if (!rows.length) { setList('<div class="mute" style="padding:12px;font-size:13px">Загружаю монеты…</div>'); return; }
+  fillSuggest(rows);
+  const cur = act()?.sym, shown = new Map(panes.map((p, i) => [p.sym, i + 1]));
   // change over the last 24 h of the market scan's candles (whatever its timeframe is)
   const bars = k => k.length > 1 ? Math.max(1, Math.round(864e5 / (k[1][0] - k[0][0]))) : 1;
   const ch = r => { const k = K.cache[r.sym]; if (!k) return 0; const b = Math.min(bars(k), k.length - 1); return b > 0 ? +k[k.length - 1][4] / +k[k.length - 1 - b][4] - 1 : 0; };
   const item = r => { const c = ch(r), k = K.cache[r.sym];
-    return `<button class="bli${r.sym === cur ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : 'спот'}</span></span>${spark(k?.slice(-bars(k) - 1).map(x => +x[4]))}
+    return `<button class="bli${r.sym === cur ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : 'спот'}${layout > 1 && shown.has(r.sym) ? ` · график ${shown.get(r.sym)}` : ''}</span></span>${spark(k?.slice(-bars(k) - 1).map(x => +x[4]))}
       <span class="bp">${K.fp(r.price)}<span class="${c > 0 ? 'pos' : c < 0 ? 'neg' : ''}">${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(c * 100).toFixed(2)}%</span></span></button>`; };
   if (listMode === 'lead') {
     const s = [...rows].map(r => [r, ch(r)]).sort((a, b) => b[1] - a[1]);
     const up = s.filter(x => x[1] > 0).slice(0, 8).map(x => x[0]), dn = s.filter(x => x[1] < 0).reverse().slice(0, 8).map(x => x[0]);
-    $('#bList').innerHTML = `<div class="bl-h pos">▲ Лидеры роста · 24 ч</div>${up.map(item).join('') || '<div class="faint bl-e">Растущих монет нет</div>'}`
-      + `<div class="bl-h neg">▼ Лидеры падения · 24 ч</div>${dn.map(item).join('') || '<div class="faint bl-e">Падающих монет нет</div>'}`;
+    setList(`<div class="bl-h pos">▲ Лидеры роста · 24 ч</div>${up.map(item).join('') || '<div class="faint bl-e">Растущих монет нет</div>'}`
+      + `<div class="bl-h neg">▼ Лидеры падения · 24 ч</div>${dn.map(item).join('') || '<div class="faint bl-e">Падающих монет нет</div>'}`);
     return;
   }
   let list;
   if (listMode === 'fav') { list = rows.filter(r => K.favs.has(r.sym)); if (!list.length) list = rows.filter(r => M.MAJORS.includes(r.sym)); }
   else list = rows.filter(r => r.rev).sort((a, b) => b.score - a.score);
-  $('#bList').innerHTML = (listMode === 'fav' && !rows.some(r => K.favs.has(r.sym)) ? '<div class="faint" style="padding:4px 10px 8px;font-size:12px">Избранного пока нет — звёздочка у монеты на «Рынке». Пока BTC, ETH, SOL.</div>' : '')
-    + (list.map(item).join('') || '<div class="mute" style="padding:12px;font-size:13px">Сейчас подтверждённых сигналов нет.</div>');
+  setList((listMode === 'fav' && !rows.some(r => K.favs.has(r.sym)) ? '<div class="faint" style="padding:4px 10px 8px;font-size:12px">Избранного пока нет — звёздочка у монеты на «Рынке». Пока BTC, ETH, SOL.</div>' : '')
+    + (list.map(item).join('') || '<div class="mute" style="padding:12px;font-size:13px">Сейчас подтверждённых сигналов нет.</div>'));
 }
 
 // ---------- indicator picker ----------
@@ -611,7 +664,7 @@ function wire() {
   $('#bIndClear').onclick = () => { sel.clear(); hidden.clear(); saveInd(); };
   $('#bInd').addEventListener('click', e => {
     const t = e.target.closest('[data-tog]')?.dataset.tog, eye = e.target.closest('[data-eye]')?.dataset.eye, cf = e.target.closest('[data-cfg]')?.dataset.cfg;
-    if (t) { sel.has(t) ? (sel.delete(t), hidden.delete(t)) : sel.add(t); if (t === 'delta' && sel.has('delta')) sel.delete('cvd'); if (t === 'cvd' && sel.has('cvd')) sel.delete('delta'); saveInd(); }
+    if (t) { sel.has(t) ? (sel.delete(t), hidden.delete(t)) : sel.add(t); if (LOWER.includes(t) && sel.has(t)) LOWER.forEach(x => x !== t && sel.delete(x)); saveInd(); }
     if (eye) { hidden.has(eye) ? hidden.delete(eye) : hidden.add(eye); saveInd(); }
     if (cf) { closeInd(); setTimeout(() => cfgPop(cf)); }
   });
@@ -623,7 +676,9 @@ function wire() {
   $('#bLink').onclick = () => { link = !link; K.save('sr_blink', link); syncBar(); hoverT = null; if (link) act().setView(act().view, true); redrawAll(); };
   document.querySelectorAll('#bListTabs .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bListTabs .tab').forEach(x => x.classList.toggle('on', x === b)); listMode = b.dataset.bl; renderList(); });
   $('#bList').onclick = e => { const b = e.target.closest('[data-sym]'); if (b) setSym(b.dataset.sym); };
-  $('#bSym').onkeydown = e => { if (e.key !== 'Enter') return; let v = e.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!v) return; if (!v.endsWith('USDT')) v += 'USDT'; e.target.value = ''; setSym(v); };
+  const goSym = el => { let v = el.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!v) return; if (!v.endsWith('USDT')) v += 'USDT'; el.value = ''; el.blur(); setSym(v); };
+  $('#bSym').onkeydown = e => { if (e.key === 'Enter') goSym(e.target); if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); } };
+  $('#bSym').oninput = e => { if (!e.inputType || e.inputType === 'insertReplacementText') goSym(e.target); };   // a coin picked from the suggestions
   // the ruler is finished on release, wherever the mouse is
   window.addEventListener('mouseup', () => { if (ruler?.live) { ruler.live = false; setTool(null); } });
   window.addEventListener('touchend', () => { if (ruler?.live) { ruler.live = false; setTool(null); } });
@@ -639,7 +694,7 @@ function wire() {
   window.addEventListener('resize', redrawAll);
   wirePop();
 }
-function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.sym = sym; savePanes(); p.restart(); renderList(); }
+function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.prevSym = p.sym; p.sym = sym; savePanes(); p.restart(); renderList(); }
 function setLive() {
   const p = act(); if (!p) return;
   const ok = p.live(), mins = Math.floor(p.heatMs / 6e4), all = panes.filter(q => q.live()).length;
