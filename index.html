@@ -23,6 +23,7 @@
   --tag-t:#cbd5e1;--up-t:#ff9aa3;--lo-t:#86efac;--acc-t:#fcd34d;
   --bad-line:#6b2027;--bad-bg:#2a1216;--ok-line:#1d5b35;--warn-line:#5c4a12;
   /* chart colours (read by the canvas code through pal()) */
+  --heat-0:#28469f;--heat-1:#00aaff;--heat-2:#ffdc00;--heat-3:#ff5a14;
   --c-up:#ef4444;--c-lo:#22c55e;--c-mid:#64748b;--c-trade:#a78bfa;--c-price:#e5e7eb;--c-acc:#f5b70a;
   --c-axis:#566173;--c-label:#5c6679;--c-grid:#334155;--c-cross:#475569;--c-rsi:#60a5fa;--c-mute:#8b95a5;
   --c-band:rgba(59,130,246,.07);--c-tip:rgba(15,22,34,.95);--c-volup:rgba(34,197,94,.45);--c-voldn:rgba(239,68,68,.45);
@@ -248,6 +249,67 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--s1)}
 .prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12.5px}
+/* ---------- Beta ---------- */
+.betalock{display:flex;justify-content:center;padding:6vh 0}
+.betalock .panel{width:min(440px,100%);text-align:center;padding:28px 24px}
+.betalock h2{margin:10px 0 6px}.betalock p{color:var(--mute);font-size:14px;margin:0 0 18px;line-height:1.5}
+.bl-ic{width:48px;height:48px;border-radius:14px;display:inline-grid;place-items:center;background:var(--accbg);color:var(--acc)}.bl-ic svg{width:22px;height:22px}
+#betaForm{display:flex;gap:8px}#betaForm input{flex:1;min-width:0;height:42px}#betaForm button{height:42px;padding:0 18px}
+.bl-err{color:var(--up);font-size:13px;min-height:18px;margin-top:8px}
+.bgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.bbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.bsym{flex:0 1 160px}.bsym input{width:100%}
+.ind-btn{gap:8px;font-weight:600}.ind-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11.5px;font-weight:700}
+.bchart{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+#bcv{height:clamp(440px,64vh,760px);cursor:crosshair}
+.bdomwrap{width:190px}.bdomwrap.hidden{display:none}#bdom{width:190px;height:clamp(440px,64vh,760px);cursor:default}
+.bnote{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:13px;color:var(--mute)}.bnote b{color:var(--text)}
+.bside .seg{margin-bottom:10px;display:flex}.bside .seg .tab{flex:1}
+.blist{display:flex;flex-direction:column;gap:2px;max-height:calc(64vh + 60px);overflow:auto}
+.bli{display:grid;grid-template-columns:minmax(0,1fr) 64px auto;gap:8px;align-items:center;width:100%;height:auto;padding:8px 10px;border:0;border-radius:10px;background:transparent;text-align:left;justify-content:stretch;font-weight:500}
+.bli:hover{background:var(--s2);border:0}.bli.on{background:var(--s3)}
+.bli .bn b{display:block;font-size:13.5px}.bli .bn span{font-size:11.5px;color:var(--faint)}.bli svg{width:64px;height:26px}
+.bli .bp{text-align:right;font-size:12.5px;font-variant-numeric:tabular-nums}.bli .bp span{display:block;font-size:11.5px}
+.indbox{width:min(920px,100%);max-height:84vh}
+.ind-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 6px}.ind-h b{font-size:17px;display:flex;gap:8px;align-items:center}
+.ind-quick{padding:0 16px 8px}.ind-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ind-chip{height:32px;border-radius:999px;font-size:13px;padding:0 12px;gap:6px}.ind-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.ind-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;min-height:0;overflow:hidden;border-top:1px solid var(--line)}
+.ind-cats{overflow:auto;padding:10px 12px;max-height:56vh}.ind-sel{border-left:1px solid var(--line);padding:12px 14px;overflow:auto;max-height:56vh}
+.ind-selh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.ind-selh button{height:30px;font-size:12.5px}
+.ind-cat{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--s1)}
+.ind-cat>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:650;display:flex;justify-content:space-between;align-items:center}.ind-cat>summary::-webkit-details-marker{display:none}
+.ind-it{display:flex;gap:12px;align-items:center;padding:10px 12px;margin:0 8px 8px;border-radius:10px;background:var(--s2)}
+.ind-it .ii{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--blue);color:#fff;flex:0 0 auto}.ind-it .ii svg{width:17px;height:17px}
+.ind-it .it{flex:1;min-width:0}.ind-it .it b{display:block;font-size:13.5px}.ind-it .it span{font-size:11.5px;color:var(--faint);line-height:1.35;display:block}
+.ind-it button{width:34px;height:34px;padding:0}.ind-it.on button{background:var(--blue);border-color:var(--blue);color:#fff}
+.ind-it.soon{opacity:.55}.ind-it.soon .ii{background:var(--s3);color:var(--mute)}
+.sel-it{display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;font-size:13px}.sel-it span{flex:1}.sel-it button{width:30px;height:30px;padding:0;background:transparent;border-color:transparent}
+.sel-it .off{opacity:.45}
+@media(max-width:1100px){.bgrid{grid-template-columns:1fr}.blist{max-height:none}}
+@media(max-width:700px){.bbar .bsym{flex:1 1 100%}#bMkt{display:none}.bbar .ind-btn{margin-left:auto}@media(max-width:420px){.ib-t{display:none}}.bchart{grid-template-columns:1fr}.bdomwrap{width:auto}#bdom{width:100%;height:220px}#bcv{height:58vh}.ind-body{grid-template-columns:1fr}.ind-sel{border-left:0;border-top:1px solid var(--line)}.indbox{max-height:92vh}}
+/* ---------- motion: short, soft, and off for people who asked their system for less motion ---------- */
+@keyframes pagein{from{opacity:0;transform:translateY(6px)}}
+@keyframes popin{from{opacity:0;transform:translateY(-4px) scale(.98)}}
+@keyframes fadein{from{opacity:0}}
+@keyframes sheetin{from{transform:translateY(24px);opacity:0}}
+@keyframes rowflash{0%,30%{background:var(--accbg)}100%{background:transparent}}
+section:not(.hidden){animation:pagein .22s ease-out}
+.modal:not(.hidden),.cmdk:not(.hidden){animation:fadein .16s ease-out}
+.modal:not(.hidden) .mbox,.cmdk:not(.hidden) .cmdbox,.cmdk:not(.hidden) .dlgbox{animation:popin .18s ease-out}
+.evp.open,.guard.open{animation:popin .16s ease-out}
+details.dis[open]>.dbody{animation:pagein .2s ease-out}
+.card,.prof,.btn,button{transition:background .15s,border-color .15s,color .15s,transform .15s,box-shadow .15s}
+@media (hover:hover){.card[data-cf]:hover{transform:translateY(-2px)}.prof.pick:hover{transform:translateY(-1px)}}
+tr.row.newsig td{animation:rowflash 2.4s ease-out}
+@media(max-width:700px){body.sheet #cpanel{animation:sheetin .22s ease-out}}
+/* theme switch: the new theme spreads as a circle from the button (View Transitions; browsers without it just swap) */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:themereveal .45s cubic-bezier(.4,0,.2,1)}
+@keyframes themereveal{from{clip-path:circle(0 at var(--vt-x,100%) var(--vt-y,0))}to{clip-path:circle(160vmax at var(--vt-x,100%) var(--vt-y,0))}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after,::view-transition-new(root){animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+/* "what's new" tab: a dot until the latest version has been seen */
+#ver.fresh{color:var(--acc);font-weight:700}#ver.fresh::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);margin-left:4px;vertical-align:2px}
 /* summary cards double as filter shortcuts */
 .card[data-cf]{cursor:pointer;transition:border-color .15s}.card[data-cf]:hover{border-color:var(--hover)}.card[data-cf].on{border-color:var(--acc)}
 .sheetbar{display:none}
@@ -514,6 +576,8 @@ details.dis>.dbody{padding:0 16px 16px}
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></symbol>
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5z"/><path d="m3 13 9 5 9-5"/><path d="m3 17.5 9 5 9-5" opacity=".55"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
@@ -528,6 +592,7 @@ details.dis>.dbody{padding:0 16px 16px}
     <button class="tab on" data-t="market"><svg class="i"><use href="#i-market"/></svg><span class="tt">Рынок</span></button>
     <button class="tab" data-t="journal"><svg class="i"><use href="#i-journal"/></svg><span class="tt">Журнал</span></button>
     <button class="tab" data-t="backtest"><svg class="i"><use href="#i-backtest"/></svg><span class="tt">Бэктест</span></button>
+    <button class="tab" data-t="beta"><svg class="i"><use href="#i-layers"/></svg><span class="tt">Бета</span></button>
     <button class="tab" data-t="help"><svg class="i"><use href="#i-help"/></svg><span class="tt lg">Как это работает</span><span class="ts">Справка</span></button>
     <button class="tab" data-t="changes"><svg class="i"><use href="#i-changes"/></svg><span class="tt lg">Что нового</span><span class="ts">Новое</span><span class="badge" id="ver"></span></button>
   </nav>
@@ -792,6 +857,48 @@ details.dis>.dbody{padding:0 16px 16px}
   </section>
 
   <!-- HELP -->
+  <!-- BETA: new tools under test; everything else on the site keeps working as before -->
+  <section id="beta" class="hidden">
+    <div id="betaLock" class="betalock">
+      <div class="panel">
+        <div class="bl-ic"><svg class="i"><use href="#i-lock"/></svg></div>
+        <h2>Бета</h2>
+        <p>Новые инструменты, которые мы сейчас тестируем: биржевой стакан, тепловая карта ликвидности, крупные сделки, дельта объёма. Вход — по паролю.</p>
+        <form id="betaForm" autocomplete="off"><input id="betaPass" type="password" placeholder="Пароль" aria-label="Пароль от беты" autocomplete="off"><button class="primary" type="submit">Войти</button></form>
+        <div class="bl-err" id="betaErr" role="alert"></div>
+      </div>
+    </div>
+    <div id="betaApp" class="hidden">
+      <div class="phead"><div><h2>Бета <span class="tag sq">тест</span></h2><p>Тот же рынок, но с данными стакана и потока сделок. Стакан и крупные сделки приходят с Binance вживую — тепловая карта копится, пока вкладка открыта.</p></div><div id="bLive"></div></div>
+      <div class="bgrid">
+        <div class="panel bmain">
+          <div class="bbar">
+            <div class="search bsym"><svg class="i"><use href="#i-search"/></svg><input id="bSym" placeholder="Монета" aria-label="Монета" autocomplete="off" spellcheck="false"></div>
+            <div class="seg mini" id="bMkt"><button class="tab on" data-mkt="spot">Спот</button><button class="tab" data-mkt="fut" disabled title="Фьючерсы — следующий шаг">Фьючерсы</button></div>
+            <div class="seg mini" id="bTf"><button class="tab" data-tf="1m">1м</button><button class="tab on" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button></div>
+            <button class="ind-btn" id="bIndBtn" aria-label="Индикаторы"><svg class="i"><use href="#i-sliders"/></svg><span class="ib-t">Индикаторы</span> <span class="ind-n" id="bIndN">0</span></button>
+          </div>
+          <div class="bchart">
+            <div class="cvwrap"><canvas id="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>
+            <div class="bdomwrap" id="bDomWrap"><canvas id="bdom" aria-label="Биржевой стакан"></canvas></div>
+          </div>
+          <div class="bnote" id="bNote"></div>
+        </div>
+        <div class="panel bside">
+          <div class="seg mini" id="bListTabs"><button class="tab on" data-bl="fav">Избранное</button><button class="tab" data-bl="lead">Лидеры</button><button class="tab" data-bl="sig">Сигналы</button></div>
+          <div class="blist" id="bList"></div>
+        </div>
+      </div>
+    </div>
+    <!-- indicator picker, modelled on the "Индикаторы" window of order-flow terminals -->
+    <div id="bInd" class="cmdk hidden"><div class="cmdbox indbox" role="dialog" aria-modal="true" aria-label="Индикаторы">
+      <div class="ind-h"><b>Индикаторы <span class="ind-n" id="bIndN2">0</span></b><button class="icon" id="bIndClose" aria-label="Закрыть">✕</button></div>
+      <div class="ind-quick"><div class="cmdg">Быстрый выбор</div><div id="bQuick" class="ind-chips"></div></div>
+      <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="bIndQ" placeholder="Найти индикатор…" autocomplete="off"></div>
+      <div class="ind-body"><div id="bCats" class="ind-cats"></div><div class="ind-sel"><div class="ind-selh"><b>Выбрано · <span id="bIndN3">0</span></b><button id="bIndClear">Очистить</button></div><div id="bSel"></div></div></div>
+    </div></div>
+  </section>
+
   <section id="help" class="hidden">
     <div class="phead"><div><h2>Как это работает</h2><p>Коротко о том, что делает сервис и как им пользоваться.</p></div></div>
     <div class="steps">
@@ -985,6 +1092,7 @@ async function scan() {
       const prevPx = new Map(rows.map(r => [r.sym, r.price]));   // for the user's level-crossing alerts
       rows = res; cache = fresh; lastScan = Date.now();
       const newSig = prevScanDone ? rows.filter(r => r.rev && r.score >= S.minScore && !prevSig.has(r.sym)) : [];
+      flashSyms = new Set(newSig.map(r => r.sym)); setTimeout(() => { flashSyms = new Set(); }, 3000);   // new signals glow once in the table
       if (newSig.length) {
         if (sound) beep();
         const r0 = newSig[0];
@@ -1047,7 +1155,7 @@ function gauge(pB) {
 const labelOf = r => r.kind === 'sig' ? (r.side === 'low' ? '▲ LONG' : '▼ SHORT')
   : r.kind === 'out' ? (r.pB > 1 ? 'за границей ↑' : 'за границей ↓')
   : r.kind === 'touch' ? `касание ${r.side === 'low' ? '↓' : '↑'} ${hm(r.touchTime)}` : r.label;
-let scanErr = null;
+let scanErr = null, flashSyms = new Set();
 function renderTable() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
   if (!rows.length) { if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
@@ -1078,7 +1186,7 @@ function renderTable() {
     const sc = r.score == null ? '<span class="faint">—</span>'
       : `<b style="color:${r.rev ? (r.score >= S.minScore ? 'var(--acc)' : 'var(--text)') : 'var(--faint)'}" title="${r.rev ? 'разворот подтверждён' : 'разворот не подтверждён — бот не войдёт'}">${r.score}</b>`;
     const vc = r.volZ >= 1 ? 'var(--acc)' : r.volZ <= -1 ? 'var(--faint)' : 'inherit';
-    return `<tr tabindex="0" class="row${r.sym === chartSym ? ' sel' : ''}" data-sym="${r.sym}">
+    return `<tr tabindex="0" class="row${r.sym === chartSym ? ' sel' : ''}${flashSyms.has(r.sym) ? ' newsig' : ''}" data-sym="${r.sym}">
       <td><span class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}">${favs.has(r.sym) ? '★' : '☆'}</span></td>
       <td>${coin(r.sym)}</td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
       <td class="hm hx ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
@@ -1139,6 +1247,8 @@ function renderChart(cv, d, o = {}) {
     g.fillStyle = PC.lo + '1f'; g.fillRect(x0, Math.min(Y(z.entry), Y(z.tp)), x1 - x0, Math.abs(Y(z.tp) - Y(z.entry)));
     g.fillStyle = PC.up + '1f'; g.fillRect(x0, Math.min(Y(z.entry), Y(z.sl)), x1 - x0, Math.abs(Y(z.sl) - Y(z.entry)));
   }
+  // layers under the price (Beta: liquidity heatmap, volume profile)
+  o.under?.(g, {X, Y, s, e, eView, bw, padL, padR, W, H, pH, T0, mn, mx, t, tAt});
   line(B.up, PC.up); line(B.lo, PC.lo); line(B.mid, PC.mid, 1, [4, 4]);
   // price
   if (candles) {
@@ -1218,6 +1328,22 @@ function renderChart(cv, d, o = {}) {
     g.fillStyle = c[i] >= op[i] ? PC.volup : PC.voldn;
     g.fillRect(X(i) - Math.max(0.5, bw * 0.35), vTop + vH - hh, Math.max(1, bw * 0.7), hh);
   }
+  if (o.sub) {
+    // lower pane replaced by a series (e.g. volume delta as bars, CVD as a line) — used by the Beta chart
+    const sv = o.sub.values; let a = Infinity, b = -Infinity;
+    for (let i = s; i <= e; i++) if (isFinite(sv[i])) { a = Math.min(a, sv[i]); b = Math.max(b, sv[i]); }
+    if (o.sub.kind === 'bars') { a = Math.min(a, 0); b = Math.max(b, 0); }
+    const SY = x => rTop + (b - x) / ((b - a) || 1) * rH;
+    g.fillStyle = PC.label; g.fillText(o.sub.label, padL + 2, rTop + 7);
+    if (o.sub.kind === 'bars') {
+      for (let i = s; i <= e; i++) { if (!isFinite(sv[i])) continue; g.fillStyle = sv[i] >= 0 ? PC.volup : PC.voldn; const y0 = SY(0), y1 = SY(sv[i]); g.fillRect(X(i) - Math.max(0.5, bw * 0.35), Math.min(y0, y1), Math.max(1, bw * 0.7), Math.abs(y1 - y0) || 1); }
+    } else {
+      g.beginPath(); let st = false;
+      for (let i = s; i <= e; i++) { if (!isFinite(sv[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), SY(sv[i])); st = true; }
+      g.strokeStyle = PC.rsi; g.lineWidth = 1.3; g.stroke();
+    }
+    if (isFinite(sv[e])) { g.fillStyle = PC.rsi; g.fillText(o.sub.fmt ? o.sub.fmt(sv[e]) : sv[e].toFixed(0), W - padR + 6, SY(sv[e])); }
+  } else {
   // RSI
   g.fillStyle = PC.label; g.fillText('RSI', padL + 2, rTop + 7);
   const RY = x => rTop + (100 - x) / 100 * rH;
@@ -1229,6 +1355,9 @@ function renderChart(cv, d, o = {}) {
   for (let i = s; i <= e; i++) { if (!isFinite(R[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), RY(R[i])); st = true; }
   g.strokeStyle = PC.rsi; g.stroke();
   if (isFinite(R[e])) { g.fillStyle = PC.rsi; g.fillText(R[e].toFixed(0), W - padR + 6, RY(R[e])); }
+  }
+  // extra layers drawn by the caller on top of everything (Beta: trade bubbles, walls)
+  o.over?.(g, {X, Y, s, e, eView, bw, padL, padR, W, H, pH, T0, mn, mx, t, tAt});
   // hover
   const hi = o.hoverI;
   if (hi != null && hi >= s && hi <= e) {
@@ -1821,6 +1950,13 @@ function renderServer() {
 
 // ---------- journal ----------
 const money = v => v.toLocaleString('ru', {minimumFractionDigits:2, maximumFractionDigits:2});
+const lastBal = {};
+function countUp(el, from, to, fmt, ms = 650) {
+  if (!el || from == null || from === to || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const t0 = performance.now(), ease = x => 1 - (1 - x) ** 3;
+  const step = t => { const k = Math.min(1, (t - t0) / ms); el.textContent = fmt(from + (to - from) * ease(k)); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
 const peakOf = D => { let b = D.start, pk = b; for (const x of [...D.closed].sort((a, b2) => a.tclose - b2.tclose)) { b += x.pnl; pk = Math.max(pk, b); } return pk; };
 // balance over time: a step line — the balance only changes when a trade closes
 function equityChart(D, tEnd) {
@@ -1894,7 +2030,7 @@ function renderJournal() {
   if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
-    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')} · <span class="faint">Входит при силе сигнала от ${set.minScore}, ${set.tf}.</span>`
+    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}<br><span class="mute">Правила: ${profPlain({coins:{mode:'top', top:set.top || 150}, set})}</span>`
     : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
   tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
@@ -1929,6 +2065,8 @@ function renderJournal() {
        ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа. Если комиссии больше прибыли до них — стратегия работает на биржу')}
        ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика')}
      </div>` : ''}`;
+  // the balance counts to its new value instead of jumping (only when it actually changed)
+  countUp($('#jcards .hv'), lastBal[jMode], D.balance, v => '$' + money(v)); lastBal[jMode] = D.balance;
   const now = Date.now();
   $('#jopen').innerHTML = D.open.map(p => {
     const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry;
@@ -2201,74 +2339,49 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
-  {v:'2.8', date:'7 октября 2026', title:'Бот не входит, когда отскок уже случился', items:[
-    'Исправлена дыра в правилах отскока: бот мог открыть сделку, когда цена уже вернулась почти к середине канала (тень коснулась границы, а следующая свеча упала сразу к середине). Теперь вход только если до середины осталось хотя бы 0.8 стопа.',
-    'Тейк «к центру» — ровно у середины канала. Раньше у него был минимум 1%, и тейк уезжал за середину, где у отскока уже нет преимущества.',
-    'Годовой бэктест «Боковик · 1h» (RR 1:2): было +0.05R на сделку и просадка 21%, стало +0.12R и 15%; обе половины года в плюсе.',
-    'В карточке сделки — сколько оставалось до середины канала на входе по сравнению со стопом.',
+  {v:'2.9', date:'7 октября 2026', title:'Общий бот на проверенных правилах, плавность и Бета', items:[
+    'Общий бот теперь торгует по правилам, которые лучше всего держались на истории за год: часовые свечи, 50 самых популярных монет, только когда рынок спокойный.',
+    'Сайт стал плавнее: мягкие переходы между вкладками, окна и списки появляются без рывков.',
+    'Новая вкладка «Бета» — по паролю, для тех, кто тестирует новые инструменты: стакан заявок, тепловая карта ликвидности и другое.',
   ]},
-  {v:'2.7', date:'7 октября 2026', title:'Тайм-стоп — настройка профиля', items:[
-    'Тайм-стоп теперь можно выключить или поменять в профиле и в бэктесте: выкл, 24, 48 или 96 свечей. По умолчанию — 48, как раньше.',
-    'Зачем он нужен: годовой бэктест «Боковик · 1h» без тайм-стопа — +0.03R на сделку, и одна сделка висела 237 дней, занимая место бота. С тайм-стопом 48 свечей — +0.05R, с 24 — та же доходность при самой низкой просадке (16%). 96 свечей — хуже всех.',
-    'В описании профиля видно, какой у него тайм-стоп или что его нет.',
+  {v:'2.8', date:'7 октября 2026', title:'Меньше бессмысленных сделок', items:[
+    'Бот больше не входит в отскок, когда цена уже почти вернулась к середине канала, — раньше такие сделки почти всегда уходили в стоп.',
+    'Цель сделки «к центру» ставится ровно у середины канала.',
+    'В карточке сделки видно, сколько хода оставалось у сделки на входе.',
+  ]},
+  {v:'2.7', date:'7 октября 2026', title:'Тайм-стоп по желанию', items:[
+    'Тайм-стоп — выход, если сделка долго стоит на месте, — теперь настраивается в профиле: выключить, 24, 48 или 96 свечей.',
   ]},
   {v:'2.6', date:'6 октября 2026', title:'Свои уровни и второй таймфрейм', items:[
-    'Исправлено: на телефоне снова виден список монет — в прошлом обновлении он сжимался в узкую полоску.',
-    'Свои уровни на графике: кнопка «— уровень» (или L), затем нажмите на нужную цену. Когда цена пересечёт уровень, придёт уведомление. Уровни хранятся для каждой монеты; удалить — крестиком под графиком или правым кликом по линии.',
-    'Второй таймфрейм: кнопка «2 ТФ» (или T) показывает ту же монету на старшем таймфрейме — по умолчанию 15м → 4ч, 1ч → 1д. В режиме «во всю ширину» графики стоят рядом.',
-    'В карточке короткой сделки подписи «вход» и «выход» больше не налезают друг на друга.',
-    'Бэктест подсказывает, как сделать долгий запуск быстрее.',
-    'В справке — раздел про управление графиком; в быстром поиске — «уровень», «второй таймфрейм», «развернуть график».',
+    'Проведите на графике свой уровень — когда цена его пересечёт, придёт уведомление.',
+    'Кнопка «2 ТФ» показывает ту же монету на более крупных свечах рядом с основным графиком.',
+    'Исправлено: на телефоне снова виден список монет.',
   ]},
   {v:'2.5', date:'6 октября 2026', title:'Удобный график', items:[
-    'График стал больше: на компьютере он шире списка монет и выше, цена занимает большую часть высоты. Кнопка ⤢ (или клавиша F) разворачивает его на всю ширину — список уходит под него, выбор запоминается.',
-    'По умолчанию видно столько свечей, сколько помещается настоящими свечами, а не линией. Отдалить — колёсиком, кнопкой − или двумя пальцами; сколько истории загружать — в настройках («История»).',
-    'Шкала цены с сеткой справа; перекрестие показывает цену под курсором и время свечи.',
-    'Кнопки на графике: − и + (масштаб), ⟲ (обычный вид) и «к последней свече →», когда вы ушли в прошлое. С клавиатуры: ← → листать, + − масштаб, End — к последней свече, 0 — сброс.',
-    'Открытая позиция подсвечена на графике: зелёная зона — от входа до тейка, красная — от входа до стопа. Так же в карточке сделки.',
-    'Разбор сигнала знает, что общий бот уже в сделке по этой монете или что все его места заняты.',
-    'Исправлено: точка из строки таблицы больше не залезает на заголовок при прокрутке.',
+    'График больше, его можно развернуть на всю ширину, по умолчанию видны свечи, а не линия.',
+    'Шкала цены, перекрестие с ценой и временем, кнопки масштаба и «к последней свече».',
+    'Открытая сделка подсвечена на графике: зелёная зона до цели, красная — до стопа.',
   ]},
   {v:'2.4', date:'6 октября 2026', title:'Результат — на первом месте', items:[
-    '«Мой бот»: выбор профиля свёрнут в строку «Профиль · сейчас «…»» — баланс и сделки видны сразу, без прокрутки через настройки. Пока сделок нет, строка раскрыта. Сменить профиль можно и ссылкой «сменить» в карточке бота.',
-    'Таблица монет по умолчанию ставит подтверждённые сигналы по силе — самые сильные сверху.',
-    'На компьютере по таблице монет можно ходить стрелками ↑ ↓ — график переключается следом.',
-    'Пока у бота нет закрытых сделок, вместо пустых показателей — одна понятная строка.',
-    '«Что нового»: последние три версии, остальные — под «Ранние обновления».',
+    'В «Моём боте» сначала баланс и сделки, выбор профиля — свёрнутой строкой.',
+    'Самые сильные сигналы — вверху таблицы монет.',
   ]},
   {v:'2.3', date:'6 октября 2026', title:'Удобно на телефоне', items:[
-    'Рынок на телефоне начинается со списка монет — он виден сразу, без прокрутки через график. Поиск и фильтры остаются под рукой при прокрутке.',
-    'Нажмите на монету — график откроется на весь экран. Назад к списку — кнопкой «Монеты» или жестом «назад», и список останется на том же месте.',
-    'Карточки сводки сверху — это кнопки: «Сигналы», «Дешевле обычного», «Дороже обычного», «Затишье» сразу показывают эти монеты.',
-    'Сделки в журнале и бэктесте на телефоне — аккуратными карточками: монета, сторона и итог крупно, вход, выход и причина — под ними.',
-    'Карточка сделки: крестик закрытия всегда в углу, подписи цен на графике больше не обрезаются.',
-    'Формы бэктеста и профиля — ровной сеткой; после запуска бэктеста экран сам переходит к результату.',
-    'Звук сигнала на телефоне включается в колокольчике — в шапке стало свободнее.',
+    'На телефоне сразу видно список монет; график монеты открывается на весь экран и закрывается жестом «назад».',
+    'Сделки в журнале — аккуратными карточками.',
   ]},
-  {v:'2.2', date:'6 октября 2026', title:'Аудит: точнее и удобнее', items:[
-    '«Подходящих сигналов пока нет» теперь ведёт на кнопку «Показать рынок глазами профиля»: рынок переключается на таймфрейм и канал профиля, и видно ровно те сигналы, которые взвешивает бот.',
-    'Разбор сигнала больше не обещает «бот войдёт», если график настроен не так, как общий бот, — честно говорит, по каким настройкам торгуют боты.',
-    'Позиции «Моего бота» на сервере теперь видны на графике и в разборе сигнала.',
-    'Бэктест по умолчанию определяет режим рынка по BTC, ETH и SOL — так же, как бот. При сохранении профиля предупредит, если тест шёл иначе.',
-    'На телефоне: карточки сводки — одной лентой, которую можно листать, график виден сразу; в таблице всегда видна «Сила»; график можно приближать двумя пальцами; кнопки в карточке бота не сжимаются.',
-    'Монету можно добавить в избранное звёздочкой рядом с её названием над графиком.',
-    'Если Binance не ответил, в таблице — понятное сообщение и кнопка «Повторить».',
-    'Окно состояния ботов говорит простыми словами, строки таблиц открываются с клавиатуры (Tab и Enter).',
+  {v:'2.2', date:'6 октября 2026', title:'Точнее и понятнее', items:[
+    'Кнопка «Показать рынок глазами профиля» — видно ровно те сигналы, на которые смотрит ваш бот.',
+    'Позиции «Моего бота» на сервере видны на графике.',
   ]},
   {v:'2.1', date:'6 октября 2026', title:'События под колокольчиком', items:[
-    'Колокольчик теперь открывает список событий: новые сигналы, сделки обоих ботов и смена профиля. Непрочитанные отмечены, нажатие ведёт к монете или в журнал. Там же включаются уведомления браузера.',
-    'Если «Мой бот» работает на сервере, о его сделках теперь тоже приходят уведомления.',
-    'В журнале — изменение за 7 дней, сравнение последних 20 сделок со средним и короткий вывод: что тянет результат вниз или что приносит больше всего.',
-    'В форме профиля появляется плашка «Есть несохранённые изменения»; Ctrl+S сохраняет, а уйти, не сохранив, сайт не даст без вопроса.',
-    'Удаление профиля и сброс журнала спрашивают через понятное окно — с тем, что именно произойдёт.',
-    'В быстрых фильтрах рынка видно, сколько монет в каждом: «Сигналы 3», «Затишье 12».',
-    'Серверный бот засыпает, если на сайт не заходить 30 дней, — откройте сайт, и он продолжит. Это нужно, чтобы на всех хватало места.',
+    'Колокольчик хранит последние сигналы и сделки ботов, нажатие ведёт к монете или в журнал.',
+    'Профиль нельзя потерять: перед уходом с несохранёнными изменениями сайт спросит.',
   ]},
   {v:'2.0', date:'6 октября 2026', title:'Быстрый поиск и профили по ссылке', items:[
-    'Поиск по всему сайту — кнопка «Поиск» в верхней панели или Ctrl+K: монеты, разделы, профили и отдельные настройки вроде «плечо», «риск», «бэктест». Понимает и неправильную раскладку: «ыщд» найдёт SOL.',
-    'Профилем можно поделиться: кнопка «Поделиться» копирует ссылку. Кто её откроет, добавит профиль себе одним нажатием.',
-    'Если бот не открывает сделки, он объясняет почему — например, «профиль торгует только в боковике, а сейчас импульс» — и предлагает, что сделать.',
-    'Рядом с данными видно, насколько они свежие: «обновлено 12 с назад». Если данные устарели, отметка становится жёлтой.',
+    'Поиск по всему сайту — Ctrl+K или кнопка «Поиск»: монеты, разделы и настройки.',
+    'Профилем можно поделиться ссылкой.',
+    'Если бот не торгует, он объясняет почему.',
   ]},
   {v:'1.9', date:'6 октября 2026', title:'«Мой бот» стал понятнее', items:[
     'Сверху — что бот делает прямо сейчас: торгует, на паузе или работает только в этой вкладке, по какому профилю и какой сейчас рынок. И одна главная кнопка.',
@@ -2355,6 +2468,7 @@ const CHANGELOG = [
 ];
 function renderChangelog() {
   $('#ver').textContent = 'v' + CHANGELOG[0].v;
+  $('#ver').classList.toggle('fresh', load('sr_seenv', null) !== CHANGELOG[0].v);   // a dot until the latest version is seen
   const item = c => `<div class="cl-item"><div style="font-weight:650;font-size:15px"><span class="tag" style="margin-right:8px">v${c.v}</span>${c.title} <span class="faint" style="font-weight:400;font-size:12px">· ${c.date}</span></div>
      <ul>${c.items.map(i => `<li>${i}</li>`).join('')}</ul></div>`;
   // the latest three are open; older ones fold away so the page doesn't run for screens
@@ -2445,7 +2559,7 @@ document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const 
 document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : (k === 'sym' || k === 'reason' ? 1 : -1); jSort = k; renderJournal(); });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
 // ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes ----------
-const PAGES = ['market', 'journal', 'backtest', 'help', 'changes'];
+const PAGES = ['market', 'journal', 'backtest', 'beta', 'help', 'changes'];
 let page = 'market';
 function go(t, push = true) {
   if (!PAGES.includes(t)) t = 'market';
@@ -2454,6 +2568,8 @@ function go(t, push = true) {
   PAGES.forEach(id => $('#' + id).classList.toggle('hidden', id !== t));
   $('#foot').classList.toggle('hidden', t !== 'market');   // the scanner status belongs to the market tab
   if (push) setHash();
+  if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); }
+  if (t === 'beta') betaOpen(); else betaPause?.();
   if (t === 'backtest' && btRes) drawEquity();
   if (t === 'market') drawChart();
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
@@ -2735,7 +2851,13 @@ function applyTheme(t) {
   pal();
   try { drawChart(); drawCard(); renderJournal(); if (btRes) renderBacktest(); } catch {}
 }
-$('#thm').onclick = () => applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
+$('#thm').onclick = e => {
+  const t = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return applyTheme(t);
+  // the new theme grows as a circle from the button
+  document.documentElement.style.setProperty('--vt-x', e.clientX + 'px'); document.documentElement.style.setProperty('--vt-y', e.clientY + 'px');
+  document.startViewTransition(() => applyTheme(t));
+};
 if (document.documentElement.dataset.theme === 'light') applyTheme('light');
 // wide mode: the chart takes the whole row (remembered); the coin list moves under it
 const setWide = on => {
@@ -2967,6 +3089,24 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); $('#cmdk').classList.contains('hidden') ? cmdOpen() : cmdClose(); }
 });
 
+// ---------- Beta: a password-gated tab for tools under test; its code (beta.js) loads only after unlocking ----------
+// The gate keeps casual visitors out of unfinished tools; it is not a security boundary (the site is static).
+const BETA_HASH = '93bc5d02dc2a24b5365347573b6f5115f069ca1097f319a1041c2a6c770079e0';
+let betaMod = null, betaPause = null;
+const sha256 = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
+async function betaOpen() {
+  const ok = load('sr_beta', false);
+  $('#betaLock').classList.toggle('hidden', ok); $('#betaApp').classList.toggle('hidden', !ok);
+  if (!ok) { setTimeout(() => $('#betaPass').focus(), 60); return; }
+  try { betaMod ||= await import('./beta.js'); betaPause = betaMod.pause; betaMod.open(window.__sr.kit); }
+  catch (e) { toast('Бета не загрузилась', String(e.message || e), 'bad'); }
+}
+$('#betaForm').onsubmit = async e => {
+  e.preventDefault();
+  if (await sha256($('#betaPass').value.trim().toLowerCase()) !== BETA_HASH) { $('#betaErr').textContent = 'Неверный пароль'; $('#betaPass').select(); return; }
+  $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true); betaOpen();
+};
+
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
 let sharedIn = null;
 if (location.hash.startsWith('#p=')) { sharedIn = parseShared(location.hash); history.replaceState(null, '', '#journal'); jMode = 'mine'; }
@@ -2981,7 +3121,7 @@ setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
 
 // ---------- auto-update: reload open tabs when a new version is deployed ----------
 // Journal and settings live in localStorage, so a reload loses nothing.
-const UPDATE_FILES = [location.pathname, new URL('./supabase/functions/_shared/math.js', location.href).pathname];
+const UPDATE_FILES = [location.pathname, new URL('./supabase/functions/_shared/math.js', location.href).pathname, new URL('./beta.js', location.href).pathname];
 const hashText = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
 const IS_DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // no auto-reload while developing locally
 const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.text() : null)))
@@ -3007,6 +3147,9 @@ async function checkUpdate() {
 setInterval(checkUpdate, 3 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 window.__sr = {get rows() { return rows; }, get J() { return J; }, get SJ() { return SJ; }, get btHist() { return btHist; }, openTrade, M};
+// the toolkit the Beta module (beta.js) builds on — the same chart, zoom, data and helpers as the rest of the site
+window.__sr.kit = {renderChart, attachZoom, viewRange, hoverIndex, priceAt, barAt, api, fp, usd, money, dt, hm, base, pair, toast, load, save, isPhone, openCoin,
+  PC, get rows() { return rows; }, get favs() { return favs; }, get cache() { return cache; }};
 </script>
 </body>
 </html>
