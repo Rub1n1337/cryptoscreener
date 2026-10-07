@@ -260,7 +260,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .bsym{flex:0 1 160px}.bsym input{width:100%}
 .ind-btn{gap:8px;font-weight:600}.ind-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11.5px;font-weight:700}
-.bchart{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.bchart{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .bpanes{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);min-width:0}.bpanes[data-lay="2"],.bpanes[data-lay="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bpane{position:relative;min-width:0;border-radius:10px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .15s}
 .bpanes:not([data-lay="1"]) .bpane.on{outline-color:var(--blue)}
@@ -271,6 +271,8 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bbar-r{margin-left:auto;display:flex;gap:8px;align-items:center}
 .pick-btn{gap:6px;font-weight:600}.pick-btn .i{width:15px;height:15px}.pick-btn[aria-pressed=true]{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 .btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12.5px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre button{flex:1}}
+.ctools .ct-yauto{display:none}.ctools .ct-yauto.show{display:inline-flex;color:var(--acc);border-color:var(--warn-line)}
+.bcv:focus,.bcv:focus-visible{outline:none}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
 .btools .tab{min-width:34px;padding:0 9px;font-weight:700}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue);color:#fff}
 .bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin .16s ease-out}
@@ -286,7 +288,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bpop .pcols{display:flex;gap:8px;margin:10px 0}.bpop .pcols button{width:28px;height:28px;padding:0;border-radius:999px;border:2px solid transparent}.bpop .pcols button.on{border-color:var(--text)}
 .bpop .pact{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 .bpop.cfg{width:min(360px,calc(100vw - 32px))}.bpop.cfg .sel-cfg{border-top:0;padding:0}
-.bdomwrap{width:190px;position:relative}.bdomwrap.hidden{display:none}#bdom{position:absolute;inset:0;width:100%;height:100%;cursor:default}
+
 .bnote{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:13px;color:var(--mute)}.bnote b{color:var(--text)}
 .bside .seg{margin-bottom:10px;display:flex}.bside .seg .tab{flex:1}
 .blist{display:flex;flex-direction:column;gap:2px;max-height:calc(64vh + 60px);overflow:auto}
@@ -317,7 +319,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .sel-it .sel-def{width:auto;height:32px;padding:0 12px;justify-self:start;border:1px solid var(--line);background:var(--s2);font-size:12px}
 .bl-h{padding:12px 10px 6px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.bl-e{padding:4px 10px 8px;font-size:12.5px}
 @media(max-width:1100px){.bgrid{grid-template-columns:1fr}.blist{max-height:none}}
-@media(max-width:700px){.bbar .bsym{flex:1 1 100%}.bbar .ind-btn{margin-left:auto}@media(max-width:420px){.ib-t{display:none}}.bchart{grid-template-columns:1fr}.bdomwrap{width:auto;height:220px}.bpanes[data-lay]{grid-template-columns:minmax(0,1fr)}.bpanes[data-lay="1"] .bcv{height:58vh}.bpanes[data-lay="2"] .bcv,.bpanes[data-lay="4"] .bcv{height:44vh}.bbar-r{margin-left:0}.ind-body{grid-template-columns:1fr}.ind-sel{border-left:0;border-top:1px solid var(--line)}.indbox{max-height:92vh}}
+@media(max-width:700px){.bbar .bsym{flex:1 1 100%}.bbar .ind-btn{margin-left:auto}@media(max-width:420px){.ib-t{display:none}}.bpanes[data-lay]{grid-template-columns:minmax(0,1fr)}.bpanes[data-lay="1"] .bcv{height:58vh}.bpanes[data-lay="2"] .bcv,.bpanes[data-lay="4"] .bcv{height:44vh}.bbar-r{margin-left:0}.ind-body{grid-template-columns:1fr}.ind-sel{border-left:0;border-top:1px solid var(--line)}.indbox{max-height:92vh}}
 /* ---------- motion: short, soft, and off for people who asked their system for less motion ---------- */
 @keyframes pagein{from{opacity:0;transform:translateY(6px)}}
 @keyframes popin{from{opacity:0;transform:translateY(-4px) scale(.98)}}
@@ -912,7 +914,7 @@ details.dis>.dbody{padding:0 16px 16px}
             <button class="pick-btn" id="bTfBtn" aria-haspopup="dialog" title="Таймфрейм"><span id="bTfL">5м</span><svg class="i"><use href="#i-chev"/></svg></button>
             <button class="pick-btn" id="bRangeBtn" aria-haspopup="dialog" title="Сколько истории на графике"><svg class="i"><use href="#i-clock"/></svg><span id="bRangeL">авто</span></button>
             <button class="ind-btn" id="bIndBtn" aria-label="Индикаторы"><svg class="i"><use href="#i-sliders"/></svg><span class="ib-t">Индикаторы</span> <span class="ind-n" id="bIndN">0</span></button>
-            <div class="seg mini btools" id="bTools" role="toolbar" aria-label="Инструменты"><button class="tab" data-tool="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка">↔</button><button class="tab" data-tool="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи">V</button><button class="tab" data-tool="note" title="Заметка на графике (T)" aria-label="Заметка">T</button><i></i><button class="tab" data-act="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить">↶</button><button class="tab" data-act="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить">↷</button><button class="tab" data-act="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения">⌫</button></div>
+            <div class="seg mini btools" id="bTools" role="toolbar" aria-label="Инструменты"><button class="tab" data-tool="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка">↔</button><button class="tab" data-tool="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи">V</button><button class="tab" data-tool="note" title="Заметка на графике (T)" aria-label="Заметка">T</button><button class="tab" data-tool="frvp" title="Профиль объёма участка: протяните по свечам (P)" aria-label="Профиль объёма участка">▥</button><i></i><button class="tab" data-act="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить">↶</button><button class="tab" data-act="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить">↷</button><button class="tab" data-act="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения">⌫</button></div>
             <div class="bbar-r">
               <div class="seg mini" id="bLay" role="group" aria-label="Сколько графиков"><button class="tab on" data-lay="1" title="Один график" aria-label="Один график">▢</button><button class="tab" data-lay="2" title="Два графика" aria-label="Два графика">◫</button><button class="tab" data-lay="4" title="Четыре графика" aria-label="Четыре графика">⊞</button></div>
               <button class="pick-btn" id="bLink" aria-pressed="true" title="Двигать графики вместе: масштаб, прокрутка и перекрестие по времени">⛓<span class="ib-t">вместе</span></button>
@@ -921,7 +923,6 @@ details.dis>.dbody{padding:0 16px 16px}
           <div class="bchart">
             <div class="bhint hidden" id="bToolHint" role="status"></div>
             <div class="bpanes" id="bPanes" data-lay="1"></div>
-            <div class="bdomwrap" id="bDomWrap"><canvas id="bdom" aria-label="Биржевой стакан"></canvas></div>
           </div>
           <div class="bnote" id="bNote"></div>
           <div class="bpop hidden" id="bPop" role="dialog"></div>
@@ -1252,7 +1253,8 @@ function renderChart(cv, d, o = {}) {
   // the right gutter is as wide as the longest price tag, so tags are never cut and no space is wasted
   g.font = '11px system-ui';
   const tagW = Math.max(...[...(o.levels || []).map(L => `${L.tag || ''} ${fp(L.v)}`), ...(o.tags || []).map(T => T.text), ...(o.ulevels || []).map(v => `ур. ${fp(v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1]) + (o.priceSub ? ' · ' + o.priceSub : '')].map(x => g.measureText(x).width));
-  const padL = 8, padR = clamp(Math.ceil(tagW) + 18, 56, 130), pH = Math.round(H * 0.7), vTop = pH + 24, vH = Math.round(H * 0.08), rTop = vTop + vH + 22, rH = H - rTop - 6;
+  // o.rightCol: a column between the plot and the price tags (Beta: the order book at the price scale)
+  const RC = o.rightCol || 0, padL = 8, padR = clamp(Math.ceil(tagW) + 18, 56, 130) + RC, pH = Math.round(H * 0.7), vTop = pH + 24, vH = Math.round(H * 0.08), rTop = vTop + vH + 22, rH = H - rTop - 6;
   const cnt = eView - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= (o.thin ? 1 : 3);   // o.thin: keep candles even when they are 1-2 px wide
   const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i <= e ? t[i] : t[e] + (i - e) * step;
   const X = i => padL + (i - s + 0.5) * bw;
@@ -1260,7 +1262,8 @@ function renderChart(cv, d, o = {}) {
   const acc = x => { if (isFinite(x)) { mn = Math.min(mn, x); mx = Math.max(mx, x); } };
   for (let i = s; i <= e; i++) { if (!o.fitPrice) { acc(B.up[i]); acc(B.lo[i]); } if (candles) { acc(h[i]); acc(l[i]); } else acc(c[i]); }
   for (const L of o.levels || []) acc(L.v);
-  const pad = (mx - mn) * 0.06 || mx * 0.01; mn -= pad; mx += pad;
+  // o.yRange: a price range the user stretched / moved on the price scale; otherwise fit what is visible
+  if (o.yRange) { mn = o.yRange.mn; mx = o.yRange.mx; } else { const pad = (mx - mn) * 0.06 || mx * 0.01; mn -= pad; mx += pad; }
   // the price pane starts below the toolbar (top-left corner) where there is one over the canvas
   const T0 = o.top ?? 8, ph = pH - T0 - 8;
   const Y = x => T0 + (mx - x) / (mx - mn) * ph;
@@ -1344,7 +1347,8 @@ function renderChart(cv, d, o = {}) {
   if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = PC.acc + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
   if (isFinite(B.up[e]) && (!o.fitPrice || B.up[e] <= mx)) tags.push({y:Y(B.up[e]), text:fp(B.up[e]), col:PC.up});
   if (isFinite(B.lo[e]) && (!o.fitPrice || B.lo[e] >= mn)) tags.push({y:Y(B.lo[e]), text:fp(B.lo[e]), col:PC.lo});
-  for (const T of o.tags || []) if (T.v >= mn && T.v <= mx) tags.push({y:Y(T.v), text:T.text, col:T.col, box:true});   // extra price tags from the caller (Beta: VWAP)
+  // extra price tags from the caller (Beta: VWAP, POC); with pin, a level off the visible range stays at the edge with an arrow
+  for (const T of o.tags || []) { if (T.v >= mn && T.v <= mx) tags.push({y:Y(T.v), text:T.text, col:T.col, box:true}); else if (T.pin && isFinite(T.v)) tags.push({y:T.v > mx ? T0 : pH - 6, text:(T.v > mx ? '↑ ' : '↓ ') + T.text, col:T.col, box:true}); }
   tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur) + (o.live && o.priceSub ? ' · ' + o.priceSub : ''), col:PC.acc, box:true});   // priceSub: e.g. time left in the candle
   // spread tags so they never overlap: sort by y, push down, then shift the stack up if it ran past the bottom
   tags.sort((a, b) => a.y - b.y);
@@ -1352,11 +1356,11 @@ function renderChart(cv, d, o = {}) {
   const over = tags.length ? tags[tags.length - 1].ty - (pH - 6) : 0;
   if (over > 0) for (let q = tags.length - 1; q >= 0; q--) tags[q].ty = Math.min(tags[q].ty - over, q < tags.length - 1 ? tags[q+1].ty - 15 : Infinity);
   g.font = '11px system-ui'; g.fillStyle = PC.axis;
-  for (const v of gridV) if (!tags.some(tg => Math.abs(tg.ty - Y(v)) < 11)) g.fillText(fp(v), W - padR + 8, Y(v));
+  for (const v of gridV) if (!tags.some(tg => Math.abs(tg.ty - Y(v)) < 11)) g.fillText(fp(v), W - padR + RC + 8, Y(v));
   for (const tg of tags) {
-    const tx = W - padR + 4, w = g.measureText(tg.text).width + 8;
+    const tx = W - padR + RC + 4, w = g.measureText(tg.text).width + 8;
     if (tg.box) { g.fillStyle = tg.col + '26'; g.fillRect(tx, tg.ty - 7, w, 14); }
-    if (Math.abs(tg.ty - tg.y) > 2) { g.strokeStyle = tg.col + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(W - padR, tg.y); g.lineTo(tx, tg.ty); g.stroke(); }
+    if (Math.abs(tg.ty - tg.y) > 2) { g.strokeStyle = tg.col + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(W - padR + RC, tg.y); g.lineTo(tx, tg.ty); g.stroke(); }
     g.fillStyle = tg.col; g.fillText(tg.text, tx + 4, tg.ty);
   }
   // time axis
@@ -1388,7 +1392,7 @@ function renderChart(cv, d, o = {}) {
       for (let i = s; i <= e; i++) { if (!isFinite(sv[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), SY(sv[i])); st = true; }
       g.strokeStyle = PC.rsi; g.lineWidth = 1.3; g.stroke();
     }
-    if (isFinite(sv[e])) { g.fillStyle = PC.rsi; g.fillText(o.sub.fmt ? o.sub.fmt(sv[e]) : sv[e].toFixed(0), W - padR + 6, SY(sv[e])); }
+    if (isFinite(sv[e])) { g.fillStyle = PC.rsi; g.fillText(o.sub.fmt ? o.sub.fmt(sv[e]) : sv[e].toFixed(0), W - padR + RC + 6, SY(sv[e])); }
   } else {
   // RSI
   g.fillStyle = PC.label; g.fillText('RSI', padL + 2, rTop + 7);
@@ -1400,7 +1404,7 @@ function renderChart(cv, d, o = {}) {
   g.setLineDash([]); g.beginPath(); let st = false;
   for (let i = s; i <= e; i++) { if (!isFinite(R[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), RY(R[i])); st = true; }
   g.strokeStyle = PC.rsi; g.stroke();
-  if (isFinite(R[e])) { g.fillStyle = PC.rsi; g.fillText(R[e].toFixed(0), W - padR + 6, RY(R[e])); }
+  if (isFinite(R[e])) { g.fillStyle = PC.rsi; g.fillText(R[e].toFixed(0), W - padR + RC + 6, RY(R[e])); }
   }
   // extra layers drawn by the caller on top of everything (Beta: trade bubbles, walls)
   o.over?.(g, {X, Y, s, e, eView, bw, padL, padR, W, H, pH, T0, mn, mx, t, tAt});
@@ -1423,9 +1427,10 @@ function renderChart(cv, d, o = {}) {
     // crosshair: the price under the cursor on the right scale, the bar's time on the time axis
     const hy = o.hoverY;
     if (hy != null && hy >= T0 && hy <= pH - 8) {
-      const price = mx - (hy - T0) / ph * (mx - mn), lbl = fp(price), lw = g.measureText(lbl).width + 10;
+      const price = mx - (hy - T0) / ph * (mx - mn), lp = o.crossPct && c[n - 1] ? (price / c[n - 1] - 1) * 100 : null;   // o.crossPct: also the distance from the last price
+      const lbl = fp(price) + (lp != null ? ` ${lp >= 0 ? "+" : "−"}${Math.abs(lp).toFixed(2)}%` : ""), lw = g.measureText(lbl).width + 10;
       g.setLineDash([3, 3]); g.strokeStyle = PC.cross; g.beginPath(); g.moveTo(padL, hy); g.lineTo(W - padR, hy); g.stroke(); g.setLineDash([]);
-      g.fillStyle = PC.cross; g.fillRect(W - padR + 2, hy - 9, lw, 18); g.fillStyle = PC.canvas; g.fillText(lbl, W - padR + 7, hy);
+      const lx = Math.min(W - padR + RC + 2, W - lw - 2); g.fillStyle = PC.cross; g.fillRect(lx, hy - 9, lw, 18); g.fillStyle = PC.canvas; g.fillText(lbl, lx + 5, hy);
     }
     const tl = dt(t[hi]), tw = g.measureText(tl).width + 10, tx = clamp(x - tw / 2, padL, W - padR - tw);
     g.fillStyle = PC.cross; g.fillRect(tx, pH - 2, tw, 17); g.fillStyle = PC.canvas; g.fillText(tl, tx + 5, pH + 6);
@@ -2394,6 +2399,7 @@ const CHANGELOG = [
     'Сайт стал плавнее: мягкие переходы между вкладками, окна и списки появляются без рывков.',
     'Новая вкладка «Бета» — по паролю, для тех, кто тестирует новые инструменты: стакан заявок, тепловая карта ликвидности и другое.',
     'В «Бете» можно открыть до 4 графиков сразу и двигать их вместе, мерить ход цены линейкой, ставить заметки и VWAP от любой свечи, а у индикаторов появились настройки.',
+    'В «Бете» стакан стоит прямо у шкалы цены, шкалу можно растягивать мышью, добавлены динамический POC, профиль объёма участка и подсветка дельты.',
   ]},
   {v:'2.8', date:'7 октября 2026', title:'Меньше бессмысленных сделок', items:[
     'Бот больше не входит в отскок, когда цена уже почти вернулась к середине канала, — раньше такие сделки почти всегда уходили в стоп.',
