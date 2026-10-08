@@ -14,6 +14,8 @@ const TFL = {'1m': '1м', '5m': '5м', '15m': '15м', '30m': '30м', '1h': '1ч'
 const RANGES = [[0, 'авто', 'авто'], [1, '1 день', '1д'], [3, '3 дня', '3д'], [7, '7 дней', '7д'], [30, '30 дней', '30д'], [90, '90 дней', '90д'], [180, '180 дней', '180д'], [365, '1 год', '1г']];
 const MAXBARS = 5000;               // candles loaded per chart at most (5 requests)
 const WS = 'wss://stream.binance.com:9443/stream?streams=';
+// on phones the chart buttons sit above the canvas, so the plot needs no room for them at the top
+const PHONE = matchMedia('(max-width:700px)');
 const DEF_SYMS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
 // ---------- indicator catalogue (the picker mirrors the "Индикаторы" window of order-flow terminals) ----------
@@ -168,8 +170,10 @@ class Pane {
     for (const q of panes) {
       if (q === this || !q.d) continue;
       if (!v) { q.view = null; } else {
-        const qtf = TFMS[q.tf], right = this.d.t[n - 1] - v.endOff * tf;
-        q.view = {span:Math.max(20, Math.round(v.span * tf / qtf)), endOff:Math.round((q.d.t[q.d.c.length - 1] - right) / qtf)};
+        // the same right edge in time, measured by candle closes (opens differ between timeframes: a 1h candle opened up to
+        // an hour ago), and never more empty space on the right than a sliver
+        const qtf = TFMS[q.tf], qn = q.d.c.length, right = this.d.t[n - 1] + tf - v.endOff * tf, span = Math.max(20, Math.round(v.span * tf / qtf));
+        q.view = {span, endOff:Math.max(-Math.round(span * 0.12), Math.round((q.d.t[qn - 1] + qtf - right) / qtf))};
       }
       q.dirty = true; q.zs.sync();
     }
@@ -227,12 +231,6 @@ class Pane {
   }
 
   // ---------- order book: snapshot + diff stream (Binance's documented sync procedure) ----------
-  async loadBook(buffer) {
-    const snap = await K.api(`/api/v3/depth?symbol=${this.sym}&limit=5000`);
-    const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false};
-    for (const ev of buffer) applyDepth(b, ev);
-    return b;
-  }
   mid() {
     const b = this.book; if (!b) return this.d ? this.d.c[this.d.c.length - 1] : null;
     let bb = 0, ba = Infinity; for (const p of b.bids.keys()) if (p > bb) bb = p; for (const p of b.asks.keys()) if (p < ba) ba = p;
@@ -280,19 +278,41 @@ class Pane {
     this.disconnect();
     const s = this.sym.toLowerCase(), buffer = [];
     const ws = this.ws = new WebSocket(WS + [`${s}@depth@100ms`, `${s}@aggTrade`, `${s}@kline_${this.tf}`].join('/'));
-    this.book = null;
-    const resync = async () => { this.book = null; try { const b = await this.loadBook(buffer.splice(0)); if (ws === this.ws) this.book = b; } catch {} };
+    this.book = null; let syncing = false;
+    // Binance's procedure: buffer the diff stream, take a snapshot, then apply the buffered events newer than it.
+    // One sync at a time per chart, snapshots spaced out across charts, growing pauses after failures —
+    // a snapshot is expensive (the 5000-level one costs 250 of the 6000 request weight per minute)
+    const resync = async () => {
+      if (syncing || ws !== this.ws) return;
+      syncing = true; this.book = null;
+      try {
+        await snapGate(); if (ws !== this.ws) return;
+        const snap = await K.api(`/api/v3/depth?symbol=${this.sym}&limit=${this === act() ? 5000 : 1000}`); if (ws !== this.ws) return;
+        const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false};
+        for (const ev of buffer.splice(0)) if (!applyDepth(b, ev)) throw new Error('snapshot older than the stream');
+        this.book = b; this.fails = 0; syncing = false;
+      } catch {
+        syncing = false; if (ws !== this.ws) return;
+        this.fails = (this.fails || 0) + 1;
+        clearTimeout(this.syncTimer); this.syncTimer = setTimeout(resync, Math.min(60e3, 1500 * 2 ** this.fails));
+      }
+    };
     ws.onmessage = e => {
+      this.wsFails = 0;
       const {stream, data} = JSON.parse(e.data);
       if (stream.endsWith('@aggTrade')) return this.onTrade(data);
       if (stream.includes('@kline_')) return this.onKline(data.k);
       if (!this.book) { buffer.push(data); if (buffer.length > 3000) buffer.shift(); return; }
-      if (!applyDepth(this.book, data)) { buffer.push(data); resync(); }
+      if (!applyDepth(this.book, data)) { buffer.length = 0; buffer.push(data); resync(); }   // a gap: start over from a fresh snapshot
     };
     ws.onopen = resync;
-    ws.onclose = () => { if (!loopOn || this.dead) return; clearTimeout(this.wsTimer); this.wsTimer = setTimeout(() => this.connect(), 3000); };   // reconnect while the tab is open
+    ws.onclose = () => {   // reconnect while the tab is open, waiting longer after each failed attempt
+      if (!loopOn || this.dead) return;
+      this.wsFails = (this.wsFails || 0) + 1;
+      clearTimeout(this.wsTimer); this.wsTimer = setTimeout(() => this.connect(), Math.min(60e3, 3000 * 2 ** (this.wsFails - 1)));
+    };
   }
-  disconnect() { clearTimeout(this.wsTimer); if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; } }
+  disconnect() { clearTimeout(this.wsTimer); clearTimeout(this.syncTimer); if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; } }
   live() { return this.ws?.readyState === 1 && this.book?.ok; }
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
@@ -322,10 +342,10 @@ class Pane {
     let lo = Infinity, hi = -Infinity;
     for (let i = Math.max(0, r.from); i <= Math.min(n - 1, r.to); i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
     if (this.yr) { lo = this.yr.mn; hi = this.yr.mx; }   // a manual price scale decides what is visible
-    const sl = this.yr ? 0 : 0.002, W = this.walls().filter(w => w.price >= lo * (1 - sl) && w.price <= hi * (1 + sl));   // only walls inside the visible range, so they don't squash the candles
-    const narrow = this.cv.clientWidth < 520;   // on narrow charts a wall tag is just its size (the colour tells the side)
+    const sl = this.yr ? 0 : 0.002, W = this.lastWalls = this.walls().filter(w => w.price >= lo * (1 - sl) && w.price <= hi * (1 + sl));   // only walls inside the visible range, so they don't squash the candles
+    const cw0 = this.cv.clientWidth, narrow = cw0 < 520;   // phones: walls stay as lines and in the book column, without tags on the scale   // on narrow charts a wall tag is just its size (the colour tells the side)
     const wi0 = Math.max(r.from, n - 1 - Math.round((r.to - r.from) * 0.3));   // wall lines only over the recent third: the book column shows them in full
-    const levels = on('walls') ? W.map(w => ({v:w.price, i0:wi0, col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
+    const levels = on('walls') ? W.map(w => ({v:w.price, i0:wi0, noTag:cw0 < 420 && on('dom'), col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
     const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd}
@@ -341,7 +361,7 @@ class Pane {
       ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
       ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:(labels ? 'dPOC ' : '') + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
     const cw = this.cv.clientWidth; this.rc = on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0;   // the order book column at the price scale
-    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:44, sub, priceSub:this.countdown(), fitPrice:true, thin:true,
+    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, priceSub:this.countdown(), fitPrice:true, thin:true,
       rightCol:this.rc, yRange:this.yr, crossPct:true,
       hoverExtra:i => [`объём $${fmtUsd(d.qv[i])} · дельта ${d.delta[i] >= 0 ? '+' : ''}${fmtUsd(d.delta[i])}`],
       under:(g, G) => { if (on('dtint')) this.drawTint(g, G); if (on('heat')) this.drawHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
@@ -380,7 +400,8 @@ class Pane {
         const agg = new Map(); for (const [k, v] of col) { const kk = Math.round(k * this.fine / step); agg.set(kk, (agg.get(kk) || 0) + v); }
         cols.push([i, agg]);
       }
-      const vals = cols.flatMap(([, a]) => [...a.values()]); if (!vals.length) { this.hc = null; return; }
+      // one or two collected candles would only be a coloured stripe on the last bar: wait for a few
+      const vals = cols.flatMap(([, a]) => [...a.values()]); if (!vals.length || cols.length < 3) { this.hc = null; return; }
       vals.sort((a, b) => a - b); top = vals[Math.floor(vals.length * (1 - C('heatCut') / 100))] || vals[vals.length - 1];
       this.hc = {key, at:now, cols, top};
     }
@@ -480,27 +501,40 @@ class Pane {
   // so stretching the price scale shows finer levels; the strip at the right edge is the imbalance near the price
   drawBook(g, G) {
     const PC = K.PC, x0 = G.W - G.padR, cw = this.rc, ph = G.pH - G.T0, m = this.mid();
-    g.fillStyle = PC.tip; g.globalAlpha = 0.55; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;
+    // a faint lane, so the column reads as part of the scale in both themes
+    g.fillStyle = PC.grid; g.globalAlpha = 0.18; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;
     if (!this.book?.ok || !m) { g.save(); g.translate(x0 + cw / 2, G.T0 + ph / 2); g.rotate(-Math.PI / 2); g.font = '11px system-ui'; g.textAlign = 'center'; g.fillStyle = PC.mute; g.fillText('стакан загружается…', 0, 0); g.restore(); return; }
-    const im = on('imb') ? this.imbalance() : null, sw = im ? 6 : 0, bw = cw - sw - (im ? 3 : 0);
-    if (on('dom')) {
+    const im = on('imb') ? this.imbalance() : null, sw = im ? 4 : 0, right = x0 + cw - sw - (im ? 3 : 1), bw = right - x0 - 2;
+    if (on('dom') && bw > 8) {
       const raw = (G.mx - G.mn) * C('domRows') / ph, step = Math.max(this.base, niceStep(raw, 1));
       const range = Math.min(0.08, Math.max(m - G.mn, G.mx - m) / m + step / m);
-      const bk = this.buckets(range, step); if (!bk) return;
-      const rows = []; for (const [side, mp] of [['ask', bk.ask], ['bid', bk.bid]]) for (const [k, v] of mp) { const y = G.Y(k * step); if (y >= G.T0 && y <= G.pH) rows.push({y, v, ask:side === 'ask'}); }
-      const max = Math.max(1, ...rows.map(r => r.v)), rh = clamp(Math.abs(G.Y(0) - G.Y(step)) - 1, 2, 13);   // thin rows read as a ladder, not blocks
-      g.font = '10.5px system-ui'; g.textBaseline = 'middle';
-      for (const r of rows) {
-        const w = Math.max(1, r.v / max * (bw - 2)), strong = r.v / max > 0.45;
-        g.fillStyle = (r.ask ? PC.up : PC.lo) + (strong ? 'b3' : '55'); g.fillRect(x0 + 1, r.y - rh / 2, w, rh);
-        if (rh >= 11 && (strong || rh >= 15)) { g.fillStyle = strong ? PC.price : PC.mute; g.fillText(fmtUsd(r.v), x0 + 4, r.y); }
+      const bk = this.buckets(range, step);
+      if (bk) {
+        const rows = []; for (const [side, mp] of [['ask', bk.ask], ['bid', bk.bid]]) for (const [k, v] of mp) { const y = G.Y(k * step); if (y >= G.T0 + 2 && y <= G.pH - 2) rows.push({y, v, k, ask:side === 'ask'}); }
+        const max = Math.max(1, ...rows.map(r => r.v)), rh = clamp(Math.abs(G.Y(0) - G.Y(step)) - 1, 2, 12);
+        // bars grow from the scale to the left; length by the square root, so mid-size levels stay visible next to a wall
+        for (const r of rows) {
+          const f = Math.sqrt(r.v / max), w = Math.max(2, f * bw);
+          g.fillStyle = (r.ask ? PC.up : PC.lo) + (f > 0.6 ? 'cc' : f > 0.3 ? '88' : '4d'); g.fillRect(right - w, r.y - rh / 2, w, rh);
+        }
+        // sizes only for the few biggest levels and only where there is room; walls already have their size on the scale
+        if (bw >= 46 && rh >= 9) {
+          g.font = '600 10px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'left';
+          const wallsAt = new Set((this.lastWalls || []).map(w => Math.round(w.price / step)));
+          for (const r of [...rows].sort((a, b) => b.v - a.v).slice(0, 4)) {
+            if (labels && on('walls') && wallsAt.has(r.k)) continue;   // its size is already in the wall tag
+            g.fillStyle = PC.price; g.fillText(fmtUsd(r.v), x0 + 3, r.y);
+          }
+        }
       }
     }
     if (im) {   // red share on top (sellers), green below (buyers), split at the buyers' share
       const sx = x0 + cw - sw - 1, split = G.T0 + ph * (1 - im.share);
       g.fillStyle = PC.up; g.fillRect(sx, G.T0, sw, split - G.T0); g.fillStyle = PC.lo; g.fillRect(sx, split, sw, G.pH - split);
-      g.font = '600 10px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'right';
-      g.fillStyle = PC.up; g.fillText(Math.round((1 - im.share) * 100) + '%', sx - 2, G.T0 + 8); g.fillStyle = PC.lo; g.fillText(Math.round(im.share * 100) + '%', sx - 2, G.pH - 8);
+      if (cw >= 30) {
+        g.font = '600 10px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'right';
+        g.fillStyle = PC.up; g.fillText(Math.round((1 - im.share) * 100) + '%', sx - 2, G.T0 + 8); g.fillStyle = PC.lo; g.fillText(Math.round(im.share * 100) + '%', sx - 2, G.pH - 8);
+      }
       g.textAlign = 'left';
     }
   }
@@ -517,6 +551,9 @@ class Pane {
   }
 }
 
+// order book snapshots from all charts go out at least 1.2 s apart (they are the heaviest request we make)
+let gateAt = 0;
+const snapGate = () => { const now = Date.now(), at = Math.max(now, gateAt); gateAt = at + 1200; return new Promise(r => setTimeout(r, at - now)); };
 function applyDepth(b, ev) {
   if (ev.u <= b.id) return true;                        // already in the snapshot
   if (!b.ok) { if (ev.U > b.id + 1) return false; b.ok = true; }   // the first event must straddle the snapshot
