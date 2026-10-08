@@ -22,7 +22,7 @@ const CATS = [
     {id:'dom', name:'Биржевой стакан', hint:'заявки по уровням — колонкой у шкалы цены'},
     {id:'imb', name:'Дисбаланс стакана', hint:'полоса у шкалы: доля покупателей и продавцов у цены'},
     {id:'heat', name:'Тепловая карта ликвидности', hint:'плотность лимитных заявок во времени'},
-    {id:'walls', name:'Стены в стакане', hint:'уровни, где заявок намного больше обычного (порог — в ⚙)'},
+    {id:'walls', name:'Стены в стакане', hint:'уровни, где заявок намного больше обычного (порог — в настройках)'},
     {id:'bubbles', name:'Пузыри крупных сделок', hint:'крупные рыночные покупки и продажи'},
     {id:'flow', name:'Поток ликвидности', hint:'как быстро ставят и снимают заявки', soon:true},
   ]},
@@ -38,13 +38,13 @@ const CATS = [
     {id:'vp', name:'Профиль объёма', hint:'объём по ценам в видимой части графика'},
     {id:'poc', name:'POC', hint:'цена с наибольшим объёмом в видимой части'},
     {id:'dpoc', name:'Динамический POC', hint:'POC с начала дня (на 4ч и 1д — недели): видно, как смещается интерес'},
-    {id:'frvp', name:'Профиль участка', hint:'инструмент ▥ на панели: протяните по свечам', tool:true},
+    {id:'frvp', name:'Профиль участка', hint:'инструмент на панели над графиком: протяните по свечам', tool:true},
   ]},
   {name:'VWAP', items:[
     {id:'vwap', name:'VWAP по дню', hint:'средняя цена с учётом объёма с начала суток (UTC)'},
   ]},
   {name:'Цена и построения', items:[
-    {id:'bb', name:'Канал Боллинджера', hint:'лог-канал, как на рынке (длина и ширина — в ⚙)'},
+    {id:'bb', name:'Канал Боллинджера', hint:'лог-канал, как на рынке (длина и ширина — в настройках)'},
     {id:'rsi', name:'RSI', hint:'нижняя панель: перекупленность и перепроданность'},
     {id:'fib', name:'Уровни Фибоначчи', hint:'два клика по графику', soon:true},
   ]},
@@ -124,7 +124,7 @@ class Pane {
     this.zs = K.attachZoom(cv, {
       state:() => !this.dead && this.d && this.geo && {n:this.d.c.length, minFrom:this.d.N - 1, defSpan:this.defSpan(), view:this.view, geo:this.geo},
       set:v => { this.setView(v, true); if (v === null) this.setY(null); }, pick:e => this.pick(e),
-      tools:'<button data-z="yauto" class="ct-txt ct-yauto" title="Вернуть автомасштаб цены (двойной клик по шкале)" aria-label="Автомасштаб цены">A</button><button data-z="help" class="ct-txt" title="Как управлять графиком" aria-label="Как управлять графиком">?</button>',
+      tools:'<button data-z="yauto" class="ct-yauto" title="Вернуть автомасштаб цены (A, двойной клик по шкале)" aria-label="Автомасштаб цены"><svg class="i"><use href="#i-scale"/></svg><span>авто</span></button><button data-z="help" title="Как управлять графиком" aria-label="Как управлять графиком"><svg class="i"><use href="#i-help"/></svg></button>',
       onTool:(z, b) => { if (z === 'yauto') this.setY(null); if (z === 'help') popFor === b ? closePop() : helpPop(b); },
       key:k => { const t = {r:'ruler', 'к':'ruler', v:'avwap', 'м':'avwap', t:'note', 'е':'note', p:'frvp', 'з':'frvp'}[k]; if (k === 'a' || k === 'ф') { this.setY(null); return true; } if (!t) return false; setTool(tool === t ? null : t); return true; }});
     // the price scale: drag it up / down to stretch / squash the candles, wheel over it does the same;
@@ -324,7 +324,8 @@ class Pane {
     if (this.yr) { lo = this.yr.mn; hi = this.yr.mx; }   // a manual price scale decides what is visible
     const sl = this.yr ? 0 : 0.002, W = this.walls().filter(w => w.price >= lo * (1 - sl) && w.price <= hi * (1 + sl));   // only walls inside the visible range, so they don't squash the candles
     const narrow = this.cv.clientWidth < 520;   // on narrow charts a wall tag is just its size (the colour tells the side)
-    const levels = on('walls') ? W.map(w => ({v:w.price, col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
+    const wi0 = Math.max(r.from, n - 1 - Math.round((r.to - r.from) * 0.3));   // wall lines only over the recent third: the book column shows them in full
+    const levels = on('walls') ? W.map(w => ({v:w.price, i0:wi0, col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
     const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd}
@@ -422,7 +423,7 @@ class Pane {
   drawTint(g, G) {   // candle background by who won the bar: market buys (green) or sells (red), stronger = brighter
     const d = this.d, PC = K.PC;
     for (let i = G.s; i <= G.e; i++) {
-      const r = d.qv[i] ? d.delta[i] / d.qv[i] : 0, a = Math.min(0.13, Math.max(0, Math.abs(r) - 0.08) * 0.45); if (a < 0.02) continue;   // only clear wins are tinted
+      const r = d.qv[i] ? d.delta[i] / d.qv[i] : 0, a = Math.min(0.1, Math.max(0, Math.abs(r) - 0.1) * 0.35); if (a < 0.02) continue;   // only clear wins are tinted
       g.globalAlpha = a; g.fillStyle = r > 0 ? PC.lo : PC.up; g.fillRect(G.X(i) - G.bw / 2, G.T0, G.bw + 0.5, G.pH - G.T0);
     }
     g.globalAlpha = 1;
@@ -440,7 +441,7 @@ class Pane {
     for (let k = 0; k < rows; k++) { const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz); g.fillStyle = k === poc ? PC.acc + '99' : PC.rsi + '44'; g.fillRect(xa, y0, vp[k] / max * wMax, Math.max(1, y1 - y0 - 1)); }
     const yp = G.Y(lo + (poc + 0.5) * sz); g.strokeStyle = PC.acc; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(xa, yp); g.lineTo(xb, yp); g.stroke(); g.setLineDash([]);
     g.restore();
-    const lbl = `▥ ${i1 - i0 + 1} св. · POC ${K.fp(lo + (poc + 0.5) * sz)} · $${fmtUsd(vol)}`; g.font = '600 11px system-ui'; g.textBaseline = 'middle';
+    const lbl = `Профиль · ${i1 - i0 + 1} св. · POC ${K.fp(lo + (poc + 0.5) * sz)} · $${fmtUsd(vol)}`; g.font = '600 11px system-ui'; g.textBaseline = 'middle';
     const lw = g.measureText(lbl).width + 10, ly = Math.max(G.T0 + 9, G.Y(hi) - 10);
     g.fillStyle = PC.tip; g.fillRect(xa, ly - 9, lw, 18); g.fillStyle = PC.rsi; g.fillText(lbl, xa + 5, ly); g.font = '11px system-ui';
     this.hits.push({x0:xa, x1:xa + lw, y0:ly - 9, y1:ly + 9, obj:x});
@@ -462,7 +463,7 @@ class Pane {
   drawRuler(g, G) {   // a box from A to B with the move in %, in $, in candles and in time
     const {a, b} = ruler, d = this.d, PC = K.PC, x0 = G.X(a.i), x1 = G.X(b.i), y0 = G.Y(a.p), y1 = G.Y(b.p);
     if (ruler.kind === 'frvp') {   // while dragging a range: a band over the chosen candles
-      const xa = Math.min(x0, x1) - G.bw / 2, xb = Math.max(x0, x1) + G.bw / 2, t = `▥ ${Math.abs(b.i - a.i) + 1} свеч.`;
+      const xa = Math.min(x0, x1) - G.bw / 2, xb = Math.max(x0, x1) + G.bw / 2, t = `Профиль · ${Math.abs(b.i - a.i) + 1} свеч.`;
       g.fillStyle = PC.rsi + '1c'; g.fillRect(xa, G.T0, xb - xa, G.pH - G.T0); g.strokeStyle = PC.rsi; g.lineWidth = 1; g.strokeRect(xa, G.T0, xb - xa, G.pH - G.T0);
       g.font = '600 12px system-ui'; g.textBaseline = 'middle'; g.fillStyle = PC.rsi; g.fillText(t, xa + 6, G.T0 + 12); return;
     }
@@ -628,7 +629,7 @@ function openPop(anchor, html, cls = '') {
   pop.querySelector('textarea, [data-tf].on, [data-range].on, input')?.focus({preventScroll:true});
 }
 const closePop = () => { $('#bPop').classList.add('hidden'); popFor = null; };
-const head = t => `<h4>${t}<button data-close aria-label="Закрыть">✕</button></h4>`;
+const head = t => `<h4>${t}<button data-close aria-label="Закрыть">${ic('x')}</button></h4>`;
 // a cheat sheet of chart gestures, behind the "?" on every chart
 function helpPop(btn) {
   const row = (k, t) => `<div class="hk"><b>${k}</b><span>${t}</span></div>`;
@@ -655,7 +656,7 @@ function rangePop() {
 }
 function cfgPop(id) {
   const it = ITEMS.find(x => x.id === id), P = PARAMS[id];
-  openPop($('#bIndBtn'), head('⚙ ' + it.name) + `<div class="sel-cfg">${P.map(p => `<label><span>${p.name}<b data-v="${p.k}">${p.u(C(p.k))}</b></span><input type="range" data-k="${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${C(p.k)}"></label>`).join('')}</div>`
+  openPop($('#bIndBtn'), head(it.name) + `<div class="sel-cfg">${P.map(p => `<label><span>${p.name}<b data-v="${p.k}">${p.u(C(p.k))}</b></span><input type="range" data-k="${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${C(p.k)}"></label>`).join('')}</div>`
     + `<div class="pact"><button data-back>← Все индикаторы</button><button data-def="${id}">По умолчанию</button></div>`, 'cfg');
 }
 const COLS = [['acc', 'жёлтый'], ['lo', 'зелёный'], ['up', 'красный'], ['rsi', 'синий'], ['trade', 'фиолетовый']];
@@ -752,23 +753,25 @@ function renderList() {
 }
 
 // ---------- indicator picker ----------
-const IC = '<svg class="i"><use href="#i-sliders"/></svg>';
+const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+// an icon per indicator in the picker (instead of one generic icon for all)
+const ICONS = {dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
-  $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${sel.has(id) ? '✓' : '+'} ${it.name}</button>`; }).join('');
+  $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
   const q = $('#bIndQ').value.trim().toLowerCase();
   $('#bCats').innerHTML = CATS.map(c => {
     const items = c.items.filter(it => !q || (it.name + ' ' + it.hint).toLowerCase().includes(q)); if (!items.length) return '';
     const cnt = items.filter(it => sel.has(it.id)).length;
     return `<details class="ind-cat"${q || cnt ? ' open' : ''}><summary>${c.name}${cnt ? ` <span class="ind-n">${cnt}</span>` : ''}</summary>`
-      + items.map(it => `<div class="ind-it${sel.has(it.id) ? ' on' : ''}${it.soon ? ' soon' : ''}"><span class="ii">${IC}</span><span class="it"><b>${it.name}</b><span>${it.soon ? 'скоро · ' : ''}${it.hint}</span></span>`
-        + (it.soon ? '' : it.tool ? `<button data-usetool="${it.id}" title="Взять инструмент" aria-label="Взять инструмент: ${it.name}">▥</button>` : `<button data-tog="${it.id}" aria-label="${sel.has(it.id) ? 'Убрать' : 'Добавить'} ${it.name}">${sel.has(it.id) ? '✓' : '+'}</button>`) + '</div>').join('') + '</details>';
+      + items.map(it => `<div class="ind-it${sel.has(it.id) ? ' on' : ''}${it.soon ? ' soon' : ''}"><span class="ii">${ic(ICONS[it.id] || 'sliders')}</span><span class="it"><b>${it.name}</b><span>${it.soon ? 'скоро · ' : ''}${it.hint}</span></span>`
+        + (it.soon ? '' : it.tool ? `<button data-usetool="${it.id}" title="Взять инструмент" aria-label="Взять инструмент: ${it.name}">${ic('range')}</button>` : `<button data-tog="${it.id}" aria-label="${sel.has(it.id) ? 'Убрать' : 'Добавить'} ${it.name}">${ic(sel.has(it.id) ? 'check' : 'plus')}</button>`) + '</div>').join('') + '</details>';
   }).join('') || '<div class="mute" style="padding:12px">Ничего не нашлось.</div>';
   $('#bSel').innerHTML = [...sel].map(id => { const it = ITEMS.find(x => x.id === id);
     return `<div class="sel-it"><span class="${hidden.has(id) ? 'off' : ''}">${it.name}</span>`
-      + `<button data-eye="${id}" aria-label="${hidden.has(id) ? 'Показать' : 'Скрыть'} ${it.name}" title="${hidden.has(id) ? 'Показать' : 'Скрыть'}">${hidden.has(id) ? '◌' : '◉'}</button>`
-      + (PARAMS[id] ? `<button data-cfg="${id}" aria-label="Настройки: ${it.name}" title="Настройки — откроются рядом с графиком">⚙</button>` : '')
-      + `<button data-tog="${id}" aria-label="Убрать ${it.name}">✕</button></div>`; }).join('')
+      + `<button data-eye="${id}" aria-label="${hidden.has(id) ? 'Показать' : 'Скрыть'} ${it.name}" title="${hidden.has(id) ? 'Показать' : 'Скрыть'}">${ic(hidden.has(id) ? 'eyeoff' : 'eye')}</button>`
+      + (PARAMS[id] ? `<button data-cfg="${id}" aria-label="Настройки: ${it.name}" title="Настройки — откроются рядом с графиком">${ic('gear')}</button>` : '')
+      + `<button data-tog="${id}" aria-label="Убрать ${it.name}" title="Убрать">${ic('x')}</button></div>`; }).join('')
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
 }
 function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); }
