@@ -296,7 +296,7 @@ class Pane {
   live() { return this.ws?.readyState === 1 && this.book?.ok; }
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
-    this.disconnect(); this.book = null; this.view = null; this.yr = null; this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
+    this.disconnect(); this.book = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
     if (ruler?.pane === this) ruler = null;
     const key = this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
     if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }
@@ -423,7 +423,7 @@ class Pane {
   drawTint(g, G) {   // candle background by who won the bar: market buys (green) or sells (red), stronger = brighter
     const d = this.d, PC = K.PC;
     for (let i = G.s; i <= G.e; i++) {
-      const r = d.qv[i] ? d.delta[i] / d.qv[i] : 0, a = Math.min(0.1, Math.max(0, Math.abs(r) - 0.1) * 0.35); if (a < 0.02) continue;   // only clear wins are tinted
+      const r = d.qv[i] ? d.delta[i] / d.qv[i] : 0, a = Math.min(0.08, Math.max(0, Math.abs(r) - 0.1) * 0.3); if (a < 0.015) continue;   // only clear wins are tinted
       g.globalAlpha = a; g.fillStyle = r > 0 ? PC.lo : PC.up; g.fillRect(G.X(i) - G.bw / 2, G.T0, G.bw + 0.5, G.pH - G.T0);
     }
     g.globalAlpha = 1;
@@ -488,7 +488,7 @@ class Pane {
       const range = Math.min(0.08, Math.max(m - G.mn, G.mx - m) / m + step / m);
       const bk = this.buckets(range, step); if (!bk) return;
       const rows = []; for (const [side, mp] of [['ask', bk.ask], ['bid', bk.bid]]) for (const [k, v] of mp) { const y = G.Y(k * step); if (y >= G.T0 && y <= G.pH) rows.push({y, v, ask:side === 'ask'}); }
-      const max = Math.max(1, ...rows.map(r => r.v)), rh = Math.max(2, Math.min(ph, Math.abs(G.Y(0) - G.Y(step))) - 1);
+      const max = Math.max(1, ...rows.map(r => r.v)), rh = clamp(Math.abs(G.Y(0) - G.Y(step)) - 1, 2, 13);   // thin rows read as a ladder, not blocks
       g.font = '10.5px system-ui'; g.textBaseline = 'middle';
       for (const r of rows) {
         const w = Math.max(1, r.v / max * (bw - 2)), strong = r.v / max > 0.45;
@@ -562,14 +562,15 @@ const avwap = (d, t) => { const i0 = K.barAt(d.t, t), arr = Array(d.c.length).fi
 function drawStep(g, G, arr, col) {   // a level that jumps between bars (developing POC)
   g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
   g.beginPath(); let prev = null;
-  for (let i = G.s; i <= G.e; i++) { const v = arr[i]; if (!isFinite(v)) { prev = null; continue; } const x0 = G.X(i) - G.bw / 2, x1 = G.X(i) + G.bw / 2, y = G.Y(v); if (prev == null) g.moveTo(x0, y); else g.lineTo(x0, y); g.lineTo(x1, y); prev = v; }
+  // horizontal pieces only: a jump to a new level is not drawn as a tall vertical line
+  for (let i = G.s; i <= G.e; i++) { const v = arr[i]; if (!isFinite(v)) { prev = null; continue; } const x0 = G.X(i) - G.bw / 2, x1 = G.X(i) + G.bw / 2, y = G.Y(v); if (prev !== v) g.moveTo(x0, y); g.lineTo(x1, y); prev = v; }
   g.strokeStyle = col; g.lineWidth = 1.5; g.stroke(); g.restore();
 }
 
 // ---------- active pane, layout, tools ----------
 function setActive(i) {
   if (i < 0 || i === active) return;
-  active = i; K.save('sr_bact', i);
+  active = i; K.save('sr_bact', i); closePop();   // an open timeframe / history panel belonged to the previous chart
   panes.forEach((p, k) => p.el.classList.toggle('on', k === i)); syncBar(); renderList(); redrawAll();
 }
 function syncBar() {
