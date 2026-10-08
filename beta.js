@@ -38,7 +38,7 @@ const CATS = [
     {id:'fp', name:'Таблицы кластеров', hint:'объём по ценам внутри свечи', soon:true},
   ]},
   {name:'Профили объёма и POC', items:[
-    {id:'vp', name:'Профиль объёма', hint:'объём по ценам в видимой части графика'},
+    {id:'vp', name:'Профиль объёма', hint:'объём по ценам в видимой части, у левого края; ярче — зона 70% объёма (VAH–VAL)'},
     {id:'poc', name:'POC', hint:'цена с наибольшим объёмом в видимой части'},
     {id:'dpoc', name:'Динамический POC', hint:'POC с начала дня (на 4ч и 1д — недели): видно, как смещается интерес'},
     {id:'frvp', name:'Профиль участка', hint:'инструмент на панели над графиком: протяните по свечам', tool:true},
@@ -68,9 +68,8 @@ const PARAMS = {
     {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
   bubbles:[{k:'bubPct', name:'Показывать самые крупные сделки', min:0.2, max:5, step:0.1, def:1.5, u:v => v + '% от всех'},
     {k:'bubMin', name:'И не меньше', min:1e3, max:1e6, step:1e3, def:5e3, u:v => '$' + fmtUsd(v)}],
-  vp:[{k:'vpRows', name:'Строк в профиле', min:20, max:150, step:10, def:60, u:v => v},
+  vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
     {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
-  poc:[{k:'vpRows', name:'Строк в профиле (общая с профилем)', min:20, max:150, step:10, def:60, u:v => v}],
   bb:[{k:'bbN', name:'Длина канала', min:20, max:300, step:10, def:210, u:v => v + ' свечей'},
     {k:'bbK', name:'Ширина канала', min:1.5, max:4, step:0.5, def:3, u:v => v + 'σ'}],
 };
@@ -362,7 +361,7 @@ class Pane {
       ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
       ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:(labels ? 'dPOC ' : '') + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
     const cw = this.cv.clientWidth; this.rc = on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0;   // the order book column at the price scale
-    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, vol:on('vol'), lower:!!sub || on('rsi'), noTip:true, vgrid:true,
+    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, vol:on('vol'), lower:!!sub || on('rsi'), noTip:true, vgrid:true, noMarks:true,
       priceCol:d.c[n - 1] >= d.o[n - 1] ? PC.lo : PC.up, priceSub:this.countdown(), fitPrice:true, thin:true,
       rightCol:this.rc, yRange:this.yr, crossPct:true,
       under:(g, G) => { if (on('dtint')) this.drawTint(g, G); if (on('heat')) this.drawHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
@@ -417,18 +416,35 @@ class Pane {
       for (const [k, v] of agg) { if (v < top * 0.12) continue; const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
     }
   }
-  drawProfile(g, G) {   // volume by price over the visible bars, drawn from the right edge of the plot
-    const d = this.d, rows = C('vpRows'), lo = G.mn, hi = G.mx, sz = (hi - lo) / rows, vp = Array(rows).fill(0);
+  // volume profile of the visible candles, from the left edge (as on order-flow terminals): thin rows, the value area
+  // (70% of the volume around the POC) brighter, VAH / POC / VAL marked at the edge
+  drawProfile(g, G) {
+    const d = this.d, PC = K.PC; let lo = Infinity, hi = -Infinity;
+    for (let i = G.s; i <= G.e; i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
+    if (!(hi > lo)) return;
+    const rows = clamp(Math.round((G.Y(lo) - G.Y(hi)) / C('vpPx')), 12, 200), sz = (hi - lo) / rows, vp = Array(rows).fill(0);
     for (let i = G.s; i <= G.e; i++) {
-      const a = Math.max(0, Math.floor((d.l[i] - lo) / sz)), b = Math.min(rows - 1, Math.floor((d.h[i] - lo) / sz)), share = d.v[i] / (b - a + 1);
+      const a = clamp(Math.floor((d.l[i] - lo) / sz), 0, rows - 1), b = clamp(Math.floor((d.h[i] - lo) / sz), 0, rows - 1), share = d.qv[i] / (b - a + 1);
       for (let k = a; k <= b; k++) vp[k] += share;
     }
-    const max = Math.max(...vp), poc = vp.indexOf(max), wMax = (G.W - G.padL - G.padR) * C('vpW') / 100, x1 = G.W - G.padR;
+    const tot = vp.reduce((s, x) => s + x, 0), max = Math.max(...vp), poc = vp.indexOf(max);
+    let va = poc, vb = poc, acc = vp[poc];   // value area: grow from the POC towards the bigger neighbour until 70%
+    while (acc < tot * 0.7 && (va > 0 || vb < rows - 1)) { const da = va > 0 ? vp[va - 1] : -1, db = vb < rows - 1 ? vp[vb + 1] : -1; if (db >= da) acc += vp[++vb]; else acc += vp[--va]; }
+    const x0 = G.padL, wMax = (G.W - G.padL - G.padR) * C('vpW') / 100, yOf = k => G.Y(lo + (k + 0.5) * sz);
+    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     if (on('vp')) for (let k = 0; k < rows; k++) {
-      const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz), w = vp[k] / max * wMax;
-      g.fillStyle = k === poc ? K.PC.acc + '55' : K.PC.mid + '33'; g.fillRect(x1 - w, y0, w, Math.max(1, y1 - y0 - 1));
+      if (!vp[k]) continue;
+      const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz), w = Math.max(1, vp[k] / max * wMax);
+      g.fillStyle = k === poc ? PC.acc + 'b3' : k >= va && k <= vb ? PC.rsi + '59' : PC.rsi + '24';
+      g.fillRect(x0, y0, w, Math.max(1, y1 - y0 - 1));
     }
-    if (on('poc')) { const y = G.Y(lo + (poc + 0.5) * sz); g.strokeStyle = K.PC.acc; g.lineWidth = 1.2; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(G.padL, y); g.lineTo(x1, y); g.stroke(); g.setLineDash([]); if (labels) { g.fillStyle = K.PC.acc; g.fillText('POC', G.padL + 4, y - 7); } }
+    if (on('poc')) { g.strokeStyle = PC.acc; g.lineWidth = 1; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(x0, yOf(poc)); g.lineTo(G.W - G.padR, yOf(poc)); g.stroke(); g.setLineDash([]); }
+    g.restore();
+    if (labels) {   // small pills at the left edge
+      const pill = (t, y, col) => { if (y < G.T0 + 8 || y > G.pH - 8) return; g.font = '600 10px system-ui'; g.textBaseline = 'middle'; const w = g.measureText(t).width + 10; g.fillStyle = PC.tip; g.fillRect(x0 + 2, y - 8, w, 16); g.strokeStyle = col; g.lineWidth = 1; g.strokeRect(x0 + 2.5, y - 7.5, w - 1, 15); g.fillStyle = col; g.fillText(t, x0 + 7, y); };
+      if (on('vp')) { pill('VAH', G.Y(lo + (vb + 1) * sz), PC.rsi); pill('VAL', G.Y(lo + va * sz), PC.rsi); }
+      pill('POC', yOf(poc), PC.acc);
+    }
   }
   drawBubbles(g, G) {
     const d = this.d, tf = TFMS[this.tf], first = d.t[G.s], last = d.t[G.e] + tf;
@@ -516,7 +532,9 @@ class Pane {
       const range = Math.min(0.08, Math.max(m - G.mn, G.mx - m) / m + step / m);
       const bk = this.buckets(range, step);
       if (bk) {
-        const rows = []; for (const [side, mp] of [['ask', bk.ask], ['bid', bk.bid]]) for (const [k, v] of mp) { const y = G.Y(k * step); if (y >= G.T0 + 2 && y <= G.pH - 2) rows.push({y, v, k, ask:side === 'ask'}); }
+        // one row per price level; the row with the price in it can hold both sides: one bar, coloured by the bigger one
+        const byK = new Map(); for (const [side, mp] of [['ask', bk.ask], ['bid', bk.bid]]) for (const [k, v] of mp) { const r = byK.get(k) || {a:0, b:0}; r[side === 'ask' ? 'a' : 'b'] += v; byK.set(k, r); }
+        const rows = []; for (const [k, r] of byK) { const y = G.Y(k * step); if (y >= G.T0 + 2 && y <= G.pH - 2) rows.push({y, v:r.a + r.b, k, ask:r.a >= r.b}); }
         const max = Math.max(1, ...rows.map(r => r.v)), rh = clamp(Math.abs(G.Y(0) - G.Y(step)) - 1, 2, 12);
         // bars grow from the scale to the left; length by the square root, so mid-size levels stay visible next to a wall
         for (const r of rows) {
@@ -527,9 +545,10 @@ class Pane {
         if (bw >= 46 && rh >= 9) {
           g.font = '600 10px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'left';
           const wallsAt = new Set((this.lastWalls || []).map(w => Math.round(w.price / step)));
-          for (const r of [...rows].sort((a, b) => b.v - a.v).slice(0, 4)) {
+          const shown = []; for (const r of [...rows].sort((a, b) => b.v - a.v).slice(0, 6)) {
+            if (shown.length >= 4 || r.v < max * 0.15 || shown.some(y => Math.abs(y - r.y) < 12)) continue;   // big levels only, labels never overlap
             if (labels && on('walls') && wallsAt.has(r.k)) continue;   // its size is already in the wall tag
-            g.fillStyle = PC.price; g.fillText(fmtUsd(r.v), x0 + 3, r.y);
+            g.fillStyle = PC.price; g.fillText(fmtUsd(r.v), x0 + 3, r.y); shown.push(r.y);
           }
         }
       }

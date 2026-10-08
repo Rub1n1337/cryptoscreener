@@ -1345,7 +1345,7 @@ function renderChart(cv, d, o = {}) {
   } else {
     line(c, PC.price, 1.2);
     const tri = (x, y, dir, col) => { g.beginPath(); g.moveTo(x, y); g.lineTo(x - 5, y - dir*8); g.lineTo(x + 5, y - dir*8); g.closePath(); g.fillStyle = col; g.fill(); };
-    for (let i = Math.max(f0, s, 1); i <= e; i++) {
+    if (!o.noMarks) for (let i = Math.max(f0, s, 1); i <= e; i++) {   // o.noMarks: no band-touch triangles (Beta)
       if (h[i] >= B.up[i] && !(h[i-1] >= B.up[i-1])) tri(X(i), Y(B.up[i]) - 8, -1, PC.up);
       if (l[i] <= B.lo[i] && !(l[i-1] <= B.lo[i-1])) tri(X(i), Y(B.lo[i]) + 8, 1, PC.lo);
     }
@@ -1484,8 +1484,8 @@ const priceAt = (geo, cv, ev) => { if (!geo) return null; const y = ev.clientY -
 function viewRange(n, minFrom, view, defSpan) {
   const room = Math.max(20, n - minFrom);
   const span = clamp(Math.round(view?.span ?? defSpan), Math.min(20, room), room);
-  // negative endOff = empty bars to the right of the last candle (up to half the view); default leaves a small margin
-  const endOff = clamp(Math.round(view?.endOff ?? -span * 0.06), -Math.round(span * 0.5), room - span);
+  // negative endOff = empty bars to the right of the last candle (up to 15% of the view); default leaves a small margin
+  const endOff = clamp(Math.round(view?.endOff ?? -span * 0.06), -Math.round(span * 0.15), room - span);   // at most 15% empty space on the right
   const to = n - 1 - endOff;
   return {from: to - span + 1, to, span, endOff};
 }
