@@ -276,7 +276,18 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bpop.help{width:min(380px,calc(100vw - 32px))}.hks{display:grid;gap:7px}.hk{display:grid;grid-template-columns:128px 1fr;gap:10px;font-size:12.5px;line-height:1.35}.hk b{font-weight:650}.hk span{color:var(--mute)}
 .ind-lbl{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--mute);margin:-2px 0 10px;cursor:pointer}.ind-lbl input{accent-color:var(--blue)}
 .ind-chip{display:inline-flex;gap:6px;align-items:center}.ind-chip .i{width:14px;height:14px}.btools .tab .i,.ctools .i{width:17px;height:17px}.ctools .ct-yauto.show{width:auto;padding:0 9px;gap:5px;font-size:12px;font-weight:600}#bLay .tab .i{width:17px;height:17px}.sel-it button .i{width:15px;height:15px}
+@media(max-width:700px){.bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.bchips::-webkit-scrollbar{display:none}.bchip,.bchip-t{flex:0 0 auto}.bchip .s{max-width:96px}}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
+.bhead-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.bhead-r #betaUntil{font-size:12px}.bhead-r:empty{display:none}
+.accbox{width:min(520px,100%);max-height:86vh}.acc-body{padding:14px 16px 16px;overflow:auto;display:grid;gap:12px}
+.acc-f{display:grid;gap:6px;font-size:12.5px;color:var(--mute)}.acc-f input{height:var(--h)}
+.acc-code{display:grid;gap:6px;padding:12px;border:1px solid var(--blue);border-radius:12px;background:var(--s2)}
+.acc-code code{font-size:22px;font-weight:700;letter-spacing:.06em;color:var(--text);user-select:all}.acc-act{display:flex;gap:8px;flex-wrap:wrap}
+.acc-err{color:var(--up-t);font-size:13px}
+.acc-lh{display:flex;justify-content:space-between;align-items:center;margin-top:4px}.acc-list{display:grid;gap:6px}
+.acc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:13px}
+.acc-row>span{display:grid;gap:2px}.acc-row .faint{font-size:12px}.acc-row.dim{opacity:.55}
+@media(max-width:700px){.bhead-r{align-items:flex-start}}
 .bchips{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:0 2px 6px;min-height:0}.bchips:empty{display:none}
 .bchip-t,.bchip{display:inline-flex;align-items:center;gap:5px;height:26px;border:1px solid var(--line);border-radius:8px;background:var(--s1);font-size:11.5px;color:var(--text)}
 .bchip-t{padding:0 8px;color:var(--mute);font-weight:600}.bchip-t .i{width:14px;height:14px}.bchip-t[aria-expanded=true]{color:var(--blue);border-color:var(--blue)}
@@ -940,13 +951,13 @@ details.dis>.dbody{padding:0 16px 16px}
       <div class="panel">
         <div class="bl-ic"><svg class="i"><use href="#i-lock"/></svg></div>
         <h2>Бета</h2>
-        <p>Новые инструменты, которые мы сейчас тестируем: биржевой стакан, тепловая карта ликвидности, крупные сделки, дельта объёма. Вход — по паролю.</p>
-        <form id="betaForm" autocomplete="off"><input id="betaPass" type="password" placeholder="Пароль" aria-label="Пароль от беты" autocomplete="off"><button class="primary" type="submit">Войти</button></form>
+        <p>Новые инструменты, которые мы сейчас тестируем: биржевой стакан, тепловая карта ликвидности, крупные сделки, дельта объёма. Вход — по паролю или по временному коду, который выдаёт владелец.</p>
+        <form id="betaForm" autocomplete="off"><input id="betaPass" type="password" placeholder="Пароль или код SR-XXXX-XXXX" aria-label="Пароль или временный код" autocomplete="off"><button class="primary" type="submit">Войти</button></form>
         <div class="bl-err" id="betaErr" role="alert"></div>
       </div>
     </div>
     <div id="betaApp" class="hidden">
-      <div class="phead"><div><h2>Бета <span class="tag sq">тест</span></h2><p>Спот Binance вживую: стакан, крупные сделки и свечи. Тепловая карта копится, пока вкладка открыта. Фьючерсы — следующим шагом.</p></div><div id="bLive"></div></div>
+      <div class="phead"><div><h2>Бета <span class="tag sq">тест</span></h2><p>Спот Binance вживую: стакан, крупные сделки и свечи. Тепловая карта копится, пока вкладка открыта. Фьючерсы — следующим шагом.</p></div><div class="bhead-r"><div id="bLive"></div><span id="betaUntil" class="faint"></span><button class="pick-btn hidden" id="betaAccessBtn" title="Создать временный код доступа к бете"><svg class="i"><use href="#i-lock"/></svg>Выдать доступ</button></div></div>
       <div class="bgrid">
         <div class="panel bmain">
           <div class="bbar">
@@ -973,6 +984,20 @@ details.dis>.dbody{padding:0 16px 16px}
         </div>
       </div>
     </div>
+    <!-- temporary access codes (owner only) -->
+    <div id="bAccess" class="cmdk hidden"><div class="cmdbox accbox" role="dialog" aria-modal="true" aria-label="Временный доступ к бете">
+      <div class="ind-h"><b>Временный доступ к «Бете»</b><button class="icon" id="bAccClose" aria-label="Закрыть"><svg class="i"><use href="#i-x"/></svg></button></div>
+      <div class="acc-body">
+        <p class="phint" style="margin-top:0">Код открывает «Бету» на выбранное время. Отозвать можно в любой момент — человек потеряет доступ при следующей проверке (обычно сразу).</p>
+        <label class="acc-f">Пароль владельца<input id="bAccPass" type="password" autocomplete="off" placeholder="тот же, что для входа в бету"></label>
+        <div class="acc-f">Срок<div class="pseg" id="bAccHours"><button data-h="1">1 час</button><button data-h="6">6 часов</button><button data-h="24" class="on">сутки</button><button data-h="72">3 дня</button><button data-h="168">неделя</button><button data-h="720">30 дней</button></div></div>
+        <label class="acc-f">Для кого (заметка)<input id="bAccNote" maxlength="80" placeholder="Например: Саша, тест стакана"></label>
+        <button class="primary" id="bAccIssue">Создать код</button>
+        <div id="bAccOut"></div>
+        <div class="acc-lh"><b>Выданные коды</b><button id="bAccRefresh">Обновить</button></div>
+        <div id="bAccList" class="acc-list"><div class="faint">Введите пароль владельца и нажмите «Обновить».</div></div>
+      </div>
+    </div></div>
     <!-- indicator picker, modelled on the "Индикаторы" window of order-flow terminals -->
     <div id="bInd" class="cmdk hidden"><div class="cmdbox indbox" role="dialog" aria-modal="true" aria-label="Индикаторы">
       <div class="ind-h"><b>Индикаторы <span class="ind-n" id="bIndN2">0</span></b><button class="icon" id="bIndClose" aria-label="Закрыть"><svg class="i"><use href="#i-x"/></svg></button></div>
@@ -3197,22 +3222,104 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- Beta: a password-gated tab for tools under test; its code (beta.js) loads only after unlocking ----------
-// The gate keeps casual visitors out of unfinished tools; it is not a security boundary (the site is static).
+// The owner password is checked in the page (it keeps casual visitors out, not a security boundary); temporary codes are checked by the server.
+// Two ways in: the owner's password (checked here, permanent) or a temporary code SR-XXXX-XXXX issued by the owner —
+// codes are checked by Supabase (beta_redeem), expire on their own and can be revoked; the page re-checks on every open.
 const BETA_HASH = '93bc5d02dc2a24b5365347573b6f5115f069ca1097f319a1041c2a6c770079e0';
-let betaMod = null, betaPause = null;
+let betaMod = null, betaPause = null, betaOwnerPass = '', betaTimer = null;   // the owner password stays in memory only
 const sha256 = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
+const betaState = () => { const s = load('sr_beta', false); return s === true ? {owner:true} : s && s.exp > Date.now() ? s : null; };
+const normCode = v => { const s = v.toUpperCase().replace(/[\s_]/g, ''); const m = s.match(/^SR-?([A-Z0-9]{4})-?([A-Z0-9]{4})$/); return m ? `SR-${m[1]}-${m[2]}` : s; };
+function betaExpire(msg) {
+  clearTimeout(betaTimer); save('sr_beta', false); betaPause?.();
+  $('#betaErr').textContent = msg || 'Срок доступа истёк — попросите у владельца новый код';
+  if (location.hash.startsWith('#beta')) betaOpen();
+}
+function betaWatch(st) {   // a temporary code: close the tab when it runs out, and ask the server whether it is still valid
+  clearTimeout(betaTimer); betaTimer = setTimeout(() => betaExpire(), Math.min(st.exp - Date.now(), 2 ** 31 - 1));
+  rpc('beta_redeem', {p_code:st.code}).then(r => {
+    if (r && !r.ok) betaExpire(r.error);
+    else if (r?.expires_at) { st.exp = Date.parse(r.expires_at); save('sr_beta', st); $('#betaUntil').textContent = `доступ до ${dt(st.exp)}`; }
+  }).catch(() => {});
+}
 async function betaOpen() {
-  const ok = load('sr_beta', false);
-  $('#betaLock').classList.toggle('hidden', ok); $('#betaApp').classList.toggle('hidden', !ok);
-  if (!ok) { setTimeout(() => $('#betaPass').focus(), 60); return; }
+  const raw = load('sr_beta', false), st = betaState();
+  if (raw && raw !== true && !st) { save('sr_beta', false); $('#betaErr').textContent = 'Срок доступа истёк — попросите у владельца новый код'; }
+  $('#betaLock').classList.toggle('hidden', !!st); $('#betaApp').classList.toggle('hidden', !st);
+  $('#betaAccessBtn').classList.toggle('hidden', !st?.owner);
+  $('#betaUntil').textContent = st && !st.owner ? `доступ до ${dt(st.exp)}` : '';
+  if (!st) { setTimeout(() => $('#betaPass').focus(), 60); return; }
+  if (!st.owner) betaWatch(st);
   try { betaMod ||= await import('./beta.js'); betaPause = betaMod.pause; betaMod.open(window.__sr.kit); }
   catch (e) { toast('Бета не загрузилась', String(e.message || e), 'bad'); }
 }
 $('#betaForm').onsubmit = async e => {
   e.preventDefault();
-  if (await sha256($('#betaPass').value.trim().toLowerCase()) !== BETA_HASH) { $('#betaErr').textContent = 'Неверный пароль'; $('#betaPass').select(); return; }
-  $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true); betaOpen();
+  const v = $('#betaPass').value.trim(), err = t => { $('#betaErr').textContent = t; $('#betaPass').select(); };
+  if (!v) return err('Введите пароль или код');
+  if (await sha256(v.toLowerCase()) === BETA_HASH) { betaOwnerPass = v; $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true); return betaOpen(); }
+  const code = normCode(v), btn = e.submitter || $('#betaForm button'); btn.disabled = true;
+  try {
+    const r = await rpc('beta_redeem', {p_code:code});
+    if (!r?.ok) return err(r?.error || 'Неверный пароль или код');
+    const exp = Date.parse(r.expires_at); save('sr_beta', {code, exp}); $('#betaErr').textContent = ''; $('#betaPass').value = '';
+    toast('Доступ к бете открыт', `до ${dt(exp)}`, 'ok'); betaOpen();
+  } catch { err('Не удалось проверить код — нет связи с сервером, попробуйте ещё раз'); }
+  finally { btn.disabled = false; }
 };
+
+// owner: issue / list / revoke temporary codes
+let accHours = 24;
+const accErr = t => { $('#bAccOut').innerHTML = `<div class="acc-err">${t}</div>`; };
+const accEsc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
+async function accList() {
+  const pass = $('#bAccPass').value.trim();
+  if (!pass) { $('#bAccList').innerHTML = '<div class="faint">Введите пароль владельца.</div>'; return; }
+  let r; try { r = await rpc('beta_list', {p_admin:pass}); } catch { return accErr('Нет связи с сервером'); }
+  if (!r?.ok) return accErr(r?.error || 'Не получилось');
+  const now = Date.now();
+  $('#bAccList').innerHTML = r.keys.length ? r.keys.map(k => {
+    const exp = Date.parse(k.expires_at), st = k.revoked ? 'отозван' : exp <= now ? 'истёк' : 'активен';
+    return `<div class="acc-row${st === 'активен' ? '' : ' dim'}"><span><b>${k.note ? accEsc(k.note) : 'без заметки'}</b><span class="faint">${st} · до ${dt(exp)} · входов ${k.uses}</span></span>`
+      + (st === 'активен' ? `<button data-revoke="${k.id}">Отозвать</button>` : '') + '</div>';
+  }).join('') : '<div class="faint">Кодов пока нет.</div>';
+}
+$('#betaAccessBtn').onclick = () => {
+  $('#bAccess').classList.remove('hidden'); $('#bAccPass').value ||= betaOwnerPass; $('#bAccOut').innerHTML = '';
+  (betaOwnerPass ? $('#bAccNote') : $('#bAccPass')).focus(); if ($('#bAccPass').value) accList();
+};
+$('#bAccClose').onclick = () => $('#bAccess').classList.add('hidden');
+$('#bAccess').onclick = e => { if (e.target.id === 'bAccess') $('#bAccess').classList.add('hidden'); };
+$('#bAccHours').onclick = e => { const b = e.target.closest('[data-h]'); if (!b) return; accHours = +b.dataset.h; $('#bAccHours').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
+$('#bAccRefresh').onclick = accList;
+$('#bAccList').onclick = async e => {
+  const b = e.target.closest('[data-revoke]'); if (!b) return;
+  if (!await ask({title:'Отозвать код?', text:'Человек потеряет доступ к бете при следующей проверке.', ok:'Отозвать', danger:true})) return;
+  const r = await rpc('beta_revoke', {p_admin:$('#bAccPass').value.trim(), p_id:b.dataset.revoke}).catch(() => null);
+  if (!r?.ok) return accErr(r?.error || 'Не получилось');
+  toast('Код отозван', '', 'ok'); accList();
+};
+$('#bAccIssue').onclick = async () => {
+  const pass = $('#bAccPass').value.trim(); if (!pass) { $('#bAccPass').focus(); return accErr('Введите пароль владельца'); }
+  $('#bAccIssue').disabled = true;
+  try {
+    const r = await rpc('beta_issue', {p_admin:pass, p_hours:accHours, p_note:$('#bAccNote').value.trim() || null});
+    if (!r?.ok) return accErr(r?.error || 'Не получилось');
+    betaOwnerPass = pass; const exp = Date.parse(r.expires_at), link = location.origin + location.pathname + '#beta';
+    const msg = `Доступ к «Бете» Sigma Radar до ${dt(exp)}: откройте ${link} и введите код ${r.code}`;
+    $('#bAccOut').innerHTML = `<div class="acc-code"><code>${r.code}</code><span class="faint">действует до ${dt(exp)}</span>`
+      + `<div class="acc-act"><button data-copy="${r.code}">Скопировать код</button><button data-copy="${accEsc(msg)}">Скопировать сообщение</button></div></div>`;
+    $('#bAccNote').value = ''; accList();
+  } catch { accErr('Нет связи с сервером'); }
+  finally { $('#bAccIssue').disabled = false; }
+};
+$('#bAccOut').onclick = e => {
+  const b = e.target.closest('[data-copy]'); if (!b) return;
+  navigator.clipboard.writeText(b.dataset.copy).then(() => toast('Скопировано', '', 'ok'), () => toast('Не удалось скопировать', 'Выделите код вручную.', 'bad'));
+};
+// order book snapshots from all charts go out at least 1.2 s apart (they are the heaviest request we make)
+let gateAt = 0;
+const snapGate = () => { const now = Date.now(), at = Math.max(now, gateAt); gateAt = at + 1200; return new Promise(r => setTimeout(r, at - now)); };
 
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
 let sharedIn = null;
