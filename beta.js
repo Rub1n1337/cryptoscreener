@@ -26,6 +26,7 @@ const CATS = [
   {name:'Стакан и ликвидность', items:[
     {id:'dom', name:'Биржевой стакан', hint:'заявки по уровням — колонкой у шкалы цены'},
     {id:'imb', name:'Дисбаланс стакана', hint:'полоса у шкалы: доля покупателей и продавцов у цены'},
+    {id:'obsum', name:'Σ стакана', hint:'внизу стакана: все известные заявки на продажу против покупки, в $'},
     {id:'heat', name:'Тепловая карта ликвидности', hint:'плотность лимитных заявок во времени'},
     {id:'walls', name:'Стены в стакане', hint:'уровни, где заявок намного больше обычного (порог — в настройках)'},
     {id:'bubbles', name:'Пузыри крупных сделок', hint:'крупные рыночные покупки и продажи'},
@@ -40,6 +41,7 @@ const CATS = [
   ]},
   {name:'Фьючерсы', items:[
     {id:'liq', name:'Ликвидации', hint:'принудительные закрытия: красный ромб — ликвидирован лонг, зелёный — шорт (только фьючерсы)'},
+    {id:'liqheat', name:'Тепловая карта ликвидаций', hint:'где принудительно закрывали позиции: красный — лонги, зелёный — шорты; история с нашего сервера (топ-20 монет)'},
     {id:'oi', name:'Открытый интерес', hint:'нижняя панель: сумма открытых позиций в $ (только фьючерсы, история до 30 дней)'},
   ]},
   {name:'Кластерный анализ', items:[
@@ -424,7 +426,7 @@ class Pane {
     this.prevSym = null; this.prevMkt = null;
     if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); }
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
-    this.srv = false; this.far = null; this.fromServer().then(() => this.farBook()); this.loadOI();
+    this.srv = false; this.far = null; this.liqHeat = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat();
   }
   // futures: forced liquidations from the stream (Binance sends the largest per second), drawn as diamonds
   onLiq(o) {
@@ -504,7 +506,7 @@ class Pane {
     this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, vol:on('vol'), lower:!!sub || on('rsi'), noTip:true, vgrid:true, noMarks:true,
       priceCol:d.c[n - 1] >= d.o[n - 1] ? PC.lo : PC.up, priceSub:this.countdown(), fitPrice:true, thin:true,
       rightCol:this.rc, yRange:this.yr, crossPct:true,
-      under:(g, G) => { if (on('dtint')) this.drawTint(g, G); if (on('heat')) this.drawHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
+      under:(g, G) => { if (on('dtint')) this.drawTint(g, G); if (on('heat')) this.drawHeat(g, G); if (on('liqheat')) this.drawLiqHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
       over:(g, G) => {
         if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, [6, 3]);
         if (vv) drawLine(g, G, vv, PC.mid, [2, 3]);
@@ -512,6 +514,7 @@ class Pane {
         if (on('dpoc')) drawStep(g, G, d.dpoc, PC.rsi);
         for (const x of drw(this.sym)) { if (x.type === 'frvp') this.drawFrvp(g, G, x); if (x.type === 'fib') this.drawFib(g, G, x); if (x.type === 'raff') this.drawRaff(g, G, x); }
         if (this.rc) this.drawBook(g, G);
+        if (on('heat') && !mirror) this.drawHeatHover(g, G, hI, hY);
         if (on('bubbles')) this.drawBubbles(g, G);
         if (on('liq') && this.mkt === 'fut') this.drawLiqs(g, G);
         this.drawNotes(g, G);
@@ -561,6 +564,44 @@ class Pane {
       const ref = this.d.c[i], floor = top * C('heatFloor') / 100, op = C('heatOp') / 100;
       for (const [k, v] of agg) { if (v < floor) continue; const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top, k * step > ref, op); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
     }
+  }
+  // liquidation heatmap from our server (it listens to all futures liquidations): per candle and price bin, longs and shorts closed by force
+  async loadLiqHeat() {
+    if (!on('liqheat') || !this.d || !(await srvHas(this.sym))) return;
+    const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/liq?symbol=${this.sym}&since=${this.d.t[0]}`);
+    if (!r?.bars || key !== this.sym + this.tf) return;
+    const lh = new Map();
+    for (const [t, k0, sh, lg] of r.bars) {
+      const bar = Math.floor(t / tf) * tf; let col = lh.get(bar); if (!col) lh.set(bar, col = new Map());
+      sh.forEach((v, i) => { if (v || lg[i]) { const c = col.get(k0 + i) || [0, 0]; c[0] += v; c[1] += lg[i]; col.set(k0 + i, c); } });
+    }
+    this.liqHeat = {base:r.base, cols:lh}; this.dirty = true;
+  }
+  drawLiqHeat(g, G) {
+    const L = this.liqHeat, d = this.d, PC = K.PC; if (!L) return;
+    const step = Math.max(L.base, this.step), cols = [];
+    for (let i = G.s; i <= G.e; i++) {
+      const col = L.cols.get(d.t[i]); if (!col) continue;
+      const agg = new Map(); for (const [k, [s, l]] of col) { const kk = Math.round(k * L.base / step), a = agg.get(kk) || [0, 0]; a[0] += s; a[1] += l; agg.set(kk, a); }
+      cols.push([i, agg]);
+    }
+    const vals = cols.flatMap(([, a]) => [...a.values()].map(([s, l]) => s + l)).sort((a, b) => a - b); if (!vals.length) return;
+    const top = vals[Math.floor(vals.length * 0.95)] || vals[vals.length - 1], h = Math.max(2, Math.abs(G.Y(0) - G.Y(step)));
+    for (const [i, agg] of cols) for (const [k, [s, l]] of agg) {
+      const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue;
+      const f = Math.min(1, Math.sqrt((s + l) / top)); g.globalAlpha = 0.15 + 0.6 * f;
+      g.fillStyle = l >= s ? PC.up : PC.lo; g.fillRect(G.X(i) - G.bw / 2, y - h / 2, G.bw + 0.5, h);
+    }
+    g.globalAlpha = 1;
+  }
+  // the heatmap cell under the cursor: how much stood at that price at that time
+  drawHeatHover(g, G, i, y) {
+    const hc = this.hc, step = this.step; if (!hc || i == null || y == null || y < G.T0 || y > G.pH) return;
+    const col = hc.cols.find(c => c[0] === i); if (!col) return;
+    const p = G.mx - (y - G.T0) / (G.pH - G.T0) * (G.mx - G.mn), v = col[1].get(Math.round(p / step)); if (!v) return;
+    const t = `карта: $${fmtUsd(v)} у ${K.fp(Math.round(p / step) * step)}`, x = G.X(i);
+    g.font = '600 11px system-ui'; g.textBaseline = 'middle'; const w = g.measureText(t).width + 12, bx = x + 14 + w > G.W - G.padR ? x - 14 - w : x + 14, by = clamp(y - 24, G.T0 + 2, G.pH - 20);
+    g.fillStyle = K.PC.tip; g.fillRect(bx, by, w, 18); g.strokeStyle = K.PC.grid; g.strokeRect(bx + 0.5, by + 0.5, w - 1, 17); g.fillStyle = K.PC.price; g.fillText(t, bx + 6, by + 9);
   }
   // volume profile of the visible candles, from the left edge (as on order-flow terminals): thin rows, the value area
   // (70% of the volume around the POC) brighter, VAH / POC / VAL marked at the edge
@@ -722,48 +763,74 @@ class Pane {
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
       // rows: from the current price (like ZeroSynapse: 83 222–84 222–85 222…) or on round levels (like ATAS: 83 000–84 000…)
       const A = C('domAnchor') ? 0 : Math.round(m / this.base) * this.base, keyOf = p => Math.floor((p - A) / step);
-      const byK = new Map(), add = (p, v, side) => { if (p < G.mn - step || p > G.mx + step) return; const k = keyOf(p), r = byK.get(k) || {a:0, b:0}; r[side] += p * v; byK.set(k, r); };
-      for (const [p, q] of this.book.asks) add(p, q, 'a');
-      for (const [p, q] of this.book.bids) add(p, q, 'b');
+      // each row keeps both sides in $ and the volume-weighted price of what is in it
+      const byK = new Map(), add = (p, usd, side) => { if (p < G.mn - step || p > G.mx + step) return; const k = keyOf(p), r = byK.get(k) || {a:0, b:0, pw:0}; r[side] += usd; r.pw += p * usd; byK.set(k, r); };
+      let totA = 0, totB = 0;   // the whole known book, for the Σ strip
+      for (const [p, q] of this.book.asks) { totA += p * q; add(p, p * q, 'a'); }
+      for (const [p, q] of this.book.bids) { totB += p * q; add(p, p * q, 'b'); }
       // deeper levels from our server (it keeps the whole book), where the browser's snapshot doesn't reach
-      if (this.far) for (const [p, usd, side] of this.far) if ((side === 'a' && p > aHi) || (side === 'b' && p < bLo)) { if (p < G.mn - step || p > G.mx + step) continue; const k = keyOf(p), r = byK.get(k) || {a:0, b:0}; r[side] += usd; byK.set(k, r); }
+      if (this.far) for (const [p, usd, side] of this.far) if ((side === 'a' && p > aHi) || (side === 'b' && p < bLo)) { side === 'a' ? totA += usd : totB += usd; add(p, usd, side); }
       const farLo = this.far ? Math.min(bLo, this.farLo ?? bLo) : bLo, farHi = this.far ? Math.max(aHi, this.farHi ?? aHi) : aHi;
       const k0 = keyOf(G.mn) - 1, k1 = keyOf(G.mx) + 1;
-      const vals = [...byK.values()].map(r => r.a + r.b).sort((a, b) => a - b), ref = vals[Math.floor(vals.length * 0.97)] || vals[vals.length - 1] || 1;   // scale by the 97th percentile, so one wall doesn't flatten the rest
+      // bar length: by side within a row (the price row holds both), scaled by the 97th percentile so one wall doesn't flatten the rest
+      const vals = [...byK.values()].flatMap(r => [r.a, r.b]).filter(Boolean).sort((a, b) => a - b), ref = vals[Math.floor(vals.length * 0.97)] || vals[vals.length - 1] || 1;
+      const yP = Math.round(G.Y(m)), rowPx = Math.abs(G.Y(0) - G.Y(step)), gap = rowPx >= 7 ? 1 : 0;   // 1 px between rows once they are tall enough
+      const bar = (usd, side, y0, y1, partial) => {   // whole pixels only, so rows look even
+        if (!usd || y1 - y0 < 1) return 0;
+        const f = Math.min(1, Math.sqrt(usd / ref)), w = Math.max(2, Math.round(f * bw));
+        g.fillStyle = (side === 'a' ? PC.up : PC.lo) + (partial ? '40' : f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, y0, w, y1 - y0);
+        return f;
+      };
       g.save(); g.beginPath(); g.rect(x0, G.T0, cw, ph); g.clip();
       g.font = '10px system-ui'; g.textBaseline = 'middle'; g.lineJoin = 'round';
       for (let k = k0; k <= k1; k++) {
-        const lo = A + k * step, hi = lo + step, yT = G.Y(hi), yB = G.Y(lo), h = yB - yT, yc = (yT + yB) / 2, p = (lo + hi) / 2;
-        if (yB < G.T0 || yT > G.pH) continue;
-        if (hi < farLo || lo > farHi) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; continue; }   // beyond the known depth
+        const lo = A + k * step, hi = lo + step, yT = Math.round(G.Y(hi)), yB = Math.round(G.Y(lo)), h = yB - yT, yc = (yT + yB) / 2, p = (lo + hi) / 2;
+        if (yB < G.T0 || yT > G.pH || h < 1) continue;
+        if (hi < farLo || lo > farHi) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, h - gap || 1); g.globalAlpha = 1; continue; }   // beyond the known depth
         // between the dense snapshot and the server's far edge only levels that changed since the server started are known
         const partial = hi < bLo || lo > aHi, r = byK.get(k);
-        if (!r) { if (partial) { g.fillStyle = PC.grid; g.globalAlpha = 0.08; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; } continue; }
-        const v = r.a + r.b, f = Math.min(1, Math.sqrt(v / ref)), w = Math.max(2, f * bw), ask = r.a >= r.b;
-        g.fillStyle = (ask ? PC.up : PC.lo) + (partial ? '40' : f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, yT, w, Math.max(1, h + 0.5));   // rows touch: no gaps
+        if (!r) { if (partial) { g.fillStyle = PC.grid; g.globalAlpha = 0.08; g.fillRect(x0, yT, cw - sw, h - gap || 1); g.globalAlpha = 1; } continue; }
+        let f;
+        if (lo <= m && m < hi && r.a && r.b) {   // the row with the price in it: asks above the price line, bids below (like ZeroSynapse)
+          f = Math.max(bar(r.a, 'a', yT, Math.max(yT, yP - 1), partial), bar(r.b, 'b', Math.min(yB - gap, yP + 1), yB - gap, partial));
+        } else f = bar(r.a >= r.b ? r.a : r.b, r.a >= r.b ? 'a' : 'b', yT, yB - gap, partial);
+        const v = r.a + r.b;
         if (h >= 10.5 && (labels || f > 0.75)) { const t = C('domUnit') ? fmtQty(v / p) : fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
       }
+      g.fillStyle = PC.acc; g.fillRect(x0, yP, cw - sw, 1);   // the last price line through the column
       // say why the far rows are empty: Binance gives the nearest 5000 levels (1000 on the other charts), not the whole book
       g.font = '10px system-ui'; g.fillStyle = PC.mute; g.textAlign = 'center';
       const yA = G.Y(farHi), yBd = G.Y(farLo), cx = x0 + (cw - sw) / 2;
       if (isFinite(farHi) && yA - G.T0 > 48) g.fillText('глубже', cx, (G.T0 + yA) / 2 - 6), g.fillText('нет данных', cx, (G.T0 + yA) / 2 + 6);
       if (farLo > 0 && G.pH - yBd > 48) g.fillText('глубже', cx, (yBd + G.pH) / 2 - 6), g.fillText('нет данных', cx, (yBd + G.pH) / 2 + 6);
       if (this.far) {   // the partly known zone (server data that is still filling up)
-        const yP = G.Y(aHi), yTp = Math.max(G.T0, G.Y(farHi)), yQ = G.Y(bLo), yBt = Math.min(G.pH, G.Y(farLo));
-        if (yP - yTp > 60) g.fillText('неполные', cx, (yTp + yP) / 2 - 6), g.fillText('данные', cx, (yTp + yP) / 2 + 6);
+        const yP2 = G.Y(aHi), yTp = Math.max(G.T0, G.Y(farHi)), yQ = G.Y(bLo), yBt = Math.min(G.pH, G.Y(farLo));
+        if (yP2 - yTp > 60) g.fillText('неполные', cx, (yTp + yP2) / 2 - 6), g.fillText('данные', cx, (yTp + yP2) / 2 + 6);
         if (yBt - yQ > 60) g.fillText('неполные', cx, (yQ + yBt) / 2 - 6), g.fillText('данные', cx, (yQ + yBt) / 2 + 6);
       }
       g.textAlign = 'left';
       g.restore();
-      // the row under the mouse: its price range, both sides in $ and in coins, distance from the price
+      // Σ: everything we know of the book, sellers against buyers, as two bars at the bottom of the column
+      if (on('obsum') && totA + totB > 0) {
+        const sh = 26, sy = G.pH - sh, half = Math.round((cw - sw - 4) * totA / (totA + totB));
+        g.fillStyle = PC.tip; g.fillRect(x0 + 1, sy, cw - sw - 2, sh - 1);
+        g.fillStyle = PC.up + 'cc'; g.fillRect(x0 + 2, sy + 3, half, 6); g.fillStyle = PC.lo + 'cc'; g.fillRect(x0 + 2 + half, sy + 3, cw - sw - 4 - half, 6);
+        g.font = '600 9.5px system-ui'; g.textBaseline = 'middle'; g.fillStyle = PC.up; g.fillText('Σ' + fmtUsd(totA), x0 + 3, sy + 17);
+        g.textAlign = 'right'; g.fillStyle = PC.lo; g.fillText(fmtUsd(totB), x0 + cw - sw - 3, sy + 17); g.textAlign = 'left';
+      }
+      // the row under the mouse: price range, both sides in $ and in coins, the volume-weighted price, distance from the price
       const by = this.bookY;
       if (by != null && by >= G.T0 && by <= G.pH) {
         const pAt = G.mx - (by - G.T0) / ph * (G.mx - G.mn), k = keyOf(pAt), lo = A + k * step, hi = lo + step, r = byK.get(k), mid = (lo + hi) / 2;
-        const yT = G.Y(hi), yB = G.Y(lo); g.strokeStyle = PC.text || PC.price; g.lineWidth = 1; g.strokeRect(x0 + 0.5, yT + 0.5, cw - sw - 1, Math.max(1, yB - yT - 1));
+        const yT = Math.round(G.Y(hi)), yB = Math.round(G.Y(lo)); g.strokeStyle = PC.price; g.lineWidth = 1; g.strokeRect(x0 + 0.5, yT + 0.5, cw - sw - 1, Math.max(1, yB - yT - 1));
         const pct = (mid / m - 1) * 100, lines = [`${K.fp(lo)} – ${K.fp(hi)}`];
         if (hi < farLo || lo > farHi) lines.push('нет данных: дальше, чем отдаёт Binance');
         else if (!r) lines.push('заявок нет');
-        else { if (r.a) lines.push(`продажа $${fmtUsd(r.a)} · ${fmtQty(r.a / mid)} ${K.base(this.sym)}`); if (r.b) lines.push(`покупка $${fmtUsd(r.b)} · ${fmtQty(r.b / mid)} ${K.base(this.sym)}`); }
+        else {
+          if (r.a) lines.push(`продажа $${fmtUsd(r.a)} · ${fmtQty(r.a / mid)} ${K.base(this.sym)}`);
+          if (r.b) lines.push(`покупка $${fmtUsd(r.b)} · ${fmtQty(r.b / mid)} ${K.base(this.sym)}`);
+          lines.push(`средняя цена заявок ${K.fp(r.pw / (r.a + r.b))}`);
+        }
         lines.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены${hi < bLo || lo > aHi ? ' · данные сервера, могут быть неполными' : ''}`);
         g.font = '11.5px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'left';
         const w = Math.max(...lines.map(t => g.measureText(t).width)) + 16, hh = lines.length * 16 + 8, bx = x0 - w - 6, byy = clamp(by - hh / 2, G.T0, G.pH - hh);
@@ -777,7 +844,7 @@ class Pane {
       this.hits.push({x0, x1:x0 + cw - sw, y0:G.T0, y1:G.T0 + 17, obj:{type:'_domstep'}});
     }
     if (im) {   // red share on top (sellers), green below (buyers), split at the buyers' share
-      const sx = x0 + cw - sw, split = G.T0 + ph * (1 - im.share);
+      const sx = x0 + cw - sw, split = Math.round(G.T0 + ph * (1 - im.share));
       g.fillStyle = PC.up; g.fillRect(sx, G.T0, sw, split - G.T0); g.fillStyle = PC.lo; g.fillRect(sx, split, sw, G.pH - split);
     }
   }
@@ -1055,7 +1122,7 @@ function renderList() {
 }
 
 // ---------- indicator chips on every chart (like order-flow terminals): short name + key settings, hide / settings / remove ----------
-const SHORT = {liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
+const SHORT = {liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
   dtint:'Подсв. дельты', vp:'Профиль', poc:'POC', dpoc:'dPOC', vwap:'VWAP', vwapv:'VWAP экр.', bb:'Канал', rsi:'RSI'};
 function chipSum(id) {
   const p = act(), stepTxt = () => C('domStep') ? '$' + niceNum((p?.base || 0) * BOOK_STEPS[C('domStep') - 1]) : 'авто';
@@ -1088,7 +1155,7 @@ function wireChips() {
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
-const ICONS = {liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
+const ICONS = {liqheat:'heat', obsum:'scale', liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
@@ -1108,7 +1175,7 @@ function renderInd() {
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
 }
 function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); renderChips(); }
-function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); redrawAll(); requestAnimationFrame(redrawAll); }
+function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); redrawAll(); requestAnimationFrame(redrawAll); }
 const openInd = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
 const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
@@ -1196,7 +1263,7 @@ export function open(kit) {
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0;
-  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) p.loadOI(); }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
+  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }

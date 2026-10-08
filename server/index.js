@@ -42,18 +42,18 @@ const DATA = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR || ''
 const disk = {
   file: (sym, kind) => path.join(DATA, `${sym}.${kind}.bin`),
   encode(kind, r) {
-    const arrs = kind === 'fp' ? [r.buy, r.sell] : [r.v], n = arrs[0].length, b = Buffer.alloc(16 + arrs.length * n * 4);
+    const arrs = kind === 'heat' ? [r.v] : [r.buy, r.sell], n = arrs[0].length, b = Buffer.alloc(16 + arrs.length * n * 4);
     b.writeDoubleLE(r.t, 0); b.writeInt32LE(r.k0, 8); b.writeInt32LE(n, 12);
     arrs.forEach((a, j) => Buffer.from(a.buffer, a.byteOffset, a.byteLength).copy(b, 16 + j * n * 4));
     return b;
   },
   decode(kind, buf) {
-    const out = [], parts = kind === 'fp' ? 2 : 1;
+    const out = [], parts = kind === 'heat' ? 1 : 2;
     for (let o = 0; o + 16 <= buf.length;) {
       const t = buf.readDoubleLE(o), k0 = buf.readInt32LE(o + 8), n = buf.readInt32LE(o + 12), end = o + 16 + parts * n * 4;
       if (n < 0 || end > buf.length) break;   // a record cut short by a crash: stop there
       const arr = j => new Float32Array(buf.buffer.slice(buf.byteOffset + o + 16 + j * n * 4, buf.byteOffset + o + 16 + (j + 1) * n * 4));
-      out.push(kind === 'fp' ? {t, k0, buy:arr(0), sell:arr(1)} : {t, k0, v:arr(0)}); o = end;
+      out.push(kind === 'heat' ? {t, k0, v:arr(0)} : {t, k0, buy:arr(0), sell:arr(1)}); o = end;
     }
     return out;
   },
@@ -62,7 +62,7 @@ const disk = {
     if (!DATA) return;
     try { fs.mkdirSync(DATA, {recursive:true}); } catch {}
     const since = Date.now() - KEEP_MIN * 6e4;
-    for (const kind of ['heat', 'fp']) {
+    for (const kind of ['heat', 'fp', 'liq']) {
       try { c[kind] = this.decode(kind, fs.readFileSync(this.file(c.sym, kind))).filter(r => r.t >= since).slice(-KEEP_MIN); } catch {}
     }
     try {   // the far levels learned before the restart; the snapshot taken after it refreshes the near ones
@@ -79,7 +79,7 @@ const disk = {
   },
   compact(c) {   // the append-only files are rewritten with just the kept minutes
     if (!DATA) return;
-    for (const kind of ['heat', 'fp']) {
+    for (const kind of ['heat', 'fp', 'liq']) {
       const tmp = this.file(c.sym, kind) + '.tmp';
       try { fs.writeFileSync(tmp, Buffer.concat(c[kind].map(r => this.encode(kind, r)))); fs.renameSync(tmp, this.file(c.sym, kind)); } catch (e) { log('compact failed:', e.message); }
     }
@@ -93,7 +93,8 @@ const coins = new Map();   // sym -> state
 function coin(sym) {
   return {sym, base:0, book:null, buffer:[], syncing:false, fails:0, last:0,
     heat:[], heatCur:null,            // heat: [{t, k0, v:Float32Array}] one per minute; heatCur: Map bin -> max $ in the current minute
-    fp:[], fpCur:null, fpT:0};        // fp: [{t, k0, buy:Float32Array, sell:Float32Array}]; fpCur: Map bin -> [buy $, sell $]
+    fp:[], fpCur:null, fpT:0,         // fp: [{t, k0, buy:Float32Array, sell:Float32Array}]; fpCur: Map bin -> [buy $, sell $]
+    liq:[], liqCur:null, liqT:0};     // futures liquidations by price bin per minute: buy = shorts closed by force, sell = longs
 }
 async function pickSymbols() {
   if (ONLY.length) return ONLY;
@@ -160,6 +161,31 @@ function closeFp(c) {
   disk.append(c.sym, 'fp', rec);
 }
 
+// ---------- futures liquidations (one stream for the whole market) -> a liquidation heatmap ----------
+const LIQ_URL = 'wss://fstream.binance.com/market/ws/!forceOrder@arr';
+function onLiq(o) {
+  const c = coins.get(o.s); if (!c || !c.base) return;
+  const p = +o.ap || +o.p, usd = p * (+o.z || +o.q); if (!usd) return;
+  const t = Math.floor(+o.T / 6e4) * 6e4;
+  if (c.liqT !== t) { closeLiq(c); c.liqT = t; c.liqCur = new Map(); }
+  const k = Math.floor(p / c.base), r = c.liqCur.get(k) || [0, 0];
+  r[o.S === 'SELL' ? 1 : 0] += usd; c.liqCur.set(k, r);   // SELL: a long was liquidated
+}
+function closeLiq(c) {
+  if (!c.liqCur?.size) return;
+  const ks = [...c.liqCur.keys()], k0 = Math.min(...ks), n = Math.max(...ks) - k0 + 1, buy = new Float32Array(n), sell = new Float32Array(n);
+  for (const [k, [b, s]] of c.liqCur) { buy[k - k0] = b; sell[k - k0] = s; }
+  const rec = {t:c.liqT, k0, buy, sell}; c.liq.push(rec); if (c.liq.length > KEEP_MIN) c.liq.shift();
+  c.liqCur = null; disk.append(c.sym, 'liq', rec);
+}
+function liqStream(attempt = 0) {
+  const ws = new WebSocket(LIQ_URL); let opened = false;
+  ws.on('open', () => { opened = true; log('liquidation stream open'); });
+  ws.on('message', buf => { let m; try { m = JSON.parse(buf); } catch { return; } if (m.o) onLiq(m.o); });
+  ws.on('error', e => log('liquidation stream error', e.message));
+  ws.on('close', () => { const wait = Math.min(60e3, 2000 * 2 ** (opened ? 0 : attempt)); setTimeout(() => liqStream(opened ? 0 : attempt + 1), wait); });
+  setTimeout(() => ws.close(), 23 * 3600e3);
+}
 // ---------- heatmap: every 10 s the book is folded into bins, the max per bin over the minute is kept ----------
 function sampleHeat(c) {
   if (!c.book?.ok || !c.base) return;
@@ -203,7 +229,7 @@ function send(req, res, code, obj) {
   res.end(gz ? zlib.gzipSync(body) : body);
 }
 const routes = {
-  '/health': () => ({ok:true, uptime:Math.round(process.uptime()), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length}))}),
+  '/health': () => ({ok:true, uptime:Math.round(process.uptime()), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length, liqMin:c.liq.length}))}),
   '/symbols': () => ({symbols:[...coins.keys()]}),
   // the whole book we know, binned by the coin's base step: [[bin, $], …] for bids and asks
   '/book': (q, c) => {
@@ -215,6 +241,8 @@ const routes = {
   // heatmap history since ?since=ms: [[t, k0, [$…]], …] per minute
   '/heat': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, cols:c.heat.filter(h => h.t >= since).map(h => [h.t, h.k0, Array.from(h.v, round)])}; },
   // clusters since ?since=ms: [[t, k0, [buy $…], [sell $…]], …] per minute
+  // liquidations since ?since=ms: [[t, k0, [shorts $…], [longs $…]], …] per minute
+  '/liq': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, bars:c.liq.filter(b => b.t >= since).map(b => [b.t, b.k0, Array.from(b.buy, round), Array.from(b.sell, round)])}; },
   '/fp': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, bars:c.fp.filter(b => b.t >= since).map(b => [b.t, b.k0, Array.from(b.buy, round), Array.from(b.sell, round)])}; },
 };
 http.createServer((req, res) => {
@@ -232,12 +260,13 @@ http.createServer((req, res) => {
   for (;;) { try { syms = await pickSymbols(); break; } catch (e) { log('cannot list symbols (is the region outside the US?):', e.message); await sleep(30e3); } }
   for (const s of syms) { const c = coin(s); disk.load(c); disk.compact(c); coins.set(s, c); }
   // Railway stops the old copy with SIGTERM on every deploy: save what is in memory first
-  process.once('SIGTERM', () => { log('stopping: saving books'); for (const c of coins.values()) { closeHeat(c); closeFp(c); disk.saveBook(c); } process.exit(0); });
+  process.once('SIGTERM', () => { log('stopping: saving books'); for (const c of coins.values()) { closeHeat(c); closeFp(c); closeLiq(c); disk.saveBook(c); } process.exit(0); });
   setTimeout(() => { for (const c of coins.values()) disk.saveBook(c); }, 70e3);   // a first save soon after start, then every 5 minutes
   setInterval(() => { for (const c of coins.values()) disk.saveBook(c); }, 5 * 6e4);
   setInterval(() => { for (const c of coins.values()) disk.compact(c); }, 6 * 3600e3);
   log('following', syms.length, 'coins:', syms.join(' '));
   for (let i = 0; i < syms.length; i += 10) stream(syms.slice(i, i + 10));
+  liqStream();
   setInterval(() => { for (const c of coins.values()) sampleHeat(c); }, 10e3);
-  setInterval(() => { const t = Math.floor(Date.now() / 6e4) * 6e4; for (const c of coins.values()) { if (c.fpT && c.fpT < t) { closeFp(c); c.fpT = 0; c.fpCur = null; } if (c.book?.ok) prune(c); } }, 15e3);
+  setInterval(() => { const t = Math.floor(Date.now() / 6e4) * 6e4; for (const c of coins.values()) { if (c.fpT && c.fpT < t) { closeFp(c); c.fpT = 0; c.fpCur = null; } if (c.liqT && c.liqT < t) { closeLiq(c); c.liqT = 0; } if (c.book?.ok) prune(c); } }, 15e3);
 })();
