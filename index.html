@@ -277,6 +277,14 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .ind-lbl{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--mute);margin:-2px 0 10px;cursor:pointer}.ind-lbl input{accent-color:var(--blue)}
 .ind-chip{display:inline-flex;gap:6px;align-items:center}.ind-chip .i{width:14px;height:14px}.btools .tab .i,.ctools .i{width:17px;height:17px}.ctools .ct-yauto.show{width:auto;padding:0 9px;gap:5px;font-size:12px;font-weight:600}#bLay .tab .i{width:17px;height:17px}.sel-it button .i{width:15px;height:15px}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
+.bchips{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:0 2px 6px;min-height:0}.bchips:empty{display:none}
+.bchip-t,.bchip{display:inline-flex;align-items:center;gap:5px;height:26px;border:1px solid var(--line);border-radius:8px;background:var(--s1);font-size:11.5px;color:var(--text)}
+.bchip-t{padding:0 8px;color:var(--mute);font-weight:600}.bchip-t .i{width:14px;height:14px}.bchip-t[aria-expanded=true]{color:var(--blue);border-color:var(--blue)}
+.bchip{padding:0 2px 0 8px;max-width:100%}.bchip b{font-weight:650;white-space:nowrap}.bchip .s{color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;font-variant-numeric:tabular-nums}
+.bchip button{width:22px;height:22px;padding:0;border:0;background:transparent;color:var(--faint);display:inline-grid;place-items:center}.bchip button:hover{color:var(--text);background:var(--s2)}.bchip button .i{width:13px;height:13px}
+.bchip.off{opacity:.5}.bchip.off b{text-decoration:line-through}
+.sel-cfg .pf{display:grid;gap:7px;font-size:12px;color:var(--mute)}.sel-cfg .pf>span{display:flex;justify-content:space-between;gap:8px}.sel-cfg .pf b{color:var(--blue);font-weight:650}
+.pseg{display:flex;gap:4px;flex-wrap:wrap}.pseg button{height:30px;padding:0 10px;font-size:12.5px;font-weight:600}.pseg button.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .btools .tab{min-width:34px;padding:0 9px;font-weight:700}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue);color:#fff}
 .bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin .16s ease-out}
 .bhint button{height:28px;padding:0 10px;font-size:12.5px}

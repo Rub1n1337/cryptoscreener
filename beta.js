@@ -64,10 +64,13 @@ const stepParam = {k:'stepX', name:'Шаг цены: уровни склеива
 const PARAMS = {
   dom:[{k:'domStep', name:'Шаг цены стакана (колёсико над стаканом — то же)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто — по масштабу'; }},
     {k:'domRows', name:'В режиме «авто»: высота строки', min:10, max:40, step:2, def:16, u:v => v + ' px'},
-    {k:'domUnit', name:'Размер заявок в', min:0, max:1, step:1, def:0, u:v => v ? 'монетах' : 'долларах'},
-    {k:'domAnchor', name:'Строки отсчитываются', min:0, max:1, step:1, def:0, u:v => v ? 'от круглых уровней (как ATAS)' : 'от текущей цены (как ZeroSynapse)'}],
+    {k:'domUnit', name:'Размер заявок', def:0, opts:[[0, 'в $'], [1, 'в монетах']]},
+    {k:'domAnchor', name:'Строки отсчитываются', def:0, opts:[[0, 'от текущей цены'], [1, 'от круглых уровней']]}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
-  heat:[stepParam, {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
+  heat:[{k:'heatScheme', name:'Цвет', def:1, opts:[[0, 'жёлто-синий'], [1, 'покупка / продажа'], [2, 'моно']]},
+    {k:'heatOp', name:'Непрозрачность', min:20, max:100, step:5, def:85, u:v => v + '%'},
+    {k:'heatFloor', name:'Порог отсечения: слабее — не рисовать', min:0, max:50, step:1, def:12, u:v => v + '% от самых плотных'},
+    {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}, stepParam],
   walls:[{k:'domRange', name:'Искать стены в пределах (дальше ±1–2% — только с сервером)', min:0.5, max:15, step:0.5, def:8, u:v => '±' + v + '%'},
     {k:'wallAlert', name:'Уведомлять о новой стене от', min:0, max:50e6, step:1e6, def:5e6, u:v => v ? '$' + fmtUsd(v) : 'не уведомлять'},
     {k:'wallX', name:'Стена — во сколько раз больше обычного уровня', min:2, max:20, step:1, def:5, u:v => v + '×'},
@@ -137,7 +140,7 @@ class Pane {
     Object.assign(this, {sym:conf.sym, tf:TFMS[conf.tf] ? conf.tf : '5m', range:conf.range || 0, d:null, view:null, geo:null, hoverI:null, hoverY:null,
       ws:null, wsTimer:null, book:null, heat:new Map(), heatKey:'', heatMs:0, base:0, fine:0, trades:[], tradeUsd:[], dirty:true, req:0, dead:false});
     const el = this.el = document.createElement('div'); el.className = 'bpane';
-    el.innerHTML = '<div class="bph"><b></b><span class="tfl"></span><span class="lg"></span><span class="bpx"></span></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
+    el.innerHTML = '<div class="bph"><b></b><span class="tfl"></span><span class="lg"></span><span class="bpx"></span></div><div class="bchips"></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
     $('#bPanes').appendChild(el); this.cv = el.querySelector('canvas');
     el.addEventListener('pointerdown', () => setActive(panes.indexOf(this)), true);
     el.addEventListener('focusin', () => setActive(panes.indexOf(this)));   // Tab to a chart makes it the active one too
@@ -179,7 +182,8 @@ class Pane {
     });
     window.addEventListener('mouseup', () => { this.yDrag = null; }); window.addEventListener('touchend', () => { this.yDrag = null; });
     cv.addEventListener('dblclick', e => { if (this.inScale(e)) this.setY(null); });
-    cv.addEventListener('mousemove', e => { if (!e.buttons && !tool && this.inScale(e)) cv.style.cursor = 'ns-resize'; });
+    cv.addEventListener('mousemove', e => { if (!e.buttons && !tool && this.inScale(e)) cv.style.cursor = 'ns-resize'; const ib = this.inBook(e); this.bookY = ib ? e.clientY - cv.getBoundingClientRect().top : null; if (ib && !e.buttons) cv.style.cursor = 'help'; });
+    cv.addEventListener('mouseleave', () => { this.bookY = null; });
     this.label();
   }
   inBook(e) { const g = this.geo; if (!g || !this.rc) return false; const x = e.clientX - this.cv.getBoundingClientRect().left; return x >= g.W - g.padR && x <= g.W - g.padR + this.rc; }
@@ -231,7 +235,7 @@ class Pane {
       if (!tool && this.yr && e instanceof MouseEvent && !this.hitAt(e)) this.yDrag = {y0:e.clientY, ...this.yr};
     }
     if (!tool) {
-      const h = this.hitAt(e); if (h) { const x = e.clientX, y = e.clientY; setTimeout(() => h.obj.type === '_domstep' ? cfgPop('dom') : objPop(this, h.obj, x, y)); return true; }
+      const h = this.hitAt(e); if (h) { const x = e.clientX, y = e.clientY; setTimeout(() => h.obj.type === '_domstep' ? cfgPop('dom', {left:x, bottom:y, top:y}) : objPop(this, h.obj, x, y)); return true; }
       if (ruler && !ruler.live) { ruler = null; redrawAll(); }
       return false;
     }
@@ -269,8 +273,9 @@ class Pane {
   // ---------- order book: snapshot + diff stream (Binance's documented sync procedure) ----------
   mid() {
     const b = this.book; if (!b) return this.d ? this.d.c[this.d.c.length - 1] : null;
+    if (b._mv === b.ver && b._mv !== undefined) return b._m;   // cached until the book changes (it is asked many times per frame)
     let bb = 0, ba = Infinity; for (const p of b.bids.keys()) if (p > bb) bb = p; for (const p of b.asks.keys()) if (p < ba) ba = p;
-    return isFinite(ba) && bb ? (bb + ba) / 2 : null;
+    b._mv = b.ver; b._m = isFinite(ba) && bb ? (bb + ba) / 2 : null; b.bb = bb; b.ba = ba; return b._m;
   }
   get step() { return this.base * C('stepX'); }
   buckets(range, step = this.step) {   // {key: usd} for bids and asks within ±range of the middle
@@ -311,6 +316,9 @@ class Pane {
   }
   // once a second: walls are recomputed (not on every frame) and a new big one raises a notice
   scanWalls() {
+    // the price walked towards the edge of what the snapshot covers: take a fresh one (at most once a minute)
+    const bk = this.book, mm = bk?.ok && this.mid();
+    if (mm && bk.cov && Date.now() - (this.lastSync || 0) > 60e3 && Math.min(mm - bk.minB, bk.maxA - mm) < bk.cov * 0.4) { this.lastSync = Date.now(); this.resyncNow?.(); return; }
     if (!this.book?.ok || !this.d) return;
     const W = this.wc = this.walls(), thr = C('wallAlert'), m = this.mid(); if (!thr || !m) return;
     const now = Date.now(), key = w => `${w.side}${Math.round(w.price / (this.step * 4))}`, seen = this.seenW ||= new Map();
@@ -355,7 +363,8 @@ class Pane {
         const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false,
           minB:+(snap.bids[snap.bids.length - 1]?.[0] ?? 0), maxA:+(snap.asks[snap.asks.length - 1]?.[0] ?? Infinity)};   // how deep the snapshot reaches
         for (const ev of buffer.splice(0)) if (!applyDepth(b, ev)) throw new Error('snapshot older than the stream');
-        this.book = b; this.fails = 0; syncing = false;
+        this.book = b; this.fails = 0; syncing = false; this.lastSync = Date.now();
+        const m0 = this.mid(); if (m0) b.cov = Math.min(m0 - b.minB, b.maxA - m0);   // how far the snapshot reaches from the price
       } catch {
         syncing = false; if (ws !== this.ws) return;
         this.fails = (this.fails || 0) + 1;
@@ -370,7 +379,7 @@ class Pane {
       if (!this.book) { buffer.push(data); if (buffer.length > 3000) buffer.shift(); return; }
       if (!applyDepth(this.book, data)) { buffer.length = 0; buffer.push(data); resync(); }   // a gap: start over from a fresh snapshot
     };
-    ws.onopen = resync;
+    ws.onopen = resync; this.resyncNow = resync;
     ws.onclose = () => {   // reconnect while the tab is open, waiting longer after each failed attempt
       if (!loopOn || this.dead) return;
       this.wsFails = (this.wsFails || 0) + 1;
@@ -499,7 +508,9 @@ class Pane {
     const h = Math.max(1, Math.abs(G.Y(0) - G.Y(step)));
     for (const [i, agg] of cols) {
       const x = G.X(i) - G.bw / 2;
-      for (const [k, v] of agg) { if (v < top * 0.12) continue; const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
+      // which side a bin was on: above the bar's close — asks (sellers), below — bids (buyers)
+      const ref = this.d.c[i], floor = top * C('heatFloor') / 100, op = C('heatOp') / 100;
+      for (const [k, v] of agg) { if (v < floor) continue; const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue; g.fillStyle = heatColor(v / top, k * step > ref, op); g.fillRect(x, y - h / 2, G.bw + 0.5, h); }
     }
   }
   // volume profile of the visible candles, from the left edge (as on order-flow terminals): thin rows, the value area
@@ -695,6 +706,21 @@ class Pane {
       }
       g.textAlign = 'left';
       g.restore();
+      // the row under the mouse: its price range, both sides in $ and in coins, distance from the price
+      const by = this.bookY;
+      if (by != null && by >= G.T0 && by <= G.pH) {
+        const pAt = G.mx - (by - G.T0) / ph * (G.mx - G.mn), k = keyOf(pAt), lo = A + k * step, hi = lo + step, r = byK.get(k), mid = (lo + hi) / 2;
+        const yT = G.Y(hi), yB = G.Y(lo); g.strokeStyle = PC.text || PC.price; g.lineWidth = 1; g.strokeRect(x0 + 0.5, yT + 0.5, cw - sw - 1, Math.max(1, yB - yT - 1));
+        const pct = (mid / m - 1) * 100, lines = [`${K.fp(lo)} – ${K.fp(hi)}`];
+        if (hi < farLo || lo > farHi) lines.push('нет данных: дальше, чем отдаёт Binance');
+        else if (!r) lines.push('заявок нет');
+        else { if (r.a) lines.push(`продажа $${fmtUsd(r.a)} · ${fmtQty(r.a / mid)} ${K.base(this.sym)}`); if (r.b) lines.push(`покупка $${fmtUsd(r.b)} · ${fmtQty(r.b / mid)} ${K.base(this.sym)}`); }
+        lines.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены${hi < bLo || lo > aHi ? ' · данные сервера, могут быть неполными' : ''}`);
+        g.font = '11.5px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'left';
+        const w = Math.max(...lines.map(t => g.measureText(t).width)) + 16, hh = lines.length * 16 + 8, bx = x0 - w - 6, byy = clamp(by - hh / 2, G.T0, G.pH - hh);
+        g.fillStyle = PC.tip; g.fillRect(bx, byy, w, hh); g.strokeStyle = PC.grid; g.strokeRect(bx + 0.5, byy + 0.5, w - 1, hh - 1);
+        lines.forEach((t, j) => { g.fillStyle = j === 0 ? PC.price : t.startsWith('продажа') ? PC.up : t.startsWith('покупка') ? PC.lo : PC.mute; g.fillText(t, bx + 8, byy + 12 + j * 16); });
+      }
       // the step in use, at the top of the column: a click opens the setting, the wheel over the column changes it
       const lbl = `шаг $${niceNum(step)}${C('domStep') ? '' : ' · авто'}`;
       g.font = '600 10px system-ui'; g.textBaseline = 'middle'; const tw = g.measureText(lbl).width + 8;
@@ -729,7 +755,7 @@ function applyDepth(b, ev) {
   // the snapshot covers only the nearest levels; updates for levels beyond it would leave isolated islands far from the price
   for (const [p, q] of ev.b) { const x = +p; if (x < b.minB) continue; +q ? b.bids.set(x, +q) : b.bids.delete(x); }
   for (const [p, q] of ev.a) { const x = +p; if (x > b.maxA) continue; +q ? b.asks.set(x, +q) : b.asks.delete(x); }
-  b.id = ev.u; return true;
+  b.id = ev.u; b.ver = (b.ver || 0) + 1; return true;
 }
 // indicators that only need candles: channel, RSI, delta, CVD, VWAP
 function calc(d) {
@@ -753,10 +779,14 @@ function calc(d) {
 // heatmap scale comes from the CSS tokens --heat-0..3 (cold → hot)
 let HEAT = null;
 const rgb = h => { h = h.replace('#', ''); if (h.length === 3) h = [...h].map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
-function heatColor(x) {
+// heatmap colour of a bin: x = 0..1 (share of the densest), ask = the bin was above the price; three schemes (setting):
+// yellow-blue scale (tokens --heat-0..3), buy / sell (green bids, red asks, like ZeroSynapse), mono (accent)
+function heatColor(x, ask, op = 1) {
+  x = Math.min(1, Math.max(0, x)); const a = ((0.1 + 0.55 * x * x) * op).toFixed(2), sc = C('heatScheme');   // faint for thin levels, so candles stay readable
+  if (sc === 1 || sc === 2) { const c = rgb(sc === 1 ? (ask ? K.PC.up : K.PC.lo) : K.PC.acc); return `rgba(${c.join(',')},${(Math.min(0.85, 0.08 + 0.75 * x) * op).toFixed(2)})`; }
   HEAT ||= [0, 1, 2, 3].map(i => rgb(getComputedStyle(document.documentElement).getPropertyValue('--heat-' + i).trim() || '#888888'));
-  const t = Math.min(0.999, Math.max(0, x)) * (HEAT.length - 1), i = Math.floor(t), f = t - i, a = HEAT[i], b = HEAT[i + 1];
-  return `rgba(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(',')},${(0.1 + 0.55 * x * x).toFixed(2)})`;   // faint for thin levels, so candles stay readable
+  const t = Math.min(0.999, x) * (HEAT.length - 1), i = Math.floor(t), f = t - i, p = HEAT[i], q = HEAT[i + 1];
+  return `rgba(${p.map((v, k) => Math.round(v + (q[k] - v) * f)).join(',')},${a})`;
 }
 function drawLine(g, G, arr, col, dash = []) {
   g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();   // stay inside the price pane
@@ -805,7 +835,7 @@ function setLayout(n) {
   panes = pool.slice(0, n);
   if (active >= n) active = 0;
   panes.forEach((p, k) => p.el.classList.toggle('on', k === active));
-  savePanes(); syncBar(); redrawAll(); requestAnimationFrame(redrawAll);
+  savePanes(); syncBar(); renderChips(); redrawAll(); requestAnimationFrame(redrawAll);
 }
 // drawing tools: chosen in the toolbar, applied to whichever chart is clicked; a chip above the charts says what to do
 const TOOL_HINT = {fib:'Фибоначчи: протяните от одного экстремума к другому', raff:'Канал Раффа: зажмите и протяните по свечам', frvp:'Профиль участка: зажмите и протяните по свечам', ruler:'Линейка: зажмите и протяните по графику', avwap:'VWAP от свечи: нажмите на свечу, от которой считать', note:'Заметка: нажмите на место на графике'};
@@ -861,11 +891,18 @@ function rangePop() {
   openPop($('#bRangeBtn'), head('Сколько истории показать') + `<div class="pgrid">${RANGES.map(([k, l]) => `<button data-range="${k}" class="${k === p.range ? 'on' : ''}"${k > mx ? ` disabled title="На ${TFL[p.tf]} — не больше ${mx} дн."` : ''}>${l}</button>`).join('')}</div>`
     + `<p class="phint">«Авто» — по ширине экрана. На мелких таймфреймах длинная история недоступна: грузим до ${MAXBARS} свечей (на ${TFL[p.tf]} это ~${mx} дн.).</p>`);
 }
-function cfgPop(id) {
+// settings of one indicator, next to the chart (like order-flow terminals): choices as segmented buttons, numbers as
+// sliders with the value on the right; changes apply at once
+const ctl = p => p.opts
+  ? `<div class="pf"><span>${p.name}</span><div class="pseg" role="group" aria-label="${p.name}">${p.opts.map(([v, l]) => `<button data-k="${p.k}" data-val="${v}" class="${C(p.k) === v ? 'on' : ''}" aria-pressed="${C(p.k) === v}">${l}</button>`).join('')}</div></div>`
+  : `<label class="pf"><span>${p.name}<b data-v="${p.k}">${p.u(C(p.k))}</b></span><input type="range" data-k="${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${C(p.k)}"></label>`;
+function cfgPop(id, anchor) {
   const it = ITEMS.find(x => x.id === id), P = PARAMS[id];
-  openPop($('#bIndBtn'), head(it.name) + `<div class="sel-cfg">${P.map(p => `<label><span>${p.name}<b data-v="${p.k}">${p.u(C(p.k))}</b></span><input type="range" data-k="${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${C(p.k)}"></label>`).join('')}</div>`
-    + `<div class="pact"><button data-back>← Все индикаторы</button><button data-def="${id}">По умолчанию</button></div>`, 'cfg');
+  openPop(anchor || $('#bIndBtn'), head(it.name) + `<p class="phint" style="margin:-4px 0 12px">${it.hint}</p><div class="sel-cfg">${P.map(ctl).join('')}</div>`
+    + `<div class="pact"><button data-back>Все индикаторы</button><button data-def="${id}">По умолчанию</button></div>`, 'cfg');
+  cfgFor = id; cfgAnchor = anchor;
 }
+let cfgFor = null, cfgAnchor = null;
 const COLS = [['acc', 'жёлтый'], ['lo', 'зелёный'], ['up', 'красный'], ['rsi', 'синий'], ['trade', 'фиолетовый']];
 let noteDraft = null;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
@@ -907,7 +944,8 @@ function wirePop() {
     if (ds.tf) { p.tf = ds.tf; if (p.range > maxDays(p.tf)) p.range = 0; savePanes(); syncBar(); closePop(); p.restart(); }
     if (ds.range != null && ds.range !== '') { p.range = +ds.range; savePanes(); syncBar(); closePop(); p.restart(); }
     if ('back' in ds) { closePop(); openInd(); }
-    if (ds.def) { for (const q of PARAMS[ds.def]) delete cfg[q.k]; applyCfg(); cfgPop(ds.def); }
+    if (ds.def) { for (const q of PARAMS[ds.def]) delete cfg[q.k]; applyCfg(); cfgPop(ds.def, cfgAnchor); }
+    if (ds.val != null && ds.k) { cfg[ds.k] = +ds.val; pop.querySelectorAll(`[data-k="${ds.k}"][data-val]`).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', x === b); }); applyCfg(); }
     if (ds.col) { noteDraft.col = ds.col; pop.querySelectorAll('[data-col]').forEach(x => x.classList.toggle('on', x === b)); }
     if ('save' in ds) saveNote();
     if ('del' in ds) delObj();
@@ -961,6 +999,37 @@ function renderList() {
     + (list.map(item).join('') || '<div class="mute" style="padding:12px;font-size:13px">Сейчас подтверждённых сигналов нет.</div>'));
 }
 
+// ---------- indicator chips on every chart (like order-flow terminals): short name + key settings, hide / settings / remove ----------
+const SHORT = {dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
+  dtint:'Подсв. дельты', vp:'Профиль', poc:'POC', dpoc:'dPOC', vwap:'VWAP', vwapv:'VWAP экр.', bb:'Канал', rsi:'RSI'};
+function chipSum(id) {
+  const p = act(), stepTxt = () => C('domStep') ? '$' + niceNum((p?.base || 0) * BOOK_STEPS[C('domStep') - 1]) : 'авто';
+  return {dom:() => `шаг ${stepTxt()} · ${C('domAnchor') ? 'круглые' : 'от цены'}${C('domUnit') ? ' · монеты' : ''}`,
+    imb:() => `±${C('imbRange')}%`, heat:() => `${['жёлто-синяя', 'покупка/продажа', 'моно'][C('heatScheme')]} · ${C('heatOp')}%`,
+    walls:() => `±${C('domRange')}% · ×${C('wallX')}${C('wallAlert') ? ' · увед. от $' + fmtUsd(C('wallAlert')) : ''}`, bubbles:() => `топ ${C('bubPct')}%`,
+    vp:() => `${C('vpPx')}px · ${C('vpW')}%`, bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
+}
+let chipsOpen = true;
+function renderChips() {
+  const ids = [...sel].filter(id => SHORT[id]);
+  const html = `<button class="bchip-t" data-chips aria-expanded="${chipsOpen}" title="${chipsOpen ? 'Свернуть' : 'Показать'} индикаторы">${ic('layers')}<span>${ids.length}</span></button>`
+    + (chipsOpen ? ids.map(id => { const off = hidden.has(id), s = chipSum(id);
+      return `<span class="bchip${off ? ' off' : ''}" title="${esc(ITEMS.find(x => x.id === id).hint)}"><b>${SHORT[id]}</b>${s ? `<span class="s">${esc(s)}</span>` : ''}`
+        + `<button data-eye="${id}" aria-label="${off ? 'Показать' : 'Скрыть'}" title="${off ? 'Показать' : 'Скрыть'}">${ic(off ? 'eyeoff' : 'eye')}</button>`
+        + (PARAMS[id] ? `<button data-cfgc="${id}" aria-label="Настройки" title="Настройки">${ic('gear')}</button>` : '')
+        + `<button data-tog="${id}" aria-label="Убрать" title="Убрать">${ic('x')}</button></span>`; }).join('') : '');
+  for (const p of pool) { const box = p.el.querySelector('.bchips'); if (box.innerHTML !== html) box.innerHTML = html; }
+}
+function wireChips() {
+  $('#bPanes').addEventListener('click', e => {
+    const b = e.target.closest('.bchips button'); if (!b) return;
+    const ds = b.dataset;
+    if ('chips' in ds) { chipsOpen = !chipsOpen; K.save('sr_bchips', chipsOpen); renderChips(); return; }
+    if (ds.eye) { hidden.has(ds.eye) ? hidden.delete(ds.eye) : hidden.add(ds.eye); saveInd(); }
+    if (ds.tog) { sel.delete(ds.tog); hidden.delete(ds.tog); saveInd(); }
+    if (ds.cfgc) { const id = ds.cfgc; setTimeout(() => cfgPop(id, b)); }
+  });
+}
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
@@ -983,8 +1052,8 @@ function renderInd() {
       + `<button data-tog="${id}" aria-label="Убрать ${it.name}" title="Убрать">${ic('x')}</button></div>`; }).join('')
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
 }
-function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); }
-function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); redrawAll(); requestAnimationFrame(redrawAll); }
+function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); renderChips(); }
+function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); redrawAll(); requestAnimationFrame(redrawAll); }
 const openInd = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
 const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
@@ -1065,7 +1134,7 @@ export function open(kit) {
     drawings = K.load('sr_bdraw', {}) || {}; link = K.load('sr_blink', true); active = K.load('sr_bact', 0);
     // older single-chart settings become the first pane
     if (!K.load('sr_bpanes', null)) K.save('sr_bpanes', [{sym:K.load('sr_bsym', 'BTCUSDT'), tf:K.load('sr_btf', '5m'), range:0}]);
-    wire(); renderInd();
+    chipsOpen = K.load('sr_bchips', !PHONE.matches); wire(); wireChips(); renderInd();
     setLayout(K.load('sr_blay', 1));
   }
   if (loopOn) return;
