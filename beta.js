@@ -110,7 +110,7 @@ const undo = () => undoRedo(undoS, redoS), redo = () => undoRedo(redoS, undoS);
 
 // ---------- our collector server (server/ on Railway): full books and heatmap history; without it the Beta works as before ----------
 // the address: SERVER below, or ?srv=https://… once in the page URL (remembered in this browser)
-const SERVER = '';
+const SERVER = 'https://cryptoscreener-production-f6ba.up.railway.app';
 let srvBase = null, srvSyms = null;
 function srvUrl() {
   if (srvBase !== null) return srvBase;
@@ -647,9 +647,11 @@ class Pane {
         const lo = A + k * step, hi = lo + step, yT = G.Y(hi), yB = G.Y(lo), h = yB - yT, yc = (yT + yB) / 2, p = (lo + hi) / 2;
         if (yB < G.T0 || yT > G.pH) continue;
         if (hi < farLo || lo > farHi) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; continue; }   // beyond the known depth
-        const r = byK.get(k); if (!r) continue;
+        // between the dense snapshot and the server's far edge only levels that changed since the server started are known
+        const partial = hi < bLo || lo > aHi, r = byK.get(k);
+        if (!r) { if (partial) { g.fillStyle = PC.grid; g.globalAlpha = 0.08; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; } continue; }
         const v = r.a + r.b, f = Math.min(1, Math.sqrt(v / ref)), w = Math.max(2, f * bw), ask = r.a >= r.b;
-        g.fillStyle = (ask ? PC.up : PC.lo) + (f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, yT, w, Math.max(1, h + 0.5));   // rows touch: no gaps
+        g.fillStyle = (ask ? PC.up : PC.lo) + (partial ? '40' : f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, yT, w, Math.max(1, h + 0.5));   // rows touch: no gaps
         if (h >= 10.5 && (labels || f > 0.75)) { const t = C('domUnit') ? fmtQty(v / p) : fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
       }
       // say why the far rows are empty: Binance gives the nearest 5000 levels (1000 on the other charts), not the whole book
@@ -657,6 +659,11 @@ class Pane {
       const yA = G.Y(farHi), yBd = G.Y(farLo), cx = x0 + (cw - sw) / 2;
       if (isFinite(farHi) && yA - G.T0 > 48) g.fillText('глубже', cx, (G.T0 + yA) / 2 - 6), g.fillText('нет данных', cx, (G.T0 + yA) / 2 + 6);
       if (farLo > 0 && G.pH - yBd > 48) g.fillText('глубже', cx, (yBd + G.pH) / 2 - 6), g.fillText('нет данных', cx, (yBd + G.pH) / 2 + 6);
+      if (this.far) {   // the partly known zone (server data that is still filling up)
+        const yP = G.Y(aHi), yTp = Math.max(G.T0, G.Y(farHi)), yQ = G.Y(bLo), yBt = Math.min(G.pH, G.Y(farLo));
+        if (yP - yTp > 60) g.fillText('неполные', cx, (yTp + yP) / 2 - 6), g.fillText('данные', cx, (yTp + yP) / 2 + 6);
+        if (yBt - yQ > 60) g.fillText('неполные', cx, (yQ + yBt) / 2 - 6), g.fillText('данные', cx, (yQ + yBt) / 2 + 6);
+      }
       g.textAlign = 'left';
       g.restore();
       // the step in use, at the top of the column: a click opens the setting, the wheel over the column changes it

@@ -17,7 +17,7 @@ const HEAT_RANGE = 0.06;                                  // heatmap: ±6% aroun
 const BOOK_RANGE = 0.25;                                  // book served up to ±25% (far levels beyond are dropped)
 const REST = ['https://data-api.binance.vision', 'https://api.binance.com'];
 const WS_URL = 'wss://stream.binance.com:9443/stream?streams=';
-const STABLE = /^(USDC|FDUSD|TUSD|BUSD|DAI|USDP|EUR|AEUR|USD1|XUSD|PAXG|WBTC|WBETH|BFUSD)USDT$/;
+const STABLE = /^(USDC|FDUSD|TUSD|BUSD|DAI|USDP|EUR|AEUR|USD1|XUSD|PAXG|XAUT|RLUSD|USDE|USDS|PYUSD|EURI|WBTC|WBETH|BFUSD|BNSOL)USDT$/;   // stablecoins, gold and wrapped tokens: no point charting them
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
