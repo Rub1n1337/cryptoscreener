@@ -31,4 +31,4 @@ Then put the domain into `SERVER` at the top of the server section in `beta.js` 
 | `/heat?symbol=BTCUSDT&since=<ms>` | heatmap columns, one per minute |
 | `/fp?symbol=BTCUSDT&since=<ms>` | market buys / sells by price bin, one per minute |
 
-Memory: about 30–60 MB for 20 coins with a day of history.
+Memory: about 30–60 MB for 20 coins with a day of history; the volume holds about the same on disk.
