@@ -32,6 +32,7 @@ const CATS = [
     {id:'vol', name:'Объём', hint:'панель объёма под графиком; выключите — цене достанется больше места'},
     {id:'delta', name:'Дельта объёма', hint:'нижняя панель: покупки − продажи по рынку, по свечам'},
     {id:'cvd', name:'CVD', hint:'нижняя панель: накопленная дельта объёма'},
+    {id:'trades', name:'Сделки', hint:'нижняя панель: сколько сделок прошло в каждой свече — всплеск активности виден раньше объёма'},
     {id:'dtint', name:'Подсветка дельты', hint:'фон свечи: зелёный — перевес покупок по рынку, красный — продаж'},
   ]},
   {name:'Кластерный анализ', items:[
@@ -45,14 +46,16 @@ const CATS = [
   ]},
   {name:'VWAP', items:[
     {id:'vwap', name:'VWAP по дню', hint:'средняя цена с учётом объёма с начала суток (UTC)'},
+    {id:'vwapv', name:'VWAP видимой части', hint:'от первой свечи на экране: средняя цена того, что вы сейчас видите'},
   ]},
   {name:'Цена и построения', items:[
     {id:'bb', name:'Канал Боллинджера', hint:'лог-канал, как на рынке (длина и ширина — в настройках)'},
     {id:'rsi', name:'RSI', hint:'нижняя панель: перекупленность и перепроданность'},
-    {id:'fib', name:'Уровни Фибоначчи', hint:'два клика по графику', soon:true},
+    {id:'fibt', name:'Уровни Фибоначчи', hint:'инструмент на панели: протяните от одного экстремума к другому', tool:'fib'},
+    {id:'rafft', name:'Регрессионный канал Раффа', hint:'инструмент на панели: протяните по свечам — канал тренда с продолжением', tool:'raff'},
   ]},
 ];
-const LOWER = ['delta', 'cvd', 'rsi'];   // one lower pane: choosing one of these replaces the other
+const LOWER = ['delta', 'cvd', 'trades', 'rsi'];   // one lower pane: choosing one of these replaces the other
 const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls', 'bubbles', 'vol', 'delta', 'cvd', 'vp', 'vwap'];
 let sel, hidden, labels = true;      // chosen indicators, chosen-but-hidden ones (the eye), text labels on the chart
 const on = id => sel.has(id) && !hidden.has(id);
@@ -128,7 +131,7 @@ class Pane {
       set:v => { this.setView(v, true); if (v === null) this.setY(null); }, pick:e => this.pick(e),
       tools:'<button data-z="yauto" class="ct-yauto" title="Вернуть автомасштаб цены (A, двойной клик по шкале)" aria-label="Автомасштаб цены"><svg class="i"><use href="#i-scale"/></svg><span>авто</span></button><button data-z="help" title="Как управлять графиком" aria-label="Как управлять графиком"><svg class="i"><use href="#i-help"/></svg></button>',
       onTool:(z, b) => { if (z === 'yauto') this.setY(null); if (z === 'help') popFor === b ? closePop() : helpPop(b); },
-      key:k => { const t = {r:'ruler', 'к':'ruler', v:'avwap', 'м':'avwap', t:'note', 'е':'note', p:'frvp', 'з':'frvp'}[k]; if (k === 'a' || k === 'ф') { this.setY(null); return true; } if (!t) return false; setTool(tool === t ? null : t); return true; }});
+      key:k => { const t = {r:'ruler', 'к':'ruler', v:'avwap', 'м':'avwap', t:'note', 'е':'note', p:'frvp', 'з':'frvp', k:'raff', 'л':'raff', f:'fib', 'а':'fib'}[k]; if (k === 'a' || k === 'ф') { this.setY(null); return true; } if (!t) return false; setTool(tool === t ? null : t); return true; }});
     // the price scale: drag it up / down to stretch / squash the candles, wheel over it does the same;
     // once the scale is manual, dragging the chart also moves it up and down; "A" or a double click goes back to auto
     cv.addEventListener('wheel', e => {
@@ -200,7 +203,7 @@ class Pane {
       return false;
     }
     const pt = this.pointAt(e); if (!pt) return true;
-    if (tool === 'ruler' || tool === 'frvp') { ruler = {pane:this, a:pt, b:pt, live:true, kind:tool}; this.dirty = true; return true; }
+    if (['ruler', 'frvp', 'fib', 'raff'].includes(tool)) { ruler = {pane:this, a:pt, b:pt, live:true, kind:tool}; this.dirty = true; return true; }
     if (tool === 'avwap') { mutate(this.sym, a => a.push({type:'avwap', t:pt.t})); setTool(null); return true; }
     if (tool === 'note') { const x = e.clientX, y = e.clientY; setTool(null); setTimeout(() => notePop(this, pt, x, y)); return true; }
     return true;
@@ -219,14 +222,14 @@ class Pane {
       rows = k.concat(rows); end = k[0][0] - 1; if (k.length < lim) break;
     }
     if (!rows.length) throw new Error('нет свечей');
-    const d = M.parse(rows); d.qv = rows.map(x => +x[7]); d.tbq = rows.map(x => +x[10]);   // quote volume and taker-buy quote volume
+    const d = M.parse(rows); d.qv = rows.map(x => +x[7]); d.tbq = rows.map(x => +x[10]); d.nt = rows.map(x => +x[8]);   // quote volume, taker-buy quote volume, number of trades
     this.d = d; calc(d); this.dirty = true; return true;
   }
   onKline(k) {   // live candle from the stream: update the forming bar or start a new one
     const d = this.d; if (!d) return;
-    const T = k.t, i = d.t.length - 1, v = [+k.o, +k.h, +k.l, +k.c, +k.v, +k.q, +k.Q];
-    if (T === d.t[i]) { [d.o[i], d.h[i], d.l[i], d.c[i], d.v[i], d.qv[i], d.tbq[i]] = v; }
-    else if (T > d.t[i]) { d.t.push(T); d.o.push(v[0]); d.h.push(v[1]); d.l.push(v[2]); d.c.push(v[3]); d.v.push(v[4]); d.qv.push(v[5]); d.tbq.push(v[6]); }
+    const T = k.t, i = d.t.length - 1, v = [+k.o, +k.h, +k.l, +k.c, +k.v, +k.q, +k.Q, +k.n];
+    if (T === d.t[i]) { [d.o[i], d.h[i], d.l[i], d.c[i], d.v[i], d.qv[i], d.tbq[i], d.nt[i]] = v; }
+    else if (T > d.t[i]) { d.t.push(T); d.o.push(v[0]); d.h.push(v[1]); d.l.push(v[2]); d.c.push(v[3]); d.v.push(v[4]); d.qv.push(v[5]); d.tbq.push(v[6]); d.nt.push(v[7]); }
     calc(d); this.dirty = true;
   }
 
@@ -348,7 +351,7 @@ class Pane {
     const levels = on('walls') ? W.map(w => ({v:w.price, i0:wi0, noTag:cw0 < 420 && on('dom'), col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
-    const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd}
+    const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd} : on('trades') ? {label:'Сделок в свече', values:d.nt, kind:'bars', fmt:v => fmtUsd(v).replace('$', '')}
       : null;   // RSI, or nothing at all (the price then takes the room)
     // the crosshair of the chart under the mouse is mirrored on the others at the same time (just the line and the time)
     this.hits = [];   // clickable drawings (notes, VWAP anchors), filled while drawing
@@ -356,9 +359,10 @@ class Pane {
     if (ruler?.pane === this) hI = null;   // the candle tooltip would cover the ruler's label
     else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; mirror = true; }
     // VWAP lines get their value as a tag on the price scale (a text label next to the line collided with the price tags)
-    const e = Math.min(n - 1, r.to), av = drw(this.sym).filter(x => x.type === 'avwap' && x.t >= d.t[0]).map(x => ({x, arr:avwap(d, x.t)}));
+    const e = Math.min(n - 1, r.to), vv = on('vwapv') ? avwap(d, d.t[clamp(r.from, 0, n - 1)]) : null, av = drw(this.sym).filter(x => x.type === 'avwap' && x.t >= d.t[0]).map(x => ({x, arr:avwap(d, x.t)}));
     const tags = [...(on('vwap') && isFinite(d.vwap[e]) ? [{v:d.vwap[e], text:(labels ? 'VWAP ' : '') + K.fp(d.vwap[e]), col:PC.acc, pin:true}] : []),
       ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
+      ...(vv && isFinite(vv[e]) ? [{v:vv[e], text:(labels ? 'VWAP экр. ' : '') + K.fp(vv[e]), col:PC.mid, pin:true}] : []),
       ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:(labels ? 'dPOC ' : '') + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
     const cw = this.cv.clientWidth; this.rc = on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0;   // the order book column at the price scale
     this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, vol:on('vol'), lower:!!sub || on('rsi'), noTip:true, vgrid:true, noMarks:true,
@@ -367,9 +371,10 @@ class Pane {
       under:(g, G) => { if (on('dtint')) this.drawTint(g, G); if (on('heat')) this.drawHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
       over:(g, G) => {
         if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, [6, 3]);
+        if (vv) drawLine(g, G, vv, PC.mid, [2, 3]);
         for (const a of av) this.drawAvwap(g, G, a);
         if (on('dpoc')) drawStep(g, G, d.dpoc, PC.rsi);
-        for (const x of drw(this.sym)) if (x.type === 'frvp') this.drawFrvp(g, G, x);
+        for (const x of drw(this.sym)) { if (x.type === 'frvp') this.drawFrvp(g, G, x); if (x.type === 'fib') this.drawFib(g, G, x); if (x.type === 'raff') this.drawRaff(g, G, x); }
         if (this.rc) this.drawBook(g, G);
         if (on('bubbles')) this.drawBubbles(g, G);
         this.drawNotes(g, G);
@@ -489,6 +494,39 @@ class Pane {
     g.fillStyle = PC.tip; g.fillRect(xa, ly - 9, lw, 18); g.fillStyle = PC.rsi; g.fillText(lbl, xa + 5, ly); g.font = '11px system-ui';
     this.hits.push({x0:xa, x1:xa + lw, y0:ly - 9, y1:ly + 9, obj:x});
   }
+  // Fibonacci retracement: from the first point (0) to the second (1), levels drawn from the left point to the right edge
+  drawFib(g, G, x, preview) {
+    const d = this.d, PC = K.PC, tA = Math.min(x.t0, x.t1); if (tA > d.t[d.c.length - 1]) return;
+    const iA = tA < d.t[0] ? 0 : K.barAt(d.t, tA); if (iA > G.e) return;
+    const xa = Math.max(G.padL, G.X(Math.max(iA, G.s)) - G.bw / 2), xb = G.W - G.padR, L = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+    const P = r => x.p1 - (x.p1 - x.p0) * r;
+    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
+    g.fillStyle = PC.acc + '14'; g.fillRect(xa, Math.min(G.Y(P(0.382)), G.Y(P(0.618))), xb - xa, Math.abs(G.Y(P(0.382)) - G.Y(P(0.618))));   // the "golden" zone
+    for (const r of L) {
+      const y = G.Y(P(r)), key = r === 0.5 || r === 0.618;
+      g.strokeStyle = key ? PC.acc : PC.trade + (r === 0 || r === 1 ? 'ff' : '99'); g.lineWidth = key ? 1.3 : 1; g.beginPath(); g.moveTo(xa, y); g.lineTo(xb, y); g.stroke();
+      if (labels || preview) { g.font = '10.5px system-ui'; g.textBaseline = 'bottom'; g.fillStyle = key ? PC.acc : PC.trade; g.fillText(`${r} · ${K.fp(P(r))}`, xa + 4, y - 2); }
+    }
+    g.restore();
+    if (!preview) { const y = G.Y(P(0)); this.hits.push({x0:xa, x1:xa + 110, y0:y - 14, y1:y + 4, obj:x}); }
+  }
+  // Raff regression channel: least-squares line through the closes, boundaries at the farthest high / low, extended dashed
+  drawRaff(g, G, x, preview) {
+    const d = this.d, PC = K.PC; if (x.t1 < d.t[0] || x.t0 > d.t[d.c.length - 1]) return;
+    const i0 = K.barAt(d.t, Math.max(x.t0, d.t[0])), i1 = K.barAt(d.t, x.t1), n = i1 - i0 + 1; if (n < 3) return;
+    let sx = 0, sy = 0, sxx = 0, sxy = 0; for (let k = 0; k < n; k++) { const y = d.c[i0 + k]; sx += k; sy += y; sxx += k * k; sxy += k * y; }
+    const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx || 1), icpt = (sy - slope * sx) / n, fit = i => icpt + slope * (i - i0);
+    let dev = 0; for (let i = i0; i <= i1; i++) dev = Math.max(dev, d.h[i] - fit(i), fit(i) - d.l[i]);
+    const iEnd = Math.max(i1, Math.min(G.e + 5, Math.round(G.eView))), seg = (a, b, off, dash) => { g.setLineDash(dash); g.beginPath(); g.moveTo(G.X(a), G.Y(fit(a) + off)); g.lineTo(G.X(b), G.Y(fit(b) + off)); g.stroke(); };
+    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
+    g.fillStyle = PC.rsi + '12'; g.beginPath(); g.moveTo(G.X(i0), G.Y(fit(i0) + dev)); g.lineTo(G.X(i1), G.Y(fit(i1) + dev)); g.lineTo(G.X(i1), G.Y(fit(i1) - dev)); g.lineTo(G.X(i0), G.Y(fit(i0) - dev)); g.closePath(); g.fill();
+    g.strokeStyle = PC.rsi; g.lineWidth = 1.3; seg(i0, i1, dev, []); seg(i0, i1, -dev, []); g.lineWidth = 1; seg(i0, i1, 0, [4, 3]);
+    if (iEnd > i1) { g.globalAlpha = 0.55; seg(i1, iEnd, dev, [3, 4]); seg(i1, iEnd, -dev, [3, 4]); seg(i1, iEnd, 0, [2, 4]); g.globalAlpha = 1; }
+    g.setLineDash([]); g.restore();
+    const pct = slope / fit(i1) * 100, lbl = `Канал Раффа · ${n} св. · ${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(3)}% за свечу`;
+    if (labels || preview) { g.font = '600 10.5px system-ui'; g.textBaseline = 'middle'; const w = g.measureText(lbl).width + 10, lx = Math.max(G.padL, G.X(i0)), ly = clamp(G.Y(fit(i0) + dev) - 11, G.T0 + 9, G.pH - 9);
+      g.fillStyle = PC.tip; g.fillRect(lx, ly - 9, w, 18); g.fillStyle = PC.rsi; g.fillText(lbl, lx + 5, ly); if (!preview) this.hits.push({x0:lx, x1:lx + w, y0:ly - 9, y1:ly + 9, obj:x}); }
+  }
   drawNotes(g, G) {
     const d = this.d, PC = K.PC;
     for (const x of drw(this.sym)) {
@@ -505,6 +543,8 @@ class Pane {
   }
   drawRuler(g, G) {   // a box from A to B with the move in %, in $, in candles and in time
     const {a, b} = ruler, d = this.d, PC = K.PC, x0 = G.X(a.i), x1 = G.X(b.i), y0 = G.Y(a.p), y1 = G.Y(b.p);
+    if (ruler.kind === 'fib') { this.drawFib(g, G, {t0:a.t, p0:a.p, t1:b.t, p1:b.p}, true); return; }   // previews while dragging
+    if (ruler.kind === 'raff') { if (Math.abs(b.i - a.i) >= 2) this.drawRaff(g, G, {t0:Math.min(a.t, b.t), t1:Math.max(a.t, b.t)}, true); return; }
     if (ruler.kind === 'frvp') {   // while dragging a range: a band over the chosen candles
       const xa = Math.min(x0, x1) - G.bw / 2, xb = Math.max(x0, x1) + G.bw / 2, t = `Профиль · ${Math.abs(b.i - a.i) + 1} свеч.`;
       g.fillStyle = PC.rsi + '1c'; g.fillRect(xa, G.T0, xb - xa, G.pH - G.T0); g.strokeStyle = PC.rsi; g.lineWidth = 1; g.strokeRect(xa, G.T0, xb - xa, G.pH - G.T0);
@@ -548,7 +588,8 @@ class Pane {
           const shown = []; for (const r of [...rows].sort((a, b) => b.v - a.v).slice(0, 6)) {
             if (shown.length >= 4 || r.v < max * 0.15 || shown.some(y => Math.abs(y - r.y) < 12)) continue;   // big levels only, labels never overlap
             if (labels && on('walls') && wallsAt.has(r.k)) continue;   // its size is already in the wall tag
-            g.fillStyle = PC.price; g.fillText(fmtUsd(r.v), x0 + 3, r.y); shown.push(r.y);
+            const t = fmtUsd(r.v); g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, r.y);   // a halo keeps it readable over the bars
+            g.fillStyle = PC.price; g.fillText(t, x0 + 3, r.y); shown.push(r.y);
           }
         }
       }
@@ -664,11 +705,11 @@ function setLayout(n) {
   savePanes(); syncBar(); redrawAll(); requestAnimationFrame(redrawAll);
 }
 // drawing tools: chosen in the toolbar, applied to whichever chart is clicked; a chip above the charts says what to do
-const TOOL_HINT = {frvp:'Профиль участка: зажмите и протяните по свечам', ruler:'Линейка: зажмите и протяните по графику', avwap:'VWAP от свечи: нажмите на свечу, от которой считать', note:'Заметка: нажмите на место на графике'};
+const TOOL_HINT = {fib:'Фибоначчи: протяните от одного экстремума к другому', raff:'Канал Раффа: зажмите и протяните по свечам', frvp:'Профиль участка: зажмите и протяните по свечам', ruler:'Линейка: зажмите и протяните по графику', avwap:'VWAP от свечи: нажмите на свечу, от которой считать', note:'Заметка: нажмите на место на графике'};
 function setTool(t) {
   tool = t; if (t !== 'ruler' && ruler?.live) ruler = null;
   document.querySelectorAll('#bTools [data-tool]').forEach(b => { b.classList.toggle('on', b.dataset.tool === t); b.setAttribute('aria-pressed', b.dataset.tool === t); });
-  if (t !== 'frvp' && ruler?.kind === 'frvp') ruler = null;
+  if (ruler?.kind && ruler.kind !== 'ruler' && ruler.kind !== t) ruler = null;
   panes.forEach(p => p.el.classList.toggle('tool', !!t));
   const h = $('#bToolHint'); h.classList.toggle('hidden', !t);
   if (t) h.innerHTML = `<span>${TOOL_HINT[t]}</span><button data-tcancel>Отмена · Esc</button>`;
@@ -737,6 +778,8 @@ function objPop(p, obj, x, y) {
   const at = {left:x, bottom:y, top:y};
   if (obj.type === 'note') openPop(at, head('Заметка') + `<textarea id="bNoteT" maxlength="80">${esc(obj.text)}</textarea>` + colsHtml(obj.col)
     + `<div class="pact"><button data-del>Удалить</button><button class="primary" data-save>Сохранить</button></div>`);
+  else if (obj.type === 'fib') openPop(at, head('Уровни Фибоначчи') + `<p class="phint" style="margin:0">От ${K.fp(obj.p0)} до ${K.fp(obj.p1)}. Жёлтым — 0.5 и 0.618: к ним цена откатывает чаще всего.</p><div class="pact"><button data-del>Удалить</button></div>`);
+  else if (obj.type === 'raff') openPop(at, head('Канал Раффа') + `<p class="phint" style="margin:0">С ${K.dt(obj.t0)} по ${K.dt(obj.t1)}. Середина — линия регрессии по закрытиям, границы — по самому дальнему отклонению; пунктир — продолжение вперёд.</p><div class="pact"><button data-del>Удалить</button></div>`);
   else if (obj.type === 'frvp') openPop(at, head('Профиль участка') + `<p class="phint" style="margin:0">С ${K.dt(obj.t0)} по ${K.dt(obj.t1)}. Жёлтая линия — POC: цена, где за этот участок прошло больше всего объёма.</p><div class="pact"><button data-del>Удалить</button></div>`);
   else openPop(at, head('VWAP от свечи') + `<p class="phint" style="margin:0">Считается с ${K.dt(obj.t)} — средняя цена с учётом объёма от этой свечи.</p><div class="pact"><button data-del>Удалить</button></div>`);
 }
@@ -750,7 +793,7 @@ function saveNote() {
 function delObj() {
   const {p, edit} = noteDraft || {}; if (!edit) return;
   mutate(p.sym, a => { const i = a.indexOf(edit); if (i >= 0) a.splice(i, 1); }); closePop(); noteDraft = null;
-  K.toast({note:'Заметка удалена', frvp:'Профиль участка удалён'}[edit.type] || 'VWAP удалён', 'Вернуть — ↶ или Ctrl+Z.', 'ok');
+  K.toast({note:'Заметка удалена', frvp:'Профиль участка удалён', fib:'Уровни Фибоначчи удалены', raff:'Канал Раффа удалён'}[edit.type] || 'VWAP удалён', 'Вернуть — ↶ или Ctrl+Z.', 'ok');
 }
 function wirePop() {
   const pop = $('#bPop');
@@ -818,7 +861,7 @@ function renderList() {
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
-const ICONS = {dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
+const ICONS = {trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
@@ -828,7 +871,7 @@ function renderInd() {
     const cnt = items.filter(it => sel.has(it.id)).length;
     return `<details class="ind-cat"${q || cnt ? ' open' : ''}><summary>${c.name}${cnt ? ` <span class="ind-n">${cnt}</span>` : ''}</summary>`
       + items.map(it => `<div class="ind-it${sel.has(it.id) ? ' on' : ''}${it.soon ? ' soon' : ''}"><span class="ii">${ic(ICONS[it.id] || 'sliders')}</span><span class="it"><b>${it.name}</b><span>${it.soon ? 'скоро · ' : ''}${it.hint}</span></span>`
-        + (it.soon ? '' : it.tool ? `<button data-usetool="${it.id}" title="Взять инструмент" aria-label="Взять инструмент: ${it.name}">${ic('range')}</button>` : `<button data-tog="${it.id}" aria-label="${sel.has(it.id) ? 'Убрать' : 'Добавить'} ${it.name}">${ic(sel.has(it.id) ? 'check' : 'plus')}</button>`) + '</div>').join('') + '</details>';
+        + (it.soon ? '' : it.tool ? `<button data-usetool="${it.tool === true ? it.id : it.tool}" title="Взять инструмент" aria-label="Взять инструмент: ${it.name}">${ic(ICONS[it.id] || 'range')}</button>` : `<button data-tog="${it.id}" aria-label="${sel.has(it.id) ? 'Убрать' : 'Добавить'} ${it.name}">${ic(sel.has(it.id) ? 'check' : 'plus')}</button>`) + '</div>').join('') + '</details>';
   }).join('') || '<div class="mute" style="padding:12px">Ничего не нашлось.</div>';
   $('#bSel').innerHTML = [...sel].map(id => { const it = ITEMS.find(x => x.id === id);
     return `<div class="sel-it"><span class="${hidden.has(id) ? 'off' : ''}">${it.name}</span>`
@@ -869,7 +912,13 @@ function wire() {
   const finish = () => {
     if (!ruler?.live) return;
     ruler.live = false;
-    if (ruler.kind === 'frvp') {
+    if (ruler.kind === 'fib' || ruler.kind === 'raff') {
+      const {pane, a, b, kind} = ruler; ruler = null;
+      if (kind === 'fib' && Math.abs(b.p - a.p) / a.p > 0.0005 && a.i !== b.i) mutate(pane.sym, x => x.push({type:'fib', t0:a.t, p0:a.p, t1:b.t, p1:b.p}));
+      else if (kind === 'raff' && Math.abs(b.i - a.i) >= 4) mutate(pane.sym, x => x.push({type:'raff', t0:Math.min(a.t, b.t), t1:Math.max(a.t, b.t)}));
+      else K.toast('Слишком коротко', kind === 'fib' ? 'Протяните от одного экстремума к другому.' : 'Протяните хотя бы через 5 свечей.', 'info');
+    }
+    if (ruler?.kind === 'frvp') {
       const {pane, a, b} = ruler; ruler = null;
       if (Math.abs(b.i - a.i) >= 2) mutate(pane.sym, x => x.push({type:'frvp', t0:Math.min(a.t, b.t), t1:Math.max(a.t, b.t)}));
       else K.toast('Слишком короткий участок', 'Протяните хотя бы через 3 свечи.', 'info');

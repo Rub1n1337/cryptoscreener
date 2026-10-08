@@ -643,6 +643,8 @@ details.dis>.dbody{padding:0 16px 16px}
   <symbol id="i-channel" viewBox="0 0 24 24"><path d="M3 8c5-3 13-3 18 0M3 16c5 3 13 3 18 0"/><path d="M3 12h18" stroke-dasharray="2 2"/></symbol>
   <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 16a8 8 0 0 1 16 0"/><path d="m12 16 4-5"/></symbol>
   <symbol id="i-poc" viewBox="0 0 24 24"><path d="M4 6h7M4 10h11M4 14h16M4 18h8"/><path d="M20 14h0" stroke-width="3"/></symbol>
+  <symbol id="i-fib" viewBox="0 0 24 24"><path d="M4 5h16M4 9.5h16M4 13h16M4 19h16" opacity=".55"/><path d="M5 19 19 5"/></symbol>
+  <symbol id="i-raff" viewBox="0 0 24 24"><path d="M3 15 21 5M3 20l18-10"/><path d="M3 17.5 21 7.5" stroke-dasharray="2 2"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
@@ -944,7 +946,7 @@ details.dis>.dbody{padding:0 16px 16px}
             <button class="pick-btn" id="bTfBtn" aria-haspopup="dialog" title="Таймфрейм"><span id="bTfL">5м</span><svg class="i"><use href="#i-chev"/></svg></button>
             <button class="pick-btn" id="bRangeBtn" aria-haspopup="dialog" title="Сколько истории на графике"><svg class="i"><use href="#i-clock"/></svg><span id="bRangeL">авто</span></button>
             <button class="ind-btn" id="bIndBtn" aria-label="Индикаторы"><svg class="i"><use href="#i-sliders"/></svg><span class="ib-t">Индикаторы</span> <span class="ind-n" id="bIndN">0</span></button>
-            <div class="seg mini btools" id="bTools" role="toolbar" aria-label="Инструменты"><button class="tab" data-tool="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка"><svg class="i"><use href="#i-ruler"/></svg></button><button class="tab" data-tool="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи"><svg class="i"><use href="#i-anchor"/></svg></button><button class="tab" data-tool="note" title="Заметка на графике (T)" aria-label="Заметка"><svg class="i"><use href="#i-note"/></svg></button><button class="tab" data-tool="frvp" title="Профиль объёма участка: протяните по свечам (P)" aria-label="Профиль объёма участка"><svg class="i"><use href="#i-range"/></svg></button><i></i><button class="tab" data-act="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить"><svg class="i"><use href="#i-undo"/></svg></button><button class="tab" data-act="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить"><svg class="i"><use href="#i-redo"/></svg></button><button class="tab" data-act="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения"><svg class="i"><use href="#i-erase"/></svg></button></div>
+            <div class="seg mini btools" id="bTools" role="toolbar" aria-label="Инструменты"><button class="tab" data-tool="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка"><svg class="i"><use href="#i-ruler"/></svg></button><button class="tab" data-tool="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи"><svg class="i"><use href="#i-anchor"/></svg></button><button class="tab" data-tool="note" title="Заметка на графике (T)" aria-label="Заметка"><svg class="i"><use href="#i-note"/></svg></button><button class="tab" data-tool="frvp" title="Профиль объёма участка: протяните по свечам (P)" aria-label="Профиль объёма участка"><svg class="i"><use href="#i-range"/></svg></button><button class="tab" data-tool="fib" title="Уровни Фибоначчи: протяните от минимума к максимуму или наоборот (F)" aria-label="Уровни Фибоначчи"><svg class="i"><use href="#i-fib"/></svg></button><button class="tab" data-tool="raff" title="Канал Раффа: протяните по свечам (K)" aria-label="Канал Раффа"><svg class="i"><use href="#i-raff"/></svg></button><i></i><button class="tab" data-act="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить"><svg class="i"><use href="#i-undo"/></svg></button><button class="tab" data-act="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить"><svg class="i"><use href="#i-redo"/></svg></button><button class="tab" data-act="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения"><svg class="i"><use href="#i-erase"/></svg></button></div>
             <div class="bbar-r">
               <div class="seg mini" id="bLay" role="group" aria-label="Сколько графиков"><button class="tab on" data-lay="1" title="Один график" aria-label="Один график"><svg class="i"><use href="#i-lay1"/></svg></button><button class="tab" data-lay="2" title="Два графика" aria-label="Два графика"><svg class="i"><use href="#i-lay2"/></svg></button><button class="tab" data-lay="4" title="Четыре графика" aria-label="Четыре графика"><svg class="i"><use href="#i-lay4"/></svg></button></div>
               <button class="pick-btn" id="bLink" aria-pressed="true" title="Двигать графики вместе: масштаб, прокрутка и перекрестие по времени"><svg class="i"><use href="#i-link"/></svg><span class="ib-t">вместе</span></button>
@@ -1484,8 +1486,8 @@ const priceAt = (geo, cv, ev) => { if (!geo) return null; const y = ev.clientY -
 function viewRange(n, minFrom, view, defSpan) {
   const room = Math.max(20, n - minFrom);
   const span = clamp(Math.round(view?.span ?? defSpan), Math.min(20, room), room);
-  // negative endOff = empty bars to the right of the last candle (up to 15% of the view); default leaves a small margin
-  const endOff = clamp(Math.round(view?.endOff ?? -span * 0.06), -Math.round(span * 0.15), room - span);   // at most 15% empty space on the right
+  // negative endOff = empty bars to the right of the last candle (up to 8% of the view); default leaves a small margin
+  const endOff = clamp(Math.round(view?.endOff ?? -Math.max(2, span * 0.03)), -Math.round(Math.max(3, span * 0.08)), room - span);   // a small margin; at most 8% empty space on the right
   const to = n - 1 - endOff;
   return {from: to - span + 1, to, span, endOff};
 }
@@ -2439,6 +2441,7 @@ const CHANGELOG = [
     'Новая вкладка «Бета» — по паролю, для тех, кто тестирует новые инструменты: стакан заявок, тепловая карта ликвидности и другое.',
     'В «Бете» можно открыть до 4 графиков сразу и двигать их вместе, мерить ход цены линейкой, ставить заметки и VWAP от любой свечи, а у индикаторов появились настройки.',
     'В «Бете» стакан стоит прямо у шкалы цены, шкалу можно растягивать мышью, добавлены динамический POC, профиль объёма участка и подсветка дельты.',
+    'В «Бете» появились уровни Фибоначчи, канал Раффа, VWAP видимой части и счётчик сделок, а профиль объёма теперь у левого края с зоной стоимости — как в профессиональных терминалах.',
   ]},
   {v:'2.8', date:'7 октября 2026', title:'Меньше бессмысленных сделок', items:[
     'Бот больше не входит в отскок, когда цена уже почти вернулась к середине канала, — раньше такие сделки почти всегда уходили в стоп.',
