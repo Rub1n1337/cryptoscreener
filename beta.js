@@ -45,7 +45,7 @@ const CATS = [
     {id:'oi', name:'Открытый интерес', hint:'нижняя панель: сумма открытых позиций в $ (только фьючерсы, история до 30 дней)'},
   ]},
   {name:'Кластерный анализ', items:[
-    {id:'fp', name:'Таблицы кластеров', hint:'объём по ценам внутри свечи', soon:true},
+    {id:'fp', name:'Таблицы кластеров (футпринт)', hint:'покупки × продажи по ценам внутри свечи; приблизьте график — появятся цифры; история с нашего сервера, живые — с открытия вкладки'},
   ]},
   {name:'Профили объёма и POC', items:[
     {id:'vp', name:'Профиль объёма', hint:'объём по ценам в видимой части, у левого края; ярче — зона 70% объёма (VAH–VAL)'},
@@ -87,6 +87,7 @@ const PARAMS = {
     {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
   bubbles:[{k:'bubPct', name:'Показывать самые крупные сделки', min:0.2, max:5, step:0.1, def:1.5, u:v => v + '% от всех'},
     {k:'bubMin', name:'И не меньше', min:1e3, max:1e6, step:1e3, def:5e3, u:v => '$' + fmtUsd(v)}],
+  fp:[{k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],
   vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
     {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
   bb:[{k:'bbN', name:'Длина канала', min:20, max:300, step:10, def:210, u:v => v + ' свечей'},
@@ -221,7 +222,7 @@ class Pane {
       if (!v) { q.view = null; } else {
         // the same right edge in time, measured by candle closes (opens differ between timeframes: a 1h candle opened up to
         // an hour ago), and never more empty space on the right than a sliver
-        const qtf = TFMS[q.tf], qn = q.d.c.length, right = this.d.t[n - 1] + tf - v.endOff * tf, span = Math.max(20, Math.round(v.span * tf / qtf));
+        const qtf = TFMS[q.tf], qn = q.d.c.length, right = this.d.t[n - 1] + tf - v.endOff * tf, span = Math.max(8, Math.round(v.span * tf / qtf));
         q.view = {span, endOff:Math.max(-Math.round(span * 0.12), Math.round((q.d.t[qn - 1] + qtf - right) / qtf))};
       }
       q.dirty = true; q.zs.sync();
@@ -350,6 +351,12 @@ class Pane {
   }
   onTrade(x) {   // big market buys / sells: the top N% of recent trades
     const usd = +x.p * +x.q;
+    if (this.base && this.d) {   // footprint: every trade into its candle and fine price bin (the server has the history, this keeps the live edge)
+      const tf = TFMS[this.tf], bar = Math.floor(x.T / tf) * tf, k = Math.floor(+x.p / this.base);
+      this.fpLive ||= new Map(); let col = this.fpLive.get(bar);
+      if (!col) { this.fpLive.set(bar, col = new Map()); if (this.fpLive.size > 600) this.fpLive.delete(this.fpLive.keys().next().value); }
+      const r = col.get(k) || [0, 0]; r[x.m ? 1 : 0] += usd; col.set(k, r);   // m = the buyer was the maker: a market sell
+    }
     this.tradeUsd.push(usd); if (this.tradeUsd.length > 2000) this.tradeUsd.shift();
     if (usd >= Math.max(C('bubMin'), this.thr || Infinity)) { this.trades.push({T:x.T, p:+x.p, usd, sell:x.m}); if (this.trades.length > 600) this.trades.shift(); this.dirty = true; }
   }
@@ -409,7 +416,7 @@ class Pane {
   live() { return this.ws?.readyState === 1 && this.book?.ok; }
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
-    this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
+    this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.fpLive = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
     if (ruler?.pane === this) ruler = null;
     const key = this.mkt + this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
     if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }
@@ -426,7 +433,7 @@ class Pane {
     this.prevSym = null; this.prevMkt = null;
     if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); }
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
-    this.srv = false; this.far = null; this.liqHeat = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat();
+    this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp();
   }
   // futures: forced liquidations from the stream (Binance sends the largest per second), drawn as diamonds
   onLiq(o) {
@@ -454,6 +461,58 @@ class Pane {
     const pts = r.map(x => [+x.timestamp, +x.sumOpenInterestValue]).sort((a, b) => a[0] - b[0]);
     let j = 0, cur = NaN; d.oi = d.t.map((t, i) => { const end = t + TFMS[this.tf]; while (j < pts.length && pts[j][0] <= end) cur = pts[j++][1]; return pts[0][0] <= end ? cur : NaN; });
     this.dirty = true;
+  }
+  // footprint history from our server: market buys / sells per minute and price bin, folded into this chart's candles
+  async loadFp() {
+    if (!on('fp') || this.mkt !== 'spot' || !this.d || !(await srvHas(this.sym))) return;
+    const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/fp?symbol=${this.sym}&since=${this.d.t[0]}`);
+    if (!r?.bars || key !== this.sym + this.tf) return;
+    const hist = new Map();
+    for (const [t, k0, buy, sell] of r.bars) {
+      const bar = Math.floor(t / tf) * tf; let col = hist.get(bar); if (!col) hist.set(bar, col = new Map());
+      buy.forEach((b, i) => { const s = sell[i]; if (!b && !s) return; const c = col.get(k0 + i) || [0, 0]; c[0] += b; c[1] += s; col.set(k0 + i, c); });
+    }
+    this.fpHist = {base:r.base, cols:hist, upTo:r.bars.length ? r.bars[r.bars.length - 1][0] + 6e4 : 0}; this.dirty = true;
+  }
+  // one candle's clusters at a given row step: Map row -> [buy $, sell $]; server history first, live trades for the rest
+  fpBar(bar, step) {
+    const out = new Map(), addCol = (col, base) => { for (const [k, [b, s]] of col) { const kk = Math.floor(k * base / step), a = out.get(kk) || [0, 0]; a[0] += b; a[1] += s; out.set(kk, a); } };
+    const H = this.fpHist, h = H?.cols.get(bar), live = this.fpLive?.get(bar);
+    if (h) addCol(h, H.base);
+    else if (live) addCol(live, this.base);   // candles the server has not got yet (or no server): trades seen since the tab opened
+    return out;
+  }
+  // like ZeroSynapse: rows ≈ the average candle range / 10; tables with numbers when a candle is wide enough, a histogram otherwise
+  drawFootprint(g, G) {
+    const d = this.d, PC = K.PC; let rs = 0, cnt = 0;
+    for (let i = G.s; i <= G.e; i++) { rs += d.h[i] - d.l[i]; cnt++; }
+    const auto = niceStep(rs / Math.max(1, cnt) / 10, 1), step = Math.max(this.base, C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : auto);
+    const rowPx = Math.abs(G.Y(0) - G.Y(step)), wide = G.bw >= 56 && rowPx >= 11;
+    if (G.bw < 6) return;
+    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
+    g.font = '600 10px system-ui'; g.textBaseline = 'middle';
+    for (let i = G.s; i <= G.e; i++) {
+      const rows = this.fpBar(d.t[i], step); if (!rows.size) continue;
+      let max = 0, poc = null, pv = 0; for (const [k, [b, s]] of rows) { max = Math.max(max, b, s); if (b + s > pv) { pv = b + s; poc = k; } }
+      const x0 = G.X(i) - G.bw / 2 + 1, w = G.bw - 2, half = w / 2;
+      if (wide) { g.fillStyle = PC.canvas; g.fillRect(x0, G.Y(d.h[i] + step), w, G.Y(d.l[i] - step) - G.Y(d.h[i] + step)); }   // a table replaces the candle body
+      for (const [k, [b, s]] of rows) {
+        const yT = Math.round(G.Y((k + 1) * step)), yB = Math.round(G.Y(k * step)), h = Math.max(1, yB - yT - (rowPx >= 7 ? 1 : 0)); if (yB < G.T0 || yT > G.pH) continue;
+        if (wide) {   // sells on the left, buys on the right; the stronger side is tinted
+          const dl = b - s, f = Math.min(1, Math.abs(dl) / (max || 1));
+          g.fillStyle = (dl >= 0 ? PC.lo : PC.up) + (f > 0.6 ? '66' : f > 0.25 ? '3a' : '1c'); g.fillRect(x0, yT, w, h);
+          g.fillStyle = PC.up; g.textAlign = 'right'; g.fillText(fmtUsd(s), x0 + half - 3, yT + h / 2);
+          g.fillStyle = PC.lo; g.textAlign = 'left'; g.fillText(fmtUsd(b), x0 + half + 3, yT + h / 2);
+        } else {   // a two-sided histogram inside the candle: sells left of the centre, buys right
+          const cx = G.X(i), sw2 = Math.max(1, s / (max || 1) * half), bw2 = Math.max(1, b / (max || 1) * half);
+          g.fillStyle = PC.up + '99'; g.fillRect(cx - sw2, yT, sw2, h); g.fillStyle = PC.lo + '99'; g.fillRect(cx, yT, bw2, h);
+        }
+        if (k === poc) { g.strokeStyle = PC.acc; g.lineWidth = 1; g.strokeRect(x0 + 0.5, yT + 0.5, w - 1, h - 1); }   // the candle's POC
+      }
+      if (wide) { g.strokeStyle = (d.c[i] >= d.o[i] ? PC.lo : PC.up) + 'aa'; g.lineWidth = 2; g.beginPath(); g.moveTo(x0 + 1, G.Y(d.h[i])); g.lineTo(x0 + 1, G.Y(d.l[i])); g.stroke(); }   // the candle as a bar at the table's edge
+    }
+    g.textAlign = 'left'; g.restore();
+    if (!wide && labels) { g.font = '10.5px system-ui'; g.fillStyle = PC.mute; g.textBaseline = 'middle'; g.fillText('футпринт: приблизьте график, чтобы увидеть цифры', G.padL + 6, G.pH - 10); }
   }
   // history and the far book from our server, when it follows this coin
   async fromServer() {
@@ -515,6 +574,7 @@ class Pane {
         for (const x of drw(this.sym)) { if (x.type === 'frvp') this.drawFrvp(g, G, x); if (x.type === 'fib') this.drawFib(g, G, x); if (x.type === 'raff') this.drawRaff(g, G, x); }
         if (this.rc) this.drawBook(g, G);
         if (on('heat') && !mirror) this.drawHeatHover(g, G, hI, hY);
+        if (on('fp')) this.drawFootprint(g, G);
         if (on('bubbles')) this.drawBubbles(g, G);
         if (on('liq') && this.mkt === 'fut') this.drawLiqs(g, G);
         this.drawNotes(g, G);
@@ -1125,14 +1185,14 @@ function renderList() {
 }
 
 // ---------- indicator chips on every chart (like order-flow terminals): short name + key settings, hide / settings / remove ----------
-const SHORT = {liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
+const SHORT = {fp:'Футпринт', liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
   dtint:'Подсв. дельты', vp:'Профиль', poc:'POC', dpoc:'dPOC', vwap:'VWAP', vwapv:'VWAP экр.', bb:'Канал', rsi:'RSI'};
 function chipSum(id) {
   const p = act(), stepTxt = () => C('domStep') ? '$' + niceNum((p?.base || 0) * BOOK_STEPS[C('domStep') - 1]) : 'авто';
   return {dom:() => `шаг ${stepTxt()} · ${C('domAnchor') ? 'круглые' : 'от цены'}${C('domUnit') ? ' · монеты' : ''}`,
     imb:() => `±${C('imbRange')}%`, heat:() => `${['жёлто-синяя', 'покупка/продажа', 'моно'][C('heatScheme')]} · ${C('heatOp')}%`,
     walls:() => `±${C('domRange')}% · ×${C('wallX')}${C('wallAlert') ? ' · увед. от $' + fmtUsd(C('wallAlert')) : ''}`, bubbles:() => `топ ${C('bubPct')}%`,
-    vp:() => `${C('vpPx')}px · ${C('vpW')}%`, bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
+    vp:() => `${C('vpPx')}px · ${C('vpW')}%`, fp:() => C('fpStep') ? 'шаг $' + niceNum((p?.base || 0) * BOOK_STEPS[C('fpStep') - 1]) : 'шаг авто', bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
 }
 let chipsOpen = true;
 function renderChips() {
@@ -1178,7 +1238,7 @@ function renderInd() {
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
 }
 function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); renderChips(); }
-function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); redrawAll(); requestAnimationFrame(redrawAll); }
+function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); if (on('fp')) panes.forEach(p => p.fpHist || p.loadFp()); redrawAll(); requestAnimationFrame(redrawAll); }
 const openInd = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
 const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
@@ -1266,7 +1326,7 @@ export function open(kit) {
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0;
-  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
+  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); p.loadFp(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }

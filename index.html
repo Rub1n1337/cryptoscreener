@@ -1518,9 +1518,11 @@ const hoverIndex = (geo, cv, ev) => geo ? geo.s + Math.floor((ev.clientX - cv.ge
 const priceAt = (geo, cv, ev) => { if (!geo) return null; const y = ev.clientY - cv.getBoundingClientRect().top; return y >= geo.T0 && y <= geo.pH - 8 ? geo.mx - (y - geo.T0) / geo.ph * (geo.mx - geo.mn) : null; };
 
 // ---------- zoom & pan: view = {span, endOff} — bars visible, bars hidden on the right; null = default ----------
+const MIN_SPAN = 8;
 function viewRange(n, minFrom, view, defSpan) {
   const room = Math.max(20, n - minFrom);
-  const span = clamp(Math.round(view?.span ?? defSpan), Math.min(20, room), room);
+  // (MIN_SPAN: the closest zoom — 8 candles, enough room for footprint numbers inside a candle)
+  const span = clamp(Math.round(view?.span ?? defSpan), Math.min(MIN_SPAN, room), room);
   // negative endOff = empty bars to the right of the last candle (up to 8% of the view); default leaves a small margin
   const endOff = clamp(Math.round(view?.endOff ?? -Math.max(2, span * 0.03)), -Math.round(Math.max(3, span * 0.08)), room - span);   // a small margin; at most 8% empty space on the right
   const to = n - 1 - endOff;
@@ -1533,7 +1535,7 @@ function attachZoom(cv, api) {
   cv.addEventListener('wheel', e => {
     const st = api.state(); if (!st?.geo) return;
     e.preventDefault();
-    const r = range(st), span = Math.round(clamp(r.span * (e.deltaY > 0 ? 1.2 : 1 / 1.2), 20, st.n - st.minFrom));
+    const r = range(st), span = Math.round(clamp(r.span * (e.deltaY > 0 ? 1.2 : 1 / 1.2), MIN_SPAN, st.n - st.minFrom));
     const cur = clamp(hoverIndex(st.geo, cv, e), r.from, r.to), frac = (cur - r.from) / Math.max(1, r.span - 1);
     const to = Math.round(cur - frac * (span - 1)) + span - 1;   // keep the bar under the cursor in place
     api.set({span, endOff: st.n - 1 - to});
@@ -1554,7 +1556,7 @@ function attachZoom(cv, api) {
   cv.addEventListener('touchmove', e => {
     if (pinch && e.touches.length === 2) {
       e.preventDefault(); const st = api.state();
-      api.set({span:Math.round(clamp(pinch.span * pinch.d / Math.max(1, dist(e.touches)), 20, st.n - st.minFrom)), endOff:pinch.endOff}); return;
+      api.set({span:Math.round(clamp(pinch.span * pinch.d / Math.max(1, dist(e.touches)), MIN_SPAN, st.n - st.minFrom)), endOff:pinch.endOff}); return;
     }
     if (e.touches.length === 1 && move(e.touches[0].clientX)) e.preventDefault();
   }, {passive:false});
@@ -1562,7 +1564,7 @@ function attachZoom(cv, api) {
   cv.addEventListener('dblclick', () => api.set(null));
   // the same actions as buttons (for people who don't know about the wheel) and keys
   const ctl = {
-    zoom: f => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:Math.round(clamp(r.span * f, 20, st.n - st.minFrom)), endOff:r.endOff}); },
+    zoom: f => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:Math.round(clamp(r.span * f, MIN_SPAN, st.n - st.minFrom)), endOff:r.endOff}); },
     pan: k => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:r.span, endOff:r.endOff + Math.round(r.span * k)}); },
     latest: () => { const st = api.state(); if (!st?.geo) return; api.set({span:range(st).span}); },   // keep the zoom, default right margin
     reset: () => api.set(null),
@@ -2478,6 +2480,7 @@ const CHANGELOG = [
     'В «Бете» стакан стоит прямо у шкалы цены, шкалу можно растягивать мышью, добавлены динамический POC, профиль объёма участка и подсветка дельты.',
     'В «Бете» появились уровни Фибоначчи, канал Раффа, VWAP видимой части и счётчик сделок, а профиль объёма теперь у левого края с зоной стоимости — как в профессиональных терминалах.',
     'В «Бете» появились фьючерсы Binance: переключатель «Спот / Фьючерсы», ликвидации на графике, открытый интерес и фандинг.',
+    'В «Бете» появился футпринт: покупки и продажи по ценам внутри каждой свечи — приблизьте график, и в свечах появятся цифры.',
   ]},
   {v:'2.8', date:'7 октября 2026', title:'Меньше бессмысленных сделок', items:[
     'Бот больше не входит в отскок, когда цена уже почти вернулась к середине канала, — раньше такие сделки почти всегда уходили в стоп.',
