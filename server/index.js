@@ -13,7 +13,7 @@ const PORT = +process.env.PORT || 8080;
 const TOP = +process.env.TOP || 20;                       // how many of the most traded USDT pairs to follow
 const ONLY = (process.env.SYMBOLS || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
 const KEEP_MIN = +process.env.KEEP_MIN || 1440;           // minutes of heatmap / cluster history per coin
-const HEAT_RANGE = 0.06;                                  // heatmap: ±6% around the price
+const HEAT_RANGE = 0.12;                                  // heatmap: ±12% around the price (far walls show up too)
 const BOOK_RANGE = 0.25;                                  // book served up to ±25% (far levels beyond are dropped)
 const REST = ['https://data-api.binance.vision', 'https://api.binance.com'];
 const WS_URL = 'wss://stream.binance.com:9443/stream?streams=';

@@ -68,7 +68,8 @@ const PARAMS = {
     {k:'domAnchor', name:'Строки отсчитываются', min:0, max:1, step:1, def:0, u:v => v ? 'от круглых уровней (как ATAS)' : 'от текущей цены (как ZeroSynapse)'}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
   heat:[stepParam, {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
-  walls:[{k:'domRange', name:'Искать стены в пределах', min:0.5, max:5, step:0.5, def:3, u:v => '±' + v + '%'},
+  walls:[{k:'domRange', name:'Искать стены в пределах (дальше ±1–2% — только с сервером)', min:0.5, max:15, step:0.5, def:8, u:v => '±' + v + '%'},
+    {k:'wallAlert', name:'Уведомлять о новой стене от', min:0, max:50e6, step:1e6, def:5e6, u:v => v ? '$' + fmtUsd(v) : 'не уведомлять'},
     {k:'wallX', name:'Стена — во сколько раз больше обычного уровня', min:2, max:20, step:1, def:5, u:v => v + '×'},
     {k:'wallMin', name:'И не меньше', min:5e3, max:2e6, step:5e3, def:2e4, u:v => '$' + fmtUsd(v)},
     {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
@@ -291,11 +292,39 @@ class Pane {
     for (const src of [bk.bid, bk.ask]) for (const [k, v] of src) if (v > (col.get(k) || 0)) col.set(k, v);
     if (this.heat.size > 1500) this.heat.delete(this.heat.keys().next().value);
   }
-  walls() {   // the strongest buckets on each side, several times the typical bucket
-    const bk = this.buckets(C('domRange') / 100); if (!bk) return [];
-    const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;
+  // walls: the strongest price bins on each side, several times the typical bin; with the server, its far book counts too
+  // (a wall put at +8% is reported by Binance's stream, the server keeps it, the browser's snapshot doesn't reach it)
+  walls() {
+    const rng = C('domRange') / 100, bk = this.buckets(rng); if (!bk) return [];
+    const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;   // typical bin: dense local book only
+    if (this.far && this.book) {
+      const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
+      for (const [p, usd, side] of this.far) {
+        if (Math.abs(p / bk.m - 1) > rng) continue;
+        const k = Math.round(p / bk.step);
+        if (side === 'a' && p > aHi) bk.ask.set(k, (bk.ask.get(k) || 0) + usd);
+        else if (side === 'b' && p < bLo) bk.bid.set(k, (bk.bid.get(k) || 0) + usd);
+      }
+    }
     const pick = (m, side) => [...m].filter(([, v]) => v >= med * C('wallX') && v >= C('wallMin')).sort((a, b) => b[1] - a[1]).slice(0, C('wallN')).map(([k, v]) => ({price:k * bk.step, usd:v, side}));
     return [...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')];
+  }
+  // once a second: walls are recomputed (not on every frame) and a new big one raises a notice
+  scanWalls() {
+    if (!this.book?.ok || !this.d) return;
+    const W = this.wc = this.walls(), thr = C('wallAlert'), m = this.mid(); if (!thr || !m) return;
+    const now = Date.now(), key = w => `${w.side}${Math.round(w.price / (this.step * 4))}`, seen = this.seenW ||= new Map();
+    if (this.wallsFor !== this.sym + this.step) { this.wallsFor = this.sym + this.step; seen.clear(); for (const w of W) seen.set(key(w), now); return; }   // the first look is the baseline
+    for (const w of W) {
+      const kk = key(w);
+      if (!seen.has(kk) && w.usd >= thr) {
+        const pct = (w.price / m - 1) * 100;
+        K.toast(`${K.base(this.sym)}: новая стена ${w.side === 'ask' ? 'на продажу' : 'на покупку'} $${fmtUsd(w.usd)}`,
+          `у ${K.fp(w.price)} (${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены). Нажмите — график.`, 'info', () => { setActive(panes.indexOf(this)); this.el.scrollIntoView({behavior:'smooth', block:'center'}); });
+      }
+      seen.set(kk, now);
+    }
+    for (const [kk, t] of seen) if (now - t > 10 * 6e4) seen.delete(kk);   // gone for 10 min: a new one there is news again
   }
   imbalance(range = C('imbRange') / 100) {
     const bk = this.buckets(range); if (!bk) return null;
@@ -352,7 +381,7 @@ class Pane {
   live() { return this.ws?.readyState === 1 && this.book?.ok; }
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
-    this.disconnect(); this.book = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
+    this.disconnect(); this.book = null; this.wc = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
     if (ruler?.pane === this) ruler = null;
     const key = this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
     if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }
@@ -397,7 +426,7 @@ class Pane {
     let lo = Infinity, hi = -Infinity;
     for (let i = Math.max(0, r.from); i <= Math.min(n - 1, r.to); i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
     if (this.yr) { lo = this.yr.mn; hi = this.yr.mx; }   // a manual price scale decides what is visible
-    const sl = this.yr ? 0 : 0.002, W = this.lastWalls = this.walls().filter(w => w.price >= lo * (1 - sl) && w.price <= hi * (1 + sl));   // only walls inside the visible range, so they don't squash the candles
+    const sl = this.yr ? 0 : 0.002, W = this.lastWalls = (this.wc || this.walls()).filter(w => w.price >= lo * (1 - sl) && w.price <= hi * (1 + sl));   // only walls inside the visible range, so they don't squash the candles
     const cw0 = this.cv.clientWidth, narrow = cw0 < 520;   // phones: walls stay as lines and in the book column, without tags on the scale   // on narrow charts a wall tag is just its size (the colour tells the side)
     const wi0 = Math.max(r.from, n - 1 - Math.round((r.to - r.from) * 0.3));   // wall lines only over the recent third: the book column shows them in full
     const levels = on('walls') ? W.map(w => ({v:w.price, i0:wi0, noTag:cw0 < 420 && on('dom'), col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
@@ -1042,7 +1071,7 @@ export function open(kit) {
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0;
-  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.dirty = true; if (tick % 3 === 0) p.farBook(); }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
+  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
