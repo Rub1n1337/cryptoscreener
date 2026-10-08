@@ -29,6 +29,7 @@ const CATS = [
     {id:'flow', name:'Поток ликвидности', hint:'как быстро ставят и снимают заявки', soon:true},
   ]},
   {name:'Поток сделок', items:[
+    {id:'vol', name:'Объём', hint:'панель объёма под графиком; выключите — цене достанется больше места'},
     {id:'delta', name:'Дельта объёма', hint:'нижняя панель: покупки − продажи по рынку, по свечам'},
     {id:'cvd', name:'CVD', hint:'нижняя панель: накопленная дельта объёма'},
     {id:'dtint', name:'Подсветка дельты', hint:'фон свечи: зелёный — перевес покупок по рынку, красный — продаж'},
@@ -52,7 +53,7 @@ const CATS = [
   ]},
 ];
 const LOWER = ['delta', 'cvd', 'rsi'];   // one lower pane: choosing one of these replaces the other
-const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'cvd', 'vp', 'vwap'];
+const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls', 'bubbles', 'vol', 'delta', 'cvd', 'vp', 'vwap'];
 let sel, hidden, labels = true;      // chosen indicators, chosen-but-hidden ones (the eye), text labels on the chart
 const on = id => sel.has(id) && !hidden.has(id);
 // per-indicator settings (the gear next to a chosen indicator); values live in cfg and are saved in localStorage
@@ -109,7 +110,7 @@ class Pane {
     Object.assign(this, {sym:conf.sym, tf:TFMS[conf.tf] ? conf.tf : '5m', range:conf.range || 0, d:null, view:null, geo:null, hoverI:null, hoverY:null,
       ws:null, wsTimer:null, book:null, heat:new Map(), heatKey:'', heatMs:0, base:0, fine:0, trades:[], tradeUsd:[], dirty:true, req:0, dead:false});
     const el = this.el = document.createElement('div'); el.className = 'bpane';
-    el.innerHTML = '<div class="bph"><b></b><span class="tfl"></span><span class="bpx"></span></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
+    el.innerHTML = '<div class="bph"><b></b><span class="tfl"></span><span class="lg"></span><span class="bpx"></span></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
     $('#bPanes').appendChild(el); this.cv = el.querySelector('canvas');
     el.addEventListener('pointerdown', () => setActive(panes.indexOf(this)), true);
     el.addEventListener('focusin', () => setActive(panes.indexOf(this)));   // Tab to a chart makes it the active one too
@@ -349,7 +350,7 @@ class Pane {
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
     const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd}
-      : on('rsi') ? null : {label:'Нижняя панель пуста — «Индикаторы»: дельта, CVD или RSI', values:[], kind:'line'};
+      : null;   // RSI, or nothing at all (the price then takes the room)
     // the crosshair of the chart under the mouse is mirrored on the others at the same time (just the line and the time)
     this.hits = [];   // clickable drawings (notes, VWAP anchors), filled while drawing
     let hI = this.hoverI, hY = this.hoverY, mirror = false;
@@ -361,9 +362,9 @@ class Pane {
       ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
       ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:(labels ? 'dPOC ' : '') + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
     const cw = this.cv.clientWidth; this.rc = on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0;   // the order book column at the price scale
-    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, priceSub:this.countdown(), fitPrice:true, thin:true,
+    this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, vol:on('vol'), lower:!!sub || on('rsi'), noTip:true, vgrid:true,
+      priceCol:d.c[n - 1] >= d.o[n - 1] ? PC.lo : PC.up, priceSub:this.countdown(), fitPrice:true, thin:true,
       rightCol:this.rc, yRange:this.yr, crossPct:true,
-      hoverExtra:i => [`объём $${fmtUsd(d.qv[i])} · дельта ${d.delta[i] >= 0 ? '+' : ''}${fmtUsd(d.delta[i])}`],
       under:(g, G) => { if (on('dtint')) this.drawTint(g, G); if (on('heat')) this.drawHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
       over:(g, G) => {
         if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, [6, 3]);
@@ -380,6 +381,11 @@ class Pane {
         }
       }});
     this.el.querySelector('.bpx').textContent = K.fp(d.c[n - 1]);
+    // the header doubles as the legend: the candle under the cursor (or the last one), instead of a box over the candles
+    const li = hI != null && hI >= 0 && hI < n ? hI : n - 1, chg = (d.c[li] / d.o[li] - 1) * 100, np = x => K.fp(x).replace('$', '');
+    const lg = `<i>O</i>${np(d.o[li])} <i>H</i>${np(d.h[li])} <i>L</i>${np(d.l[li])} <i>C</i>${np(d.c[li])} <span class="${chg >= 0 ? 'pos' : 'neg'}">${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(2)}%</span>`
+      + ` <i>об.</i>$${fmtUsd(d.qv[li])} <i>Δ</i><span class="${d.delta[li] >= 0 ? 'pos' : 'neg'}">${d.delta[li] >= 0 ? '+' : ''}${fmtUsd(d.delta[li])}</span>`;
+    if (lg !== this.lgHtml) { this.lgHtml = lg; this.el.querySelector('.lg').innerHTML = lg; }
     if (this === act()) this.note(W);
   }
   // time left until the current candle closes; shown inside the live price tag (as on order-flow terminals)
@@ -882,7 +888,9 @@ export function open(kit) {
   K = kit;
   if (!wired) {
     wired = true;
-    sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'delta', 'bb'])); hidden = new Set(K.load('sr_bhide', [])); labels = K.load('sr_blabels', true); cfg = K.load('sr_bcfg', {}) || {};
+    sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'vol', 'delta', 'bb']));
+    if (!K.load('sr_bvol', false)) { sel.add('vol'); K.save('sr_bvol', true); K.save('sr_bind', [...sel]); }   // volume became optional: keep it on for everyone once
+    hidden = new Set(K.load('sr_bhide', [])); labels = K.load('sr_blabels', true); cfg = K.load('sr_bcfg', {}) || {};
     drawings = K.load('sr_bdraw', {}) || {}; link = K.load('sr_blink', true); active = K.load('sr_bact', 0);
     // older single-chart settings become the first pane
     if (!K.load('sr_bpanes', null)) K.save('sr_bpanes', [{sym:K.load('sr_bsym', 'BTCUSDT'), tf:K.load('sr_btf', '5m'), range:0}]);
