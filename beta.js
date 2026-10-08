@@ -62,7 +62,8 @@ const on = id => sel.has(id) && !hidden.has(id);
 // per-indicator settings (the gear next to a chosen indicator); values live in cfg and are saved in localStorage
 const stepParam = {k:'stepX', name:'Шаг цены: уровни склеиваются в строки по', min:0.5, max:10, step:0.5, def:1, u:v => { const p = act(); return p?.base ? '$' + niceNum(p.base * v) : v + '×'; }};
 const PARAMS = {
-  dom:[{k:'domRows', name:'Высота строки стакана (растяните шкалу цены — строки станут мельче)', min:10, max:40, step:2, def:16, u:v => v + ' px'}],
+  dom:[{k:'domStep', name:'Шаг цены стакана (колёсико над стаканом — то же)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто — по масштабу'; }},
+    {k:'domRows', name:'В режиме «авто»: высота строки', min:10, max:40, step:2, def:16, u:v => v + ' px'}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
   heat:[stepParam, {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
   walls:[{k:'domRange', name:'Искать стены в пределах', min:0.5, max:5, step:0.5, def:3, u:v => '±' + v + '%'},
@@ -77,6 +78,8 @@ const PARAMS = {
     {k:'bbK', name:'Ширина канала', min:1.5, max:4, step:0.5, def:3, u:v => v + 'σ'}],
 };
 const ALLP = Object.values(PARAMS).flat();
+// steps of the book column, in units of the coin's base step (≈0.05% of the price)
+const BOOK_STEPS = [1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 1000];
 let cfg = {};
 const C = k => cfg[k] ?? ALLP.find(p => p.k === k).def;
 
@@ -134,6 +137,13 @@ class Pane {
       key:k => { const t = {r:'ruler', 'к':'ruler', v:'avwap', 'м':'avwap', t:'note', 'е':'note', p:'frvp', 'з':'frvp', k:'raff', 'л':'raff', f:'fib', 'а':'fib'}[k]; if (k === 'a' || k === 'ф') { this.setY(null); return true; } if (!t) return false; setTool(tool === t ? null : t); return true; }});
     // the price scale: drag it up / down to stretch / squash the candles, wheel over it does the same;
     // once the scale is manual, dragging the chart also moves it up and down; "A" or a double click goes back to auto
+    cv.addEventListener('wheel', e => {   // the wheel over the book column changes its price step (up — finer, down — coarser)
+      if (!this.inBook(e) || !on('dom')) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      const now = performance.now(); if (now - (this.stepWheelAt || 0) < 120) return; this.stepWheelAt = now;
+      let cur = C('domStep'); if (!cur) { const s = this.lastBookStep || this.base; cur = BOOK_STEPS.findIndex(x => this.base * x >= s * 0.999) + 1 || BOOK_STEPS.length; }
+      cfg.domStep = clamp(cur + (e.deltaY > 0 ? 1 : -1), 1, BOOK_STEPS.length); applyCfg();
+    }, {passive:false, capture:true});
     cv.addEventListener('wheel', e => {
       if (!this.inScale(e) || !this.geo) return;
       e.preventDefault(); e.stopImmediatePropagation();
@@ -150,6 +160,7 @@ class Pane {
     cv.addEventListener('mousemove', e => { if (!e.buttons && !tool && this.inScale(e)) cv.style.cursor = 'ns-resize'; });
     this.label();
   }
+  inBook(e) { const g = this.geo; if (!g || !this.rc) return false; const x = e.clientX - this.cv.getBoundingClientRect().left; return x >= g.W - g.padR && x <= g.W - g.padR + this.rc; }
   inScale(e) { const g = this.geo; if (!g) return false; const x = e.clientX - this.cv.getBoundingClientRect().left; return x > g.W - g.padR + this.rc && x < g.W; }
   setY(r) {
     if (r && !(r.mx > r.mn)) return;
@@ -198,7 +209,7 @@ class Pane {
       if (!tool && this.yr && e instanceof MouseEvent && !this.hitAt(e)) this.yDrag = {y0:e.clientY, ...this.yr};
     }
     if (!tool) {
-      const h = this.hitAt(e); if (h) { const x = e.clientX, y = e.clientY; setTimeout(() => objPop(this, h.obj, x, y)); return true; }
+      const h = this.hitAt(e); if (h) { const x = e.clientX, y = e.clientY; setTimeout(() => h.obj.type === '_domstep' ? cfgPop('dom') : objPop(this, h.obj, x, y)); return true; }
       if (ruler && !ruler.live) { ruler = null; redrawAll(); }
       return false;
     }
@@ -561,47 +572,50 @@ class Pane {
   }
   // the order book at the price scale (as on order-flow terminals): one row per price step that fits ~domRows px,
   // so stretching the price scale shows finer levels; the strip at the right edge is the imbalance near the price
+  // the price step of the book column: chosen by the user (multiples of the coin's base step) or, on "авто", ~domRows px per row
+  bookStep(G) {
+    const sx = C('domStep'), ph = G.pH - G.T0;
+    let step = sx ? this.base * BOOK_STEPS[sx - 1] : Math.max(this.base, niceStep((G.mx - G.mn) * C('domRows') / ph, 1));
+    while ((G.mx - G.mn) / step > 400) step *= 2;   // never more than ~400 rows (a very fine step on a wide view)
+    return step;
+  }
+  // the order book at the price scale, like order-flow terminals: one row per price step over the whole height,
+  // rows touch each other (no gaps), each row shows its size; the strip at the right edge is the imbalance near the price
   drawBook(g, G) {
     const PC = K.PC, x0 = G.W - G.padR, cw = this.rc, ph = G.pH - G.T0, m = this.mid();
-    // a faint lane, so the column reads as part of the scale in both themes
-    g.fillStyle = PC.grid; g.globalAlpha = 0.18; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;
+    g.fillStyle = PC.grid; g.globalAlpha = 0.16; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;
     if (!this.book?.ok || !m) { g.save(); g.translate(x0 + cw / 2, G.T0 + ph / 2); g.rotate(-Math.PI / 2); g.font = '11px system-ui'; g.textAlign = 'center'; g.fillStyle = PC.mute; g.fillText('стакан загружается…', 0, 0); g.restore(); return; }
-    const im = on('imb') ? this.imbalance() : null, sw = im ? 4 : 0, right = x0 + cw - sw - (im ? 3 : 1), bw = right - x0 - 2;
+    const im = on('imb') ? this.imbalance() : null, sw = im ? 4 : 0, right = x0 + cw - sw - (im ? 2 : 0), bw = right - x0;
     if (on('dom') && bw > 8) {
-      const raw = (G.mx - G.mn) * C('domRows') / ph, step = Math.max(this.base, niceStep(raw, 1));
-      const range = Math.min(0.08, Math.max(m - G.mn, G.mx - m) / m + step / m);
-      const bk = this.buckets(range, step);
-      if (bk) {
-        // one row per price level; the row with the price in it can hold both sides: one bar, coloured by the bigger one
-        const byK = new Map(); for (const [side, mp] of [['ask', bk.ask], ['bid', bk.bid]]) for (const [k, v] of mp) { const r = byK.get(k) || {a:0, b:0}; r[side === 'ask' ? 'a' : 'b'] += v; byK.set(k, r); }
-        const rows = []; for (const [k, r] of byK) { const y = G.Y(k * step); if (y >= G.T0 + 2 && y <= G.pH - 2) rows.push({y, v:r.a + r.b, k, ask:r.a >= r.b}); }
-        const max = Math.max(1, ...rows.map(r => r.v)), rh = clamp(Math.abs(G.Y(0) - G.Y(step)) - 1, 2, 12);
-        // bars grow from the scale to the left; length by the square root, so mid-size levels stay visible next to a wall
-        for (const r of rows) {
-          const f = Math.sqrt(r.v / max), w = Math.max(2, f * bw);
-          g.fillStyle = (r.ask ? PC.up : PC.lo) + (f > 0.6 ? 'cc' : f > 0.3 ? '88' : '4d'); g.fillRect(right - w, r.y - rh / 2, w, rh);
-        }
-        // sizes only for the few biggest levels and only where there is room; walls already have their size on the scale
-        if (bw >= 46 && rh >= 9) {
-          g.font = '600 10px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'left';
-          const wallsAt = new Set((this.lastWalls || []).map(w => Math.round(w.price / step)));
-          const shown = []; for (const r of [...rows].sort((a, b) => b.v - a.v).slice(0, 6)) {
-            if (shown.length >= 4 || r.v < max * 0.15 || shown.some(y => Math.abs(y - r.y) < 12)) continue;   // big levels only, labels never overlap
-            if (labels && on('walls') && wallsAt.has(r.k)) continue;   // its size is already in the wall tag
-            const t = fmtUsd(r.v); g.lineJoin = 'round'; g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, r.y);   // a halo keeps it readable over the bars
-            g.fillStyle = PC.price; g.fillText(t, x0 + 3, r.y); shown.push(r.y);
-          }
-        }
+      const step = this.bookStep(G); this.lastBookStep = step;
+      // how deep the loaded book reaches: rows beyond it are unknown, not empty
+      let bLo = Infinity, aHi = 0; for (const p of this.book.bids.keys()) if (p < bLo) bLo = p; for (const p of this.book.asks.keys()) if (p > aHi) aHi = p;
+      const range = Math.min(0.2, Math.max(m - G.mn, G.mx - m) / m + step / m);
+      const bk = this.buckets(range, step) || {bid:new Map(), ask:new Map()};
+      const byK = new Map(); for (const [side, mp] of [['a', bk.ask], ['b', bk.bid]]) for (const [k, v] of mp) { const r = byK.get(k) || {a:0, b:0}; r[side] += v; byK.set(k, r); }
+      const k0 = Math.floor(G.mn / step), k1 = Math.ceil(G.mx / step);
+      const vals = [...byK.values()].map(r => r.a + r.b).sort((a, b) => a - b), ref = vals[Math.floor(vals.length * 0.97)] || vals[vals.length - 1] || 1;   // scale by the 97th percentile, so one wall doesn't flatten the rest
+      g.save(); g.beginPath(); g.rect(x0, G.T0, cw, ph); g.clip();
+      g.font = '10px system-ui'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+      for (let k = k0; k <= k1; k++) {
+        const yT = G.Y((k + 0.5) * step), yB = G.Y((k - 0.5) * step), h = yB - yT, yc = (yT + yB) / 2, p = k * step;
+        if (yB < G.T0 || yT > G.pH) continue;
+        if (p < bLo - step || p > aHi + step) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; continue; }   // beyond the loaded depth
+        const r = byK.get(k); if (!r) continue;
+        const v = r.a + r.b, f = Math.min(1, Math.sqrt(v / ref)), w = Math.max(2, f * bw), ask = r.a >= r.b;
+        g.fillStyle = (ask ? PC.up : PC.lo) + (f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, yT, w, Math.max(1, h - (h >= 9 ? 1 : 0)));
+        if (h >= 10.5 && (labels || f > 0.75)) { const t = fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
       }
+      g.restore();
+      // the step in use, at the top of the column: a click opens the setting, the wheel over the column changes it
+      const lbl = `шаг $${niceNum(step)}${C('domStep') ? '' : ' · авто'}`;
+      g.font = '600 10px system-ui'; g.textBaseline = 'middle'; const tw = g.measureText(lbl).width + 8;
+      g.fillStyle = PC.tip; g.fillRect(x0 + 1, G.T0 + 1, Math.min(cw - sw - 2, tw), 15); g.fillStyle = PC.mute; g.fillText(lbl, x0 + 5, G.T0 + 9);
+      this.hits.push({x0, x1:x0 + cw - sw, y0:G.T0, y1:G.T0 + 17, obj:{type:'_domstep'}});
     }
     if (im) {   // red share on top (sellers), green below (buyers), split at the buyers' share
-      const sx = x0 + cw - sw - 1, split = G.T0 + ph * (1 - im.share);
+      const sx = x0 + cw - sw, split = G.T0 + ph * (1 - im.share);
       g.fillStyle = PC.up; g.fillRect(sx, G.T0, sw, split - G.T0); g.fillStyle = PC.lo; g.fillRect(sx, split, sw, G.pH - split);
-      if (cw >= 30) {
-        g.font = '600 10px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'right';
-        g.fillStyle = PC.up; g.fillText(Math.round((1 - im.share) * 100) + '%', sx - 2, G.T0 + 8); g.fillStyle = PC.lo; g.fillText(Math.round(im.share * 100) + '%', sx - 2, G.pH - 8);
-      }
-      g.textAlign = 'left';
     }
   }
   // one line of plain words under the charts (active one): walls near the price, who is stronger in the book, the channel
