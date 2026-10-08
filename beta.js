@@ -13,7 +13,10 @@ const TFMS = {'1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 1
 const TFL = {'1m': '1м', '5m': '5м', '15m': '15м', '30m': '30м', '1h': '1ч', '4h': '4ч', '1d': '1д'};
 const RANGES = [[0, 'авто', 'авто'], [1, '1 день', '1д'], [3, '3 дня', '3д'], [7, '7 дней', '7д'], [30, '30 дней', '30д'], [90, '90 дней', '90д'], [180, '180 дней', '180д'], [365, '1 год', '1г']];
 const MAXBARS = 5000;               // candles loaded per chart at most (5 requests)
-const WS = 'wss://stream.binance.com:9443/stream?streams=';
+const WS = 'wss://stream.binance.com:9443/stream?streams=', WSF_PUB = 'wss://fstream.binance.com/public/stream?streams=', WSF_MKT = 'wss://fstream.binance.com/market/stream?streams=';
+// USDⓈ-M futures: the same endpoints under /fapi/v1 on fapi.binance.com (answers the browser directly)
+async function fapi(path) { const r = await fetch('https://fapi.binance.com' + path); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+const rest = (p, path) => p.mkt === 'fut' ? fapi(path.replace('/api/v3/', '/fapi/v1/')) : K.api(path);
 // on phones the chart buttons sit above the canvas, so the plot needs no room for them at the top
 const PHONE = matchMedia('(max-width:700px)');
 const DEF_SYMS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
@@ -35,6 +38,10 @@ const CATS = [
     {id:'trades', name:'Сделки', hint:'нижняя панель: сколько сделок прошло в каждой свече — всплеск активности виден раньше объёма'},
     {id:'dtint', name:'Подсветка дельты', hint:'фон свечи: зелёный — перевес покупок по рынку, красный — продаж'},
   ]},
+  {name:'Фьючерсы', items:[
+    {id:'liq', name:'Ликвидации', hint:'принудительные закрытия: красный ромб — ликвидирован лонг, зелёный — шорт (только фьючерсы)'},
+    {id:'oi', name:'Открытый интерес', hint:'нижняя панель: сумма открытых позиций в $ (только фьючерсы, история до 30 дней)'},
+  ]},
   {name:'Кластерный анализ', items:[
     {id:'fp', name:'Таблицы кластеров', hint:'объём по ценам внутри свечи', soon:true},
   ]},
@@ -55,7 +62,7 @@ const CATS = [
     {id:'rafft', name:'Регрессионный канал Раффа', hint:'инструмент на панели: протяните по свечам — канал тренда с продолжением', tool:'raff'},
   ]},
 ];
-const LOWER = ['delta', 'cvd', 'trades', 'rsi'];   // one lower pane: choosing one of these replaces the other
+const LOWER = ['delta', 'cvd', 'trades', 'oi', 'rsi'];   // one lower pane: choosing one of these replaces the other
 const ITEMS = CATS.flatMap(c => c.items), QUICK = ['dom', 'imb', 'heat', 'walls', 'bubbles', 'vol', 'delta', 'cvd', 'vp', 'vwap'];
 let sel, hidden, labels = true;      // chosen indicators, chosen-but-hidden ones (the eye), text labels on the chart
 const on = id => sel.has(id) && !hidden.has(id);
@@ -137,7 +144,7 @@ const redrawAll = () => panes.forEach(p => p.dirty = true);
 
 class Pane {
   constructor(conf) {
-    Object.assign(this, {sym:conf.sym, tf:TFMS[conf.tf] ? conf.tf : '5m', range:conf.range || 0, d:null, view:null, geo:null, hoverI:null, hoverY:null,
+    Object.assign(this, {sym:conf.sym, mkt:conf.mkt === 'fut' ? 'fut' : 'spot', liqs:[], fund:null, oi:null, tf:TFMS[conf.tf] ? conf.tf : '5m', range:conf.range || 0, d:null, view:null, geo:null, hoverI:null, hoverY:null,
       ws:null, wsTimer:null, book:null, heat:new Map(), heatKey:'', heatMs:0, base:0, fine:0, trades:[], tradeUsd:[], dirty:true, req:0, dead:false});
     const el = this.el = document.createElement('div'); el.className = 'bpane';
     el.innerHTML = '<div class="bph"><b></b><span class="tfl"></span><span class="lg"></span><span class="bpx"></span></div><div class="bchips"></div><div class="cvwrap"><canvas class="bcv" tabindex="0" aria-label="График беты: свечи, стакан и сделки"></canvas></div>';
@@ -197,7 +204,7 @@ class Pane {
     const p = clamp(cur.mx - (y - g.T0) / g.ph * (cur.mx - cur.mn), cur.mn, cur.mx);
     this.setY({mn:p - (p - cur.mn) * f, mx:p + (cur.mx - p) * f});
   }
-  label() { this.el.querySelector('.bph b').textContent = K.base(this.sym); this.el.querySelector('.bph .tfl').textContent =TFL[this.tf] + (this.range ? ' · ' + RANGES.find(r => r[0] === this.range)[2] : ''); }
+  label() { this.el.querySelector('.bph b').textContent = K.base(this.sym); this.el.querySelector('.bph .tfl').textContent = (this.mkt === 'fut' ? 'фьюч · ' : '') + TFL[this.tf] + (this.range ? ' · ' + RANGES.find(r => r[0] === this.range)[2] : ''); }
   defSpan() {
     const avail = this.d.c.length - this.d.N;
     return this.range ? clamp(Math.round(this.range * 864e5 / TFMS[this.tf]), 20, avail) : Math.min(avail, Math.max(60, Math.round(this.cv.clientWidth / 6)));
@@ -253,7 +260,7 @@ class Pane {
     let rows = [], end = null;
     while (rows.length < total) {   // Binance gives at most 1000 candles per request: page backwards
       const lim = Math.min(1000, total - rows.length);
-      const k = await K.api(`/api/v3/klines?symbol=${this.sym}&interval=${this.tf}&limit=${lim}${end ? '&endTime=' + end : ''}`);
+      const k = await rest(this, `/api/v3/klines?symbol=${this.sym}&interval=${this.tf}&limit=${lim}${end ? '&endTime=' + end : ''}`);
       if (req !== this.req) return false;
       if (!k.length) break;
       rows = k.concat(rows); end = k[0][0] - 1; if (k.length < lim) break;
@@ -349,7 +356,11 @@ class Pane {
   connect() {
     this.disconnect();
     const s = this.sym.toLowerCase(), buffer = [];
-    const ws = this.ws = new WebSocket(WS + [`${s}@depth@100ms`, `${s}@aggTrade`, `${s}@kline_${this.tf}`].join('/'));
+    // spot: one connection for everything; futures: Binance serves the book on /public and trades, candles, funding and
+    // liquidations on /market, so they get a second connection (it follows the first one's life)
+    const fut = this.mkt === 'fut', rest4 = [`${s}@aggTrade`, `${s}@kline_${this.tf}`, ...(fut ? [`${s}@forceOrder`, `${s}@markPrice@1s`] : [])];
+    const ws = this.ws = new WebSocket(fut ? WSF_PUB + `${s}@depth@100ms` : WS + [`${s}@depth@100ms`, ...rest4].join('/'));
+    if (fut) { const w2 = this.ws2 = new WebSocket(WSF_MKT + rest4.join('/')); w2.onmessage = e => ws.onmessage(e); w2.onclose = () => { if (this.ws === ws && loopOn && !this.dead) ws.close(); }; }
     this.book = null; let syncing = false;
     // Binance's procedure: buffer the diff stream, take a snapshot, then apply the buffered events newer than it.
     // One sync at a time per chart, snapshots spaced out across charts, growing pauses after failures —
@@ -359,7 +370,7 @@ class Pane {
       syncing = true; this.book = null;
       try {
         await snapGate(); if (ws !== this.ws) return;
-        const snap = await K.api(`/api/v3/depth?symbol=${this.sym}&limit=${this === act() ? 5000 : 1000}`); if (ws !== this.ws) return;
+        const snap = await rest(this, `/api/v3/depth?symbol=${this.sym}&limit=${this.mkt === 'fut' ? 1000 : this === act() ? 5000 : 1000}`); if (ws !== this.ws) return;   // futures: 1000 levels at most
         const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false,
           minB:+(snap.bids[snap.bids.length - 1]?.[0] ?? 0), maxA:+(snap.asks[snap.asks.length - 1]?.[0] ?? Infinity)};   // how deep the snapshot reaches
         for (const ev of buffer.splice(0)) if (!applyDepth(b, ev)) throw new Error('snapshot older than the stream');
@@ -375,6 +386,8 @@ class Pane {
       this.wsFails = 0;
       const {stream, data} = JSON.parse(e.data);
       if (stream.endsWith('@aggTrade')) return this.onTrade(data);
+      if (stream.endsWith('@forceOrder')) return this.onLiq(data.o);
+      if (stream.includes('@markPrice')) { this.fund = {rate:+data.r, next:+data.T, mark:+data.p}; return; }
       if (stream.includes('@kline_')) return this.onKline(data.k);
       if (!this.book) { buffer.push(data); if (buffer.length > 3000) buffer.shift(); return; }
       if (!applyDepth(this.book, data)) { buffer.length = 0; buffer.push(data); resync(); }   // a gap: start over from a fresh snapshot
@@ -386,31 +399,63 @@ class Pane {
       clearTimeout(this.wsTimer); this.wsTimer = setTimeout(() => this.connect(), Math.min(60e3, 3000 * 2 ** (this.wsFails - 1)));
     };
   }
-  disconnect() { clearTimeout(this.wsTimer); clearTimeout(this.syncTimer); if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; } }
+  disconnect() {
+    clearTimeout(this.wsTimer); clearTimeout(this.syncTimer);
+    if (this.ws2) { this.ws2.onclose = null; this.ws2.close(); this.ws2 = null; }
+    if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; }
+  }
   live() { return this.ws?.readyState === 1 && this.book?.ok; }
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
-    this.disconnect(); this.book = null; this.wc = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
+    this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
     if (ruler?.pane === this) ruler = null;
-    const key = this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
+    const key = this.mkt + this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
     if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }
     this.dirty = true;
     try { if (!await this.load()) return; }
     catch (e) {
       // a mistyped coin: go back to the previous one instead of leaving an empty chart (and saving it)
       const bad = this.sym, back = this.prevSym; this.prevSym = null;
+      if (!back && this.prevMkt) { const m0 = this.prevMkt; this.prevMkt = null; K.toast(`${K.base(bad)} нет на ${this.mkt === 'fut' ? 'фьючерсах' : 'споте'} Binance`, 'Вернул прежний рынок.', 'bad'); this.mkt = m0; savePanes(); syncBar(); this.label(); this.restart(); return; }
       K.toast(back ? `Монеты ${K.base(bad)} нет на споте Binance` : 'Не удалось загрузить свечи', back ? `Вернул ${K.base(back)}. Пишите тикер, например SOL или PEPE.` : `${bad}: ${e.message || e}`, 'bad');
       if (back) { this.sym = back; savePanes(); renderList(); this.restart(); }
       return;
     }
-    this.prevSym = null;
+    this.prevSym = null; this.prevMkt = null;
     if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); }
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
-    this.srv = false; this.far = null; this.fromServer().then(() => this.farBook());
+    this.srv = false; this.far = null; this.fromServer().then(() => this.farBook()); this.loadOI();
+  }
+  // futures: forced liquidations from the stream (Binance sends the largest per second), drawn as diamonds
+  onLiq(o) {
+    const p = +o.ap || +o.p, usd = p * +o.z || p * +o.q; if (!usd) return;
+    this.liqs.push({T:+o.T, p, usd, long:o.S === 'SELL'}); if (this.liqs.length > 800) this.liqs.shift(); this.dirty = true;   // SELL = a long was closed by force
+  }
+  drawLiqs(g, G) {
+    const d = this.d, tf = TFMS[this.tf], first = d.t[G.s], last = d.t[G.e] + tf, PC = K.PC;
+    const vis = this.liqs.filter(x => x.T >= first && x.T < last); if (!vis.length) return;
+    const base = Math.max(1, Math.min(...vis.map(x => x.usd)));
+    for (const x of vis) {
+      const i = K.barAt(d.t, x.T), cx = G.X(i) - G.bw / 2 + (x.T - d.t[i]) / tf * G.bw, cy = G.Y(x.p); if (cy < G.T0 || cy > G.pH) continue;
+      const r = Math.min(14, Math.max(3.5, Math.sqrt(x.usd / base) * 3.5)), col = x.long ? PC.up : PC.lo;
+      g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.closePath();
+      g.fillStyle = col + '59'; g.fill(); g.strokeStyle = col; g.lineWidth = 1.2; g.stroke();
+      if (labels && x.usd >= 1e5 && r >= 8) { g.font = '600 10px system-ui'; g.textBaseline = 'middle'; g.fillStyle = col; g.fillText('$' + fmtUsd(x.usd), cx + r + 3, cy); }
+    }
+  }
+  // futures: open interest ($) by candle, from Binance's 5m…1d history (30 days at most), refreshed every minute
+  async loadOI() {
+    if (this.mkt !== 'fut' || !this.d) return;
+    const per = {'1m':'5m', '5m':'5m', '15m':'15m', '30m':'30m', '1h':'1h', '4h':'4h', '1d':'1d'}[this.tf], key = this.sym + this.tf;
+    let r; try { r = await fapi(`/futures/data/openInterestHist?symbol=${this.sym}&period=${per}&limit=500`); } catch { return; }
+    const d = this.d; if (!d || key !== this.sym + this.tf || !r?.length) return;
+    const pts = r.map(x => [+x.timestamp, +x.sumOpenInterestValue]).sort((a, b) => a[0] - b[0]);
+    let j = 0, cur = NaN; d.oi = d.t.map((t, i) => { const end = t + TFMS[this.tf]; while (j < pts.length && pts[j][0] <= end) cur = pts[j++][1]; return pts[0][0] <= end ? cur : NaN; });
+    this.dirty = true;
   }
   // history and the far book from our server, when it follows this coin
   async fromServer() {
-    if (!(await srvHas(this.sym)) || !this.d) return;
+    if (this.mkt !== 'spot' || !(await srvHas(this.sym)) || !this.d) return;   // the collector follows spot books
     const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}&since=${this.d.t[0]}`);
     if (!r?.cols?.length || key !== this.sym + this.tf) return;
     this.fine = r.base; const heat = new Map();   // server bins become our fine bins, so live samples line up with the history
@@ -442,6 +487,7 @@ class Pane {
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
     const sub = on('delta') ? {label:'Дельта объёма, $', values:d.delta, kind:'bars', fmt:fmtUsd} : on('cvd') ? {label:'CVD, $', values:d.cvd, kind:'line', fmt:fmtUsd} : on('trades') ? {label:'Сделок в свече', values:d.nt, kind:'bars', fmt:v => fmtUsd(v).replace('$', '')}
+      : on('oi') && this.mkt === 'fut' && d.oi ? {label:'Открытый интерес, $', values:d.oi, kind:'line', fmt:fmtUsd}
       : null;   // RSI, or nothing at all (the price then takes the room)
     // the crosshair of the chart under the mouse is mirrored on the others at the same time (just the line and the time)
     this.hits = [];   // clickable drawings (notes, VWAP anchors), filled while drawing
@@ -467,6 +513,7 @@ class Pane {
         for (const x of drw(this.sym)) { if (x.type === 'frvp') this.drawFrvp(g, G, x); if (x.type === 'fib') this.drawFib(g, G, x); if (x.type === 'raff') this.drawRaff(g, G, x); }
         if (this.rc) this.drawBook(g, G);
         if (on('bubbles')) this.drawBubbles(g, G);
+        if (on('liq') && this.mkt === 'fut') this.drawLiqs(g, G);
         this.drawNotes(g, G);
         if (ruler?.pane === this) this.drawRuler(g, G);
         if (labels && on('heat') && this.heatMs < 15 * 6e4) {   // the heatmap only has what was collected while the tab was open: say so
@@ -479,7 +526,9 @@ class Pane {
     const li = hI != null && hI >= 0 && hI < n ? hI : n - 1, chg = (d.c[li] / d.o[li] - 1) * 100, np = x => K.fp(x).replace('$', '');
     const lg = `<i>O</i>${np(d.o[li])} <i>H</i>${np(d.h[li])} <i>L</i>${np(d.l[li])} <i>C</i>${np(d.c[li])} <span class="${chg >= 0 ? 'pos' : 'neg'}">${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(2)}%</span>`
       + ` <i>об.</i>$${fmtUsd(d.qv[li])} <i>Δ</i><span class="${d.delta[li] >= 0 ? 'pos' : 'neg'}">${d.delta[li] >= 0 ? '+' : ''}${fmtUsd(d.delta[li])}</span>`;
-    if (lg !== this.lgHtml) { this.lgHtml = lg; this.el.querySelector('.lg').innerHTML = lg; }
+    const fu = this.mkt === 'fut' && this.fund, left = fu ? Math.max(0, this.fund.next - Date.now()) : 0;   // futures: funding rate and time to the next payment
+    const lgAll = lg + (fu ? ` <i>фанд.</i><span class="${this.fund.rate >= 0 ? 'pos' : 'neg'}">${this.fund.rate >= 0 ? '+' : '−'}${Math.abs(this.fund.rate * 100).toFixed(4)}%</span> <i>через</i>${Math.floor(left / 36e5)}:${String(Math.floor(left % 36e5 / 6e4)).padStart(2, '0')}` : '');
+    if (lgAll !== this.lgHtml) { this.lgHtml = lgAll; this.el.querySelector('.lg').innerHTML = lgAll; }
     if (this === act()) this.note(W);
   }
   // time left until the current candle closes; shown inside the live price tag (as on order-flow terminals)
@@ -749,9 +798,15 @@ class Pane {
 let gateAt = 0;
 const snapGate = () => { const now = Date.now(), at = Math.max(now, gateAt); gateAt = at + 1200; return new Promise(r => setTimeout(r, at - now)); };
 function applyDepth(b, ev) {
-  if (ev.u <= b.id) return true;                        // already in the snapshot
-  if (!b.ok) { if (ev.U > b.id + 1) return false; b.ok = true; }   // the first event must straddle the snapshot
-  else if (ev.U !== b.id + 1) return false;             // a gap: the book is no longer exact
+  if (ev.pu !== undefined) {   // futures: each event names the previous one (pu = the previous event's u)
+    if (ev.u < b.id) return true;
+    if (!b.ok) { if (ev.U > b.id) return false; b.ok = true; }
+    else if (ev.pu !== b.id) return false;
+  } else {   // spot
+    if (ev.u <= b.id) return true;                        // already in the snapshot
+    if (!b.ok) { if (ev.U > b.id + 1) return false; b.ok = true; }   // the first event must straddle the snapshot
+    else if (ev.U !== b.id + 1) return false;             // a gap: the book is no longer exact
+  }
   // the snapshot covers only the nearest levels; updates for levels beyond it would leave isolated islands far from the price
   for (const [p, q] of ev.b) { const x = +p; if (x < b.minB) continue; +q ? b.bids.set(x, +q) : b.bids.delete(x); }
   for (const [p, q] of ev.a) { const x = +p; if (x > b.maxA) continue; +q ? b.asks.set(x, +q) : b.asks.delete(x); }
@@ -811,12 +866,12 @@ function setActive(i) {
 }
 function syncBar() {
   const p = act(); if (!p) return;
-  $('#bTfL').textContent = TFL[p.tf]; $('#bRangeL').textContent = RANGES.find(r => r[0] === p.range)[2];
+  $('#bTfL').textContent = TFL[p.tf]; $('#bMktL').textContent = p.mkt === 'fut' ? 'Фьючерсы' : 'Спот'; $('#bMktBtn').classList.toggle('on', p.mkt === 'fut'); $('#bRangeL').textContent = RANGES.find(r => r[0] === p.range)[2];
   $('#bSym').placeholder = K.base(p.sym);
   document.querySelectorAll('#bLay .tab').forEach(b => b.classList.toggle('on', +b.dataset.lay === layout));
   $('#bLink').setAttribute('aria-pressed', link); $('#bLink').classList.toggle('hidden', layout === 1);
 }
-const savePanes = () => K.save('sr_bpanes', pool.map(p => ({sym:p.sym, tf:p.tf, range:p.range})));
+const savePanes = () => K.save('sr_bpanes', pool.map(p => ({sym:p.sym, tf:p.tf, range:p.range, mkt:p.mkt})));
 // panes are kept (hidden, streams closed) when the layout shrinks, so switching back is instant and the heatmap survives
 let pool = [];
 function setLayout(n) {
@@ -1000,7 +1055,7 @@ function renderList() {
 }
 
 // ---------- indicator chips on every chart (like order-flow terminals): short name + key settings, hide / settings / remove ----------
-const SHORT = {dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
+const SHORT = {liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
   dtint:'Подсв. дельты', vp:'Профиль', poc:'POC', dpoc:'dPOC', vwap:'VWAP', vwapv:'VWAP экр.', bb:'Канал', rsi:'RSI'};
 function chipSum(id) {
   const p = act(), stepTxt = () => C('domStep') ? '$' + niceNum((p?.base || 0) * BOOK_STEPS[C('domStep') - 1]) : 'авто';
@@ -1033,7 +1088,7 @@ function wireChips() {
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
-const ICONS = {trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
+const ICONS = {liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
@@ -1071,6 +1126,7 @@ function wire() {
   });
   $('#bTools').onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.tool) setTool(tool === b.dataset.tool ? null : b.dataset.tool); if (b.dataset.act) toolAct(b.dataset.act); };
   $('#bToolHint').onclick = e => { if (e.target.closest('[data-tcancel]')) setTool(null); };
+  $('#bMktBtn').onclick = () => { const p = act(); if (!p) return; p.prevMkt = p.mkt; p.mkt = p.mkt === 'fut' ? 'spot' : 'fut'; savePanes(); syncBar(); p.restart(); K.toast(p.mkt === 'fut' ? 'Фьючерсы USDⓈ-M' : 'Спот', p.mkt === 'fut' ? 'Видны ликвидации, открытый интерес и фандинг — включите их в «Индикаторах».' : '', 'info'); };
   $('#bTfBtn').onclick = () => popFor === $('#bTfBtn') ? closePop() : tfPop();
   $('#bRangeBtn').onclick = () => popFor === $('#bRangeBtn') ? closePop() : rangePop();
   document.querySelectorAll('#bLay .tab').forEach(b => b.onclick = () => setLayout(+b.dataset.lay));
@@ -1140,7 +1196,7 @@ export function open(kit) {
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0;
-  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
+  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) p.loadOI(); }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
