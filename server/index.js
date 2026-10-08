@@ -233,6 +233,7 @@ http.createServer((req, res) => {
   for (const s of syms) { const c = coin(s); disk.load(c); disk.compact(c); coins.set(s, c); }
   // Railway stops the old copy with SIGTERM on every deploy: save what is in memory first
   process.once('SIGTERM', () => { log('stopping: saving books'); for (const c of coins.values()) { closeHeat(c); closeFp(c); disk.saveBook(c); } process.exit(0); });
+  setTimeout(() => { for (const c of coins.values()) disk.saveBook(c); }, 70e3);   // a first save soon after start, then every 5 minutes
   setInterval(() => { for (const c of coins.values()) disk.saveBook(c); }, 5 * 6e4);
   setInterval(() => { for (const c of coins.values()) disk.compact(c); }, 6 * 3600e3);
   log('following', syms.length, 'coins:', syms.join(' '));
