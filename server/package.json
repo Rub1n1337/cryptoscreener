@@ -1,0 +1,16 @@
+{
+  "name": "sigma-radar-collector",
+  "version": "1.0.0",
+  "description": "Keeps full Binance order books, liquidity heatmap history and trade clusters for the Sigma Radar Beta tab",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

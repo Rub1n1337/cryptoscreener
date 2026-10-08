@@ -64,7 +64,8 @@ const stepParam = {k:'stepX', name:'Шаг цены: уровни склеива
 const PARAMS = {
   dom:[{k:'domStep', name:'Шаг цены стакана (колёсико над стаканом — то же)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто — по масштабу'; }},
     {k:'domRows', name:'В режиме «авто»: высота строки', min:10, max:40, step:2, def:16, u:v => v + ' px'},
-    {k:'domUnit', name:'Размер заявок в', min:0, max:1, step:1, def:0, u:v => v ? 'монетах' : 'долларах'}],
+    {k:'domUnit', name:'Размер заявок в', min:0, max:1, step:1, def:0, u:v => v ? 'монетах' : 'долларах'},
+    {k:'domAnchor', name:'Строки отсчитываются', min:0, max:1, step:1, def:0, u:v => v ? 'от круглых уровней (как ATAS)' : 'от текущей цены (как ZeroSynapse)'}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
   heat:[stepParam, {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
   walls:[{k:'domRange', name:'Искать стены в пределах', min:0.5, max:5, step:0.5, def:3, u:v => '±' + v + '%'},
@@ -107,6 +108,24 @@ function undoRedo(from, to) {
 }
 const undo = () => undoRedo(undoS, redoS), redo = () => undoRedo(redoS, undoS);
 
+// ---------- our collector server (server/ on Railway): full books and heatmap history; without it the Beta works as before ----------
+// the address: SERVER below, or ?srv=https://… once in the page URL (remembered in this browser)
+const SERVER = '';
+let srvBase = null, srvSyms = null;
+function srvUrl() {
+  if (srvBase !== null) return srvBase;
+  const q = new URLSearchParams(location.search).get('srv'); if (q) K.save('sr_bsrv', q);
+  return srvBase = (q || K.load('sr_bsrv', '') || SERVER).replace(/\/$/, '');
+}
+async function srv(path) {
+  const base = srvUrl(); if (!base) return null;
+  try { const r = await fetch(base + path); return r.ok ? await r.json() : null; } catch { return null; }
+}
+async function srvHas(sym) {
+  if (!srvUrl()) return false;
+  if (!srvSyms) { const r = await srv('/symbols'); srvSyms = new Set(r?.symbols || []); if (!r) setTimeout(() => { srvSyms = null; }, 60e3); }
+  return srvSyms.has(sym);
+}
 // ---------- panes ----------
 let panes = [], active = 0, layout = 1, link = true, hoverT = null, tool = null, ruler = null, loopOn = false;
 const act = () => panes[active];
@@ -349,6 +368,25 @@ class Pane {
     this.prevSym = null;
     if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); }
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
+    this.srv = false; this.far = null; this.fromServer().then(() => this.farBook());
+  }
+  // history and the far book from our server, when it follows this coin
+  async fromServer() {
+    if (!(await srvHas(this.sym)) || !this.d) return;
+    const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}&since=${this.d.t[0]}`);
+    if (!r?.cols?.length || key !== this.sym + this.tf) return;
+    this.fine = r.base; const heat = new Map();   // server bins become our fine bins, so live samples line up with the history
+    for (const [t, k0, v] of r.cols) {
+      const bar = Math.floor(t / tf) * tf; let col = heat.get(bar); if (!col) heat.set(bar, col = new Map());
+      v.forEach((x, i) => { if (x > (col.get(k0 + i) || 0)) col.set(k0 + i, x); });
+    }
+    this.heat = heat; this.heatMs = Math.max(this.heatMs, r.cols.length * 6e4); this.hc = null; this.srv = true; this.dirty = true;
+  }
+  async farBook() {
+    if (!this.srv) return;
+    const r = await srv(`/book?symbol=${this.sym}`); if (!r?.bids) return;
+    const far = []; for (const [k, v] of r.bids) far.push([(k + 0.5) * r.base, v, 'b']); for (const [k, v] of r.asks) far.push([(k + 0.5) * r.base, v, 'a']);
+    this.far = far; this.farLo = r.minB; this.farHi = r.maxA; this.dirty = true;
   }
   destroy() { this.dead = true; this.disconnect(); this.el.remove(); }
 
@@ -593,17 +631,22 @@ class Pane {
       const step = this.bookStep(G); this.lastBookStep = step;
       // how deep the loaded book reaches: rows beyond it are unknown, not empty
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
-      const range = Math.min(0.2, Math.max(m - G.mn, G.mx - m) / m + step / m);
-      const bk = this.buckets(range, step) || {bid:new Map(), ask:new Map()};
-      const byK = new Map(); for (const [side, mp] of [['a', bk.ask], ['b', bk.bid]]) for (const [k, v] of mp) { const r = byK.get(k) || {a:0, b:0}; r[side] += v; byK.set(k, r); }
-      const k0 = Math.floor(G.mn / step), k1 = Math.ceil(G.mx / step);
+      // rows: from the current price (like ZeroSynapse: 83 222–84 222–85 222…) or on round levels (like ATAS: 83 000–84 000…)
+      const A = C('domAnchor') ? 0 : Math.round(m / this.base) * this.base, keyOf = p => Math.floor((p - A) / step);
+      const byK = new Map(), add = (p, v, side) => { if (p < G.mn - step || p > G.mx + step) return; const k = keyOf(p), r = byK.get(k) || {a:0, b:0}; r[side] += p * v; byK.set(k, r); };
+      for (const [p, q] of this.book.asks) add(p, q, 'a');
+      for (const [p, q] of this.book.bids) add(p, q, 'b');
+      // deeper levels from our server (it keeps the whole book), where the browser's snapshot doesn't reach
+      if (this.far) for (const [p, usd, side] of this.far) if ((side === 'a' && p > aHi) || (side === 'b' && p < bLo)) { if (p < G.mn - step || p > G.mx + step) continue; const k = keyOf(p), r = byK.get(k) || {a:0, b:0}; r[side] += usd; byK.set(k, r); }
+      const farLo = this.far ? Math.min(bLo, this.farLo ?? bLo) : bLo, farHi = this.far ? Math.max(aHi, this.farHi ?? aHi) : aHi;
+      const k0 = keyOf(G.mn) - 1, k1 = keyOf(G.mx) + 1;
       const vals = [...byK.values()].map(r => r.a + r.b).sort((a, b) => a - b), ref = vals[Math.floor(vals.length * 0.97)] || vals[vals.length - 1] || 1;   // scale by the 97th percentile, so one wall doesn't flatten the rest
       g.save(); g.beginPath(); g.rect(x0, G.T0, cw, ph); g.clip();
       g.font = '10px system-ui'; g.textBaseline = 'middle'; g.lineJoin = 'round';
       for (let k = k0; k <= k1; k++) {
-        const yT = G.Y((k + 0.5) * step), yB = G.Y((k - 0.5) * step), h = yB - yT, yc = (yT + yB) / 2, p = k * step;
+        const lo = A + k * step, hi = lo + step, yT = G.Y(hi), yB = G.Y(lo), h = yB - yT, yc = (yT + yB) / 2, p = (lo + hi) / 2;
         if (yB < G.T0 || yT > G.pH) continue;
-        if (p < bLo || p > aHi) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; continue; }   // beyond the loaded depth
+        if (hi < farLo || lo > farHi) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; continue; }   // beyond the known depth
         const r = byK.get(k); if (!r) continue;
         const v = r.a + r.b, f = Math.min(1, Math.sqrt(v / ref)), w = Math.max(2, f * bw), ask = r.a >= r.b;
         g.fillStyle = (ask ? PC.up : PC.lo) + (f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, yT, w, Math.max(1, h + 0.5));   // rows touch: no gaps
@@ -611,9 +654,9 @@ class Pane {
       }
       // say why the far rows are empty: Binance gives the nearest 5000 levels (1000 on the other charts), not the whole book
       g.font = '10px system-ui'; g.fillStyle = PC.mute; g.textAlign = 'center';
-      const yA = G.Y(aHi), yBd = G.Y(bLo), cx = x0 + (cw - sw) / 2;
-      if (isFinite(aHi) && yA - G.T0 > 48) g.fillText('глубже', cx, (G.T0 + yA) / 2 - 6), g.fillText('нет данных', cx, (G.T0 + yA) / 2 + 6);
-      if (bLo > 0 && G.pH - yBd > 48) g.fillText('глубже', cx, (yBd + G.pH) / 2 - 6), g.fillText('нет данных', cx, (yBd + G.pH) / 2 + 6);
+      const yA = G.Y(farHi), yBd = G.Y(farLo), cx = x0 + (cw - sw) / 2;
+      if (isFinite(farHi) && yA - G.T0 > 48) g.fillText('глубже', cx, (G.T0 + yA) / 2 - 6), g.fillText('нет данных', cx, (G.T0 + yA) / 2 + 6);
+      if (farLo > 0 && G.pH - yBd > 48) g.fillText('глубже', cx, (yBd + G.pH) / 2 - 6), g.fillText('нет данных', cx, (yBd + G.pH) / 2 + 6);
       g.textAlign = 'left';
       g.restore();
       // the step in use, at the top of the column: a click opens the setting, the wheel over the column changes it
@@ -966,7 +1009,7 @@ function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.prevS
 function setLive() {
   const p = act(); if (!p) return;
   const ok = p.live(), mins = Math.floor(p.heatMs / 6e4), all = panes.filter(q => q.live()).length;
-  $('#bLive').innerHTML = `<span class="live${ok ? '' : ' stale'}"><i></i><span>${ok ? `стакан и сделки вживую${layout > 1 ? ` · ${all} из ${layout} графиков` : ''} · карта ${K.base(p.sym)} копится ${mins ? mins + ' мин' : 'с этой минуты'}` : 'нет связи с Binance — переподключаюсь'}</span></span>`;
+  $('#bLive').innerHTML = `<span class="live${ok ? '' : ' stale'}"><i></i><span>${ok ? `стакан и сделки вживую${layout > 1 ? ` · ${all} из ${layout} графиков` : ''} · ${p.srv ? `сервер: полный стакан ${K.base(p.sym)} и карта за ${durTxt(p.heatMs)}` : `карта ${K.base(p.sym)} копится ${mins ? mins + ' мин' : 'с этой минуты'}`}` : 'нет связи с Binance — переподключаюсь'}</span></span>`;
 }
 function loop() {
   if (!loopOn) return;
@@ -991,7 +1034,8 @@ export function open(kit) {
   }
   if (loopOn) return;
   loopOn = true; renderList();
-  sampler = setInterval(() => { panes.forEach(p => { p.sampleHeat(); p.dirty = true; }); setLive(); renderList(); }, 1000);
+  let tick = 0;
+  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.dirty = true; if (tick % 3 === 0) p.farBook(); }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
