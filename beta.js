@@ -63,7 +63,8 @@ const on = id => sel.has(id) && !hidden.has(id);
 const stepParam = {k:'stepX', name:'Шаг цены: уровни склеиваются в строки по', min:0.5, max:10, step:0.5, def:1, u:v => { const p = act(); return p?.base ? '$' + niceNum(p.base * v) : v + '×'; }};
 const PARAMS = {
   dom:[{k:'domStep', name:'Шаг цены стакана (колёсико над стаканом — то же)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто — по масштабу'; }},
-    {k:'domRows', name:'В режиме «авто»: высота строки', min:10, max:40, step:2, def:16, u:v => v + ' px'}],
+    {k:'domRows', name:'В режиме «авто»: высота строки', min:10, max:40, step:2, def:16, u:v => v + ' px'},
+    {k:'domUnit', name:'Размер заявок в', min:0, max:1, step:1, def:0, u:v => v ? 'монетах' : 'долларах'}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
   heat:[stepParam, {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}],
   walls:[{k:'domRange', name:'Искать стены в пределах', min:0.5, max:5, step:0.5, def:3, u:v => '±' + v + '%'},
@@ -85,6 +86,7 @@ const C = k => cfg[k] ?? ALLP.find(p => p.k === k).def;
 
 // ---------- formatting ----------
 const fmtUsd = v => { const a = Math.abs(v), s = v < 0 ? '−' : ''; return s + (a >= 1e9 ? (a / 1e9).toFixed(2) + 'B' : a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : a >= 1e3 ? Math.round(a / 1e3) + 'K' : Math.round(a)); };
+const fmtQty = v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'K' : v >= 100 ? v.toFixed(0) : v >= 1 ? v.toFixed(2) : v.toPrecision(2);   // coin amounts
 const niceNum = v => v >= 1 ? +v.toFixed(2) + '' : v.toPrecision(2);
 const durTxt = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + ' мин' : m < 1440 ? (m / 60).toFixed(m < 600 ? 1 : 0) + ' ч' : (m / 1440).toFixed(1) + ' д'; };
 // price buckets of a "nice" size ≈ share of the price, fixed per coin so heatmap columns line up over time
@@ -302,7 +304,8 @@ class Pane {
       try {
         await snapGate(); if (ws !== this.ws) return;
         const snap = await K.api(`/api/v3/depth?symbol=${this.sym}&limit=${this === act() ? 5000 : 1000}`); if (ws !== this.ws) return;
-        const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false};
+        const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false,
+          minB:+(snap.bids[snap.bids.length - 1]?.[0] ?? 0), maxA:+(snap.asks[snap.asks.length - 1]?.[0] ?? Infinity)};   // how deep the snapshot reaches
         for (const ev of buffer.splice(0)) if (!applyDepth(b, ev)) throw new Error('snapshot older than the stream');
         this.book = b; this.fails = 0; syncing = false;
       } catch {
@@ -589,7 +592,7 @@ class Pane {
     if (on('dom') && bw > 8) {
       const step = this.bookStep(G); this.lastBookStep = step;
       // how deep the loaded book reaches: rows beyond it are unknown, not empty
-      let bLo = Infinity, aHi = 0; for (const p of this.book.bids.keys()) if (p < bLo) bLo = p; for (const p of this.book.asks.keys()) if (p > aHi) aHi = p;
+      const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
       const range = Math.min(0.2, Math.max(m - G.mn, G.mx - m) / m + step / m);
       const bk = this.buckets(range, step) || {bid:new Map(), ask:new Map()};
       const byK = new Map(); for (const [side, mp] of [['a', bk.ask], ['b', bk.bid]]) for (const [k, v] of mp) { const r = byK.get(k) || {a:0, b:0}; r[side] += v; byK.set(k, r); }
@@ -600,12 +603,18 @@ class Pane {
       for (let k = k0; k <= k1; k++) {
         const yT = G.Y((k + 0.5) * step), yB = G.Y((k - 0.5) * step), h = yB - yT, yc = (yT + yB) / 2, p = k * step;
         if (yB < G.T0 || yT > G.pH) continue;
-        if (p < bLo - step || p > aHi + step) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; continue; }   // beyond the loaded depth
+        if (p < bLo || p > aHi) { g.fillStyle = PC.grid; g.globalAlpha = 0.22; g.fillRect(x0, yT, cw - sw, Math.max(1, h)); g.globalAlpha = 1; continue; }   // beyond the loaded depth
         const r = byK.get(k); if (!r) continue;
         const v = r.a + r.b, f = Math.min(1, Math.sqrt(v / ref)), w = Math.max(2, f * bw), ask = r.a >= r.b;
-        g.fillStyle = (ask ? PC.up : PC.lo) + (f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, yT, w, Math.max(1, h - (h >= 9 ? 1 : 0)));
-        if (h >= 10.5 && (labels || f > 0.75)) { const t = fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
+        g.fillStyle = (ask ? PC.up : PC.lo) + (f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, yT, w, Math.max(1, h + 0.5));   // rows touch: no gaps
+        if (h >= 10.5 && (labels || f > 0.75)) { const t = C('domUnit') ? fmtQty(v / p) : fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
       }
+      // say why the far rows are empty: Binance gives the nearest 5000 levels (1000 on the other charts), not the whole book
+      g.font = '10px system-ui'; g.fillStyle = PC.mute; g.textAlign = 'center';
+      const yA = G.Y(aHi), yBd = G.Y(bLo), cx = x0 + (cw - sw) / 2;
+      if (isFinite(aHi) && yA - G.T0 > 48) g.fillText('глубже', cx, (G.T0 + yA) / 2 - 6), g.fillText('нет данных', cx, (G.T0 + yA) / 2 + 6);
+      if (bLo > 0 && G.pH - yBd > 48) g.fillText('глубже', cx, (yBd + G.pH) / 2 - 6), g.fillText('нет данных', cx, (yBd + G.pH) / 2 + 6);
+      g.textAlign = 'left';
       g.restore();
       // the step in use, at the top of the column: a click opens the setting, the wheel over the column changes it
       const lbl = `шаг $${niceNum(step)}${C('domStep') ? '' : ' · авто'}`;
@@ -638,8 +647,9 @@ function applyDepth(b, ev) {
   if (ev.u <= b.id) return true;                        // already in the snapshot
   if (!b.ok) { if (ev.U > b.id + 1) return false; b.ok = true; }   // the first event must straddle the snapshot
   else if (ev.U !== b.id + 1) return false;             // a gap: the book is no longer exact
-  for (const [p, q] of ev.b) +q ? b.bids.set(+p, +q) : b.bids.delete(+p);
-  for (const [p, q] of ev.a) +q ? b.asks.set(+p, +q) : b.asks.delete(+p);
+  // the snapshot covers only the nearest levels; updates for levels beyond it would leave isolated islands far from the price
+  for (const [p, q] of ev.b) { const x = +p; if (x < b.minB) continue; +q ? b.bids.set(x, +q) : b.bids.delete(x); }
+  for (const [p, q] of ev.a) { const x = +p; if (x > b.maxA) continue; +q ? b.asks.set(x, +q) : b.asks.delete(x); }
   b.id = ev.u; return true;
 }
 // indicators that only need candles: channel, RSI, delta, CVD, VWAP
