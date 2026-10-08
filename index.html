@@ -278,6 +278,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .ind-chip{display:inline-flex;gap:6px;align-items:center}.ind-chip .i{width:14px;height:14px}.btools .tab .i,.ctools .i{width:17px;height:17px}.ctools .ct-yauto.show{width:auto;padding:0 9px;gap:5px;font-size:12px;font-weight:600}#bLay .tab .i{width:17px;height:17px}.sel-it button .i{width:15px;height:15px}
 @media(max-width:700px){.bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.bchips::-webkit-scrollbar{display:none}.bchip,.bchip-t{flex:0 0 auto}.bchip .s{max-width:96px}}
 #bMktBtn.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
+.bpop.fpp{width:min(380px,calc(100vw - 32px))}.fps{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px;font-size:12px;color:var(--mute)}.fps span{display:grid;gap:1px}.fps b{font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}.fpr{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:6px;font-size:12px;padding:4px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}.fpr span:not(:first-child){text-align:right}.fph{color:var(--faint);font-size:11px;border-top:0}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
 .bhead-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.bhead-r #betaUntil{font-size:12px}.bhead-r:empty{display:none}
 .accbox{width:min(520px,100%);max-height:86vh}.acc-body{padding:14px 16px 16px;overflow:auto;display:grid;gap:12px}
@@ -2481,6 +2482,7 @@ const CHANGELOG = [
     'В «Бете» появились уровни Фибоначчи, канал Раффа, VWAP видимой части и счётчик сделок, а профиль объёма теперь у левого края с зоной стоимости — как в профессиональных терминалах.',
     'В «Бете» появились фьючерсы Binance: переключатель «Спот / Фьючерсы», ликвидации на графике, открытый интерес и фандинг.',
     'В «Бете» появился футпринт: покупки и продажи по ценам внутри каждой свечи — приблизьте график, и в свечах появятся цифры.',
+    'Футпринт: уровни, где покупки сильно перевешивают продажи (и наоборот), выделены; нажмите на свечу — покажем её покупки, продажи, дельту, POC и крупнейшие уровни.',
   ]},
   {v:'2.8', date:'7 октября 2026', title:'Меньше бессмысленных сделок', items:[
     'Бот больше не входит в отскок, когда цена уже почти вернулась к середине канала, — раньше такие сделки почти всегда уходили в стоп.',

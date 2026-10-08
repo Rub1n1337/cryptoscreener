@@ -90,7 +90,8 @@ const PARAMS = {
     {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
   bubbles:[{k:'bubPct', name:'Показывать самые крупные сделки', min:0.2, max:5, step:0.1, def:1.5, u:v => v + '% от всех'},
     {k:'bubMin', name:'И не меньше', min:1e3, max:1e6, step:1e3, def:5e3, u:v => '$' + fmtUsd(v)}],
-  fp:[{k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],
+  fp:[{k:'fpImb', name:'Подсвечивать перевес (покупки к продажам уровнем ниже и наоборот)', def:3, opts:[[0, 'выкл'], [2, '2×'], [3, '3×'], [4, '4×']]},
+    {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],
   vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
     {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
   bb:[{k:'bbN', name:'Длина канала', min:20, max:300, step:10, def:210, u:v => v + ' свечей'},
@@ -197,6 +198,12 @@ class Pane {
     cv.addEventListener('dblclick', e => { if (this.inScale(e)) this.setY(null); });
     cv.addEventListener('mousemove', e => { if (!e.buttons && !tool && this.inScale(e)) cv.style.cursor = 'ns-resize'; const ib = this.inBook(e); this.bookY = ib ? e.clientY - cv.getBoundingClientRect().top : null; if (ib && !e.buttons) cv.style.cursor = 'help'; });
     cv.addEventListener('mouseleave', () => { this.bookY = null; });
+    // a click (not a drag) on a candle opens its footprint details
+    cv.addEventListener('mousedown', e => { this.downAt = [e.clientX, e.clientY]; });
+    cv.addEventListener('click', e => {
+      if (!on('fp') || tool || !this.downAt || Math.hypot(e.clientX - this.downAt[0], e.clientY - this.downAt[1]) > 4 || this.inScale(e) || this.inBook(e) || this.hitAt(e) || !this.geo) return;
+      const i = clamp(K.hoverIndex(this.geo, cv, e), 0, this.d.c.length - 1), x = e.clientX, y = e.clientY; setTimeout(() => this.fpPop(i, x, y));
+    });
     this.label();
   }
   inBook(e) { const g = this.geo; if (!g || !this.rc) return false; const x = e.clientX - this.cv.getBoundingClientRect().left; return x >= g.W - g.padR && x <= g.W - g.padR + this.rc; }
@@ -486,12 +493,23 @@ class Pane {
     else if (live) addCol(live, this.base);   // candles the server has not got yet (or no server): trades seen since the tab opened
     return out;
   }
+  // a click on a candle with the footprint on: its totals, delta, POC and the biggest levels
+  fpPop(i, x, y) {
+    const d = this.d, step = this.fpStepNow || this.base, rows = this.fpBar(d.t[i], step); if (!rows.size) return;
+    let B = 0, S = 0; for (const [, [b, s]] of rows) { B += b; S += s; }
+    const top = [...rows].sort((a, b) => (b[1][0] + b[1][1]) - (a[1][0] + a[1][1])).slice(0, 6), poc = top[0];
+    const row = ([k, [b, s]]) => `<div class="fpr"><span>${K.fp(k * step)}</span><span class="neg">$${fmtUsd(s)}</span><span class="pos">$${fmtUsd(b)}</span><span class="${b - s >= 0 ? 'pos' : 'neg'}">${b - s >= 0 ? '+' : ''}${fmtUsd(b - s)}</span></div>`;
+    openPop({left:x, bottom:y, top:y}, head(`Свеча ${K.dt(d.t[i])} · ${TFL[this.tf]}`)
+      + `<div class="fps"><span>покупки по рынку<b class="pos">$${fmtUsd(B)}</b></span><span>продажи по рынку<b class="neg">$${fmtUsd(S)}</b></span><span>дельта<b class="${B - S >= 0 ? 'pos' : 'neg'}">${B - S >= 0 ? '+' : ''}${fmtUsd(B - S)} (${((B - S) / ((B + S) || 1) * 100).toFixed(0)}%)</b></span><span>POC<b>${K.fp(poc[0] * step)} – ${K.fp((poc[0] + 1) * step)}</b></span></div>`
+      + `<div class="fpr fph"><span>крупнейшие уровни</span><span>продажи</span><span>покупки</span><span>дельта</span></div>${[...top].sort((a, b) => b[0] - a[0]).map(row).join('')}`
+      + `<p class="phint">Шаг строк $${niceNum(step)}. ${this.fpHist?.cols.has(d.t[i]) ? 'История — с нашего сервера.' : 'Только сделки с момента открытия вкладки.'}</p>`, 'fpp');
+  }
   // like ZeroSynapse: rows ≈ the average candle range / 10; tables with numbers when a candle is wide enough, a histogram otherwise
   drawFootprint(g, G) {
     const d = this.d, PC = K.PC; let rs = 0, cnt = 0;
     for (let i = G.s; i <= G.e; i++) { rs += d.h[i] - d.l[i]; cnt++; }
     const auto = niceStep(rs / Math.max(1, cnt) / 10, 1), step = Math.max(this.base, C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : auto);
-    const rowPx = Math.abs(G.Y(0) - G.Y(step)), wide = G.bw >= 56 && rowPx >= 11;
+    const rowPx = Math.abs(G.Y(0) - G.Y(step)), wide = G.bw >= 56 && rowPx >= 11; this.fpStepNow = step;
     if (G.bw < 6) return;
     g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     g.font = '600 10px system-ui'; g.textBaseline = 'middle';
@@ -505,7 +523,12 @@ class Pane {
         if (wide) {   // sells on the left, buys on the right; the stronger side is tinted
           const dl = b - s, f = Math.min(1, Math.abs(dl) / (max || 1));
           g.fillStyle = (dl >= 0 ? PC.lo : PC.up) + (f > 0.6 ? '66' : f > 0.25 ? '3a' : '1c'); g.fillRect(x0, yT, w, h);
-          g.fillStyle = PC.up; g.textAlign = 'right'; g.fillText(fmtUsd(s), x0 + half - 3, yT + h / 2);
+          // diagonal imbalance (classic footprint): buys here vs sells one row below, sells here vs buys one row above
+          const R = C('fpImb'), below = rows.get(k - 1), above = rows.get(k + 1), bi = R && b > 0 && b >= R * (below ? below[1] : 0) && b >= max * 0.05, si = R && s > 0 && s >= R * (above ? above[0] : 0) && s >= max * 0.05;
+          if (si) { g.fillStyle = PC.up + '55'; g.fillRect(x0, yT, half, h); }
+          if (bi) { g.fillStyle = PC.lo + '55'; g.fillRect(x0 + half, yT, half, h); }
+          g.font = si ? '800 10px system-ui' : '600 10px system-ui'; g.fillStyle = PC.up; g.textAlign = 'right'; g.fillText(fmtUsd(s), x0 + half - 3, yT + h / 2);
+          g.font = bi ? '800 10px system-ui' : '600 10px system-ui';
           g.fillStyle = PC.lo; g.textAlign = 'left'; g.fillText(fmtUsd(b), x0 + half + 3, yT + h / 2);
         } else {   // a two-sided histogram inside the candle: sells left of the centre, buys right
           const cx = G.X(i), sw2 = Math.max(1, s / (max || 1) * half), bw2 = Math.max(1, b / (max || 1) * half);
