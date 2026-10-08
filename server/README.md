@@ -13,6 +13,10 @@ liquidity-heatmap history and trade clusters, and serves them over HTTP. No keys
 4. Optional **Variables**: `TOP` (how many coins, default 20), `SYMBOLS` (exact list, e.g. `BTCUSDT,ETHUSDT`),
    `KEEP_MIN` (minutes of history, default 1440).
 5. Open `https://<domain>/health` — after a minute every coin should show `"book": true`.
+6. Keep history across restarts: attach a **Volume** to the service (any mount path, e.g. `/data`). Railway passes its
+   path in `RAILWAY_VOLUME_MOUNT_PATH`; the logs then show `restored: …` after each restart. Without a volume the
+   history lives in memory only.
+7. **Settings → Build → Watch Paths**: `/server/**`, so site-only commits do not restart the collector.
 
 Then put the domain into `SERVER` at the top of the server section in `beta.js` (or open the site once with
 `?srv=https://<domain>`).

@@ -8,6 +8,8 @@
 import http from 'node:http';
 import zlib from 'node:zlib';
 import WebSocket from 'ws';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const PORT = +process.env.PORT || 8080;
 const TOP = +process.env.TOP || 20;                       // how many of the most traded USDT pairs to follow
@@ -33,6 +35,56 @@ async function api(path) {
   throw err;
 }
 
+// ---------- disk (a Railway Volume): history and the known book survive restarts ----------
+// Railway sets RAILWAY_VOLUME_MOUNT_PATH when a volume is attached; without one everything stays in memory as before.
+// Heatmap / cluster minutes are appended as binary records (t, k0, n, values…); the book is saved every 5 minutes.
+const DATA = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.DATA_DIR || '';
+const disk = {
+  file: (sym, kind) => path.join(DATA, `${sym}.${kind}.bin`),
+  encode(kind, r) {
+    const arrs = kind === 'fp' ? [r.buy, r.sell] : [r.v], n = arrs[0].length, b = Buffer.alloc(16 + arrs.length * n * 4);
+    b.writeDoubleLE(r.t, 0); b.writeInt32LE(r.k0, 8); b.writeInt32LE(n, 12);
+    arrs.forEach((a, j) => Buffer.from(a.buffer, a.byteOffset, a.byteLength).copy(b, 16 + j * n * 4));
+    return b;
+  },
+  decode(kind, buf) {
+    const out = [], parts = kind === 'fp' ? 2 : 1;
+    for (let o = 0; o + 16 <= buf.length;) {
+      const t = buf.readDoubleLE(o), k0 = buf.readInt32LE(o + 8), n = buf.readInt32LE(o + 12), end = o + 16 + parts * n * 4;
+      if (n < 0 || end > buf.length) break;   // a record cut short by a crash: stop there
+      const arr = j => new Float32Array(buf.buffer.slice(buf.byteOffset + o + 16 + j * n * 4, buf.byteOffset + o + 16 + (j + 1) * n * 4));
+      out.push(kind === 'fp' ? {t, k0, buy:arr(0), sell:arr(1)} : {t, k0, v:arr(0)}); o = end;
+    }
+    return out;
+  },
+  append(sym, kind, r) { if (!DATA) return; try { fs.appendFileSync(this.file(sym, kind), this.encode(kind, r)); } catch (e) { log('disk append failed:', e.message); } },
+  load(c) {
+    if (!DATA) return;
+    try { fs.mkdirSync(DATA, {recursive:true}); } catch {}
+    const since = Date.now() - KEEP_MIN * 6e4;
+    for (const kind of ['heat', 'fp']) {
+      try { c[kind] = this.decode(kind, fs.readFileSync(this.file(c.sym, kind))).filter(r => r.t >= since).slice(-KEEP_MIN); } catch {}
+    }
+    try {   // the far levels learned before the restart; the snapshot taken after it refreshes the near ones
+      const b = JSON.parse(fs.readFileSync(path.join(DATA, `${c.sym}.book.json`), 'utf8'));
+      if (Date.now() - b.t < 6 * 3600e3) { c.base = b.base; c.book = {bids:new Map(b.bids), asks:new Map(b.asks), id:0, ok:false, live:false}; }
+    } catch {}
+    if (c.heat.length || c.book) log(c.sym, 'restored:', c.heat.length, 'heat min,', c.fp.length, 'cluster min,', c.book ? c.book.bids.size + c.book.asks.size : 0, 'levels');
+  },
+  saveBook(c) {
+    if (!DATA || !c.book?.live) return;
+    const tmp = path.join(DATA, `${c.sym}.book.json.tmp`);
+    try { fs.writeFileSync(tmp, JSON.stringify({t:Date.now(), base:c.base, bids:[...c.book.bids], asks:[...c.book.asks]})); fs.renameSync(tmp, path.join(DATA, `${c.sym}.book.json`)); }
+    catch (e) { log('book save failed:', e.message); }
+  },
+  compact(c) {   // the append-only files are rewritten with just the kept minutes
+    if (!DATA) return;
+    for (const kind of ['heat', 'fp']) {
+      const tmp = this.file(c.sym, kind) + '.tmp';
+      try { fs.writeFileSync(tmp, Buffer.concat(c[kind].map(r => this.encode(kind, r)))); fs.renameSync(tmp, this.file(c.sym, kind)); } catch (e) { log('compact failed:', e.message); }
+    }
+  },
+};
 // ---------- coins ----------
 const coins = new Map();   // sym -> state
 function coin(sym) {
@@ -101,7 +153,8 @@ function closeFp(c) {
   if (!c.fpCur?.size) return;
   const ks = [...c.fpCur.keys()], k0 = Math.min(...ks), n = Math.max(...ks) - k0 + 1, buy = new Float32Array(n), sell = new Float32Array(n);
   for (const [k, [b, s]] of c.fpCur) { buy[k - k0] = b; sell[k - k0] = s; }
-  c.fp.push({t:c.fpT, k0, buy, sell}); if (c.fp.length > KEEP_MIN) c.fp.shift();
+  const rec = {t:c.fpT, k0, buy, sell}; c.fp.push(rec); if (c.fp.length > KEEP_MIN) c.fp.shift();
+  disk.append(c.sym, 'fp', rec);
 }
 
 // ---------- heatmap: every 10 s the book is folded into bins, the max per bin over the minute is kept ----------
@@ -119,7 +172,8 @@ function closeHeat(c) {
   const h = c.heatCur; if (!h?.m.size) return;
   const ks = [...h.m.keys()], k0 = Math.min(...ks), v = new Float32Array(Math.max(...ks) - k0 + 1);
   for (const [k, x] of h.m) v[k - k0] = x;
-  c.heat.push({t:h.t, k0, v}); if (c.heat.length > KEEP_MIN) c.heat.shift();
+  const rec = {t:h.t, k0, v}; c.heat.push(rec); if (c.heat.length > KEEP_MIN) c.heat.shift();
+  disk.append(c.sym, 'heat', rec);
 }
 
 // ---------- streams: one connection per 10 coins, reconnect with growing pauses ----------
@@ -173,7 +227,11 @@ http.createServer((req, res) => {
 (async () => {
   let syms;
   for (;;) { try { syms = await pickSymbols(); break; } catch (e) { log('cannot list symbols (is the region outside the US?):', e.message); await sleep(30e3); } }
-  for (const s of syms) coins.set(s, coin(s));
+  for (const s of syms) { const c = coin(s); disk.load(c); disk.compact(c); coins.set(s, c); }
+  // Railway stops the old copy with SIGTERM on every deploy: save what is in memory first
+  process.once('SIGTERM', () => { log('stopping: saving books'); for (const c of coins.values()) { closeHeat(c); closeFp(c); disk.saveBook(c); } process.exit(0); });
+  setInterval(() => { for (const c of coins.values()) disk.saveBook(c); }, 5 * 6e4);
+  setInterval(() => { for (const c of coins.values()) disk.compact(c); }, 6 * 3600e3);
   log('following', syms.length, 'coins:', syms.join(' '));
   for (let i = 0; i < syms.length; i += 10) stream(syms.slice(i, i + 10));
   setInterval(() => { for (const c of coins.values()) sampleHeat(c); }, 10e3);
