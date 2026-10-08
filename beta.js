@@ -327,7 +327,7 @@ class Pane {
   scanWalls() {
     // the price walked towards the edge of what the snapshot covers: take a fresh one (at most once a minute)
     const bk = this.book, mm = bk?.ok && this.mid();
-    if (mm && bk.cov && Date.now() - (this.lastSync || 0) > 60e3 && Math.min(mm - bk.minB, bk.maxA - mm) < bk.cov * 0.4) { this.lastSync = Date.now(); this.resyncNow?.(); return; }
+    if (mm && bk.cov && Date.now() - (this.lastSync || 0) > (this.mkt === 'fut' ? 15e3 : 60e3) && Math.min(mm - bk.minB, bk.maxA - mm) < bk.cov * 0.4) { this.lastSync = Date.now(); this.resyncNow?.(); return; }
     if (!this.book?.ok || !this.d) return;
     const W = this.wc = this.walls(), thr = C('wallAlert'), m = this.mid(); if (!thr || !m) return;
     const now = Date.now(), key = w => `${w.side}${Math.round(w.price / (this.step * 4))}`, seen = this.seenW ||= new Map();
@@ -770,7 +770,9 @@ class Pane {
       for (const [p, q] of this.book.bids) { totB += p * q; add(p, p * q, 'b'); }
       // deeper levels from our server (it keeps the whole book), where the browser's snapshot doesn't reach
       if (this.far) for (const [p, usd, side] of this.far) if ((side === 'a' && p > aHi) || (side === 'b' && p < bLo)) { side === 'a' ? totA += usd : totB += usd; add(p, usd, side); }
-      const farLo = this.far ? Math.min(bLo, this.farLo ?? bLo) : bLo, farHi = this.far ? Math.max(aHi, this.farHi ?? aHi) : aHi;
+      // the known edge: what the stream told us beyond the snapshot, and the server's far book
+      let kLo = bLo, kHi = aHi; for (const p of this.book.bids.keys()) if (p < kLo) kLo = p; for (const p of this.book.asks.keys()) if (p > kHi) kHi = p;
+      const farLo = Math.min(kLo, this.far ? this.farLo ?? kLo : kLo), farHi = Math.max(kHi, this.far ? this.farHi ?? kHi : kHi);
       const k0 = keyOf(G.mn) - 1, k1 = keyOf(G.mx) + 1;
       // bar length: by side within a row (the price row holds both), scaled by the 97th percentile so one wall doesn't flatten the rest
       const vals = [...byK.values()].flatMap(r => [r.a, r.b]).filter(Boolean).sort((a, b) => a - b), ref = vals[Math.floor(vals.length * 0.97)] || vals[vals.length - 1] || 1;
@@ -803,7 +805,7 @@ class Pane {
       const yA = G.Y(farHi), yBd = G.Y(farLo), cx = x0 + (cw - sw) / 2;
       if (isFinite(farHi) && yA - G.T0 > 48) g.fillText('глубже', cx, (G.T0 + yA) / 2 - 6), g.fillText('нет данных', cx, (G.T0 + yA) / 2 + 6);
       if (farLo > 0 && G.pH - yBd > 48) g.fillText('глубже', cx, (yBd + G.pH) / 2 - 6), g.fillText('нет данных', cx, (yBd + G.pH) / 2 + 6);
-      if (this.far) {   // the partly known zone (server data that is still filling up)
+      {   // the partly known zone: levels learned from the stream / the server beyond the dense snapshot
         const yP2 = G.Y(aHi), yTp = Math.max(G.T0, G.Y(farHi)), yQ = G.Y(bLo), yBt = Math.min(G.pH, G.Y(farLo));
         if (yP2 - yTp > 60) g.fillText('неполные', cx, (yTp + yP2) / 2 - 6), g.fillText('данные', cx, (yTp + yP2) / 2 + 6);
         if (yBt - yQ > 60) g.fillText('неполные', cx, (yQ + yBt) / 2 - 6), g.fillText('данные', cx, (yQ + yBt) / 2 + 6);
@@ -831,7 +833,7 @@ class Pane {
           if (r.b) lines.push(`покупка $${fmtUsd(r.b)} · ${fmtQty(r.b / mid)} ${K.base(this.sym)}`);
           lines.push(`средняя цена заявок ${K.fp(r.pw / (r.a + r.b))}`);
         }
-        lines.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены${hi < bLo || lo > aHi ? ' · данные сервера, могут быть неполными' : ''}`);
+        lines.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены${hi < bLo || lo > aHi ? ' · вне снимка: известны только изменившиеся уровни' : ''}`);
         g.font = '11.5px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'left';
         const w = Math.max(...lines.map(t => g.measureText(t).width)) + 16, hh = lines.length * 16 + 8, bx = x0 - w - 6, byy = clamp(by - hh / 2, G.T0, G.pH - hh);
         g.fillStyle = PC.tip; g.fillRect(bx, byy, w, hh); g.strokeStyle = PC.grid; g.strokeRect(bx + 0.5, byy + 0.5, w - 1, hh - 1);
@@ -874,9 +876,10 @@ function applyDepth(b, ev) {
     if (!b.ok) { if (ev.U > b.id + 1) return false; b.ok = true; }   // the first event must straddle the snapshot
     else if (ev.U !== b.id + 1) return false;             // a gap: the book is no longer exact
   }
-  // the snapshot covers only the nearest levels; updates for levels beyond it would leave isolated islands far from the price
-  for (const [p, q] of ev.b) { const x = +p; if (x < b.minB) continue; +q ? b.bids.set(x, +q) : b.bids.delete(x); }
-  for (const [p, q] of ev.a) { const x = +p; if (x > b.maxA) continue; +q ? b.asks.set(x, +q) : b.asks.delete(x); }
+  // the snapshot covers only the nearest levels (futures: ±0.15%); changes beyond it are kept too — they are exact for the
+  // levels they name, the book column marks that zone as partly known, so the book never goes stale when the price moves
+  for (const [p, q] of ev.b) { const x = +p; +q ? b.bids.set(x, +q) : b.bids.delete(x); }
+  for (const [p, q] of ev.a) { const x = +p; +q ? b.asks.set(x, +q) : b.asks.delete(x); }
   b.id = ev.u; b.ver = (b.ver || 0) + 1; return true;
 }
 // indicators that only need candles: channel, RSI, delta, CVD, VWAP
