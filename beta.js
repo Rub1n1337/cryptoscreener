@@ -26,6 +26,8 @@ const CATS = [
   {name:'Стакан и ликвидность', items:[
     {id:'dom', name:'Биржевой стакан', hint:'заявки по уровням — колонкой у шкалы цены'},
     {id:'imb', name:'Дисбаланс стакана', hint:'полоса у шкалы: доля покупателей и продавцов у цены'},
+    {id:'act', name:'Динамика стакана', hint:'полоса у стакана: где за последние секунды заявки ставили (зелёный) и снимали (красный)'},
+    {id:'tape', name:'Лента сделок', hint:'последние сделки кружками на своей цене у шкалы, новые — справа (как лента для скальпинга)'},
     {id:'obsum', name:'Σ стакана', hint:'внизу стакана: все известные заявки на продажу против покупки, в $'},
     {id:'heat', name:'Тепловая карта ликвидности', hint:'плотность лимитных заявок во времени'},
     {id:'walls', name:'Стены в стакане', hint:'уровни, где заявок намного больше обычного (порог — в настройках)'},
@@ -75,6 +77,7 @@ const PARAMS = {
     {k:'domRows', name:'В режиме «авто»: высота строки', min:10, max:40, step:2, def:16, u:v => v + ' px'},
     {k:'domUnit', name:'Размер заявок', def:0, opts:[[0, 'в $'], [1, 'в монетах']]},
     {k:'domAnchor', name:'Строки отсчитываются', def:0, opts:[[0, 'от текущей цены'], [1, 'от круглых уровней']]}],
+  act:[{k:'actWin', name:'За сколько секунд', def:30, opts:[[10, '10 с'], [30, '30 с'], [60, '1 мин'], [120, '2 мин']]}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
   heat:[{k:'heatScheme', name:'Цвет', def:1, opts:[[0, 'жёлто-синий'], [1, 'покупка / продажа'], [2, 'моно']]},
     {k:'heatOp', name:'Непрозрачность', min:20, max:100, step:5, def:85, u:v => v + '%'},
@@ -357,6 +360,7 @@ class Pane {
       if (!col) { this.fpLive.set(bar, col = new Map()); if (this.fpLive.size > 600) this.fpLive.delete(this.fpLive.keys().next().value); }
       const r = col.get(k) || [0, 0]; r[x.m ? 1 : 0] += usd; col.set(k, r);   // m = the buyer was the maker: a market sell
     }
+    this.tape ||= []; this.tape.push({p:+x.p, usd, sell:x.m}); if (this.tape.length > 120) this.tape.splice(0, 40);   // the trade tape
     this.tradeUsd.push(usd); if (this.tradeUsd.length > 2000) this.tradeUsd.shift();
     if (usd >= Math.max(C('bubMin'), this.thr || Infinity)) { this.trades.push({T:x.T, p:+x.p, usd, sell:x.m}); if (this.trades.length > 600) this.trades.shift(); this.dirty = true; }
   }
@@ -383,7 +387,7 @@ class Pane {
         const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false,
           minB:+(snap.bids[snap.bids.length - 1]?.[0] ?? 0), maxA:+(snap.asks[snap.asks.length - 1]?.[0] ?? Infinity)};   // how deep the snapshot reaches
         for (const ev of buffer.splice(0)) if (!applyDepth(b, ev)) throw new Error('snapshot older than the stream');
-        this.book = b; this.fails = 0; syncing = false; this.lastSync = Date.now();
+        b.onChange = (p, d) => this.recordAct(p, d); this.book = b; this.fails = 0; syncing = false; this.lastSync = Date.now();
         const m0 = this.mid(); if (m0) b.cov = Math.min(m0 - b.minB, b.maxA - m0);   // how far the snapshot reaches from the price
       } catch {
         syncing = false; if (ws !== this.ws) return;
@@ -561,7 +565,7 @@ class Pane {
       ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
       ...(vv && isFinite(vv[e]) ? [{v:vv[e], text:(labels ? 'VWAP экр. ' : '') + K.fp(vv[e]), col:PC.mid, pin:true}] : []),
       ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:(labels ? 'dPOC ' : '') + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
-    const cw = this.cv.clientWidth; this.rc = on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0;   // the order book column at the price scale
+    const cw = this.cv.clientWidth; this.rc = (on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0) + (on('act') && on('dom') ? 24 : 0);   // the order book column at the price scale
     this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, vol:on('vol'), lower:!!sub || on('rsi'), noTip:true, vgrid:true, noMarks:true,
       priceCol:d.c[n - 1] >= d.o[n - 1] ? PC.lo : PC.up, priceSub:this.countdown(), fitPrice:true, thin:true,
       rightCol:this.rc, yRange:this.yr, crossPct:true,
@@ -575,6 +579,7 @@ class Pane {
         if (this.rc) this.drawBook(g, G);
         if (on('heat') && !mirror) this.drawHeatHover(g, G, hI, hY);
         if (on('fp')) this.drawFootprint(g, G);
+        if (on('tape')) this.drawTape(g, G);
         if (on('bubbles')) this.drawBubbles(g, G);
         if (on('liq') && this.mkt === 'fut') this.drawLiqs(g, G);
         this.drawNotes(g, G);
@@ -653,6 +658,31 @@ class Pane {
       g.fillStyle = l >= s ? PC.up : PC.lo; g.fillRect(G.X(i) - G.bw / 2, y - h / 2, G.bw + 0.5, h);
     }
     g.globalAlpha = 1;
+  }
+  // book dynamics: net $ put up (+) or pulled (−) per fine price bin, in one-second buckets (two minutes kept)
+  recordAct(p, d) {
+    if (!this.fine || !d) return;
+    const s = Math.floor(Date.now() / 1000); this.act ||= new Map(); let m = this.act.get(s);
+    if (!m) { this.act.set(s, m = new Map()); for (const k of this.act.keys()) { if (k < s - 120) this.act.delete(k); else break; } }
+    const k = Math.floor(p / this.fine); m.set(k, (m.get(k) || 0) + d);
+  }
+  actRows(keyOf) {   // the last N seconds (setting), folded into the book column's rows
+    const out = new Map(), from = Math.floor(Date.now() / 1000) - C('actWin'); if (!this.act) return out;
+    for (const [s, m] of this.act) if (s > from) for (const [k, d] of m) { const r = keyOf((k + 0.5) * this.fine); out.set(r, (out.get(r) || 0) + d); }
+    return out;
+  }
+  // the tape: the latest trades as circles at their price next to the book, newest on the right (like a scalping tape)
+  drawTape(g, G) {
+    const T = this.tape; if (!T?.length) return;
+    const PC = K.PC, x1 = G.W - G.padR - 8, n = Math.min(T.length, 40), gap = Math.max(4, Math.min(10, (G.W - G.padL - G.padR) * 0.12 / n));   // a narrow strip next to the book
+    let max = 0; for (let j = T.length - n; j < T.length; j++) max = Math.max(max, T[j].usd);
+    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
+    for (let j = 0; j < n; j++) {
+      const t = T[T.length - 1 - j], y = G.Y(t.p); if (y < G.T0 || y > G.pH) continue;
+      const r = 1.8 + 6 * Math.log1p(t.usd) / Math.log1p(max || 1), col = t.sell ? PC.up : PC.lo;
+      g.globalAlpha = Math.max(0.25, 1 - j / n); g.beginPath(); g.arc(x1 - j * gap, y, r, 0, 7); g.fillStyle = col + '99'; g.fill(); g.strokeStyle = col; g.lineWidth = 1; g.stroke();
+    }
+    g.globalAlpha = 1; g.restore();
   }
   // the heatmap cell under the cursor: how much stood at that price at that time
   drawHeatHover(g, G, i, y) {
@@ -813,8 +843,9 @@ class Pane {
   // the order book at the price scale, like order-flow terminals: one row per price step over the whole height,
   // rows touch each other (no gaps), each row shows its size; the strip at the right edge is the imbalance near the price
   drawBook(g, G) {
-    const PC = K.PC, x0 = G.W - G.padR, cw = this.rc, ph = G.pH - G.T0, m = this.mid();
-    g.fillStyle = PC.grid; g.globalAlpha = 0.16; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;
+    // the column, left to right: book dynamics, the book, the imbalance strip (with dynamics on, the book starts after its strip)
+    const PC = K.PC, xA = G.W - G.padR, aw = on('act') && on('dom') ? 24 : 0, x0 = xA + aw, cw = this.rc - aw, ph = G.pH - G.T0, m = this.mid();
+    g.fillStyle = PC.grid; g.globalAlpha = 0.16; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;   // the book's lane
     if (!this.book?.ok || !m) { g.save(); g.translate(x0 + cw / 2, G.T0 + ph / 2); g.rotate(-Math.PI / 2); g.font = '11px system-ui'; g.textAlign = 'center'; g.fillStyle = PC.mute; g.fillText('стакан загружается…', 0, 0); g.restore(); return; }
     const im = on('imb') ? this.imbalance() : null, sw = im ? 4 : 0, right = x0 + cw - sw - (im ? 2 : 0), bw = right - x0;
     if (on('dom') && bw > 8) {
@@ -843,7 +874,7 @@ class Pane {
         g.fillStyle = (side === 'a' ? PC.up : PC.lo) + (partial ? '40' : f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, y0, w, y1 - y0);
         return f;
       };
-      g.save(); g.beginPath(); g.rect(x0, G.T0, cw, ph); g.clip();
+      g.save(); g.beginPath(); g.rect(xA, G.T0, cw + aw, ph); g.clip();
       g.font = '10px system-ui'; g.textBaseline = 'middle'; g.lineJoin = 'round';
       for (let k = k0; k <= k1; k++) {
         const lo = A + k * step, hi = lo + step, yT = Math.round(G.Y(hi)), yB = Math.round(G.Y(lo)), h = yB - yT, yc = (yT + yB) / 2, p = (lo + hi) / 2;
@@ -860,6 +891,17 @@ class Pane {
         if (h >= 10.5 && (labels || f > 0.75)) { const t = C('domUnit') ? fmtQty(v / p) : fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
       }
       g.fillStyle = PC.acc; g.fillRect(x0, yP, cw - sw, 1);   // the last price line through the column
+      // book dynamics strip (left of the book): per row, net $ put up (green, to the right) or pulled (red, to the left) in the last N seconds
+      if (aw) {
+        const ar = this.actRows(keyOf), amax = Math.max(1, ...[...ar.values()].map(Math.abs)), cxA = xA + aw / 2;
+        g.fillStyle = PC.grid; g.globalAlpha = 0.1; g.fillRect(xA, G.T0, aw - 1, ph); g.globalAlpha = 1;
+        for (const [k, dv] of ar) {
+          const lo = A + k * step, yT = Math.round(G.Y(lo + step)), yB = Math.round(G.Y(lo)); if (yB < G.T0 || yT > G.pH) continue;
+          const w = Math.max(1, Math.round(Math.sqrt(Math.abs(dv) / amax) * (aw / 2 - 1)));
+          g.fillStyle = (dv >= 0 ? PC.lo : PC.up) + 'b3'; g.fillRect(dv >= 0 ? cxA : cxA - w, yT, w, Math.max(1, yB - yT - gap));
+        }
+        g.fillStyle = PC.grid; g.fillRect(Math.round(cxA), G.T0, 1, ph);
+      }
       // say why the far rows are empty: Binance gives the nearest 5000 levels (1000 on the other charts), not the whole book
       g.font = '10px system-ui'; g.fillStyle = PC.mute; g.textAlign = 'center';
       const yA = G.Y(farHi), yBd = G.Y(farLo), cx = x0 + (cw - sw) / 2;
@@ -938,8 +980,9 @@ function applyDepth(b, ev) {
   }
   // the snapshot covers only the nearest levels (futures: ±0.15%); changes beyond it are kept too — they are exact for the
   // levels they name, the book column marks that zone as partly known, so the book never goes stale when the price moves
-  for (const [p, q] of ev.b) { const x = +p; +q ? b.bids.set(x, +q) : b.bids.delete(x); }
-  for (const [p, q] of ev.a) { const x = +p; +q ? b.asks.set(x, +q) : b.asks.delete(x); }
+  const ch = b.onChange;   // "book dynamics": how much was put up (+) or pulled (−) at each level, in $
+  for (const [p, q] of ev.b) { const x = +p, nq = +q; if (ch) ch(x, (nq - (b.bids.get(x) || 0)) * x); nq ? b.bids.set(x, nq) : b.bids.delete(x); }
+  for (const [p, q] of ev.a) { const x = +p, nq = +q; if (ch) ch(x, (nq - (b.asks.get(x) || 0)) * x); nq ? b.asks.set(x, nq) : b.asks.delete(x); }
   b.id = ev.u; b.ver = (b.ver || 0) + 1; return true;
 }
 // indicators that only need candles: channel, RSI, delta, CVD, VWAP
@@ -1185,12 +1228,12 @@ function renderList() {
 }
 
 // ---------- indicator chips on every chart (like order-flow terminals): short name + key settings, hide / settings / remove ----------
-const SHORT = {fp:'Футпринт', liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
+const SHORT = {act:'Динамика', tape:'Лента', fp:'Футпринт', liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
   dtint:'Подсв. дельты', vp:'Профиль', poc:'POC', dpoc:'dPOC', vwap:'VWAP', vwapv:'VWAP экр.', bb:'Канал', rsi:'RSI'};
 function chipSum(id) {
   const p = act(), stepTxt = () => C('domStep') ? '$' + niceNum((p?.base || 0) * BOOK_STEPS[C('domStep') - 1]) : 'авто';
   return {dom:() => `шаг ${stepTxt()} · ${C('domAnchor') ? 'круглые' : 'от цены'}${C('domUnit') ? ' · монеты' : ''}`,
-    imb:() => `±${C('imbRange')}%`, heat:() => `${['жёлто-синяя', 'покупка/продажа', 'моно'][C('heatScheme')]} · ${C('heatOp')}%`,
+    imb:() => `±${C('imbRange')}%`, act:() => `за ${C('actWin')} с`, heat:() => `${['жёлто-синяя', 'покупка/продажа', 'моно'][C('heatScheme')]} · ${C('heatOp')}%`,
     walls:() => `±${C('domRange')}% · ×${C('wallX')}${C('wallAlert') ? ' · увед. от $' + fmtUsd(C('wallAlert')) : ''}`, bubbles:() => `топ ${C('bubPct')}%`,
     vp:() => `${C('vpPx')}px · ${C('vpW')}%`, fp:() => C('fpStep') ? 'шаг $' + niceNum((p?.base || 0) * BOOK_STEPS[C('fpStep') - 1]) : 'шаг авто', bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
 }
@@ -1218,7 +1261,7 @@ function wireChips() {
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
-const ICONS = {liqheat:'heat', obsum:'scale', liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
+const ICONS = {act:'wave', tape:'bubble', liqheat:'heat', obsum:'scale', liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
