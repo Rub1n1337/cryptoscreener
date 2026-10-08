@@ -85,6 +85,9 @@ const disk = {
     }
   },
 };
+// what is on the volume (for /health): the folder and the size of the saved files
+function diskInfo() { if (!DATA) return null; try { const fl = fs.readdirSync(DATA); return {path:DATA, files:fl.length, mb:+(fl.reduce((s, x) => s + fs.statSync(path.join(DATA, x)).size, 0) / 1048576).toFixed(1)}; } catch (e) { return {path:DATA, error:e.message}; } }
+
 // ---------- coins ----------
 const coins = new Map();   // sym -> state
 function coin(sym) {
@@ -200,7 +203,7 @@ function send(req, res, code, obj) {
   res.end(gz ? zlib.gzipSync(body) : body);
 }
 const routes = {
-  '/health': () => ({ok:true, uptime:Math.round(process.uptime()), coins:[...coins.values()].map(c => ({sym:c.sym, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length}))}),
+  '/health': () => ({ok:true, uptime:Math.round(process.uptime()), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length}))}),
   '/symbols': () => ({symbols:[...coins.keys()]}),
   // the whole book we know, binned by the coin's base step: [[bin, $], …] for bids and asks
   '/book': (q, c) => {
