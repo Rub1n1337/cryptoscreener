@@ -48,7 +48,7 @@ const CATS = [
   ]},
   {name:'Кластерный анализ', items:[
     {id:'fp', name:'Таблицы кластеров (футпринт)', hint:'покупки × продажи по ценам внутри свечи; приблизьте график — появятся цифры; история с нашего сервера, живые — с открытия вкладки'},
-    {id:'mk', name:'Маркеры кластеров', hint:'кружки на уровнях внутри свечей, где прошло особенно много: крупные покупки и продажи, перевес одной стороны или общий объём; история с нашего сервера (спот)'},
+    {id:'mk', name:'Маркеры кластеров', hint:'кружки на уровнях внутри свечей, где прошло особенно много: крупные покупки и продажи, перевес одной стороны или общий объём; история с нашего сервера'},
   ]},
   {name:'Профили объёма и POC', items:[
     {id:'vp', name:'Профиль объёма', hint:'объём по ценам в видимой части, у левого края; ярче — зона 70% объёма (VAH–VAL)'},
@@ -145,10 +145,11 @@ async function srv(path) {
   const base = srvUrl(); if (!base) return null;
   try { const r = await fetch(base + path); return r.ok ? await r.json() : null; } catch { return null; }
 }
-async function srvHas(sym) {
+// the server follows the top spot coins and the top futures separately: ask per market
+async function srvHas(sym, mkt = 'spot') {
   if (!srvUrl()) return false;
-  if (!srvSyms) { const r = await srv('/symbols'); srvSyms = new Set(r?.symbols || []); if (!r) setTimeout(() => { srvSyms = null; }, 60e3); }
-  return srvSyms.has(sym);
+  if (!srvSyms) { const r = await srv('/symbols'); srvSyms = {spot:new Set(r?.symbols || []), fut:new Set(r?.futures || [])}; if (!r) setTimeout(() => { srvSyms = null; }, 60e3); }
+  return srvSyms[mkt].has(sym);
 }
 // ---------- panes ----------
 let panes = [], active = 0, layout = 1, link = true, hoverT = null, tool = null, ruler = null, loopOn = false;
@@ -479,11 +480,14 @@ class Pane {
     let j = 0, cur = NaN; d.oi = d.t.map((t, i) => { const end = t + TFMS[this.tf]; while (j < pts.length && pts[j][0] <= end) cur = pts[j++][1]; return pts[0][0] <= end ? cur : NaN; });
     this.dirty = true;
   }
+  // a server answer belongs to this chart only while coin, timeframe and market are the same; futures are asked with &mkt=fut
+  key() { return this.sym + this.tf + this.mkt; }
+  sq() { return this.mkt === 'fut' ? '&mkt=fut' : ''; }
   // footprint history from our server: market buys / sells per minute and price bin, folded into this chart's candles
   async loadFp() {
-    if (!(on('fp') || on('mk')) || this.mkt !== 'spot' || !this.d || !(await srvHas(this.sym))) return;
-    const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/fp?symbol=${this.sym}&since=${this.d.t[0]}`);
-    if (!r?.bars || key !== this.sym + this.tf) return;
+    if (!(on('fp') || on('mk')) || !this.d || !(await srvHas(this.sym, this.mkt))) return;
+    const key = this.key(), tf = TFMS[this.tf], r = await srv(`/fp?symbol=${this.sym}${this.sq()}&since=${this.d.t[0]}`);
+    if (!r?.bars || key !== this.key()) return;
     const hist = new Map();
     for (const [t, k0, buy, sell] of r.bars) {
       const bar = Math.floor(t / tf) * tf; let col = hist.get(bar); if (!col) hist.set(bar, col = new Map());
@@ -583,9 +587,9 @@ class Pane {
   }
   // history and the far book from our server, when it follows this coin
   async fromServer() {
-    if (this.mkt !== 'spot' || !(await srvHas(this.sym)) || !this.d) return;   // the collector follows spot books
-    const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}&since=${this.d.t[0]}`);
-    if (!r?.cols?.length || key !== this.sym + this.tf) return;
+    if (!(await srvHas(this.sym, this.mkt)) || !this.d) return;
+    const key = this.key(), tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}${this.sq()}&since=${this.d.t[0]}`);
+    if (!r?.cols?.length || key !== this.key()) return;
     this.fine = r.base; const heat = new Map();   // server bins become our fine bins, so live samples line up with the history
     for (const [t, k0, v] of r.cols) {
       const bar = Math.floor(t / tf) * tf; let col = heat.get(bar); if (!col) heat.set(bar, col = new Map());
@@ -595,7 +599,7 @@ class Pane {
   }
   async farBook() {
     if (!this.srv) return;
-    const r = await srv(`/book?symbol=${this.sym}`); if (!r?.bids) return;
+    const key = this.key(), r = await srv(`/book?symbol=${this.sym}${this.sq()}`); if (!r?.bids || key !== this.key()) return;
     const far = []; for (const [k, v] of r.bids) far.push([(k + 0.5) * r.base, v, 'b']); for (const [k, v] of r.asks) far.push([(k + 0.5) * r.base, v, 'a']);
     this.far = far; this.farLo = r.minB; this.farHi = r.maxA; this.dirty = true;
   }
@@ -699,9 +703,9 @@ class Pane {
   }
   // liquidation heatmap from our server (it listens to all futures liquidations): per candle and price bin, longs and shorts closed by force
   async loadLiqHeat() {
-    if (!on('liqheat') || !this.d || !(await srvHas(this.sym))) return;
-    const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/liq?symbol=${this.sym}&since=${this.d.t[0]}`);
-    if (!r?.bars || key !== this.sym + this.tf) return;
+    if (!on('liqheat') || !this.d || !(await srvHas(this.sym, 'fut'))) return;   // liquidations are futures-only on the server
+    const key = this.key(), tf = TFMS[this.tf], r = await srv(`/liq?symbol=${this.sym}&since=${this.d.t[0]}`);
+    if (!r?.bars || key !== this.key()) return;
     const lh = new Map();
     for (const [t, k0, sh, lg] of r.bars) {
       const bar = Math.floor(t / tf) * tf; let col = lh.get(bar); if (!col) lh.set(bar, col = new Map());
@@ -1416,7 +1420,7 @@ function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.prevS
 function setLive() {
   const p = act(); if (!p) return;
   const ok = p.live(), mins = Math.floor(p.heatMs / 6e4), all = panes.filter(q => q.live()).length;
-  $('#bLive').innerHTML = `<span class="live${ok ? '' : ' stale'}"><i></i><span>${ok ? `стакан и сделки вживую${layout > 1 ? ` · ${all} из ${layout} графиков` : ''} · ${p.srv ? `сервер: полный стакан ${K.base(p.sym)} и карта за ${durTxt(p.heatMs)}` : `карта ${K.base(p.sym)} копится ${mins ? mins + ' мин' : 'с этой минуты'}`}` : 'нет связи с Binance — переподключаюсь'}</span></span>`;
+  $('#bLive').innerHTML = `<span class="live${ok ? '' : ' stale'}"><i></i><span>${ok ? `стакан и сделки вживую${layout > 1 ? ` · ${all} из ${layout} графиков` : ''} · ${p.srv ? `сервер: полный стакан ${K.base(p.sym)}${p.mkt === 'fut' ? ' (фьючерсы)' : ''} и карта за ${durTxt(p.heatMs)}` : `карта ${K.base(p.sym)} копится ${mins ? mins + ' мин' : 'с этой минуты'}`}` : 'нет связи с Binance — переподключаюсь'}</span></span>`;
 }
 function loop() {
   if (!loopOn) return;
