@@ -57,7 +57,7 @@ const CATS = [
     {id:'frvp', name:'Профиль участка', hint:'инструмент на панели над графиком: протяните по свечам', tool:true},
   ]},
   {name:'VWAP', items:[
-    {id:'vwap', name:'VWAP по дню', hint:'средняя цена с учётом объёма с начала суток (UTC)'},
+    {id:'vwap', name:'VWAP сессии', hint:'средняя цена с учётом объёма с начала дня, недели или месяца (UTC); можно добавить полосы ±1σ и ±2σ'},
     {id:'vwapv', name:'VWAP видимой части', hint:'от первой свечи на экране: средняя цена того, что вы сейчас видите'},
   ]},
   {name:'Цена и построения', items:[
@@ -98,6 +98,8 @@ const PARAMS = {
     {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],
   vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
     {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
+  vwap:[{k:'vwapPer', name:'С начала', def:0, opts:[[0, 'дня'], [1, 'недели'], [2, 'месяца']]},
+    {k:'vwapBand', name:'Полосы отклонения (σ по объёму)', def:0, opts:[[0, 'выкл'], [1, '±1σ'], [2, '±1σ и ±2σ']]}],
   bb:[{k:'bbN', name:'Длина канала', min:20, max:300, step:10, def:210, u:v => v + ' свечей'},
     {k:'bbK', name:'Ширина канала', min:1.5, max:4, step:0.5, def:3, u:v => v + 'σ'}],
 };
@@ -632,7 +634,10 @@ class Pane {
       rightCol:this.rc, yRange:this.yr, crossPct:true,
       under:(g, G) => { if (on('dtint')) this.drawTint(g, G); if (on('heat')) this.drawHeat(g, G); if (on('liqheat')) this.drawLiqHeat(g, G); if (on('vp') || on('poc')) this.drawProfile(g, G); },
       over:(g, G) => {
-        if (on('vwap')) drawLine(g, G, d.vwap, PC.acc, [6, 3]);
+        if (on('vwap')) {
+          drawLine(g, G, d.vwap, PC.acc, [6, 3], d.vwapNew);
+          for (let m = 1; m <= C('vwapBand'); m++) for (const sg of [1, -1]) drawLine(g, G, d.vwap.map((v, i) => v + sg * m * d.vwapSd[i]), PC.acc + (m === 1 ? '80' : '4d'), [2, 3], d.vwapNew);
+        }
         if (vv) drawLine(g, G, vv, PC.mid, [2, 3]);
         for (const a of av) this.drawAvwap(g, G, a);
         if (on('dpoc')) drawStep(g, G, d.dpoc, PC.rsi);
@@ -1053,8 +1058,14 @@ function calc(d) {
   d.N = N; d.B = M.bands(d.c, N, C('bbK'), 'log'); d.R = M.rsi(d.c);
   d.delta = d.qv.map((v, i) => 2 * d.tbq[i] - v);   // market buys − market sells, in $
   let cum = 0; d.cvd = d.delta.map(x => cum += x);
-  let day = -1, pv = 0, vv = 0;
-  d.vwap = d.c.map((c, i) => { const dd = Math.floor(d.t[i] / 864e5); if (dd !== day) { day = dd; pv = 0; vv = 0; } const tp = (d.h[i] + d.l[i] + c) / 3; pv += tp * d.v[i]; vv += d.v[i]; return vv ? pv / vv : NaN; });
+  // VWAP from the start of each day / week (from Monday, UTC) / month, with volume-weighted σ bands (like ZeroSynapse's RMS bands)
+  const per = C('vwapPer'), vsess = t => per === 1 ? Math.floor((t / 864e5 + 3) / 7) : per === 2 ? new Date(t).getUTCFullYear() * 12 + new Date(t).getUTCMonth() : Math.floor(t / 864e5);
+  let day = -1, pv = 0, vv = 0, p2 = 0; d.vwapSd = []; d.vwapNew = [];
+  d.vwap = d.c.map((c, i) => {
+    const dd = vsess(d.t[i]); d.vwapNew[i] = dd !== day; if (dd !== day) { day = dd; pv = 0; vv = 0; p2 = 0; }
+    const tp = (d.h[i] + d.l[i] + c) / 3; pv += tp * d.v[i]; vv += d.v[i]; p2 += tp * tp * d.v[i];
+    const m = vv ? pv / vv : NaN; d.vwapSd[i] = vv ? Math.sqrt(Math.max(0, p2 / vv - m * m)) : NaN; return m;
+  });
   // developing POC: the price with the most volume since the session start (day; a week on 4h / 1d candles)
   const tfms = d.t.length > 1 ? d.t[1] - d.t[0] : 864e5, sess = tfms >= 144e5 ? 7 * 864e5 : 864e5, bin = niceStep(d.c[d.c.length - 1], 0.001);
   let sk = null, hist = new Map(), best = null, bestV = 0;
@@ -1078,10 +1089,10 @@ function heatColor(x, ask, op = 1) {
   const t = Math.min(0.999, x) * (HEAT.length - 1), i = Math.floor(t), f = t - i, p = HEAT[i], q = HEAT[i + 1];
   return `rgba(${p.map((v, k) => Math.round(v + (q[k] - v) * f)).join(',')},${a})`;
 }
-function drawLine(g, G, arr, col, dash = []) {
+function drawLine(g, G, arr, col, dash = [], brk = null) {   // brk[i]: a new session starts here, don't join it to the previous one
   g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();   // stay inside the price pane
   g.beginPath(); g.setLineDash(dash); let s0 = false;
-  for (let i = G.s; i <= G.e; i++) { if (!isFinite(arr[i])) continue; g[s0 ? 'lineTo' : 'moveTo'](G.X(i), G.Y(arr[i])); s0 = true; }
+  for (let i = G.s; i <= G.e; i++) { if (!isFinite(arr[i])) continue; g[s0 && !brk?.[i] ? 'lineTo' : 'moveTo'](G.X(i), G.Y(arr[i])); s0 = true; }
   g.strokeStyle = col; g.lineWidth = 1.4; g.stroke(); g.setLineDash([]); g.restore();
 }
 const avwap = (d, t) => { const i0 = K.barAt(d.t, t), arr = Array(d.c.length).fill(NaN); let pv = 0, vv = 0; for (let i = i0; i < d.c.length; i++) { pv += (d.h[i] + d.l[i] + d.c[i]) / 3 * d.v[i]; vv += d.v[i]; arr[i] = vv ? pv / vv : NaN; } return arr; };
@@ -1297,7 +1308,7 @@ function chipSum(id) {
   return {dom:() => `шаг ${stepTxt()} · ${C('domAnchor') ? 'круглые' : 'от цены'}${C('domUnit') ? ' · монеты' : ''}`,
     imb:() => `±${C('imbRange')}%`, act:() => `за ${C('actWin')} с`, heat:() => `${['жёлто-синяя', 'покупка/продажа', 'моно'][C('heatScheme')]} · ${C('heatOp')}%`,
     walls:() => `±${C('domRange')}% · ×${C('wallX')}${C('wallAlert') ? ' · увед. от $' + fmtUsd(C('wallAlert')) : ''}`, bubbles:() => `топ ${C('bubPct')}%`,
-    mk:() => `${['покупки/продажи', 'перевес', 'объём'][C('mkMode')]} · топ ${C('mkTop')}%`,     vp:() => `${C('vpPx')}px · ${C('vpW')}%`, fp:() => C('fpStep') ? 'шаг $' + niceNum((p?.base || 0) * BOOK_STEPS[C('fpStep') - 1]) : 'шаг авто', bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
+    vwap:() => `с начала ${['дня', 'недели', 'месяца'][C('vwapPer')]}${C('vwapBand') ? ' · ±' + C('vwapBand') + 'σ' : ''}`,     mk:() => `${['покупки/продажи', 'перевес', 'объём'][C('mkMode')]} · топ ${C('mkTop')}%`,     vp:() => `${C('vpPx')}px · ${C('vpW')}%`, fp:() => C('fpStep') ? 'шаг $' + niceNum((p?.base || 0) * BOOK_STEPS[C('fpStep') - 1]) : 'шаг авто', bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
 }
 let chipsOpen = true;
 function renderChips() {
