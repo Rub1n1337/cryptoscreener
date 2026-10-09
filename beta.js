@@ -48,6 +48,7 @@ const CATS = [
   ]},
   {name:'Кластерный анализ', items:[
     {id:'fp', name:'Таблицы кластеров (футпринт)', hint:'покупки × продажи по ценам внутри свечи; приблизьте график — появятся цифры; история с нашего сервера, живые — с открытия вкладки'},
+    {id:'mk', name:'Маркеры кластеров', hint:'кружки на уровнях внутри свечей, где прошло особенно много: крупные покупки и продажи, перевес одной стороны или общий объём; история с нашего сервера (спот)'},
   ]},
   {name:'Профили объёма и POC', items:[
     {id:'vp', name:'Профиль объёма', hint:'объём по ценам в видимой части, у левого края; ярче — зона 70% объёма (VAH–VAL)'},
@@ -90,6 +91,9 @@ const PARAMS = {
     {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
   bubbles:[{k:'bubPct', name:'Показывать самые крупные сделки', min:0.2, max:5, step:0.1, def:1.5, u:v => v + '% от всех'},
     {k:'bubMin', name:'И не меньше', min:1e3, max:1e6, step:1e3, def:5e3, u:v => '$' + fmtUsd(v)}],
+  mk:[{k:'mkMode', name:'Что отмечать', def:0, opts:[[0, 'покупки / продажи'], [1, 'перевес на уровне'], [2, 'общий объём']]},
+    {k:'mkTop', name:'Отмечать самые крупные уровни', min:0.5, max:10, step:0.5, def:2, u:v => v + '% от видимых'},
+    {k:'mkLines', name:'Линии вправо, пока цена не вернётся к уровню', def:1, opts:[[0, 'выкл'], [1, 'вкл']]}],
   fp:[{k:'fpImb', name:'Подсвечивать перевес (покупки к продажам уровнем ниже и наоборот)', def:3, opts:[[0, 'выкл'], [2, '2×'], [3, '3×'], [4, '4×']]},
     {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],
   vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
@@ -475,7 +479,7 @@ class Pane {
   }
   // footprint history from our server: market buys / sells per minute and price bin, folded into this chart's candles
   async loadFp() {
-    if (!on('fp') || this.mkt !== 'spot' || !this.d || !(await srvHas(this.sym))) return;
+    if (!(on('fp') || on('mk')) || this.mkt !== 'spot' || !this.d || !(await srvHas(this.sym))) return;
     const key = this.sym + this.tf, tf = TFMS[this.tf], r = await srv(`/fp?symbol=${this.sym}&since=${this.d.t[0]}`);
     if (!r?.bars || key !== this.sym + this.tf) return;
     const hist = new Map();
@@ -504,11 +508,45 @@ class Pane {
       + `<div class="fpr fph"><span>крупнейшие уровни</span><span>продажи</span><span>покупки</span><span>дельта</span></div>${[...top].sort((a, b) => b[0] - a[0]).map(row).join('')}`
       + `<p class="phint">Шаг строк $${niceNum(step)}. ${this.fpHist?.cols.has(d.t[i]) ? 'История — с нашего сервера.' : 'Только сделки с момента открытия вкладки.'}</p>`, 'fpp');
   }
+  // the cluster row step: the average visible candle range / 10 (like ZeroSynapse), or the fixed step from the settings
+  fpStepFor(G) {
+    const d = this.d; let rs = 0, cnt = 0;
+    for (let i = G.s; i <= G.e; i++) { rs += d.h[i] - d.l[i]; cnt++; }
+    return Math.max(this.base, C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : niceStep(rs / Math.max(1, cnt) / 10, 1));
+  }
+  // like ZeroSynapse's markers: circles on the in-candle levels that stand out — big buys / sells, one side outweighing the other, or total volume;
+  // the threshold is the top N% of the visible levels, so it adapts to the coin and the zoom
+  drawMarkers(g, G) {
+    const d = this.d, PC = K.PC, step = this.fpStepFor(G), mode = C('mkMode'), pts = [];
+    for (let i = G.s; i <= G.e; i++) for (const [k, [b, s]] of this.fpBar(d.t[i], step)) {
+      if (mode === 0) { if (b) pts.push({i, k, v:b, buy:true}); if (s) pts.push({i, k, v:s, buy:false}); }
+      else if (mode === 1) { if (b !== s) pts.push({i, k, v:Math.abs(b - s), buy:b > s, r:Math.max(b, s) / (Math.min(b, s) || 1)}); }
+      else pts.push({i, k, v:b + s, buy:b >= s});
+    }
+    if (pts.length < 8) return;
+    const sorted = pts.map(p => p.v).sort((a, b) => b - a), thr = sorted[Math.max(0, Math.floor(sorted.length * C('mkTop') / 100) - 1)], top = sorted[0];
+    const hit = pts.filter(p => p.v >= thr && (mode !== 1 || p.r >= 1.5));
+    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
+    if (C('mkLines')) for (const p of hit) {   // a level stays drawn to the right until a later candle trades through it
+      const y = G.Y((p.k + 0.5) * step), lvl = (p.k + 0.5) * step; let j = p.i + 1;
+      while (j <= G.e && !(d.l[j] <= lvl && d.h[j] >= lvl)) j++;
+      if (j === p.i + 1) continue;
+      g.strokeStyle = (p.buy ? PC.lo : PC.up) + '80'; g.lineWidth = 1; g.setLineDash([3, 3]);
+      g.beginPath(); g.moveTo(G.X(p.i), Math.round(y) + 0.5); g.lineTo(j > G.e ? G.W - G.padR : G.X(j), Math.round(y) + 0.5); g.stroke();
+    }
+    g.setLineDash([]); g.font = '600 9.5px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'center';
+    for (const p of hit) {
+      const x = G.X(p.i), y = G.Y((p.k + 0.5) * step); if (y < G.T0 || y > G.pH) continue;
+      const r = Math.max(3, Math.min(Math.max(6, G.bw * 0.7), 4 + Math.sqrt(p.v / top) * 12)), col = mode === 2 ? PC.acc : p.buy ? PC.lo : PC.up;
+      g.beginPath(); g.arc(x, y, r, 0, 7); g.fillStyle = col + '55'; g.fill(); g.strokeStyle = col; g.lineWidth = 1.5; g.stroke();
+      if (r >= 11) { g.fillStyle = PC.price; g.fillText(mode === 1 ? (p.r >= 10 ? '10×+' : p.r.toFixed(1) + '×') : fmtUsd(p.v), x, y); }
+      else if (mode !== 2) { g.fillStyle = PC.price; g.fillText(p.buy ? '+' : '−', x, y + 0.5); }   // the side not only by colour
+    }
+    g.textAlign = 'left'; g.restore();
+  }
   // like ZeroSynapse: rows ≈ the average candle range / 10; tables with numbers when a candle is wide enough, a histogram otherwise
   drawFootprint(g, G) {
-    const d = this.d, PC = K.PC; let rs = 0, cnt = 0;
-    for (let i = G.s; i <= G.e; i++) { rs += d.h[i] - d.l[i]; cnt++; }
-    const auto = niceStep(rs / Math.max(1, cnt) / 10, 1), step = Math.max(this.base, C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : auto);
+    const d = this.d, PC = K.PC, step = this.fpStepFor(G);
     const rowPx = Math.abs(G.Y(0) - G.Y(step)), wide = G.bw >= 56 && rowPx >= 11; this.fpStepNow = step;
     if (G.bw < 6) return;
     g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
@@ -602,6 +640,7 @@ class Pane {
         if (this.rc) this.drawBook(g, G);
         if (on('heat') && !mirror) this.drawHeatHover(g, G, hI, hY);
         if (on('fp')) this.drawFootprint(g, G);
+        if (on('mk')) this.drawMarkers(g, G);
         if (on('tape')) this.drawTape(g, G);
         if (on('bubbles')) this.drawBubbles(g, G);
         if (on('liq') && this.mkt === 'fut') this.drawLiqs(g, G);
@@ -1251,14 +1290,14 @@ function renderList() {
 }
 
 // ---------- indicator chips on every chart (like order-flow terminals): short name + key settings, hide / settings / remove ----------
-const SHORT = {act:'Динамика', tape:'Лента', fp:'Футпринт', liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
+const SHORT = {mk:'Маркеры', act:'Динамика', tape:'Лента', fp:'Футпринт', liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
   dtint:'Подсв. дельты', vp:'Профиль', poc:'POC', dpoc:'dPOC', vwap:'VWAP', vwapv:'VWAP экр.', bb:'Канал', rsi:'RSI'};
 function chipSum(id) {
   const p = act(), stepTxt = () => C('domStep') ? '$' + niceNum((p?.base || 0) * BOOK_STEPS[C('domStep') - 1]) : 'авто';
   return {dom:() => `шаг ${stepTxt()} · ${C('domAnchor') ? 'круглые' : 'от цены'}${C('domUnit') ? ' · монеты' : ''}`,
     imb:() => `±${C('imbRange')}%`, act:() => `за ${C('actWin')} с`, heat:() => `${['жёлто-синяя', 'покупка/продажа', 'моно'][C('heatScheme')]} · ${C('heatOp')}%`,
     walls:() => `±${C('domRange')}% · ×${C('wallX')}${C('wallAlert') ? ' · увед. от $' + fmtUsd(C('wallAlert')) : ''}`, bubbles:() => `топ ${C('bubPct')}%`,
-    vp:() => `${C('vpPx')}px · ${C('vpW')}%`, fp:() => C('fpStep') ? 'шаг $' + niceNum((p?.base || 0) * BOOK_STEPS[C('fpStep') - 1]) : 'шаг авто', bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
+    mk:() => `${['покупки/продажи', 'перевес', 'объём'][C('mkMode')]} · топ ${C('mkTop')}%`,     vp:() => `${C('vpPx')}px · ${C('vpW')}%`, fp:() => C('fpStep') ? 'шаг $' + niceNum((p?.base || 0) * BOOK_STEPS[C('fpStep') - 1]) : 'шаг авто', bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
 }
 let chipsOpen = true;
 function renderChips() {
@@ -1284,7 +1323,7 @@ function wireChips() {
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
-const ICONS = {act:'wave', tape:'bubble', liqheat:'heat', obsum:'scale', liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
+const ICONS = {mk:'bubble', act:'wave', tape:'bubble', liqheat:'heat', obsum:'scale', liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
@@ -1304,7 +1343,7 @@ function renderInd() {
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
 }
 function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); renderChips(); }
-function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); if (on('fp')) panes.forEach(p => p.fpHist || p.loadFp()); redrawAll(); requestAnimationFrame(redrawAll); }
+function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); if (on('fp') || on('mk')) panes.forEach(p => p.fpHist || p.loadFp()); redrawAll(); requestAnimationFrame(redrawAll); }
 const openInd = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
 const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
