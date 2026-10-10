@@ -515,12 +515,14 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .prof.on .radio{border-color:var(--acc);background:var(--acc);box-shadow:inset 0 0 0 3px var(--s1)}
 .prof .pplain{font-size:13px;color:var(--text);margin-top:3px}.prof .ptech{font-size:11.5px;color:var(--faint);margin-top:3px}
 .jot{display:flex;align-items:center;gap:8px}.jot button{margin-left:auto;height:28px;padding:0 10px;font-size:12.5px}td.jx{text-align:right;white-space:nowrap}td.jx button{height:26px;padding:0 9px;font-size:12px}
-.sprof{display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--s1)}.sprof .pplain{font-size:13px;color:var(--text);margin-top:3px}.sprof .ptech{font-size:11.5px;color:var(--faint);margin-top:3px}.sprof button{flex:0 0 auto}
-@media(max-width:560px){.sprof{flex-wrap:wrap}.sprof button{width:100%}}
+.sprof{display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--s1)}.sprof .pplain{font-size:13px;color:var(--text);margin-top:3px}.sprof .ptech{font-size:11.5px;color:var(--faint);margin-top:3px}.sprof-a{display:flex;gap:8px;flex:0 0 auto}
+@media(max-width:560px){.sprof{flex-wrap:wrap}.sprof-a{width:100%;flex-direction:column}.sprof-a button{width:100%}}
 .prof .roles{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .chipb{height:30px!important;border-radius:999px;font-size:12.5px;padding:0 12px}.chipb.on{background:var(--accbg);border-color:var(--warn-line);color:var(--acc-t)}
 .bmore{margin:16px 0 0}
 .bopt{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.bopt:first-child{border-top:0;padding-top:0}
+.btg{display:flex;align-items:center;gap:12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--s1)}.btg p{margin:2px 0 0;font-size:12.5px;color:var(--mute)}.btg-i{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--accbg);color:var(--acc);flex:0 0 auto}.btg button{flex:0 0 auto}
+@media(max-width:560px){.btg{flex-wrap:wrap}.btg button{width:100%}}
 .bopt>div{flex:1 1 320px;min-width:0}.bopt b{font-size:14px}.bopt p{margin:3px 0 0;font-size:13px;color:var(--mute);max-width:640px}
 #bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .tablewrap:not(.more) .hx{display:none}
@@ -840,6 +842,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <!-- 1. what the bot is doing right now, in plain words, with one main action -->
       <div class="pimp hidden" id="pimp"></div>
       <div class="bhero" id="bhero"></div>
+      <div class="btg" id="btg"></div>
       <!-- 2. which rules it trades by -->
       <details class="dis bsec" id="bprof"><summary>Профиль <span class="mute" id="bprofSum"></span></summary><div class="dbody">
         <div class="bsech"><h3>Как выбирать профиль</h3>
@@ -1802,7 +1805,7 @@ async function fetchServerBot() {
       for (const t of (r.closed || []).filter(t => !seenC.has(t.id))) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', toJ);
     }
     SB_MINE = {balance:b.balance, start:b.start_balance, open:r.open || [], closed:r.closed || [], on:b.enabled,
-      checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error};
+      checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error, tg:!!b.tg_chat};
     renderBotPanel();
     if (!$('#journal').classList.contains('hidden')) renderJournal();
     if (chart) drawChart();
@@ -1961,7 +1964,38 @@ function idleReason(act, reg, srv) {
   return '';
 }
 let bprofInit = false;
+// ---------- Telegram: the shared bot's trades and signals ≥ 60 for anyone (/start), my bot's trades once it is linked ----------
+let tgBot;   // the Telegram bot's username, or null when the owner hasn't set it up
+const tgName = async () => tgBot !== undefined ? tgBot : (tgBot = await rpc('tg_bot_name', {}).catch(() => null) || null);
+function renderTg() {
+  const el = $('#btg'); if (!el) return;
+  const srv = BP.where === 'server' && UB, linked = srv && SB_MINE?.tg;
+  el.innerHTML = `<span class="btg-i"><svg class="i"><use href="#i-bell"/></svg></span><div style="min-width:0;flex:1"><b>Сделки бота в Telegram</b><p>${
+    !srv ? 'Бот присылает сделки, только когда работает на сервере 24/7.'
+    : linked ? 'Подключено: каждая сделка вашего бота придёт сообщением. Отключить можно здесь или командой /unlink в боте.'
+    : 'Нажмите — откроется Telegram, там нажмите «Start». Через минуту бот подтвердит, что всё связано.'}</p></div>${
+    !srv ? '<button data-tg="server">Перевести на сервер</button>' : linked ? '<button data-tg="off">Отключить</button>' : '<button data-tg="on" class="primary">Подключить Telegram</button>'}`;
+}
+$('#btg').onclick = async e => {
+  const b = e.target.closest('[data-tg]'); if (!b) return;
+  if (b.dataset.tg === 'server') { setWhere('server'); return; }
+  if (b.dataset.tg === 'off') {
+    try { await rpc('ub_tg_unlink', {p_id:UB.id, p_secret:UB.secret}); SB_MINE.tg = false; renderTg(); toast('Telegram отключён', '', 'ok'); }
+    catch (err) { toast('Не удалось отключить', String(err.message || err), 'bad'); }
+    return;
+  }
+  const w = window.open('', '_blank');   // opened right on the click, so the browser doesn't block it
+  try {
+    const r = await rpc('ub_tg_link', {p_id:UB.id, p_secret:UB.secret});
+    if (!r?.bot) { w?.close(); toast('Telegram-бот ещё не настроен', 'Владелец сайта должен подключить его — тогда кнопка заработает.', 'warn'); return; }
+    const url = `https://t.me/${encodeURIComponent(r.bot)}?start=${encodeURIComponent(r.code)}`;
+    if (w) w.location = url; else location.href = url;
+    toast('Нажмите «Start» в Telegram', 'Ссылка действует 30 минут. Бот ответит в течение минуты.', 'info');
+    setTimeout(fetchServerBot, 70e3);
+  } catch (err) { w?.close(); toast('Не удалось подключить', String(err.message || err), 'bad'); }
+};
 function renderBotPanel() {
+  renderTg();
   $('#bER').value = String(BP.erMax);
   document.querySelectorAll('#bmode .tab').forEach(b => b.classList.toggle('on', b.dataset.m === BP.mode));
   document.querySelectorAll('#bwhere .tab').forEach(b => b.classList.toggle('on', b.dataset.w === BP.where));
@@ -2185,7 +2219,7 @@ function renderJournal() {
   $('#jdesc').innerHTML = shared
     ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
       <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
-        <button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div>`
+        <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Сделки общего бота и новые сигналы с силой ≥ 60 — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>`
     : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
   tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
@@ -2500,6 +2534,7 @@ const CHANGELOG = [
     'В журнале общего бота теперь видно, по какому профилю он торгует: таймфрейм, вход, сила сигнала, риск, плечо, фильтр рынка.',
     'Кнопка «Проверить в бэктесте» у общего бота и «В бэктест» у каждого вашего профиля: настройки переносятся в бэктест, остаётся выбрать период и нажать «Запустить».',
     'Позиции «Моего бота» можно закрыть вручную — по одной или все сразу, по цене рынка с обычной комиссией. В журнале такая сделка помечена «вручную».',
+    'Telegram: сделки общего бота и новые сигналы с силой ≥ 60 приходят всем, кто нажал Start в нашем боте; свой бот с сайта можно привязать кнопкой «Подключить Telegram» в «Моём боте» — тогда придут и его сделки.',
   ]},
   {v:'2.9', date:'7 октября 2026', title:'Общий бот на проверенных правилах, плавность и Бета', items:[
     'Общий бот теперь торгует по правилам, которые лучше всего держались на истории за год: часовые свечи, 50 самых популярных монет, только когда рынок спокойный.',
@@ -2741,7 +2776,10 @@ async function closeMine(id) {
   toast(id == null ? 'Позиции закрыты' : 'Позиция закрыта', `итог ${usd(net)}`, net > 0 ? 'ok' : net < 0 ? 'bad' : 'info');
 }
 $('#jcloseAll').onclick = () => closeMine(null);
-$('#jdesc').onclick = e => { if (e.target.closest('#jSharedBt') && SJ) profToBacktest(sharedProf(), 'общий бот'); };
+$('#jdesc').onclick = e => {
+  if (e.target.closest('#jSharedBt') && SJ) profToBacktest(sharedProf(), 'общий бот');
+  if (e.target.closest('#jSharedTg') && tgBot) window.open(`https://t.me/${encodeURIComponent(tgBot)}?start=go`, '_blank', 'noopener');
+};
 ['#jopen', '#jclosed'].forEach(s => $(s).onclick = e => {
   const cb = e.target.closest('[data-close]'); if (cb) { closeMine(cb.dataset.close); return; }
   const tr = e.target.closest('tr.row'); if (tr) openTrade(tr.dataset.kind, tr.dataset.id);
@@ -3196,6 +3234,7 @@ window.addEventListener('resize', () => { if (btRes) drawEquity(); });
 $('#btDays').value = '30'; $('#btTop').value = '50'; btFill(S);
 renderChangelog();
 renderBotPanel();
+tgName().then(b => { if (b && !$('#journal').classList.contains('hidden')) renderJournal(); });
 if (BP.where === 'server') fetchServerBot();
 if (!load('sr_intro', false)) $('#intro').classList.remove('hidden');
 $('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };
