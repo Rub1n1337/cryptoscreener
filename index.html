@@ -175,6 +175,8 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .gauge::after{content:"";position:absolute;left:50%;top:2px;bottom:2px;border-left:1px dashed var(--mid)}
 .gauge i{position:absolute;top:1px;width:8px;height:8px;margin-left:-4px;border-radius:50%;z-index:1;box-shadow:0 0 0 2px var(--canvas)}
 .tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:var(--tag-t);white-space:nowrap}
+.tag.weak{opacity:.55;filter:saturate(.6)}   /* a confirmed reversal below the bot threshold: visible, but not an invitation */
+.whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity .2s;z-index:3;white-space:nowrap}.whint.show{opacity:1}
 .tag.up{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.lo{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sq{background:var(--accbg);color:var(--acc-t)}
 .tag.upc{background:#c9303d;color:#fff}.tag.loc{background:#16a34a;color:#fff}
 .tag.uo{background:transparent;color:var(--up-t);box-shadow:inset 0 0 0 1px var(--bad-line)}.tag.lout{background:transparent;color:var(--lo-t);box-shadow:inset 0 0 0 1px var(--ok-line)}
@@ -786,15 +788,15 @@ details.dis>.dbody{padding:0 16px 16px}
           <span><i style="border-color:var(--c-up)"></i>верхняя граница</span>
           <span><i style="border-color:var(--c-mid);border-top-style:dashed"></i>обычная цена</span>
           <span><i style="border-color:var(--c-lo)"></i>нижняя граница</span>
-          <span><i style="border-color:var(--c-trade);border-top-style:dashed"></i>сделка бота</span>
-          <span class="faint hint-mouse">колёсико или − + — масштаб · перетаскивание или ← → — время · F — во всю ширину · двойной клик — сброс</span><span class="faint hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span>
+          <span id="lgTrade"><i style="border-color:var(--c-trade);border-top-style:dashed"></i>сделка бота</span>
+          <span class="faint hint-mouse">нажмите на график и крутите колёсико (или − +) — масштаб · перетаскивание или ← → — время · F — во всю ширину · двойной клик — сброс</span><span class="faint hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span>
         </div>
         <div class="detail" id="detail"></div>
       </div>
 
       <div class="panel tpanel">
         <div class="filters">
-          <div class="search" style="flex:1 1 160px"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
+          <div class="search" style="flex:1 1 110px"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
           <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
           <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
           <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
@@ -911,6 +913,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="«Отскок» — от границы к обычной цене (как у ботов сейчас); «Отскок по тренду» — только по направлению движения; «Пробой» — вслед за выходом за границу">Идея входа <select id="btStrat">
         <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму рынка</option>
       </select></label>
+      <label title="Таймфрейм свечей: на 1h торгуют общий бот и проверенный профиль">Таймфрейм <select id="btTf"><option>15m</option><option>1h</option><option>4h</option></select></label>
       <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></label>
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
       <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
@@ -923,7 +926,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="RM: какую долю баланса теряем, если сработал стоп">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
       <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на 3 позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
     </div></div>
-    <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, фильтры T½ и ширины, канал, таймфрейм</span></summary><div class="dbody">
+    <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, режим рынка, фильтры T½ и ширины, канал</span></summary><div class="dbody">
       <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
         <label class="fl" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:80px"></label>
         <label class="fl" title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
@@ -934,7 +937,6 @@ details.dis>.dbody{padding:0 16px 16px}
         </select></label>
         <label class="fl" title="Длина окна канала, свечей">N <input type="number" id="btN" min="20" max="300" style="width:80px"></label>
         <label class="fl" title="Ширина канала в σ">k <input type="number" id="btK" min="1" max="4" step="0.1" style="width:72px"></label>
-        <label class="fl" title="Таймфрейм свечей">ТФ <select id="btTf"><option>15m</option><option>1h</option><option>4h</option></select></label>
         <label class="fl" title="Когда разрешено входить: в любом рынке, только в боковике (флэт) или только в импульсе (сильное движение)">Режим рынка <select id="btReg"><option value="any">любой</option><option value="flat">только флэт</option><option value="impulse">только импульс</option></select></label>
         <label class="fl" title="По каким монетам определять режим. «BTC+ETH+SOL» — флэт, только когда все три стоят в боковике">Режим по <select id="btSrc"><option value="btc">BTC</option><option value="majors">BTC+ETH+SOL</option></select></label>
         <label class="fl" title="ER = чистое движение за ~7 дней / весь пройденный путь. Ниже порога — флэт (боковик), выше — импульс">Флэт, если ER <select id="btER"><option value="0.1">&lt; 0.10</option><option value="0.15">&lt; 0.15</option><option value="0.25">&lt; 0.25</option></select></label>
@@ -1058,7 +1060,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они придут, даже когда вкладка свёрнута. Рядом — кнопка звука.</p>
       <h3>График</h3>
       <ul>
-        <li><b>Масштаб и время:</b> колёсико или кнопки − + в углу графика, перетаскивание или стрелки ← →; на телефоне — два пальца и свайп. ⟲ — обычный вид, «к последней свече →» — вернуться к текущему моменту.</li>
+        <li><b>Масштаб и время:</b> нажмите на график и крутите колёсико (или держите Ctrl), либо кнопки − + в углу графика, перетаскивание или стрелки ← →; на телефоне — два пальца и свайп. ⟲ — обычный вид, «к последней свече →» — вернуться к текущему моменту.</li>
         <li><b>Свой уровень:</b> кнопка «— уровень» (или клавиша L), затем нажмите на нужную цену. Когда цена пересечёт уровень, придёт уведомление. Удалить — крестиком под графиком или правым кликом по линии.</li>
         <li><b>Второй таймфрейм:</b> кнопка «2 ТФ» (или T) показывает ту же монету на старшем таймфрейме. В режиме ⤢ (F) графики стоят рядом.</li>
         <li><b>Позиции ботов:</b> зелёная зона — от входа до тейка, красная — от входа до стопа.</li>
@@ -1138,13 +1140,14 @@ const { TFMS, clamp, median, bands, rsi, halfLife, parse } = M;
 
 // ---------- utils ----------
 const $ = s => document.querySelector(s);
-const DEF = {method:'log', N:210, k:3, tf:'15m', candles:540, top:150, minScore:60, v:2};
+const DEF = {method:'log', N:210, k:3, tf:'1h', candles:540, top:150, minScore:60, v:3};   // 1h — the same timeframe the bots trade, so the market shows what they act on
 const SCAN_MS = 60000;
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
 let S = Object.assign({}, DEF, load('sr_settings', {}));
 if (!TFMS[S.tf]) S.tf = DEF.tf;
 if ((S.v || 1) < 2) { S.method = DEF.method; S.v = 2; }
+if (S.v < 3) { if (S.tf === '15m') S.tf = DEF.tf; S.v = 3; save('sr_settings', S); }   // the old default 15m moves to the bots' 1h once
 const METHOD_HINT = {
   log: 'Лог-канал: как классика, но в процентах — вверх шире, чем вниз. Хороший вариант по умолчанию.',
   classic: 'Классические полосы Боллинджера (SMA ± k·σ) — для сравнения.',
@@ -1272,9 +1275,10 @@ function renderCards() {
   $('#c1m').style.width = med + '%';
   $('#c2').textContent = cold; $('#c2s').textContent = `из ${rows.length} монет · возможен отскок вверх`;
   $('#c3').textContent = hot; $('#c3s').textContent = `из ${rows.length} монет · возможен откат вниз`;
-  const sigN = rows.filter(r => r.rev).length;
+  // "signals" = what a bot would act on: a confirmed reversal with strength at the threshold; weaker ones are counted apart
+  const sigN = rows.filter(r => r.rev && r.score >= S.minScore).length, weakN = rows.filter(r => r.rev && r.score < S.minScore).length;
   const plur = (n, f) => f[n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2];
-  $('#c4').textContent = sigN; $('#c4s').textContent = sigN ? `подтверждённ${plur(sigN, ['ый разворот', 'ых разворота', 'ых разворотов'])}` : 'сейчас нет — это нормально';
+  $('#c4').textContent = sigN; $('#c4s').textContent = (sigN ? `с силой от ${S.minScore} — бот может войти` : 'сильных сейчас нет — это нормально') + (weakN ? ` · ещё ${weakN} ${plur(weakN, ['слабый', 'слабых', 'слабых'])}` : '');
   const sqN = rows.filter(r => r.squeeze).length;
   $('#c5').textContent = sqN; $('#c5').nextElementSibling.textContent = `${plur(sqN, ['монета', 'монеты', 'монет'])} без движения`;
 }
@@ -1324,7 +1328,7 @@ function renderTable() {
       <td><span class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}">${favs.has(r.sym) ? '★' : '☆'}</span></td>
       <td>${coin(r.sym)}</td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
       <td class="hm hx ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
-      <td>${r.label ? `<span class="tag ${r.cls}">${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
+      <td>${r.label ? `<span class="tag ${r.cls}${r.rev && r.score < S.minScore ? ' weak' : ''}"${r.rev && r.score < S.minScore ? ` title="Сила ${r.score} ниже порога ${S.minScore} — бот по такому сигналу не войдёт"` : ''}>${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
       <td>${sc}</td>
       <td class="hm hx" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
       <td class="hm ${isFinite(r.hl) ? 'mute' : 'faint'}">${hl}</td></tr>`;
@@ -1442,8 +1446,9 @@ function renderChart(cv, d, o = {}) {
   const cur = o.live ? c[n - 1] : c[e];
   const curCol = o.priceCol || PC.acc;   // o.priceCol: e.g. green / red by the last candle
   if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = curCol + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
-  if (isFinite(B.up[e]) && (!o.fitPrice || B.up[e] <= mx)) tags.push({y:Y(B.up[e]), text:fp(B.up[e]), col:PC.up});
-  if (isFinite(B.lo[e]) && (!o.fitPrice || B.lo[e] >= mn)) tags.push({y:Y(B.lo[e]), text:fp(B.lo[e]), col:PC.lo});
+  // a border off the plot (the scale fits the candles) is pinned to the edge with an arrow, so it never disappears
+  if (isFinite(B.up[e])) tags.push(!o.fitPrice || B.up[e] <= mx ? {y:Y(B.up[e]), text:fp(B.up[e]), col:PC.up} : {y:T0, text:'↑ ' + fp(B.up[e]), col:PC.up});
+  if (isFinite(B.lo[e])) tags.push(!o.fitPrice || B.lo[e] >= mn ? {y:Y(B.lo[e]), text:fp(B.lo[e]), col:PC.lo} : {y:pH - 6, text:'↓ ' + fp(B.lo[e]), col:PC.lo});
   // extra price tags from the caller (Beta: VWAP, POC); with pin, a level off the visible range stays at the edge with an arrow
   for (const T of o.tags || []) { if (T.v >= mn && T.v <= mx) tags.push({y:Y(T.v), text:T.text, col:T.col, box:true}); else if (T.pin && isFinite(T.v)) tags.push({y:T.v > mx ? T0 : pH - 6, text:(T.v > mx ? '↑ ' : '↓ ') + T.text, col:T.col, box:true}); }
   tags.push({y:Y(clamp(cur, mn, mx)), text:fp(cur) + (o.live && o.priceSub ? ' · ' + o.priceSub : ''), col:curCol, box:true});   // priceSub: e.g. time left in the candle
@@ -1555,8 +1560,22 @@ function viewRange(n, minFrom, view, defSpan) {
 // api.state() → {n, minFrom, defSpan, view, geo}; api.set(view) stores the view and redraws
 function attachZoom(cv, api) {
   let drag = null;
+  // charts inside a scrolling page (api.wheelGate): the wheel scrolls the page until the chart is clicked (or with Ctrl/⌘),
+  // so the page doesn't get stuck under the mouse; a short hint says how to zoom
+  let armed = false, hintAt = 0;
+  if (api.wheelGate) {
+    cv.addEventListener('mousedown', () => { armed = true; });
+    cv.addEventListener('mouseleave', () => { armed = false; });
+  }
+  const wheelHint = () => {
+    if (performance.now() - hintAt < 4000) return; hintAt = performance.now();
+    const box = cv.parentElement; let h = box.querySelector('.whint');
+    if (!h) { h = document.createElement('div'); h.className = 'whint'; h.textContent = 'Чтобы менять масштаб колёсиком — нажмите на график или держите Ctrl'; box.append(h); }
+    h.classList.add('show'); setTimeout(() => h.classList.remove('show'), 1800);
+  };
   const range = st => viewRange(st.n, st.minFrom, st.view, st.defSpan);
   cv.addEventListener('wheel', e => {
+    if (api.wheelGate && !armed && !e.ctrlKey && !e.metaKey) { wheelHint(); return; }   // let the page scroll
     const st = api.state(); if (!st?.geo) return;
     e.preventDefault();
     const r = range(st), span = Math.round(clamp(r.span * (e.deltaY > 0 ? 1.2 : 1 / 1.2), MIN_SPAN, st.n - st.minFrom));
@@ -1665,6 +1684,16 @@ const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})
 // room for the toolbar over the top-left of the canvas; on phones the toolbar sits above the canvas instead
 const chartTop = () => matchMedia('(max-width:700px)').matches ? 8 : 44;
 const chartDefSpan = () => Math.min(S.candles, Math.max(80, Math.round($('#cv').clientWidth / 5)));
+// the scale fits the channel, unless the channel is far wider than the candles in view (then they'd be a thin strip):
+// in that case the candles fill the plot and the channel borders are labelled at the edge
+function fitCandles(d, r) {
+  let lo = Infinity, hi = -Infinity, bl = Infinity, bh = -Infinity;
+  for (let i = Math.max(0, r.from); i <= Math.min(d.c.length - 1, r.to); i++) {
+    lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]);
+    if (isFinite(d.B.up[i])) { bh = Math.max(bh, d.B.up[i]); bl = Math.min(bl, d.B.lo[i]); }
+  }
+  return isFinite(bh) && hi > lo && (Math.max(bh, hi) - Math.min(bl, lo)) > 3 * (hi - lo);
+}
 function drawChart() {
   if (!chart) return;
   const levels = [], zones = [];
@@ -1675,7 +1704,8 @@ function drawChart() {
     zones.push({i0, entry:p.entry, tp:p.tp, sl:p.sl});
   }
   const r = viewRange(chart.c.length, chart.N - 1, chartView, chartDefSpan());
-  chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, zones, ulevels:lvOf(chartSym), live:true, hoverI, hoverY, top:chartTop()});
+  chartGeo = renderChart($('#cv'), chart, {from:r.from, to:r.to, levels, zones, ulevels:lvOf(chartSym), live:true, hoverI, hoverY, top:chartTop(), fitPrice:fitCandles(chart, r)});
+  $('#lgTrade')?.classList.toggle('hidden', !zones.length);   // the legend only names what is on the chart
   drawChart2();   // the second timeframe follows every redraw (theme, positions, levels)
   zm?.sync();   // show or hide «к последней свече»
 }
@@ -1938,6 +1968,22 @@ const allowsReg = (p, r) => { const x = profSet(p);
   if (x.regimeOnly === 'flat' && r !== 'flat') return false;
   if (x.regimeOnly === 'impulse' && r === 'flat') return false;
   return !(x.strategy === 'switch' && r === 'down'); };
+// the same "why isn't it trading" for the shared bot: its rules often wait for a flat market, and silence looks like a breakdown
+let sharedRegAsked = false;
+function sharedIdle() {
+  if (!SJ?.checked) return '';
+  const s = {...SJ.settings, regimeSrc:SJ.settings.regimeSrc || 'majors'};
+  if (!botRegime && !sharedRegAsked) { sharedRegAsked = true; marketRegime().then(r => { botRegime ||= r; renderJournal(); }).catch(() => {}); }
+  const reg = botRegime ? M.regimeOf(botRegime, s) : null, open = SJ.open || [];
+  if (open.length >= M.MAX_OPEN) return `<div class="bh-why"><b>Все ${M.MAX_OPEN} места заняты.</b> Новую сделку бот откроет, когда закроется одна из текущих.</div>`;
+  const only = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
+  if (reg && ((only === 'flat' && reg !== 'flat') || (only === 'impulse' && reg === 'flat') || (s.strategy === 'switch' && reg === 'down')))
+    return `<div class="bh-why"><b>Бот ждёт:</b> ${only === 'flat' ? `он торгует только в боковике, а сейчас ${regPlain(reg)}` : only === 'impulse' ? 'он торгует только в импульсе, а сейчас боковик' : 'в падающем рынке он в сделки не входит'}. Новых сделок не будет, пока рынок не сменится — так правила и задуманы.</div>`;
+  const last = (SJ.closed || []).reduce((m, x) => Math.max(m, x.tclose || 0), 0);
+  if (!open.length && (!last || Date.now() - last > 6 * 36e5))
+    return `<div class="bh-why"><b>Подходящих сигналов пока нет.</b> Бот смотрит на ${TF_PLAIN[s.tf] || s.tf} и входит только по подтверждённым разворотам с силой от ${s.minScore}.</div>`;
+  return '';
+}
 function idleReason(act, reg, srv) {
   const D = srv ? SB_MINE : J;
   if (!D?.checked) return '';
@@ -2220,7 +2266,7 @@ function renderJournal() {
   $('#jdesc').innerHTML = shared
     ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
       <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
-        <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Сделки общего бота и новые сигналы с силой ≥ 60 — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>`
+        <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Сделки общего бота и новые сигналы с силой ≥ 60 — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>${sharedIdle()}`
     : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
   tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
@@ -2538,6 +2584,10 @@ const CHANGELOG = [
     'Telegram: сделки общего бота и новые сигналы с силой ≥ 60 приходят всем, кто нажал Start в нашем боте; свой бот с сайта можно привязать кнопкой «Подключить Telegram» в «Моём боте» — тогда придут и его сделки.',
     'Золото (PAXG, XAUT), обёрнутые монеты (WBTC и др.) и стейблкоин U больше не попадают в сканер и к ботам — их цена повторяет золото, доллар или другую монету.',
     'В таблице «Рынка» вместо «∞» и сотен дней в колонке T½ теперь пишется «тренд»; в словаре исправлен риск общего бота (1%, а не 2%).',
+    '«Рынок» по умолчанию на часовом таймфрейме — том же, на котором торгуют боты; карточка «Сигналы» считает только сигналы с силой от порога, а слабые метки в таблице стали бледнее.',
+    'Бэктест открывается на проверенных правилах (как у общего бота) за 60 дней; таймфрейм вынесен наверх.',
+    'В журнале общего бота видно, почему он не торгует, если рынок не подходит его правилам.',
+    'Колёсико над графиком «Рынка» больше не мешает листать страницу: нажмите на график (или держите Ctrl), чтобы менять масштаб. Если канал намного шире свечей, график вписывается по свечам, а границы канала подписаны у краёв.',
   ]},
   {v:'2.9', date:'7 октября 2026', title:'Общий бот на проверенных правилах, плавность и Бета', items:[
     'Общий бот теперь торгует по правилам, которые лучше всего держались на истории за год: часовые свечи, 50 самых популярных монет, только когда рынок спокойный.',
@@ -3111,7 +3161,7 @@ const setWide = on => {
   const b = $('#cv').parentElement.querySelector('[data-z=expand]'); if (b) { b.textContent = on ? '⤡' : '⤢'; b.title = on ? 'Вернуть график рядом со списком (F)' : 'Развернуть график на всю ширину (F)'; }
   requestAnimationFrame(drawChart);
 };
-zm = attachZoom(cv, {state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:chartDefSpan(), view:chartView, geo:chartGeo},
+zm = attachZoom(cv, {wheelGate:true, state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:chartDefSpan(), view:chartView, geo:chartGeo},
   set:v => { chartView = v; drawChart(); }, expand:() => setWide(!document.body.classList.contains('wide')),
   tools:`<button data-z="level" class="ct-txt" title="Провести свой уровень (L): нажмите на график на нужной цене" aria-label="Свой уровень">— уровень</button>`
     + `<button data-z="tf2" class="ct-txt" title="Второй таймфрейм рядом (T)" aria-label="Второй таймфрейм">2 ТФ</button>`,
@@ -3205,7 +3255,7 @@ document.querySelectorAll('#tf2seg .tab').forEach(b => b.onclick = () => { tf2Pr
 const cv2 = $('#cv2');
 cv2.onmousemove = e => { hover2 = hoverIndex(chart2Geo, cv2, e); hover2Y = e.clientY - cv2.getBoundingClientRect().top; drawChart2(); };
 cv2.onmouseleave = () => { hover2 = null; hover2Y = null; drawChart2(); };
-zm2 = attachZoom(cv2, {state:() => chart2 && {n:chart2.c.length, minFrom:chart2.N - 1, defSpan:chart2DefSpan(), view:chart2View, geo:chart2Geo},
+zm2 = attachZoom(cv2, {wheelGate:true, state:() => chart2 && {n:chart2.c.length, minFrom:chart2.N - 1, defSpan:chart2DefSpan(), view:chart2View, geo:chart2Geo},
   set:v => { chart2View = v; drawChart2(); }, pick:e => pickLevel(e, chart2Geo, cv2)});
 if (tf2On) setTf2(true);
 attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
@@ -3215,12 +3265,15 @@ $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate()
 // the shared bot's rules as a profile, for showing them and for the backtest
 const sharedProf = () => ({name:'Общий бот', coins:{mode:'top', top:SJ.settings.top || 150}, set:SJ.settings});
 // a profile (or the shared bot's rules) → the backtest form, then the backtest page: check it on history in one click
-function profToBacktest(p, who) {
+function btFromProf(p) {   // fill the backtest form from a profile: rules and coins
   btFill(p.set);
   const c = p.coins || {};
   if (c.mode === 'list' && c.list?.length) { $('#btTop').value = 'custom'; $('#btCustom').value = c.list.map(s => s.replace(/USDT$/, '')).join(', '); }
   else { const tops = [...$('#btTop').options].map(o => +o.value).filter(Boolean), want = +(c.top || 50); $('#btTop').value = String(tops.reduce((a, b) => Math.abs(b - want) < Math.abs(a - want) ? b : a)); }
-  btEstimate(); go('backtest');
+  btEstimate();
+}
+function profToBacktest(p, who) {
+  btFromProf(p); go('backtest');
   const tfNote = $('#btTf').value !== p.set.tf ? ` Таймфрейм ${p.set.tf} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
   toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
 }
@@ -3234,7 +3287,8 @@ $('#btTrades').onclick = e => {
   if (x) showTrade(x, {isOpen:false, who:'бэктест', set:btRes.settings});
 };
 window.addEventListener('resize', () => { if (btRes) drawEquity(); });
-$('#btDays').value = '30'; $('#btTop').value = '50'; btFill(S);
+// the backtest opens on the rules that held up over a year (the shared bot trades by the same), not on a setup that loses
+$('#btDays').value = '60'; btFromProf(PRESETS[0]);
 renderChangelog();
 renderBotPanel();
 tgName().then(b => { if (b && !$('#journal').classList.contains('hidden')) renderJournal(); });
