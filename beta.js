@@ -148,8 +148,9 @@ async function srv(path) {
 // the server follows the top spot coins and the top futures separately: ask per market
 async function srvHas(sym, mkt = 'spot') {
   if (!srvUrl()) return false;
-  if (!srvSyms) { const r = await srv('/symbols'); srvSyms = {spot:new Set(r?.symbols || []), fut:new Set(r?.futures || [])}; if (!r) setTimeout(() => { srvSyms = null; }, 60e3); }
-  return srvSyms[mkt].has(sym);
+  // one request shared by everyone asking at the same time; a failed one is retried in a minute
+  srvSyms ||= srv('/symbols').then(r => { if (!r) setTimeout(() => { srvSyms = null; }, 60e3); return {spot:new Set(r?.symbols || []), fut:new Set(r?.futures || [])}; });
+  return (await srvSyms)[mkt].has(sym);
 }
 // ---------- panes ----------
 let panes = [], active = 0, layout = 1, link = true, hoverT = null, tool = null, ruler = null, loopOn = false;
@@ -305,11 +306,13 @@ class Pane {
     b._mv = b.ver; b._m = isFinite(ba) && bb ? (bb + ba) / 2 : null; b.bb = bb; b.ba = ba; return b._m;
   }
   get step() { return this.base * C('stepX'); }
-  buckets(range, step = this.step) {   // {key: usd} for bids and asks within ±range of the middle
+  // {key: usd} for bids and asks within ±range of the middle; noFar: beyond the snapshot leave the levels to the server's far book
+  buckets(range, step = this.step, noFar = false) {
     const m = this.mid(); if (!this.book || !m || !step) return null;
     const bid = new Map(), ask = new Map();
-    for (const [p, q] of this.book.bids) if (p >= m * (1 - range)) { const k = Math.round(p / step); bid.set(k, (bid.get(k) || 0) + p * q); }
-    for (const [p, q] of this.book.asks) if (p <= m * (1 + range)) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); }
+    const bLo = noFar ? this.book.minB || 0 : 0, aHi = noFar ? this.book.maxA || Infinity : Infinity;
+    for (const [p, q] of this.book.bids) if (p >= m * (1 - range) && p >= bLo) { const k = Math.round(p / step); bid.set(k, (bid.get(k) || 0) + p * q); }
+    for (const [p, q] of this.book.asks) if (p <= m * (1 + range) && p <= aHi) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); }
     return {m, bid, ask, step};
   }
   // every second the current book is folded into the bar it belongs to (max per fine bucket), building the heatmap
@@ -327,7 +330,7 @@ class Pane {
   // walls: the strongest price bins on each side, several times the typical bin; with the server, its far book counts too
   // (a wall put at +8% is reported by Binance's stream, the server keeps it, the browser's snapshot doesn't reach it)
   walls() {
-    const rng = C('domRange') / 100, bk = this.buckets(rng); if (!bk) return [];
+    const rng = C('domRange') / 100, bk = this.buckets(rng, this.step, !!this.far); if (!bk) return [];
     const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;   // typical bin: dense local book only
     if (this.far && this.book) {
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
@@ -338,6 +341,7 @@ class Pane {
         else if (side === 'b' && p < bLo) bk.bid.set(k, (bk.bid.get(k) || 0) + usd);
       }
     }
+    this.wallBk = bk;   // every bin, for the new-wall notices
     const pick = (m, side) => [...m].filter(([, v]) => v >= med * C('wallX') && v >= C('wallMin')).sort((a, b) => b[1] - a[1]).slice(0, C('wallN')).map(([k, v]) => ({price:k * bk.step, usd:v, side}));
     return [...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')];
   }
@@ -348,18 +352,34 @@ class Pane {
     if (mm && bk.cov && Date.now() - (this.lastSync || 0) > (this.mkt === 'fut' ? 15e3 : 60e3) && Math.min(mm - bk.minB, bk.maxA - mm) < bk.cov * 0.4) { this.lastSync = Date.now(); this.resyncNow?.(); return; }
     if (!this.book?.ok || !this.d) return;
     const W = this.wc = this.walls(), thr = C('wallAlert'), m = this.mid(); if (!thr || !m) return;
-    const now = Date.now(), key = w => `${w.side}${Math.round(w.price / (this.step * 4))}`, seen = this.seenW ||= new Map();
-    if (this.wallsFor !== this.sym + this.step) { this.wallsFor = this.sym + this.step; seen.clear(); for (const w of W) seen.set(key(w), now); return; }   // the first look is the baseline
-    for (const w of W) {
-      const kk = key(w);
-      if (!seen.has(kk) && w.usd >= thr) {
-        const pct = (w.price / m - 1) * 100;
-        K.toast(`${K.base(this.sym)}: новая стена ${w.side === 'ask' ? 'на продажу' : 'на покупку'} $${fmtUsd(w.usd)}`,
-          `у ${K.fp(w.price)} (${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены). Нажмите — график.`, 'info', () => { setActive(panes.indexOf(this)); this.el.scrollIntoView({behavior:'smooth', block:'center'}); });
-      }
-      seen.set(kk, now);
+    // a notice is about an order that was just placed: the exact changes of the last 1.5 s (levels we already knew, or inside the
+    // snapshot) add up to the alert amount in one bin, and not because an order moved over from the next bin;
+    // beyond what the browser knows, the server's far book: a bin it already had grew between two of its updates.
+    // A wall that merely came into view (the far book arrived, a new snapshot reaches further) or moved up the wall list is not news
+    const bk2 = this.wallBk; if (!bk2) return;
+    const now = Date.now(), seen = this.seenW ||= new Map(), st = bk2.step, add = new Map();
+    const chg = this.chg || []; let j = 0; while (j < chg.length && chg[j][0] < now - 1500) j++; if (j) chg.splice(0, j);
+    for (const [, p, d, sd] of chg) { if (this.far && (sd === 'a' ? p > bk.maxA : p < bk.minB)) continue; const kk = (sd === 'a' ? 'ask' : 'bid') + Math.round(p / st); add.set(kk, (add.get(kk) || 0) + d); }
+    // the server's far bins swing by millions between its updates (orders there come and go all the time): a far wall is news only
+    // when its bin rises above everything it held in the last 30 s; a new snapshot moves the edges and the bins hold other levels: start over
+    const farNow = this.far, H = this.farHist ||= [];
+    if (farNow && farNow !== this.farLast) {
+      this.farLast = farNow; const bins = new Map();
+      for (const [p, usd, s] of farNow) { if ((s === 'a' && p <= bk.maxA) || (s === 'b' && p >= bk.minB)) continue; const kk = (s === 'a' ? 'ask' : 'bid') + Math.round(p / st); bins.set(kk, (bins.get(kk) || 0) + usd); }
+      if (H.length && (H[0].st !== st || H[0].lo !== bk.minB || H[0].hi !== bk.maxA)) H.length = 0;
+      if (H.length >= 8) for (const [kk, v] of bins) { const mx = Math.max(...H.map(h => h.bins.get(kk) ?? Infinity)); if (v > mx) add.set(kk, (add.get(kk) || 0) + v - mx); }
+      H.push({bins, st, lo:bk.minB, hi:bk.maxA}); if (H.length > 10) H.shift();
     }
-    for (const [kk, t] of seen) if (now - t > 10 * 6e4) seen.delete(kk);   // gone for 10 min: a new one there is news again
+    if (this.wallsFor !== this.sym + st + this.mkt) { this.wallsFor = this.sym + st + this.mkt; seen.clear(); return; }   // a new coin or bin size: start clean
+    for (const [kk, grew] of add) {
+      const side = kk.startsWith('ask') ? 'ask' : 'bid', k = +kk.slice(3), price = k * st, v = (side === 'ask' ? bk2.ask : bk2.bid).get(k) || grew;
+      if (grew < thr || seen.has(kk) || Math.min(add.get(side + (k - 1)) || 0, add.get(side + (k + 1)) || 0) < -grew * 0.5) continue;
+      seen.set(kk, now);
+      const pct = (price / m - 1) * 100;
+      K.toast(`${K.base(this.sym)}: новая стена ${side === 'ask' ? 'на продажу' : 'на покупку'} $${fmtUsd(grew)}`,
+        `у ${K.fp(price)} (${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены)${v > grew * 1.2 ? `, на уровне теперь $${fmtUsd(v)}` : ''}. Нажмите — график.`, 'info', () => { setActive(panes.indexOf(this)); this.el.scrollIntoView({behavior:'smooth', block:'center'}); });
+    }
+    for (const [kk, t] of seen) if (now - t > 10 * 6e4) seen.delete(kk);   // one notice per place in 10 minutes, even if the wall flickers
   }
   imbalance(range = C('imbRange') / 100) {
     const bk = this.buckets(range); if (!bk) return null;
@@ -401,7 +421,7 @@ class Pane {
         const b = {bids:new Map(snap.bids.map(([p, q]) => [+p, +q])), asks:new Map(snap.asks.map(([p, q]) => [+p, +q])), id:snap.lastUpdateId, ok:false,
           minB:+(snap.bids[snap.bids.length - 1]?.[0] ?? 0), maxA:+(snap.asks[snap.asks.length - 1]?.[0] ?? Infinity)};   // how deep the snapshot reaches
         for (const ev of buffer.splice(0)) if (!applyDepth(b, ev)) throw new Error('snapshot older than the stream');
-        b.onChange = (p, d) => this.recordAct(p, d); this.book = b; this.fails = 0; syncing = false; this.lastSync = Date.now();
+        b.onChange = (p, d, side) => this.recordAct(p, d, side); this.book = b; this.fails = 0; syncing = false; this.lastSync = Date.now();
         const m0 = this.mid(); if (m0) b.cov = Math.min(m0 - b.minB, b.maxA - m0);   // how far the snapshot reaches from the price
       } catch {
         syncing = false; if (ws !== this.ws) return;
@@ -731,8 +751,11 @@ class Pane {
     g.globalAlpha = 1;
   }
   // book dynamics: net $ put up (+) or pulled (−) per fine price bin, in one-second buckets (two minutes kept)
-  recordAct(p, d) {
-    if (!this.fine || !d) return;
+  recordAct(p, d, side) {
+    if (!d) return;
+    // the raw changes of the last seconds, for the new-wall notices
+    (this.chg ||= []).push([Date.now(), p, d, side]); if (this.chg.length > 20000) this.chg.splice(0, 5000);
+    if (!this.fine) return;
     const s = Math.floor(Date.now() / 1000); this.act ||= new Map(); let m = this.act.get(s);
     if (!m) { this.act.set(s, m = new Map()); for (const k of this.act.keys()) { if (k < s - 120) this.act.delete(k); else break; } }
     const k = Math.floor(p / this.fine); m.set(k, (m.get(k) || 0) + d);
@@ -928,8 +951,9 @@ class Pane {
       // each row keeps both sides in $ and the volume-weighted price of what is in it
       const byK = new Map(), add = (p, usd, side) => { if (p < G.mn - step || p > G.mx + step) return; const k = keyOf(p), r = byK.get(k) || {a:0, b:0, pw:0}; r[side] += usd; r.pw += p * usd; byK.set(k, r); };
       let totA = 0, totB = 0;   // the whole known book, for the Σ strip
-      for (const [p, q] of this.book.asks) { totA += p * q; add(p, p * q, 'a'); }
-      for (const [p, q] of this.book.bids) { totB += p * q; add(p, p * q, 'b'); }
+      // beyond the snapshot the server's far book is complete where the browser knows only what changed: use one of them, not both
+      for (const [p, q] of this.book.asks) { if (this.far && p > aHi) continue; totA += p * q; add(p, p * q, 'a'); }
+      for (const [p, q] of this.book.bids) { if (this.far && p < bLo) continue; totB += p * q; add(p, p * q, 'b'); }
       // deeper levels from our server (it keeps the whole book), where the browser's snapshot doesn't reach
       if (this.far) for (const [p, usd, side] of this.far) if ((side === 'a' && p > aHi) || (side === 'b' && p < bLo)) { side === 'a' ? totA += usd : totB += usd; add(p, usd, side); }
       // the known edge: what the stream told us beyond the snapshot, and the server's far book
@@ -1052,8 +1076,9 @@ function applyDepth(b, ev) {
   // the snapshot covers only the nearest levels (futures: ±0.15%); changes beyond it are kept too — they are exact for the
   // levels they name, the book column marks that zone as partly known, so the book never goes stale when the price moves
   const ch = b.onChange;   // "book dynamics": how much was put up (+) or pulled (−) at each level, in $
-  for (const [p, q] of ev.b) { const x = +p, nq = +q; if (ch) ch(x, (nq - (b.bids.get(x) || 0)) * x); nq ? b.bids.set(x, nq) : b.bids.delete(x); }
-  for (const [p, q] of ev.a) { const x = +p, nq = +q; if (ch) ch(x, (nq - (b.asks.get(x) || 0)) * x); nq ? b.asks.set(x, nq) : b.asks.delete(x); }
+  // a level beyond the snapshot that we have never seen is new to us, not necessarily new in the book: no "put up" for it
+  for (const [p, q] of ev.b) { const x = +p, nq = +q, o = b.bids.get(x); if (ch && (o !== undefined || x >= b.minB)) ch(x, (nq - (o || 0)) * x, 'b'); nq ? b.bids.set(x, nq) : b.bids.delete(x); }
+  for (const [p, q] of ev.a) { const x = +p, nq = +q, o = b.asks.get(x); if (ch && (o !== undefined || x <= b.maxA)) ch(x, (nq - (o || 0)) * x, 'a'); nq ? b.asks.set(x, nq) : b.asks.delete(x); }
   b.id = ev.u; b.ver = (b.ver || 0) + 1; return true;
 }
 // indicators that only need candles: channel, RSI, delta, CVD, VWAP
@@ -1338,7 +1363,8 @@ function wireChips() {
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
-const ICONS = {mk:'bubble', act:'wave', tape:'bubble', liqheat:'heat', obsum:'scale', liq:'bubble', oi:'wave', trades:'delta', vwapv:'vwap', fibt:'fib', rafft:'raff', dom:'book', imb:'scale', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', delta:'delta', dtint:'delta', cvd:'wave', fp:'heat', vp:'poc', poc:'poc', dpoc:'poc', frvp:'range', vwap:'vwap', bb:'channel', rsi:'gauge', fib:'ruler'};
+const ICONS = {dom:'book', imb:'imb', act:'act', tape:'tape', obsum:'sigma', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', vol:'volbars', delta:'delta', cvd:'cvd', trades:'trades', dtint:'tint',
+  liq:'liq', liqheat:'liqheat', oi:'oi', fp:'fp', mk:'mk', vp:'vp', poc:'poc', dpoc:'dpoc', frvp:'range', vwap:'vwap', vwapv:'vwapv', bb:'channel', rsi:'gauge', fibt:'fib', rafft:'raff'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
