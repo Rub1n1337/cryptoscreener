@@ -94,9 +94,11 @@ async function tgPoll() {
 const SIG_MIN = 60;
 async function announceSignals(rows: any[], S: any, sent: Record<string, number>, now: number) {
   const fresh = rows.filter((r) => r.score != null && r.score >= SIG_MIN && r.touchTime && !sent[`${r.sym}:${r.touchTime}`]).sort((a, b) => b.score - a.score);
-  const first = !Object.keys(sent).length;   // the very first run only remembers what is there, so nobody gets a pile of old signals
+  // the very first run only remembers what is there, so nobody gets a pile of old signals ("_init" marks that it has run)
+  const first = !sent._init;
   for (const r of fresh) sent[`${r.sym}:${r.touchTime}`] = now;
   for (const k of Object.keys(sent)) if (now - sent[k] > 3 * 864e5) delete sent[k];
+  sent._init = now;
   await db.from("bot_state").update({ sig_sent: sent }).eq("id", 1);
   if (first || !fresh.length) return;
   const line = (r: any) => `${r.side === "low" ? "🟢" : "🔴"} <b>${pair(r.sym)}</b> · сила <b>${r.score}</b> · ${esc(r.label)}\n` +

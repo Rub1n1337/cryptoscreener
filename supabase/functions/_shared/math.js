@@ -3,7 +3,8 @@
 // Any change here changes both — the site picks it up on the next Vercel deploy, the bot on the next function deploy.
 
 export const TFMS = { '5m': 3e5, '15m': 9e5, '1h': 36e5, '4h': 144e5, '1d': 864e5, '1w': 6048e5 };
-export const STABLE = new Set(['USDC','FDUSD','TUSD','BUSD','DAI','USDP','AEUR','EUR','EURI','USDE','USD1','BFUSD','XUSD','PYUSD','RLUSD','UST','USTC','SUSD']);
+// stablecoins, gold tokens and wrapped coins: their price follows the dollar, gold or another coin, so a "signal" on them means nothing
+export const STABLE = new Set(['USDC','FDUSD','TUSD','BUSD','DAI','USDP','AEUR','EUR','EURI','USDE','USD1','BFUSD','XUSD','PYUSD','RLUSD','UST','USTC','SUSD','U','PAXG','XAUT','WBTC','WBETH','BNSOL']);
 export const FEE = 0.00075;   // exchange fee per side (taker, with BNB discount)
 export const SLIP = 0.0005;   // slippage on market fills: entry, stop and time-stop exits (TP is a limit order — no slippage)
 export const MAX_OPEN = 3;    // max simultaneous positions
