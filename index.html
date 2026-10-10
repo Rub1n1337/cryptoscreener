@@ -410,7 +410,7 @@ tr.row.newsig td{animation:rowflash 2.4s ease-out}
   :is(#jclosed,#btTrades) td:nth-child(5)::before{content:"выход "}#jopen td:nth-child(5)::before{content:"сейчас "}
   /* open positions: 1 opened · 2 coin · 3 side · 4 entry · 5 now · 9 PnL · 10 R */
   #jopen tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10)){display:block}
-  #jopen tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry now ."}
+  #jopen tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry now x"}#jopen tr.row td.jx{display:block;grid-area:x}
   #jopen td:nth-child(2){grid-area:coin}#jopen td:nth-child(3){grid-area:side;font-size:12px;font-weight:600}#jopen td:nth-child(9){grid-area:pnl;text-align:right;font-weight:650}
   #jopen td:nth-child(10){grid-area:r;text-align:right;font-size:12.5px}#jopen td:nth-child(1){grid-area:date;font-size:12px;color:var(--mute)}
   #jopen td:nth-child(4){grid-area:entry}#jopen td:nth-child(5){grid-area:now}
@@ -514,6 +514,9 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .prof .radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;background:var(--s1)}
 .prof.on .radio{border-color:var(--acc);background:var(--acc);box-shadow:inset 0 0 0 3px var(--s1)}
 .prof .pplain{font-size:13px;color:var(--text);margin-top:3px}.prof .ptech{font-size:11.5px;color:var(--faint);margin-top:3px}
+.jot{display:flex;align-items:center;gap:8px}.jot button{margin-left:auto;height:28px;padding:0 10px;font-size:12.5px}td.jx{text-align:right;white-space:nowrap}td.jx button{height:26px;padding:0 9px;font-size:12px}
+.sprof{display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--s1)}.sprof .pplain{font-size:13px;color:var(--text);margin-top:3px}.sprof .ptech{font-size:11.5px;color:var(--faint);margin-top:3px}.sprof button{flex:0 0 auto}
+@media(max-width:560px){.sprof{flex-wrap:wrap}.sprof button{width:100%}}
 .prof .roles{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .chipb{height:30px!important;border-radius:999px;font-size:12.5px;padding:0 12px}.chipb.on{background:var(--accbg);border-color:var(--warn-line);color:var(--acc-t)}
 .bmore{margin:16px 0 0}
@@ -882,10 +885,10 @@ details.dis>.dbody{padding:0 16px 16px}
       </div>
     </div>
     <div id="jcards"></div>
-    <div class="panel" style="margin-bottom:12px"><div class="ptitle">Открытые позиции <span>· клик — карточка позиции</span></div>
+    <div class="panel" style="margin-bottom:12px"><div class="ptitle jot">Открытые позиции <span>· клик — карточка позиции</span><button id="jcloseAll" class="hidden" title="Закрыть все позиции вашего бота по рынку">Закрыть все</button></div>
       <div class="tablewrap"><table><thead><tr>
         <th>Открыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Сейчас</th><th class="hm" title="Сумма позиции в долларах">Размер</th><th class="hm">Тейк</th><th class="hm">Стоп</th>
-        <th title="Нереализованный PnL после комиссии на вход и выход">PnL сейчас</th><th title="Текущий результат в R: 1R — сумма, которую потеряем на стопе">R сейчас</th><th>Сила</th>
+        <th title="Нереализованный PnL после комиссии на вход и выход">PnL сейчас</th><th title="Текущий результат в R: 1R — сумма, которую потеряем на стопе">R сейчас</th><th>Сила</th><th aria-label="Закрыть"></th>
       </tr></thead><tbody id="jopen"></tbody></table></div>
     </div>
     <div class="panel"><div class="ptitle">Закрытые сделки <span>· клик по строке — карточка сделки<span class="sorthint">, по заголовку — сортировка</span></span></div>
@@ -1999,7 +2002,7 @@ function renderBotPanel() {
       ${auto ? '' : '<span class="radio"></span>'}
       <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-flat1h' && !/проверен/.test(p.name) ? ' <span class="tag lo" title="Бэктест за 12 месяцев, топ-50, 1h: в среднем +0.13R на сделку после комиссий">проверен за год</span>' : ''}
         <div class="pplain">${profPlain(p)}</div><div class="ptech">${profSummary(p)}</div>${roles}</div>
-      <div class="pa"><button data-pe="${p.id}">Изменить</button><button data-ps="${p.id}" title="Скопировать ссылку на этот профиль, чтобы отправить другу">Поделиться</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
+      <div class="pa"><button data-pb="${p.id}" title="Перенести настройки профиля в бэктест и проверить их на истории">В бэктест</button><button data-pe="${p.id}">Изменить</button><button data-ps="${p.id}" title="Скопировать ссылку на этот профиль, чтобы отправить другу">Поделиться</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
 }
 function openForm(p) {
   editId = p?.id || null; const s = {...PROFILE_DEF, ...(p?.set || {})};
@@ -2180,7 +2183,9 @@ function renderJournal() {
   if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
-    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}<br><span class="mute">Правила: ${profPlain({coins:{mode:'top', top:set.top || 150}, set})}</span>`
+    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
+      <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
+        <button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div>`
     : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
   tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
@@ -2223,8 +2228,10 @@ function renderJournal() {
     const u = sg * (last - p.entry) * p.qty - (p.entry + last) * p.qty * M.FEE, risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
     return `<tr tabindex="0" class="row" data-kind="open" data-id="${p.id}" title="Открыть карточку позиции"><td>${dt(p.time)} <span class="faint">${dur(now - p.time)}</span></td><td>${coin(p.sym)}</td>
       <td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(last)}</td><td class="hm">$${(p.qty * p.entry).toFixed(0)}</td><td class="hm">${fp(p.tp)}</td><td class="hm">${fp(p.sl)}</td>
-      <td class="${cl(u)}">${usd(u)}</td><td class="${cl(u)}">${rr(risk ? u / risk : null)}</td><td>${scoreOf(p)}</td></tr>`;
-  }).join('') || '<tr><td colspan="11" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
+      <td class="${cl(u)}">${usd(u)}</td><td class="${cl(u)}">${rr(risk ? u / risk : null)}</td><td>${scoreOf(p)}</td>
+      <td class="jx">${jMode === 'mine' ? `<button data-close="${p.id}"${p.closeReq ? ' disabled' : ''} title="Закрыть позицию по рынку">${p.closeReq ? 'закрывается…' : 'Закрыть'}</button>` : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="12" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
+  $('#jcloseAll').classList.toggle('hidden', jMode !== 'mine' || D.open.filter(p => !p.closeReq).length < 2);
   const list = D.closed.map(M.normTrade).sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * jDir; });
   document.querySelectorAll('#jhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === jSort); th.dataset.dir = th.dataset.s === jSort ? (jDir > 0 ? 'asc' : 'desc') : ''; });
   $('#jclosed').innerHTML = list.map(x => `<tr tabindex="0" class="row" data-kind="closed" data-id="${x.id}" title="Открыть карточку сделки"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
@@ -2489,6 +2496,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.10', date:'11 октября 2026', title:'Профиль общего бота, бэктест в один клик, ручное закрытие позиций', items:[
+    'В журнале общего бота теперь видно, по какому профилю он торгует: таймфрейм, вход, сила сигнала, риск, плечо, фильтр рынка.',
+    'Кнопка «Проверить в бэктесте» у общего бота и «В бэктест» у каждого вашего профиля: настройки переносятся в бэктест, остаётся выбрать период и нажать «Запустить».',
+    'Позиции «Моего бота» можно закрыть вручную — по одной или все сразу, по цене рынка с обычной комиссией. В журнале такая сделка помечена «вручную».',
+  ]},
   {v:'2.9', date:'7 октября 2026', title:'Общий бот на проверенных правилах, плавность и Бета', items:[
     'Общий бот теперь торгует по правилам, которые лучше всего держались на истории за год: часовые свечи, 50 самых популярных монет, только когда рынок спокойный.',
     'Сайт стал плавнее: мягкие переходы между вкладками, окна и списки появляются без рывков.',
@@ -2705,7 +2717,35 @@ $('#tb').onclick = e => {
   if (f) { const s = f.dataset.fav; favs.has(s) ? favs.delete(s) : favs.add(s); save('sr_favs', [...favs]); renderTable(); if (s === chartSym) computeChart(); return; }
   const tr = e.target.closest('tr.row'); if (tr) openCoin(tr.dataset.sym);
 };
-['#jopen', '#jclosed'].forEach(s => $(s).onclick = e => { const tr = e.target.closest('tr.row'); if (tr) openTrade(tr.dataset.kind, tr.dataset.id); });
+// close my bot's positions by hand (one, or all with id = null), at market with the usual fee and slippage.
+// In the browser it happens at once; on the server the positions are marked and the bot closes them on its next run (within a minute)
+async function closeMine(id) {
+  const open = myOpen().filter(p => !p.closeReq && (id == null || p.id === id)); if (!open.length) return;
+  const what = id == null ? `все ${open.length} ${plural(open.length, ['позицию', 'позиции', 'позиций'])}` : `${open[0].side} ${pair(open[0].sym)}`;
+  if (!(await ask({title:`Закрыть ${what}?`, text:'По текущей цене рынка, с обычной комиссией. Бот не будет входить в эту монету, пока не пройдёт пауза после сделки.', ok:'Закрыть', danger:true}))) return;
+  if (BP.where === 'server' && UB) {
+    try { await rpc('ub_close', {p_id:UB.id, p_secret:UB.secret, p_pos:id}); }
+    catch (e) { const m = String(e.message || e); toast('Не удалось закрыть', /ub_close|PGRST202|Could not find/.test(m) ? 'Закрытие позиций на сервере ещё не включено — скоро заработает. В браузерном режиме уже работает.' : m, 'bad'); return; }
+    for (const p of open) p.closeReq = true;
+    renderJournal(); toast(id == null ? 'Позиции закрываются' : 'Позиция закрывается', 'Бот на сервере закроет по рынку в течение минуты.', 'info');
+    setTimeout(fetchServerBot, 65e3); return;
+  }
+  const now = Date.now(); let net = 0;
+  for (const p of open) {
+    let px; try { px = +(await api(`/api/v3/ticker/price?symbol=${p.sym}`)).price; } catch {}
+    if (!(px > 0)) { toast(`Нет цены ${pair(p.sym)}`, 'Позиция осталась открытой — попробуйте ещё раз.', 'bad'); continue; }
+    const t = M.closeTrade(p, px * (1 - (p.side === 'LONG' ? 1 : -1) * M.SLIP), 'вручную', now);
+    J.open = J.open.filter(x => x.id !== p.id); J.closed = [t, ...J.closed]; J.balance += t.pnl; net += t.pnl;
+  }
+  save('sr_journal', J); renderJournal(); renderBotPanel(); renderGuard();
+  toast(id == null ? 'Позиции закрыты' : 'Позиция закрыта', `итог ${usd(net)}`, net > 0 ? 'ok' : net < 0 ? 'bad' : 'info');
+}
+$('#jcloseAll').onclick = () => closeMine(null);
+$('#jdesc').onclick = e => { if (e.target.closest('#jSharedBt') && SJ) profToBacktest(sharedProf(), 'общий бот'); };
+['#jopen', '#jclosed'].forEach(s => $(s).onclick = e => {
+  const cb = e.target.closest('[data-close]'); if (cb) { closeMine(cb.dataset.close); return; }
+  const tr = e.target.closest('tr.row'); if (tr) openTrade(tr.dataset.kind, tr.dataset.id);
+});
 $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
@@ -2943,6 +2983,7 @@ $('#pfCoins').onchange = () => $('#pfListL').classList.toggle('hidden', $('#pfCo
 $('#blist').onclick = async e => {
   const ed = e.target.closest('[data-pe]'), del = e.target.closest('[data-pd]'), role = e.target.closest('[data-role]'), sh = e.target.closest('[data-ps]');
   if (sh) { shareProfile(profById(sh.dataset.ps)); return; }
+  const tb = e.target.closest('[data-pb]'); if (tb) { const p = profById(tb.dataset.pb); profToBacktest(p, p.name); return; }
   if (role) { BP[role.dataset.role] = role.dataset.id; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot(); return; }
   if (!ed && !del) { const c = e.target.closest('.prof.pick'); if (c) pickProfile(c.dataset.pick); return; }
   if (ed) {
@@ -3130,7 +3171,19 @@ attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom
 
 $('#btRun').onclick = runBacktest;
 $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); toast('Подставлены настройки «Рынка»', `${S.tf}, канал ${S.N}/${S.k}, топ-50 монет. Нажмите «Запустить».`, 'ok'); };
-$('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } btFill(SJ.settings); const tp = String(SJ.settings.top || 50); if ([...$('#btTop').options].some(o => o.value === tp)) { $('#btTop').value = tp; btEstimate(); } toast('Подставлены правила общего бота', profPlain({coins:{mode:'top', top:SJ.settings.top || 150}, set:SJ.settings}) + ' Нажмите «Запустить».', 'ok'); };
+// the shared bot's rules as a profile, for showing them and for the backtest
+const sharedProf = () => ({name:'Общий бот', coins:{mode:'top', top:SJ.settings.top || 150}, set:SJ.settings});
+// a profile (or the shared bot's rules) → the backtest form, then the backtest page: check it on history in one click
+function profToBacktest(p, who) {
+  btFill(p.set);
+  const c = p.coins || {};
+  if (c.mode === 'list' && c.list?.length) { $('#btTop').value = 'custom'; $('#btCustom').value = c.list.map(s => s.replace(/USDT$/, '')).join(', '); }
+  else { const tops = [...$('#btTop').options].map(o => +o.value).filter(Boolean), want = +(c.top || 50); $('#btTop').value = String(tops.reduce((a, b) => Math.abs(b - want) < Math.abs(a - want) ? b : a)); }
+  btEstimate(); go('backtest');
+  const tfNote = $('#btTf').value !== p.set.tf ? ` Таймфрейм ${p.set.tf} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
+  toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
+}
+$('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
 ['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER'].forEach(s => $(s).onchange = btEstimate);
 $('#btCustom').oninput = btEstimate;
 $('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });

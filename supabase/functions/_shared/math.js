@@ -289,6 +289,7 @@ export function checkExit(p, K, now) {
     if (p.side === 'LONG' ? hi >= p.tp : lo <= p.tp) return { exit: p.tp, reason: 'тейк' };
   }
   const c = +K[K.length - 1][4]; p.last = c;
+  if (p.closeReq) return { exit: c * (1 - sg * SLIP), reason: 'вручную' };   // the owner asked to close it at market
   if (p.side === 'LONG' ? c <= p.sl : c >= p.sl) return { exit: c * (1 - sg * SLIP), reason: 'стоп' };
   if (p.side === 'LONG' ? c >= p.tp : c <= p.tp) return { exit: p.tp, reason: 'тейк' };
   // time stop in bars, set per position at entry (S.timeStop; 0 = off); older positions without it use the default
