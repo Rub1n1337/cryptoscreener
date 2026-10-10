@@ -74,14 +74,14 @@ const on = id => sel.has(id) && !hidden.has(id);
 // per-indicator settings (the gear next to a chosen indicator); values live in cfg and are saved in localStorage
 const stepParam = {k:'stepX', name:'Шаг цены: уровни склеиваются в строки по', min:0.5, max:10, step:0.5, def:1, u:v => { const p = act(); return p?.base ? '$' + niceNum(p.base * v) : v + '×'; }};
 const PARAMS = {
-  dom:[{k:'domStep', name:'Шаг цены стакана (колёсико над стаканом — то же)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто — по масштабу'; }},
+  dom:[{k:'domStp', name:'Шаг цены стакана (колёсико над стаканом — то же)', min:0, max:17, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * DOM_STEPS[v - 1]) : DOM_STEPS[v - 1] + '×') : 'авто — по масштабу'; }},
     {k:'domRows', name:'В режиме «авто»: высота строки', min:10, max:40, step:2, def:16, u:v => v + ' px'},
     {k:'domUnit', name:'Размер заявок', def:0, opts:[[0, 'в $'], [1, 'в монетах']]},
     {k:'domAnchor', name:'Строки отсчитываются', def:0, opts:[[0, 'от текущей цены'], [1, 'от круглых уровней']]}],
   act:[{k:'actWin', name:'За сколько секунд', def:30, opts:[[10, '10 с'], [30, '30 с'], [60, '1 мин'], [120, '2 мин']]}],
   imb:[{k:'imbRange', name:'Зона подсчёта у цены', min:0.2, max:3, step:0.1, def:1, u:v => '±' + v + '%'}],
   heat:[{k:'heatScheme', name:'Цвет', def:1, opts:[[0, 'жёлто-синий'], [1, 'покупка / продажа'], [2, 'моно']]},
-    {k:'heatOp', name:'Непрозрачность', min:20, max:100, step:5, def:85, u:v => v + '%'},
+    {k:'heatOp', name:'Непрозрачность', min:20, max:100, step:5, def:70, u:v => v + '%'},
     {k:'heatFloor', name:'Порог отсечения: слабее — не рисовать', min:0, max:50, step:1, def:12, u:v => v + '% от самых плотных'},
     {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}, stepParam],
   walls:[{k:'domRange', name:'Искать стены в пределах (дальше ±1–2% — только с сервером)', min:0.5, max:15, step:0.5, def:8, u:v => '±' + v + '%'},
@@ -95,7 +95,7 @@ const PARAMS = {
     {k:'mkTop', name:'Отмечать самые крупные уровни', min:0.5, max:10, step:0.5, def:2, u:v => v + '% от видимых'},
     {k:'mkLines', name:'Линии вправо, пока цена не вернётся к уровню', def:1, opts:[[0, 'выкл'], [1, 'вкл']]}],
   fp:[{k:'fpImb', name:'Подсвечивать перевес (покупки к продажам уровнем ниже и наоборот)', def:3, opts:[[0, 'выкл'], [2, '2×'], [3, '3×'], [4, '4×']]},
-    {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],
+    {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * DOM_STEPS[v - 1]) : DOM_STEPS[v - 1] + '×') : 'авто'; }}],
   vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
     {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
   vwap:[{k:'vwapPer', name:'С начала', def:0, opts:[[0, 'дня'], [1, 'недели'], [2, 'месяца']]},
@@ -106,6 +106,7 @@ const PARAMS = {
 const ALLP = Object.values(PARAMS).flat();
 // steps of the book column, in units of the coin's base step (≈0.05% of the price)
 const BOOK_STEPS = [1, 2, 4, 5, 10, 20, 40, 50, 100, 200, 400, 1000];
+const DOM_STEPS = [0.02, 0.05, 0.1, 0.2, 0.5, ...BOOK_STEPS];   // the book has every price level: it can go finer than the base bin (BTC: $1–$25)
 let cfg = {};
 const C = k => cfg[k] ?? ALLP.find(p => p.k === k).def;
 
@@ -188,8 +189,8 @@ class Pane {
       if (!this.inBook(e) || !on('dom')) return;
       e.preventDefault(); e.stopImmediatePropagation();
       const now = performance.now(); if (now - (this.stepWheelAt || 0) < 120) return; this.stepWheelAt = now;
-      let cur = C('domStep'); if (!cur) { const s = this.lastBookStep || this.base; cur = BOOK_STEPS.findIndex(x => this.base * x >= s * 0.999) + 1 || BOOK_STEPS.length; }
-      cfg.domStep = clamp(cur + (e.deltaY > 0 ? 1 : -1), 1, BOOK_STEPS.length); applyCfg();
+      let cur = C('domStp'); if (!cur) { const s = this.lastBookStep || this.base; cur = DOM_STEPS.findIndex(x => this.base * x >= s * 0.999) + 1 || DOM_STEPS.length; }
+      cfg.domStp = clamp(cur + (e.deltaY > 0 ? 1 : -1), 1, DOM_STEPS.length); applyCfg();
     }, {passive:false, capture:true});
     cv.addEventListener('wheel', e => {
       if (!this.inScale(e) || !this.geo) return;
@@ -469,7 +470,7 @@ class Pane {
       return;
     }
     this.prevSym = null; this.prevMkt = null;
-    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); }
+    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); renderChips(); }   // chips show steps in $
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
     this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp();
   }
@@ -714,6 +715,24 @@ class Pane {
       this.hc = {key, at:now, cols, top};
     }
     const h = Math.max(1, Math.abs(G.Y(0) - G.Y(step)));
+    if (h > 6) {   // zoomed in: the history can't be finer than its bins, so blend between them instead of drawing tall blocks
+      const kLo = Math.floor(G.mn / step) - 1, kHi = Math.ceil(G.mx / step) + 1, n = G.e - G.s + 1, rows = kHi - kLo + 1;
+      const ik = `${this.hc.key}|${kLo}|${kHi}|${C('heatOp')}|${C('heatFloor')}|${C('heatScheme')}|${this.hc.at}`;
+      if (this.himg?.key !== ik) {
+        const cv = this.himg?.cv || document.createElement('canvas'); cv.width = n; cv.height = rows;
+        // blended cells cover the whole area (blocks leave gaps): a lighter touch keeps the candles readable
+        const cx = cv.getContext('2d'), im = cx.createImageData(n, rows), floor = top * C('heatFloor') / 100, op = C('heatOp') / 100 * 0.7;
+        for (const [i, agg] of cols) for (const [k, v] of agg) {
+          if (v < floor || k < kLo || k > kHi) continue;
+          const [r, gg, b, a] = heatRGBA(v / top, k * step > this.d.c[i], op), o = ((kHi - k) * n + (i - G.s)) * 4;
+          im.data[o] = r; im.data[o + 1] = gg; im.data[o + 2] = b; im.data[o + 3] = Math.round(a * 255);
+        }
+        cx.putImageData(im, 0, 0); this.himg = {key:ik, cv};
+      }
+      g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip(); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+      g.drawImage(this.himg.cv, G.X(G.s) - G.bw / 2, G.Y(kHi * step) - h / 2, n * G.bw, rows * h); g.restore();
+      return;
+    }
     for (const [i, agg] of cols) {
       const x = G.X(i) - G.bw / 2;
       // which side a bin was on: above the bar's close — asks (sellers), below — bids (buyers)
@@ -929,8 +948,9 @@ class Pane {
   // so stretching the price scale shows finer levels; the strip at the right edge is the imbalance near the price
   // the price step of the book column: chosen by the user (multiples of the coin's base step) or, on "авто", ~domRows px per row
   bookStep(G) {
-    const sx = C('domStep'), ph = G.pH - G.T0;
-    let step = sx ? this.base * BOOK_STEPS[sx - 1] : Math.max(this.base, niceStep((G.mx - G.mn) * C('domRows') / ph, 1));
+    const sx = C('domStp'), ph = G.pH - G.T0;
+    // the browser has every price level, so zoomed in the rows can go well below the heatmap's bin (BTC: down to $1 instead of $50)
+    let step = sx ? this.base * DOM_STEPS[sx - 1] : Math.max(niceStep(this.base, 0.02), niceStep((G.mx - G.mn) * C('domRows') / ph, 1));
     while ((G.mx - G.mn) / step > 400) step *= 2;   // never more than ~400 rows (a very fine step on a wide view)
     return step;
   }
@@ -1037,8 +1057,9 @@ class Pane {
         lines.forEach((t, j) => { g.fillStyle = j === 0 ? PC.price : t.startsWith('продажа') ? PC.up : t.startsWith('покупка') ? PC.lo : PC.mute; g.fillText(t, bx + 8, byy + 12 + j * 16); });
       }
       // the step in use, at the top of the column: a click opens the setting, the wheel over the column changes it
-      const lbl = `шаг $${niceNum(step)}${C('domStep') ? '' : ' · авто'}`;
-      g.font = '600 10px system-ui'; g.textBaseline = 'middle'; const tw = g.measureText(lbl).width + 8;
+      // the label shortens to fit the column: "шаг $50 · авто" → "шаг $50" → "$50"
+      g.font = '600 10px system-ui'; g.textBaseline = 'middle';
+      const room = cw - sw - 10, lbl = [`шаг $${niceNum(step)}${C('domStp') ? '' : ' · авто'}`, `шаг $${niceNum(step)}`, `$${niceNum(step)}`].find(t => g.measureText(t).width <= room) || `$${niceNum(step)}`, tw = g.measureText(lbl).width + 8;
       g.fillStyle = PC.tip; g.fillRect(x0 + 1, G.T0 + 1, Math.min(cw - sw - 2, tw), 15); g.fillStyle = PC.mute; g.fillText(lbl, x0 + 5, G.T0 + 9);
       this.hits.push({x0, x1:x0 + cw - sw, y0:G.T0, y1:G.T0 + 17, obj:{type:'_domstep'}});
     }
@@ -1111,13 +1132,15 @@ let HEAT = null;
 const rgb = h => { h = h.replace('#', ''); if (h.length === 3) h = [...h].map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16)); };
 // heatmap colour of a bin: x = 0..1 (share of the densest), ask = the bin was above the price; three schemes (setting):
 // yellow-blue scale (tokens --heat-0..3), buy / sell (green bids, red asks, like ZeroSynapse), mono (accent)
-function heatColor(x, ask, op = 1) {
-  x = Math.min(1, Math.max(0, x)); const a = ((0.1 + 0.55 * x * x) * op).toFixed(2), sc = C('heatScheme');   // faint for thin levels, so candles stay readable
-  if (sc === 1 || sc === 2) { const c = rgb(sc === 1 ? (ask ? K.PC.up : K.PC.lo) : K.PC.acc); return `rgba(${c.join(',')},${(Math.min(0.85, 0.08 + 0.75 * x) * op).toFixed(2)})`; }
+// a heatmap cell's colour as [r, g, b, alpha 0–1]: faint for thin levels, so candles stay readable
+function heatRGBA(x, ask, op = 1) {
+  x = Math.min(1, Math.max(0, x)); const sc = C('heatScheme');
+  if (sc === 1 || sc === 2) return [...rgb(sc === 1 ? (ask ? K.PC.up : K.PC.lo) : K.PC.acc), Math.min(0.85, 0.08 + 0.75 * x) * op];
   HEAT ||= [0, 1, 2, 3].map(i => rgb(getComputedStyle(document.documentElement).getPropertyValue('--heat-' + i).trim() || '#888888'));
   const t = Math.min(0.999, x) * (HEAT.length - 1), i = Math.floor(t), f = t - i, p = HEAT[i], q = HEAT[i + 1];
-  return `rgba(${p.map((v, k) => Math.round(v + (q[k] - v) * f)).join(',')},${a})`;
+  return [...p.map((v, k) => Math.round(v + (q[k] - v) * f)), (0.1 + 0.55 * x * x) * op];
 }
+function heatColor(x, ask, op = 1) { const [r, g, b, a] = heatRGBA(x, ask, op); return `rgba(${r},${g},${b},${a.toFixed(2)})`; }
 function drawLine(g, G, arr, col, dash = [], brk = null) {   // brk[i]: a new session starts here, don't join it to the previous one
   g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();   // stay inside the price pane
   g.beginPath(); g.setLineDash(dash); let s0 = false;
@@ -1333,7 +1356,7 @@ function renderList() {
 const SHORT = {mk:'Маркеры', act:'Динамика', tape:'Лента', fp:'Футпринт', liqheat:'Карта ликв.', obsum:'Σ стакана', liq:'Ликвидации', oi:'ОИ', dom:'Стакан', imb:'Дисбаланс', heat:'Тепл. карта', walls:'Стены', bubbles:'Пузыри', vol:'Объём', delta:'Дельта', cvd:'CVD', trades:'Сделки',
   dtint:'Подсв. дельты', vp:'Профиль', poc:'POC', dpoc:'dPOC', vwap:'VWAP', vwapv:'VWAP экр.', bb:'Канал', rsi:'RSI'};
 function chipSum(id) {
-  const p = act(), stepTxt = () => C('domStep') ? '$' + niceNum((p?.base || 0) * BOOK_STEPS[C('domStep') - 1]) : 'авто';
+  const p = act(), stepTxt = () => !C('domStp') ? 'авто' : p?.base ? '$' + niceNum(p.base * DOM_STEPS[C('domStp') - 1]) : DOM_STEPS[C('domStp') - 1] + '×';
   return {dom:() => `шаг ${stepTxt()} · ${C('domAnchor') ? 'круглые' : 'от цены'}${C('domUnit') ? ' · монеты' : ''}`,
     imb:() => `±${C('imbRange')}%`, act:() => `за ${C('actWin')} с`, heat:() => `${['жёлто-синяя', 'покупка/продажа', 'моно'][C('heatScheme')]} · ${C('heatOp')}%`,
     walls:() => `±${C('domRange')}% · ×${C('wallX')}${C('wallAlert') ? ' · увед. от $' + fmtUsd(C('wallAlert')) : ''}`, bubbles:() => `топ ${C('bubPct')}%`,
@@ -1462,7 +1485,7 @@ export function open(kit) {
     wired = true;
     sel = new Set(K.load('sr_bind', ['dom', 'imb', 'heat', 'walls', 'bubbles', 'vol', 'delta', 'bb']));
     if (!K.load('sr_bvol', false)) { sel.add('vol'); K.save('sr_bvol', true); K.save('sr_bind', [...sel]); }   // volume became optional: keep it on for everyone once
-    hidden = new Set(K.load('sr_bhide', [])); labels = K.load('sr_blabels', true); cfg = K.load('sr_bcfg', {}) || {};
+    hidden = new Set(K.load('sr_bhide', [])); labels = K.load('sr_blabels', true); cfg = K.load('sr_bcfg', {}) || {}; if (cfg.domStep && cfg.domStp == null) { cfg.domStp = cfg.domStep + 5; delete cfg.domStep; }   // the book step list got 5 finer steps in front
     drawings = K.load('sr_bdraw', {}) || {}; link = K.load('sr_blink', true); active = K.load('sr_bact', 0);
     // older single-chart settings become the first pane
     if (!K.load('sr_bpanes', null)) K.save('sr_bpanes', [{sym:K.load('sr_bsym', 'BTCUSDT'), tf:K.load('sr_btf', '5m'), range:0}]);
