@@ -63,3 +63,8 @@ end $$;
 alter table public.user_bots add column if not exists tg_sig boolean not null default true;
 alter table public.user_bots add column if not exists sig_sent jsonb not null default '{}'::jsonb;
 -- (ub_get then also drops 'sig_sent' from the bot row it returns)
+
+-- Telegram delivers messages to the "tg" function at once (a webhook) instead of the bot polling once a minute;
+-- the bot function registers the webhook itself with this secret, Telegram sends it back in a header on every call
+alter table public.tg_config add column if not exists wh_secret text not null default encode(gen_random_bytes(24), 'hex');
+alter table public.tg_config add column if not exists wh_ok boolean not null default false;

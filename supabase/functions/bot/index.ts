@@ -2,6 +2,7 @@
 // All strategy math lives in ../_shared/math.js — the same file the site uses.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as M from "../_shared/math.js";
+import { esc, handleMessage } from "../_shared/tg.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
@@ -23,7 +24,6 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
 const fp = (p: number) => { const a = Math.abs(p); return "$" + (a >= 1000 ? p.toFixed(0) : a >= 100 ? p.toFixed(2) : a >= 1 ? p.toFixed(3) : p.toPrecision(4)); };
 const pct = (v: number, e: number) => { const x = (v / e - 1) * 100; return (x > 0 ? "+" : "−") + Math.abs(x).toFixed(2) + "%"; };
 const pair = (s: string) => s.replace(/USDT$/, "/USDT");
-const esc = (s: string) => String(s).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!));
 let TG: any;   // tg_config, read once per run
 async function tgConf() { if (TG === undefined) { const { data } = await db.from("tg_config").select("*").eq("id", 1).maybeSingle(); TG = data?.enabled && data.bot_token ? data : null; } return TG; }
 async function tgCall(method: string, body: unknown) {
@@ -50,47 +50,20 @@ async function chatsFor(kind: "shared" | "signals") {
 }
 const notify = async (lines: string[]) => sendTo(await chatsFor("shared"), lines);
 
-// commands from Telegram, read every minute (getUpdates — no webhook to set up)
-const HELP = "Команды:\n/signals — новые сигналы с силой ≥ 60 вкл/выкл\n/shared — сделки общего бота вкл/выкл\n/status — что сейчас включено\n/mysignals — сигналы вашего профиля вкл/выкл\n/unlink — отвязать ваш бот с сайта\n/stop — отписаться от всего\n\nЧтобы получать сделки и сигналы своего бота: на сайте «Журнал» → «Мой бот» → «Подключить Telegram».";
+// commands from Telegram: the "tg" function answers them at once (a webhook); this registers it, and until that works
+// reads them here once a minute (getUpdates)
 async function tgPoll() {
   const tg = await tgConf(); if (!tg) return;
+  // registered: check every 10 minutes that it still is (a new token after /revoke has no webhook yet)
+  if (tg.wh_ok) { if (new Date().getUTCMinutes() % 10) return; const i = await tgCall("getWebhookInfo", {}); if (!i?.ok || i.result?.url) return; }
+  const wh = await tgCall("setWebhook", { url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/tg`, secret_token: tg.wh_secret, allowed_updates: ["message"] });
+  if (wh?.ok) { await db.from("tg_config").update({ wh_ok: true }).eq("id", 1); return; }
   const r = await tgCall("getUpdates", { offset: Number(tg.upd_offset || 0) + 1, timeout: 0, allowed_updates: ["message"] });
   if (!r?.ok || !r.result?.length) return;
   for (const u of r.result) {
-    const m = u.message, chat = m?.chat?.id, text = String(m?.text || "").trim();
-    if (!chat || !text.startsWith("/")) continue;
-    const [cmd0, arg = ""] = text.split(/\s+/, 2), cmd = cmd0.replace(/@.*$/, "").toLowerCase();
-    const name = m.chat.title || [m.chat.first_name, m.chat.last_name].filter(Boolean).join(" ") || m.chat.username || "";
-    const say = (t: string) => tgCall("sendMessage", { chat_id: chat, text: t, parse_mode: "HTML", disable_web_page_preview: true }).catch(() => null);
-    const { data: sub } = await db.from("tg_subs").select("*").eq("chat_id", chat).maybeSingle();
-    try {
-      if (cmd === "/start") {
-        if (!sub) await db.from("tg_subs").insert({ chat_id: chat, name: name.slice(0, 80) });
-        if (/^b[0-9a-f]{18}$/.test(arg)) {   // a link code from the site: this chat gets that bot's trades
-          const { data: b } = await db.from("user_bots").select("id, active_profile").eq("tg_code", arg).gt("tg_code_until", new Date().toISOString()).maybeSingle();
-          if (b) { await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ Ваш бот с сайта привязан${b.active_profile ? ` (профиль «${esc(b.active_profile)}»)` : ""}. Сюда будут приходить его сделки и новые сигналы его профиля.\n\n${HELP}`); }
-          else await say("Ссылка устарела — на сайте нажмите «Подключить Telegram» ещё раз.");
-        } else await say(`👋 Это бот <b>Sigma Radar</b>. Сюда будут приходить сделки общего бота и новые сигналы с силой ≥ 60 (по правилам общего бота).\n\n${HELP}`);
-      } else if (!sub && cmd !== "/unlink" && cmd !== "/mysignals") await say("Сначала нажмите /start.");
-      else if (cmd === "/mysignals") {
-        const { data: bots } = await db.from("user_bots").select("tg_sig").eq("tg_chat", chat);
-        if (!bots?.length) await say("Сначала привяжите своего бота: на сайте «Журнал» → «Мой бот» → «Подключить Telegram».");
-        else { const on = arg ? !/^(off|выкл|0|нет)$/i.test(arg) : !bots[0].tg_sig; await db.from("user_bots").update({ tg_sig: on }).eq("tg_chat", chat); await say(`Сигналы вашего профиля: ${on ? "включены" : "выключены"}.`); }
-      }
-      else if (cmd === "/signals" || cmd === "/shared") {
-        const k = cmd.slice(1), on = arg ? !/^(off|выкл|0|нет)$/i.test(arg) : !sub[k];
-        await db.from("tg_subs").update({ [k]: on }).eq("chat_id", chat);
-        await say(`${k === "signals" ? "Сигналы ≥ 60" : "Сделки общего бота"}: ${on ? "включены" : "выключены"}.`);
-      } else if (cmd === "/status") {
-        const { data: bots } = await db.from("user_bots").select("active_profile, tg_sig").eq("tg_chat", chat);
-        await say(`Сигналы ≥ 60: ${sub.signals ? "вкл" : "выкл"}\nСделки общего бота: ${sub.shared ? "вкл" : "выкл"}\nВаш бот с сайта: ${bots?.length ? bots.map((x: any) => `привязан${x.active_profile ? ` («${esc(x.active_profile)}»)` : ""}, сигналы профиля ${x.tg_sig === false ? "выкл" : "вкл"}`).join(", ") : "не привязан"}`);
-      } else if (cmd === "/unlink") {
-        await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); await say("Бот с сайта отвязан.");
-      } else if (cmd === "/stop") {
-        await db.from("tg_subs").delete().eq("chat_id", chat); await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat);
-        await say("Вы отписались от всего. Вернуться — /start.");
-      } else await say(HELP);
-    } catch { /* one bad message must not stop the others */ }
+    const chat = u.message?.chat?.id;
+    try { await handleMessage(db, u.message, (t: string) => tgCall("sendMessage", { chat_id: chat, text: t, parse_mode: "HTML", disable_web_page_preview: true }).catch(() => null)); }
+    catch { /* one bad message must not stop the others */ }
   }
   await db.from("tg_config").update({ upd_offset: r.result[r.result.length - 1].update_id }).eq("id", 1);
 }
