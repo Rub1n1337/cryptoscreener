@@ -88,20 +88,24 @@ function freshSignals(rows: any[], min: number, sent: Record<string, number>, no
   sent["_init" + pre] = now;
   return first ? [] : fresh;
 }
-// one signal: side and coin first, then where the price is and why it counts
-const sigLine = (r: any) => {
-  const long = r.side === "low", toMid = (r.mid / r.price - 1) * 100;
+// one signal: side and coin first, then where the price is and why it counts; last — how long it can still be entered
+// (a touch counts for M.TOUCH_BARS candles) and whether the coin springs back to the centre on this timeframe (T½)
+const sigLine = (tf: string) => (r: any) => {
+  const long = r.side === "low", toMid = (r.mid / r.price - 1) * 100, tfms = (M.TFMS as any)[tf];
+  const left = r.touchTime + M.TOUCH_BARS * tfms - Date.now(), hlMs = r.hl * tfms;
+  const hl = !isFinite(hlMs) || hlMs >= 30 * 864e5 ? "тренд ⚠️" : `${dur(hlMs)}${r.hl <= 20 ? " ✅" : r.hl > 40 ? " ⚠️" : ""}`;
   return `${long ? "🟢" : "🔴"} <b>${long ? "LONG" : "SHORT"} ${coin(r.sym)}</b> · сила <b>${r.score}</b>\n` +
     `цена ${fp(r.price)} · до центра ${toMid >= 0 ? "+" : "−"}${Math.abs(toMid).toFixed(1)}%\n` +
-    `RSI ${Math.round(r.rsi)} · объём ${r.volX ? "×" + r.volX.toFixed(1) : "—"} ·${r.rev ? "✔ отскок подтверждён" : "⏳ ждём подтверждения"}`;
+    `RSI ${Math.round(r.rsi)} · объём ${r.volX ? "×" + r.volX.toFixed(1) : "—"} · ${r.rev ? "✔ отскок подтверждён" : "⏳ ждём подтверждения"}\n` +
+    `⌛ войти можно ещё ${left > 6e4 ? dur(left) : "минуту"} · T½ ${hl}`;
 };
 // a signal message: title, the rules it follows in one grey line, up to 15 signals
-const sigMsg = (title: string, rules: string, list: any[]) =>
-  [`${title}\n<i>${rules}</i>`, ...list.slice(0, 15).map(sigLine), ...(list.length > 15 ? [`…и ещё ${list.length - 15} — на сайте`] : [])];
+const sigMsg = (title: string, rules: string, list: any[], tf: string) =>
+  [`${title}\n<i>${rules}</i>`, ...list.slice(0, 15).map(sigLine(tf)), ...(list.length > 15 ? [`…и ещё ${list.length - 15} — на сайте`] : [])];
 async function announceSignals(rows: any[], S: any, sent: Record<string, number>, now: number) {
   const fresh = freshSignals(rows, SIG_MIN, sent, now);
   await db.from("bot_state").update({ sig_sent: sent }).eq("id", 1);
-  if (fresh.length) await sendTo(await chatsFor("signals"), sigMsg("📡 <b>Новые сигналы</b> · общие правила", `${S.tf} · топ-${S.top} монет · сила от ${SIG_MIN}`, fresh), fresh.map((r) => r.sym));
+  if (fresh.length) await sendTo(await chatsFor("signals"), sigMsg("📡 <b>Новые сигналы</b> · общие правила", `${S.tf} · топ-${S.top} монет · сила от ${SIG_MIN}`, fresh, S.tf), fresh.map((r) => r.sym));
 }
 // who: "общий бот" or "ваш бот «…»"
 const openedMsg = (p: any, who = "общий бот") =>
@@ -237,8 +241,8 @@ async function runUserBots(now: number) {
       if (b.tg_chat) await sendTo([b.tg_chat], [
         ...res.closed.map((t: any) => closedMsg(t, `ваш бот «${esc(pname)}»`)),
         ...res.opened.map((p: any) => openedMsg(p, `ваш бот «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
-      if (mySigs.length) await sendTo([b.tg_chat], sigMsg(`📡 <b>Сигналы профиля «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, mySigs), mySigs.map((r: any) => r.sym));
-      if (mktSigs.length) await sendTo([b.tg_chat], sigMsg("🔔 <b>Сигналы вашего «Рынка»</b>", `${SM.tf} · ${mktTop} монет · сила от ${SM.minScore} · как колокольчик на сайте`, mktSigs), mktSigs.map((r: any) => r.sym));
+      if (mySigs.length) await sendTo([b.tg_chat], sigMsg(`📡 <b>Сигналы профиля «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, mySigs, S.tf), mySigs.map((r: any) => r.sym));
+      if (mktSigs.length) await sendTo([b.tg_chat], sigMsg("🔔 <b>Сигналы вашего «Рынка»</b>", `${SM.tf} · ${mktTop} монет · сила от ${SM.minScore} · как колокольчик на сайте`, mktSigs, SM.tf), mktSigs.map((r: any) => r.sym));
       done++;
     } catch (e) {
       await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e), checked_at: new Date(now).toISOString() }).eq("id", b.id);

@@ -89,9 +89,12 @@ export function prepare(K, S) {
   const x = c.map((ci, i) => isFinite(B.mid[i]) && B.mid[i] > 0 ? Math.log(ci) - Math.log(B.mid[i]) : NaN);
   return { ...d, n, B, R: rsi(c), A: atrSeries(d.h, d.l, c), lr, x, S };
 }
-// cheap pre-check used by the backtest: any band touch in the last 5 bars?
+// a band touch counts for this many bars, the touch bar included: the window for an entry, not for holding a position
+// (a year of history: 10 or 20 bars made every tested setup worse — late entries; see docs/RESEARCH-2026-10.md)
+export const TOUCH_BARS = 5;
+// cheap pre-check used by the backtest: any band touch in the last TOUCH_BARS bars?
 export function touchedAt(P, i) {
-  for (let j = i; j >= i - 4 && j >= 0; j--) if (P.l[j] <= P.B.lo[j] || P.h[j] >= P.B.up[j]) return true;
+  for (let j = i; j > i - TOUCH_BARS && j >= 0; j--) if (P.l[j] <= P.B.lo[j] || P.h[j] >= P.B.up[j]) return true;
   return false;
 }
 function halfLifeAt(P, i) {
@@ -116,7 +119,7 @@ export function analyze(sym, K, S, now = Date.now()) {
   const P = prepare(K, S);
   return signalAt(P, P.n - 1, sym, now);
 }
-export function signalAt(P, i, sym, now) {
+export function signalAt(P, i, sym, now, lite = false) {   // lite: skip the display-only extras (backtest)
   const { t, o, h, l, c, v, B, S } = P, p = i - 1;
   if (i < S.N + 9) return null;
   if (!isFinite(B.mid[i]) || B.up[i] <= B.lo[i]) return null;
@@ -133,7 +136,7 @@ export function signalAt(P, i, sym, now) {
   const vz = x => x > 0 && isFinite(vm) ? (Math.log(x) - vm) / vmad : 0;
 
   let touch = null;
-  for (let j = i; j >= i - 4; j--) {
+  for (let j = i; j > i - TOUCH_BARS; j--) {
     if (l[j] <= B.lo[j]) { touch = { side: 'low', j }; break; }
     if (h[j] >= B.up[j]) { touch = { side: 'up', j }; break; }
   }
@@ -176,12 +179,16 @@ export function signalAt(P, i, sym, now) {
   let path = 0; for (let j = i - L + 1; j <= i; j++) path += Math.abs(c[j] - c[j - 1]);
   const er = path ? Math.abs(c[i] - c[i - L]) / path : 0, erCh = c[i] / c[i - L] - 1;
   const outUp = c[i] > B.up[i], outLo = c[i] < B.lo[i];
+  // display only (the bots trade on `rev`): the reversal was confirmed on an earlier bar since this touch and only the last
+  // candle went against it — the site shows such a signal as weakened instead of dropping it until the next candle
+  let wasRev = false;
+  if (touch && !rev && !lite) for (let q = i - 1; q > touch.j && !wasRev; q--) { const x = signalAt(P, q, sym, t[q] + TFMS[S.tf], true); wasRev = !!(x?.rev && x.touch.j === touch.j); }
   let label = '', cls = '', kind = '';
   if (touch && rev) { kind = 'sig'; label = touch.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT'; cls = touch.side === 'low' ? 'loc' : 'upc'; }
   else if (outUp || outLo) { kind = 'out'; label = outUp ? 'за каналом ↑' : 'за каналом ↓'; cls = outUp ? 'uo' : 'lout'; }
   else if (touch) { kind = 'touch'; label = touch.side === 'low' ? 'касание низа' : 'касание верха'; cls = touch.side === 'low' ? 'lo' : 'up'; }
   else if (squeeze) { kind = 'sq'; label = 'сжатие'; cls = 'sq'; }
-  return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, rev, score, comps, checks, exc, volX, volZ,
+  return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, age: touch ? i - touch.j : null, wasRev, rev, score, comps, checks, exc, volX, volZ,
            label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side, slope, brk, er, erCh };
 }
 export const erBars = tf => Math.min(300, Math.round(7 * 864e5 / TFMS[tf]));
@@ -405,7 +412,7 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
         const Q = P[sym], i = Q.idx.get(T);
         if (i == null || !touchedAt(Q, i) || open.some(p => p.sym === sym)) continue;
         if (lastClose[sym] != null && T - lastClose[sym] < COOLDOWN * tfms) continue;
-        const r = signalAt(Q, i, sym, T + tfms);   // bar fully elapsed
+        const r = signalAt(Q, i, sym, T + tfms, true);   // bar fully elapsed
         if (r) r.mkt = mkt;
         if (wants(r, S)) { r.i = i; cands.push(r); }
       }

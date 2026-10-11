@@ -1232,7 +1232,7 @@ async function scan() {
       if (++done % 10 === 0) foot.textContent = `сканирую ${done}/${list.length}…`;
     });
     if (!scanQueued) { // settings changed during the scan → results are stale, the queued scan replaces them
-      const prevSig = new Set(rows.filter(r => r.rev).map(r => r.sym));
+      const prevSig = new Set(rows.filter(r => r.rev || r.wasRev).map(r => r.sym));   // a weakened signal coming back is not new
       const prevPx = new Map(rows.map(r => [r.sym, r.price]));   // for the user's level-crossing alerts
       rows = res; cache = fresh; lastScan = Date.now();
       const newSig = prevScanDone ? rows.filter(r => r.rev && r.score >= S.minScore && !prevSig.has(r.sym)) : [];
@@ -1298,13 +1298,28 @@ function gauge(pB) {
 }
 // compact labels for the table; the long wording stays in the breakdown and the glossary
 const labelOf = r => r.kind === 'sig' ? (r.side === 'low' ? '▲ LONG' : '▼ SHORT')
+  : r.kind === 'touch' && r.wasRev ? (r.side === 'low' ? '▲ LONG · ослаб' : '▼ SHORT · ослаб')
   : r.kind === 'out' ? (r.pB > 1 ? 'за границей ↑' : 'за границей ↓')
   : r.kind === 'touch' ? `касание ${r.side === 'low' ? '↓' : '↑'} ${hm(r.touchTime)}` : r.label;
+// the T½ filter counts candles: show what that is in time on the chosen timeframe
+function hlOpts(sel, tf) { for (const o of $(sel).options) if (+o.value) o.textContent = `T½ ≤ ${o.value} свечей (≈ ${dur(+o.value * TFMS[tf])})`; }
+// a signal lives TOUCH_BARS candles from the candle that touched the band: a window for an entry, not a reason to exit
+// a time of day, with «вчера» / «завтра» or the date when it is not today (4h and 1d signals span days)
+const hmDay = t => { const d = Math.round((new Date(t).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5); return (d === 0 ? '' : d === -1 ? 'вчера ' : d === 1 ? 'завтра ' : new Date(t).toLocaleDateString('ru', {day:'numeric', month:'short'}) + ' ') + hm(t); };
+const sigEnd = r => r.touchTime + M.TOUCH_BARS * TFMS[S.tf];
+const sigLife = r => { const ms = sigEnd(r) - Date.now(); return ms > 6e4 ? `виден ещё ${dur(ms)}, до ${hmDay(sigEnd(r))}` : 'срок входа истекает'; };
+const sigTip = r => r.wasRev && !r.rev
+  ? `Разворот был подтверждён, но последняя свеча закрылась против него. Следующая свеча в сторону сделки вернёт сигнал. Касание ${hmDay(r.touchTime)}, сигнал ${sigLife(r)}.`
+  : `Касание границы ${hmDay(r.touchTime)}. Сигнал ${sigLife(r)} — это срок для входа; позицию держат до тейка или стопа.`;
+// T½ in candles of the current timeframe: ≤ 20 — the coin springs back (the T½ filter passes), > 40 or none — it trends
+const hlCls = hl => !isFinite(hl) || hl > 40 ? 'neg' : hl <= 20 ? 'pos' : '';
+const hlTip = hl => !isFinite(hl) || hl * TFMS[S.tf] >= 30 * 864e5 ? 'Монета в тренде: к центру канала сейчас не возвращается. Отскок рискован'
+  : `${hl.toFixed(0)} свечей ${S.tf}. ${hl <= 20 ? 'Быстро возвращается к центру — фильтр T½ ≤ 20 проходит' : hl <= 40 ? 'Возвращается медленно — проходит только фильтр T½ ≤ 40' : 'Почти не возвращается к центру — отскок рискован'}. Норма зависит от таймфрейма: 20 свечей — это ${dur(20 * TFMS[S.tf])} на ${S.tf}`;
 let scanErr = null, flashSyms = new Set();
 function renderTable() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
   if (!rows.length) { if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
-  $('#cntSig').textContent = rows.filter(r => r.rev).length || ''; $('#cntSq').textContent = rows.filter(r => r.squeeze).length || ''; $('#cntFav').textContent = rows.filter(r => favs.has(r.sym)).length || '';
+  $('#cntSig').textContent = rows.filter(r => r.rev || r.wasRev).length || ''; $('#cntSq').textContent = rows.filter(r => r.squeeze).length || ''; $('#cntFav').textContent = rows.filter(r => favs.has(r.sym)).length || '';
   const fz = $('#fz').value, fl = $('#fl').value, q = $('#fs').value.trim().toUpperCase();
   document.querySelectorAll('.card[data-cf]').forEach(c => c.classList.toggle('on', c.dataset.cf === fz || c.dataset.cf === fl));
   const list = rows.filter(r => {
@@ -1313,7 +1328,7 @@ function renderTable() {
     if (fz === 'hi' && r.pB <= 0.9) return false;
     if (fz === 'out' && r.pB >= 0 && r.pB <= 1) return false;
     if (fz === 'in' && (r.pB < 0 || r.pB > 1)) return false;
-    if (fl === 'sig' && !r.rev) return false;
+    if (fl === 'sig' && !r.rev && !r.wasRev) return false;
     if (fl === 'touch' && !r.touch && r.kind !== 'out') return false;
     if (fl === 'sq' && !r.squeeze) return false;
     if (fl === 'fav' && !favs.has(r.sym)) return false;
@@ -1321,25 +1336,26 @@ function renderTable() {
   });
   const kindRank = {sig:4, out:3, touch:2, sq:1, '':0};
   // default order: favourites, then confirmed signals by strength, then the coins furthest from the middle of their range
-  const key = r => sortKey === 'ext' ? (favs.has(r.sym) ? 1e3 : 0) + (r.rev ? 100 + (r.score || 0) / 10 : 0) + Math.min(Math.abs(r.pB - 0.5), 5) / 10
+  const key = r => sortKey === 'ext' ? (favs.has(r.sym) ? 1e3 : 0) + (r.rev ? 100 + (r.score || 0) / 10 : r.wasRev ? 50 : 0) + Math.min(Math.abs(r.pB - 0.5), 5) / 10
     : sortKey === 'fav' ? (favs.has(r.sym) ? 1 : 0) : sortKey === 'vol' ? (r.volX ?? -1) : sortKey === 'score' ? (r.score ?? -1)
     : sortKey === 'label' ? kindRank[r.kind] : sortKey === 'hl' ? (isFinite(r.hl) ? -r.hl : -1e9) : r[sortKey];
   list.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sortDir; });
   document.querySelectorAll('#mhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === sortKey); th.dataset.dir = th.dataset.s === sortKey ? (sortDir > 0 ? 'asc' : 'desc') : ''; });
   $('#tb').innerHTML = list.map(r => {
     // T½ longer than a month (or none at all) means the coin is trending, not coming back: say so instead of "∞" or "460 д"
-    const hlMs = r.hl * TFMS[S.tf], hl = isFinite(hlMs) && hlMs < 30 * 864e5 ? dur(hlMs) : '<span class="faint" title="Монета в тренде: к центру канала сейчас не возвращается">тренд</span>';
+    const hlMs = r.hl * TFMS[S.tf], hl = isFinite(hlMs) && hlMs < 30 * 864e5 ? dur(hlMs) : 'тренд';
     const sc = r.score == null ? '<span class="faint">—</span>'
-      : `<b style="color:${r.rev ? (r.score >= S.minScore ? 'var(--acc)' : 'var(--text)') : 'var(--faint)'}" title="${r.rev ? 'разворот подтверждён' : 'разворот не подтверждён — бот не войдёт'}">${r.score}</b>`;
+      : `<b style="color:${r.rev ? (r.score >= S.minScore ? 'var(--acc)' : 'var(--text)') : 'var(--faint)'}" title="${r.rev ? 'разворот подтверждён' : r.wasRev ? 'подтверждение ослабло: последняя свеча против разворота, сила без него. Бот по ослабшему сигналу не войдёт' : 'разворот не подтверждён — бот не войдёт'}">${r.score}</b>`;
+    const weak = r.rev && r.score < S.minScore, tip = weak ? `Сила ${r.score} ниже порога ${S.minScore} — бот по такому сигналу не войдёт. ` : '';
     const vc = r.volZ >= 1 ? 'var(--acc)' : r.volZ <= -1 ? 'var(--faint)' : 'inherit';
     return `<tr tabindex="0" class="row${r.sym === chartSym ? ' sel' : ''}${flashSyms.has(r.sym) ? ' newsig' : ''}" data-sym="${r.sym}">
       <td><span class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}">${favs.has(r.sym) ? '★' : '☆'}</span></td>
       <td>${coin(r.sym)}</td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
       <td class="hm hx ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
-      <td>${r.label ? `<span class="tag ${r.cls}${r.rev && r.score < S.minScore ? ' weak' : ''}"${r.rev && r.score < S.minScore ? ` title="Сила ${r.score} ниже порога ${S.minScore} — бот по такому сигналу не войдёт"` : ''}>${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
+      <td>${r.label ? `<span class="tag ${r.wasRev && !r.rev && r.kind === 'touch' ? (r.side === 'low' ? 'loc' : 'upc') + ' weak' : r.cls + (weak ? ' weak' : '')}"${r.touchTime && (r.rev || r.wasRev) ? ` title="${tip}${sigTip(r)}"` : weak ? ` title="${tip}"` : ''}>${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
       <td>${sc}</td>
       <td class="hm hx" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
-      <td class="hm ${isFinite(r.hl) ? 'mute' : 'faint'}">${hl}</td></tr>`;
+      <td class="hm ${hlCls(r.hl)}" title="${hlTip(r.hl)}">${hl}</td></tr>`;
   }).join('') || '<tr><td colspan="9" class="mute">Нет пар под фильтр</td></tr>';
 }
 
@@ -1681,7 +1697,7 @@ function computeChart() {
   const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
   const fav = favs.has(chartSym);
   $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button> <span class="cprice">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
-  $('#cstats').innerHTML = `${(pB*100).toFixed(0)}% диапазона · границы ${fp(B.lo[i])} — ${fp(B.up[i])} · RSI ${chart.R[i].toFixed(0)} · T½ ${isFinite(hl) && hl * TFMS[S.tf] < 30 * 864e5 ? dur(hl * TFMS[S.tf]) : 'тренд'}`
+  $('#cstats').innerHTML = `${(pB*100).toFixed(0)}% диапазона · границы ${fp(B.lo[i])} — ${fp(B.up[i])} · RSI ${chart.R[i].toFixed(0)} · <span class="${hlCls(hl)}" title="${hlTip(hl)}">T½ ${isFinite(hl) && hl * TFMS[S.tf] < 30 * 864e5 ? dur(hl * TFMS[S.tf]) : 'тренд'}</span>`
     + `<span class="faint"> · ${METHOD_NAME[S.method]} ${S.N}/${S.k}</span>`;
   drawChart(); renderDetail();
 }
@@ -1741,9 +1757,12 @@ function renderDetail() {
   const r = M.analyze(chartSym, chartK, {...S, N:effN(chartK.length)});
   if (!r) { el.innerHTML = '<div class="mute">Мало истории для расчёта канала — уменьшите N.</div>'; return; }
   const name = base(chartSym), pct = (r.pB * 100).toFixed(0) + '%';
-  const hlTxt = isFinite(r.hl)
-    ? `${name} обычно проходит половину пути обратно к своей цене за <b>${dur(r.hl * TFMS[S.tf])}</b>${r.hl > 40 ? ' — это медленно, на быстрый возврат рассчитывать не стоит' : ''}.`
-    : `${name} сейчас в <b>тренде</b> и не стремится вернуться к своей цене — ловить разворот рискованно.`;
+  const hlTxt = isFinite(r.hl) && r.hl * TFMS[S.tf] < 30 * 864e5
+    ? `${name} обычно проходит половину пути обратно к своей цене за <b class="${hlCls(r.hl)}">${dur(r.hl * TFMS[S.tf])}</b> (${r.hl.toFixed(0)} свечей ${S.tf})`
+      + (r.hl <= 20 ? ' — быстро, отскок успевает дойти до цели.' : r.hl <= 40 ? ` — медленно: норма на ${S.tf} — до 20 свечей, это ${dur(20 * TFMS[S.tf])}.` : ` — очень медленно, на ${S.tf} это почти тренд: норма — до ${dur(20 * TFMS[S.tf])}.`)
+    : `${name} сейчас в <b class="neg">тренде</b> и не стремится вернуться к своей цене — ловить разворот рискованно.`;
+  // how long the signal stays: counted from the candle that touched the band, not from the confirmation
+  const life = r.touchTime && (r.rev || r.wasRev) ? ` <span class="mute">Касание было ${hmDay(r.touchTime)}, сигнал ${sigLife(r)}. Это срок для входа: дальше бот по нему не войдёт, а открытую позицию держат до тейка или стопа.</span>` : '';
   const edge = r.side === 'low' ? 'нижней' : 'верхней';
   let verdict;
   if (r.rev) {
@@ -1754,7 +1773,9 @@ function renderDetail() {
           : SJ.open.some(p => p.sym === chartSym) ? 'общий бот уже в сделке по этой монете.'
           : SJ.open.length >= M.MAX_OPEN ? `сигнал проходит, но у общего бота заняты все ${M.MAX_OPEN} места — войдёт, когда одно освободится.`
           : 'общий бот войдёт в сделку на ближайшей проверке рынка.')
-        : `${r.score >= 60 ? 'сильный сигнал' : 'слабый сигнал'}. Боты торгуют по своим настройкам${bs ? ` (общий — ${bs.tf}, k = ${bs.k})` : ''}, поэтому могут его не взять.`);
+        : `${r.score >= 60 ? 'сильный сигнал' : 'слабый сигнал'}. Боты торгуют по своим настройкам${bs ? ` (общий — ${bs.tf}, k = ${bs.k})` : ''}, поэтому могут его не взять.`) + life;
+  } else if (r.wasRev && r.kind === 'touch') {
+    verdict = `<b>${r.side === 'low' ? '▲ Разворот вверх' : '▼ Разворот вниз'} ослаб.</b> Он был подтверждён, но последняя свеча закрылась против него, поэтому сила сейчас ${r.score} — без подтверждения. Следующая свеча в сторону сделки вернёт сигнал; бот по ослабшему сигналу не входит.` + life;
   } else if (r.touch) {
     const miss = [];
     if (!r.checks.closed) miss.push('свеча ещё не закрылась');
@@ -2130,6 +2151,7 @@ function openForm(p) {
   $('#pfCoins').value = p?.coins.mode === 'list' ? 'list' : String(p?.coins.top || 150);
   $('#pfList').value = p?.coins.mode === 'list' ? p.coins.list.map(base).join(', ') : '';
   $('#pfListL').classList.toggle('hidden', $('#pfCoins').value !== 'list');
+  hlOpts('#pfHL', s.tf);
   $('#pfTf').value = s.tf; $('#pfMethod').value = s.method; $('#pfN').value = s.N; $('#pfK').value = s.k; $('#pfStrat').value = s.strategy; $('#pfMin').value = s.minScore;
   $('#pfRR').value = String(s.rr); $('#pfRisk').value = String(Math.round(s.risk * 1000) / 10); $('#pfLev').value = String(s.lev);
   $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any'; $('#pfTS').value = String(s.timeStop ?? 48);
@@ -2479,7 +2501,7 @@ function btSettings() {
           erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value};
 }
 function btFill(s) {
-  $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0);
+  $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0); hlOpts('#btHL', $('#btTf').value);
   $('#btStrat').value = s.strategy || 'revert'; $('#btLong').checked = !!s.longOnly; $('#btW').value = String(s.minWidth || 0);
   $('#btRR').value = String(s.rr || 0); $('#btRisk').value = String(Math.round((s.risk ?? M.RISK) * 1000) / 10); $('#btLev').value = String(s.lev ?? 1);
   $('#btER').value = String(s.erMax ?? 0.15); $('#btReg').value = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
@@ -2615,6 +2637,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.13', date:'11 октября 2026', title:'Срок сигнала и цвет T½', items:[
+    'У сигнала виден срок: «касание в 12:00, сигнал виден ещё 45м, до 13:15» — в подсказке метки и в разборе сигнала. Сигнал живёт 5 свечей от касания границы (а не от подтверждения) — это срок для входа; открытую позицию держат до тейка или стопа. На истории выход «когда сигнал пропал» и более долгий срок сигнала давали результат хуже.',
+    'Подтверждённый сигнал больше не пропадает из-за одной встречной свечи: он остаётся в таблице как «SHORT · ослаб» (или «LONG · ослаб») и возвращается со следующей свечой в его сторону. Колокольчик не звонит второй раз за тот же сигнал.',
+    'T½ окрашен: зелёный — монета быстро возвращается к центру на этом таймфрейме (до 20 свечей), красный — медленно или тренд, отскок рискован. В подсказке — сколько это свечей и какая норма на выбранном таймфрейме. У фильтра T½ написано, сколько это во времени.',
+    'Telegram: у каждого сигнала — сколько ещё можно войти и T½ с отметкой ✅ / ⚠️.',
+  ]},
   {v:'2.12', date:'11 октября 2026', title:'Telegram-бот с кнопками', items:[
     'В Telegram-боте появилось меню с кнопками: «Уведомления» включают и выключают каждый вид сообщений одним нажатием, «Общий бот» и «Мой бот» показывают баланс, открытые позиции с текущим результатом и последние сделки, «Как читать» объясняет сигналы. Команды тоже в меню у поля ввода.',
     'Сигналы в Telegram стали понятнее: сторона и монета сразу в заголовке, сколько осталось до центра канала, подтверждён ли отскок. Сделки — с тейком и стопом отдельными строками, причиной закрытия и временем в сделке.',
@@ -3330,6 +3358,9 @@ function profToBacktest(p, who) {
 }
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
 ['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER'].forEach(s => $(s).onchange = btEstimate);
+$('#btTf').addEventListener('change', () => hlOpts('#btHL', $('#btTf').value));
+$('#pfTf').addEventListener('change', () => hlOpts('#pfHL', $('#pfTf').value));
+hlOpts('#btHL', $('#btTf').value);
 $('#btCustom').oninput = btEstimate;
 $('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });
 $('#btTrades').onclick = e => {
