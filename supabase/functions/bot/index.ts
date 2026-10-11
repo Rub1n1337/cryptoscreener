@@ -97,8 +97,24 @@ const sigLine = (tf: string) => (r: any) => {
   return `${long ? "🟢" : "🔴"} <b>${long ? "LONG" : "SHORT"} ${coin(r.sym)}</b> · сила <b>${r.score}</b>\n` +
     `цена ${fp(r.price)} · до центра ${toMid >= 0 ? "+" : "−"}${Math.abs(toMid).toFixed(1)}%\n` +
     `RSI ${Math.round(r.rsi)} · объём ${r.volX ? "×" + r.volX.toFixed(1) : "—"} · ${r.rev ? "✔ отскок подтверждён" : "⏳ ждём подтверждения"}\n` +
-    `⌛ войти можно ещё ${left > 6e4 ? dur(left) : "минуту"} · T½ ${hl}`;
+    `⌛ войти можно ещё ${left > 6e4 ? dur(left) : "минуту"} · T½ ${hl}` + (r.botNote ? `\n${r.botNote}` : "");
 };
+// why the profile's own bot passes a signal at its threshold — so a signal it doesn't take is not a mystery
+function whyNot(r: any, S: any, nOpen: number) {
+  const mode = M.modeOf(r, S), reg = M.regimeOf(r.mkt, S), only = S.regimeOnly || "any";
+  if (mode === "none") return "рынок падает — «переключатель» в падении не торгует";
+  if (mode === "breakout_long") return "рынок растёт — «переключатель» берёт только пробои вверх";
+  if (only === "flat" && reg !== "flat") return "профиль торгует только в боковике";
+  if (only === "impulse" && (reg == null || reg === "flat")) return "профиль торгует только в импульсе";
+  if (S.coinErMax && mode !== "breakout" && r.er >= S.coinErMax) return "монета сама в тренде (фильтр профиля)";
+  if (!r.rev) return "разворот не подтверждён";
+  if (S.longOnly && r.side === "up") return "профиль торгует только LONG";
+  if (mode === "revert_trend" && !(r.side === "low" ? r.slope > 0 : r.slope < 0)) return "отскок против тренда канала";
+  if (S.minWidth && !((r.up - r.lo) / r.mid * 100 >= S.minWidth)) return `канал уже ${S.minWidth}% (фильтр профиля)`;
+  if (S.maxHL && !(isFinite(r.hl) && r.hl <= S.maxHL)) return `T½ ${isFinite(r.hl) ? Math.round(r.hl) + " свечей" : "— тренд"}, а в профиле T½ ≤ ${S.maxHL}`;
+  if (nOpen >= M.MAX_OPEN) return `заняты все ${M.MAX_OPEN} места`;
+  return "до центра осталось мало места или по монете недавно была сделка";
+}
 // a signal message: title, the rules it follows in one grey line, up to 15 signals
 const sigMsg = (title: string, rules: string, list: any[], tf: string) =>
   [`${title}\n<i>${rules}</i>`, ...list.slice(0, 15).map(sigLine(tf)), ...(list.length > 15 ? [`…и ещё ${list.length - 15} — на сайте`] : [])];
@@ -224,6 +240,9 @@ async function runUserBots(now: number) {
       if (keep.length) await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p })));
       // a linked chat also gets the profile's own signals (strength at its threshold), unless switched off with /mysignals
       const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore), mySigs = sigOn ? freshSignals(rows, sigMin, sent, now) : [];   // a floor of 40: a profile with no threshold would message every touch
+      const took = new Set(res.opened.map((p: any) => p.sym)), held = new Set(res.stillOpen.map((p: any) => p.sym));
+      for (const r of mySigs) r.botNote = took.has(r.sym) ? "🤖 бот вошёл в сделку" : held.has(r.sym) ? "🤖 бот уже в сделке по этой монете"
+        : `🤖 бот не войдёт: ${whyNot(r, S, res.stillOpen.length + res.opened.length)}`;
       // the owner's "Рынок" settings (sent by the site): the same signals as the bell there — a confirmed reversal at the threshold
       const sc = cfg.scan, mktOn = !!(b.tg_chat && b.tg_mkt !== false && sc && typeof sc === "object");
       let mktSigs: any[] = [], SM: any = null, mktTop = 0;
