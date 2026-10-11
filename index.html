@@ -1832,7 +1832,9 @@ async function rpc(fn, args) {
   if (!r.ok) throw new Error((await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
-const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax});
+// scan: the "Рынок" settings, so the server can send the same signals as the bell on the site to a linked Telegram chat
+const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax,
+  scan:{tf:S.tf, top:S.top, minScore:S.minScore, method:S.method, N:S.N, k:S.k}});
 let syncTimer;
 function syncServerBot() {   // push profiles/mode to the server bot (debounced)
   if (BP.where !== 'server' || !UB) return;
@@ -2617,6 +2619,7 @@ const CHANGELOG = [
     'Общий бот перешёл на 4-часовые свечи и «переключатель по режиму рынка»: в боковике ловит отскоки, в росте — пробои вверх, в падении ждёт. Настройки доведены по предложению из чата: канал шире (3.5σ), только монеты, которые быстро возвращаются к центру (T½ ≤ 20), боковик — при ER < 0.25. На истории за год медиана +0.38R на сделку, старые правила были в минусе. Сделок мало — около трёх в месяц, зато отбор строже.',
     '«Рынок» и бэктест по умолчанию на том же таймфрейме 4ч, что и общий бот.',
     'Telegram-бот отвечает на команды сразу, а не через минуту. Под сообщениями о сигналах и сделках — кнопки, открывающие график монеты на сайте. /status показывает, сколько сообщений бот уже прислал и когда последнее.',
+    'Telegram: привязанный «Мой бот» присылает те же сигналы, что колокольчик на сайте, — по вашим настройкам «Рынка» (таймфрейм, число монет). Выключить — /market.',
   ]},
   {v:'2.10', date:'11 октября 2026', title:'Профиль общего бота, бэктест в один клик, ручное закрытие позиций', items:[
     'В журнале общего бота теперь видно, по какому профилю он торгует: таймфрейм, вход, сила сигнала, риск, плечо, фильтр рынка.',
@@ -2815,7 +2818,7 @@ const setMore = on => { $('#mtable').classList.toggle('more', on); $('#morebar')
 $('#more').onclick = () => setMore(!$('#mtable').classList.contains('more'));
 setMore(load('sr_more', false));
 let scanTimer;
-const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); };
+const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); syncServerBot(); };   // the server bot sends this market's signals to Telegram
 $('#N').oninput = e => { S.N = +e.target.value; $('#Nv').textContent = S.N; computeChart(); };
 $('#k').oninput = e => { S.k = +e.target.value; $('#kv').textContent = S.k; computeChart(); };
 $('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').textContent = S.candles; chartView = null; drawChart(); };
@@ -3336,6 +3339,7 @@ $('#btDays').value = '60'; btFromProf(PRESETS[0]);
 renderChangelog();
 renderBotPanel();
 tgName().then(b => { if (b && !$('#journal').classList.contains('hidden')) renderJournal(); });
+if (BP.where === 'server' && UB) syncServerBot();   // the server learns this browser's "Рынок" settings for its Telegram signals
 if (BP.where === 'server') fetchServerBot();
 if (!load('sr_intro', false)) $('#intro').classList.remove('hidden');
 $('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };

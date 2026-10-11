@@ -79,12 +79,13 @@ async function tgPoll() {
 const SIG_MIN = 60;
 // signals at the threshold not announced yet (`sent` is updated in place: "SYM:touchTime" → ms, kept 3 days);
 // the very first call only remembers what is there, so nobody gets a pile of old signals ("_init" marks that it has run)
-function freshSignals(rows: any[], min: number, sent: Record<string, number>, now: number) {
-  const fresh = rows.filter((r) => r.score != null && r.score >= min && r.touchTime && !sent[`${r.sym}:${r.touchTime}`]).sort((a, b) => b.score - a.score);
-  const first = !sent._init;
-  for (const r of fresh) sent[`${r.sym}:${r.touchTime}`] = now;
+// pre: a separate memory inside the same object (the "Рынок" feed uses "m:"), with its own first-run marker
+function freshSignals(rows: any[], min: number, sent: Record<string, number>, now: number, pre = "") {
+  const fresh = rows.filter((r) => r.score != null && r.score >= min && r.touchTime && !sent[`${pre}${r.sym}:${r.touchTime}`]).sort((a, b) => b.score - a.score);
+  const first = !sent["_init" + pre];
+  for (const r of fresh) sent[`${pre}${r.sym}:${r.touchTime}`] = now;
   for (const k of Object.keys(sent)) if (now - sent[k] > 3 * 864e5) delete sent[k];
-  sent._init = now;
+  sent["_init" + pre] = now;
   return first ? [] : fresh;
 }
 const sigLine = (r: any) => `${r.side === "low" ? "🟢" : "🔴"} <b>${pair(r.sym)}</b> · сила <b>${r.score}</b> · ${esc(r.label)}\n` +
@@ -166,7 +167,7 @@ async function majorsRegime() {
 async function runUserBots(now: number) {
   // fair queue: the least recently checked bots go first, so with more bots than fit in one run every bot still gets its turn;
   // bots whose owner hasn't opened the site for 30 days are not scheduled
-  const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat, tg_sig, sig_sent").eq("enabled", true)
+  const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat, tg_sig, tg_mkt, sig_sent").eq("enabled", true)
     .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
   if (!bots?.length) return 0;
   const reg = await majorsRegime(), ticker = await api("/api/v3/ticker/24hr");
@@ -208,12 +209,25 @@ async function runUserBots(now: number) {
       if (keep.length) await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p })));
       // a linked chat also gets the profile's own signals (strength at its threshold), unless switched off with /mysignals
       const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore), mySigs = sigOn ? freshSignals(rows, sigMin, sent, now) : [];   // a floor of 40: a profile with no threshold would message every touch
+      // the owner's "Рынок" settings (sent by the site): the same signals as the bell there — a confirmed reversal at the threshold
+      const sc = cfg.scan, mktOn = !!(b.tg_chat && b.tg_mkt !== false && sc && typeof sc === "object");
+      let mktSigs: any[] = [], SM: any = null, mktTop = 0;
+      if (mktOn) {
+        SM = { method: oneOf(sc.method, ["log", "classic", "robust", "ewma"], "log"), N: Math.round(num(sc.N, 20, 300, 210)), k: num(sc.k, 1, 5, 3),
+          tf: oneOf(sc.tf, ["5m", "15m", "1h", "4h", "1d"], "4h"), minScore: num(sc.minScore, 40, 100, 60) };
+        mktTop = Math.round(num(sc.top, 10, 250, 150));
+        const lst = M.pickSymbols(ticker, mktTop, [], now), KM: Record<string, any> = {};
+        await pool(lst, 10, async (s) => { KM[s] = await getK(s, SM.tf); });
+        const rowsM = lst.map((s) => KM[s]?.length ? M.analyze(s, KM[s], { ...SM, N: effN(KM[s].length, SM) }, now) : null).filter((r: any) => r?.rev);
+        mktSigs = freshSignals(rowsM, SM.minScore, sent, now, "m:");
+      }
       await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: pname,
-        regime: reg ? { state: regName, by: reg.by } : null, last_error: null, ...(sigOn ? { sig_sent: sent } : {}) }).eq("id", b.id);
+        regime: reg ? { state: regName, by: reg.by } : null, last_error: null, ...(sigOn || mktOn ? { sig_sent: sent } : {}) }).eq("id", b.id);
       if (b.tg_chat) await sendTo([b.tg_chat], [
         ...res.closed.map((t: any) => closedMsg(t).replace("</b> закрыта", "</b> — ваш бот закрыл")),
         ...res.opened.map((p: any) => openedMsg(p).replace("общий бот открыл позицию", `ваш бот открыл позицию · «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
       if (mySigs.length) await sendTo([b.tg_chat], [`📡 <b>Сигналы профиля «${esc(pname)}»</b> · ${S.tf}, сила от ${sigMin}`, ...mySigs.slice(0, 15).map(sigLine)], mySigs.map((r: any) => r.sym));
+      if (mktSigs.length) await sendTo([b.tg_chat], [`🔔 <b>Сигналы вашего «Рынка»</b> · ${SM.tf}, ${mktTop} монет, сила от ${SM.minScore}`, ...mktSigs.slice(0, 15).map(sigLine)], mktSigs.map((r: any) => r.sym));
       done++;
     } catch (e) {
       await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e), checked_at: new Date(now).toISOString() }).eq("id", b.id);
