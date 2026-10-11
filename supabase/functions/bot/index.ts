@@ -32,12 +32,14 @@ async function tgCall(method: string, body: unknown) {
   return await r.json().catch(() => null);
 }
 const FOOT = `\n\n<a href="${SITE}">Sigma Radar</a> · бумажная торговля, не совет`;
-async function sendTo(chats: (number | string)[], lines: string[]) {
+// syms: up to 3 coins get a button that opens the coin's chart on the site
+async function sendTo(chats: (number | string)[], lines: string[], syms: string[] = []) {
   if (!lines.length || !chats.length || !(await tgConf())) return;
-  const text = lines.join("\n\n").slice(0, 3900) + FOOT;
+  const text = lines.join("\n\n").slice(0, 3900) + FOOT, coins = [...new Set(syms.map((s) => s.replace(/USDT$/, "")))].slice(0, 3);
+  const reply_markup = coins.length ? { inline_keyboard: [coins.map((c) => ({ text: `📈 ${c}`, url: `${SITE}/#market/${c}` }))] } : undefined;
   for (const chat of [...new Set(chats.map(String))]) {
     try {
-      const r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true });
+      const r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup });
       if (r && !r.ok && r.error_code === 403) await db.from("tg_subs").delete().eq("chat_id", chat);   // the user blocked the bot
     } catch { /* notifications must never break trading */ }
   }
@@ -48,7 +50,7 @@ async function chatsFor(kind: "shared" | "signals") {
   const { data } = await db.from("tg_subs").select("chat_id").eq(kind, true);
   return [...(data ?? []).map((x: any) => x.chat_id), ...(kind === "shared" && tg.chat_id ? [tg.chat_id] : [])];
 }
-const notify = async (lines: string[]) => sendTo(await chatsFor("shared"), lines);
+const notify = async (lines: string[], syms: string[] = []) => sendTo(await chatsFor("shared"), lines, syms);
 
 // commands from Telegram: the "tg" function answers them at once (a webhook); this registers it, and until that works
 // reads them here once a minute (getUpdates)
@@ -85,7 +87,7 @@ const sigLine = (r: any) => `${r.side === "low" ? "🟢" : "🔴"} <b>${pair(r.s
 async function announceSignals(rows: any[], S: any, sent: Record<string, number>, now: number) {
   const fresh = freshSignals(rows, SIG_MIN, sent, now);
   await db.from("bot_state").update({ sig_sent: sent }).eq("id", 1);
-  if (fresh.length) await sendTo(await chatsFor("signals"), [`📡 <b>Новые сигналы ≥ ${SIG_MIN}</b> · ${S.tf}, топ-${S.top} монет`, ...fresh.slice(0, 15).map(sigLine)]);
+  if (fresh.length) await sendTo(await chatsFor("signals"), [`📡 <b>Новые сигналы ≥ ${SIG_MIN}</b> · ${S.tf}, топ-${S.top} монет`, ...fresh.slice(0, 15).map(sigLine)], fresh.map((r) => r.sym));
 }
 const openedMsg = (p: any) =>
   `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side} ${pair(p.sym)}</b> — общий бот открыл позицию\n` +
@@ -121,7 +123,7 @@ async function run() {
   const upserts = [...res.stillOpen, ...res.opened];
   if (upserts.length) { const { error } = await db.from("positions").upsert(upserts); if (error) throw error; }
   await db.from("bot_state").update({ balance: res.balance, checked_at: new Date(now).toISOString(), scanned: Object.keys(klines).length, last_error: null }).eq("id", 1);
-  await notify([...res.closed.map(closedMsg), ...res.opened.map(openedMsg)]);
+  await notify([...res.closed.map(closedMsg), ...res.opened.map(openedMsg)], [...res.opened, ...res.closed].map((x: any) => x.sym));
   try { await announceSignals(rows, S, st.sig_sent || {}, now); } catch { /* signals must never break trading */ }
   return { scanned: Object.keys(klines).length, signals: rows.filter((r) => M.wants(r, S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, ticker: undefined as any };
 }
@@ -205,8 +207,8 @@ async function runUserBots(now: number) {
         regime: reg ? { state: regName, by: reg.by } : null, last_error: null, ...(sigOn ? { sig_sent: sent } : {}) }).eq("id", b.id);
       if (b.tg_chat) await sendTo([b.tg_chat], [
         ...res.closed.map((t: any) => closedMsg(t).replace("</b> закрыта", "</b> — ваш бот закрыл")),
-        ...res.opened.map((p: any) => openedMsg(p).replace("общий бот открыл позицию", `ваш бот открыл позицию · «${esc(pname)}»`))]);
-      if (mySigs.length) await sendTo([b.tg_chat], [`📡 <b>Сигналы профиля «${esc(pname)}»</b> · ${S.tf}, сила от ${sigMin}`, ...mySigs.slice(0, 15).map(sigLine)]);
+        ...res.opened.map((p: any) => openedMsg(p).replace("общий бот открыл позицию", `ваш бот открыл позицию · «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
+      if (mySigs.length) await sendTo([b.tg_chat], [`📡 <b>Сигналы профиля «${esc(pname)}»</b> · ${S.tf}, сила от ${sigMin}`, ...mySigs.slice(0, 15).map(sigLine)], mySigs.map((r: any) => r.sym));
       done++;
     } catch (e) {
       await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e), checked_at: new Date(now).toISOString() }).eq("id", b.id);
