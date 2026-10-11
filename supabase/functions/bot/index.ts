@@ -215,7 +215,7 @@ async function runUserBots(now: number) {
       if (mktOn) {
         SM = { method: oneOf(sc.method, ["log", "classic", "robust", "ewma"], "log"), N: Math.round(num(sc.N, 20, 300, 210)), k: num(sc.k, 1, 5, 3),
           tf: oneOf(sc.tf, ["5m", "15m", "1h", "4h", "1d"], "4h"), minScore: num(sc.minScore, 40, 100, 60) };
-        mktTop = Math.round(num(sc.top, 10, 250, 150));
+        mktTop = Math.round(num(sc.top, 10, 400, 150));
         const lst = M.pickSymbols(ticker, mktTop, [], now), KM: Record<string, any> = {};
         await pool(lst, 10, async (s) => { KM[s] = await getK(s, SM.tf); });
         const rowsM = lst.map((s) => KM[s]?.length ? M.analyze(s, KM[s], { ...SM, N: effN(KM[s].length, SM) }, now) : null).filter((r: any) => r?.rev);
