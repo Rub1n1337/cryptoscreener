@@ -2,11 +2,10 @@
 // All strategy math lives in ../_shared/math.js — the same file the site uses.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as M from "../_shared/math.js";
-import { esc, handleMessage } from "../_shared/tg.ts";
+import { COMMANDS, SITE, coin, dur, esc, fp, handleUpdate, pct, rr, usd } from "../_shared/tg.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
-const SITE = "https://cryptoscreener-topaz.vercel.app";
 
 async function api(path: string) {
   let err: unknown;
@@ -21,9 +20,6 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
 }
 
 // ---------- Telegram (optional: one bot, token in public.tg_config; chats subscribe with /start, see README) ----------
-const fp = (p: number) => { const a = Math.abs(p); return "$" + (a >= 1000 ? p.toFixed(0) : a >= 100 ? p.toFixed(2) : a >= 1 ? p.toFixed(3) : p.toPrecision(4)); };
-const pct = (v: number, e: number) => { const x = (v / e - 1) * 100; return (x > 0 ? "+" : "−") + Math.abs(x).toFixed(2) + "%"; };
-const pair = (s: string) => s.replace(/USDT$/, "/USDT");
 let TG: any;   // tg_config, read once per run
 async function tgConf() { if (TG === undefined) { const { data } = await db.from("tg_config").select("*").eq("id", 1).maybeSingle(); TG = data?.enabled && data.bot_token ? data : null; } return TG; }
 async function tgCall(method: string, body: unknown) {
@@ -31,17 +27,21 @@ async function tgCall(method: string, body: unknown) {
   const r = await fetch(`https://api.telegram.org/bot${tg.bot_token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   return await r.json().catch(() => null);
 }
-const FOOT = `\n\n<a href="${SITE}">Sigma Radar</a> · бумажная торговля, не совет`;
-// syms: up to 3 coins get a button that opens the coin's chart on the site
+const FOOT = `\n\n<i>бумажная торговля · не финансовый совет</i>`;
+// syms: up to 3 coins get a button that opens the coin's chart on the site; under them — the notification settings
+// ("+n": opens them as a new message, so the signal itself stays in the chat)
 async function sendTo(chats: (number | string)[], lines: string[], syms: string[] = []) {
   if (!lines.length || !chats.length || !(await tgConf())) return;
   const text = lines.join("\n\n").slice(0, 3900) + FOOT, coins = [...new Set(syms.map((s) => s.replace(/USDT$/, "")))].slice(0, 3);
   // the link is percent-encoded: a coin named in Chinese would otherwise make Telegram refuse the whole message
-  const reply_markup = coins.length ? { inline_keyboard: [coins.map((c) => ({ text: `📈 ${c}`, url: `${SITE}/#market/${encodeURIComponent(c)}` }))] } : undefined;
+  const reply_markup = { inline_keyboard: [
+    ...(coins.length ? [coins.map((c) => ({ text: `📈 ${c}`, url: `${SITE}/#market/${encodeURIComponent(c)}` }))] : []),
+    [{ text: "🔔 Уведомления", callback_data: "+n" }, { text: "📊 Общий бот", callback_data: "+s" }],
+  ] };
   for (const chat of [...new Set(chats.map(String))]) {
     try {
       let r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup });
-      if (r && !r.ok && r.error_code === 400 && reply_markup) r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true });   // buttons refused: send without them
+      if (r && !r.ok && r.error_code === 400) r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true });   // buttons refused: send without them
       if (r && !r.ok && r.error_code === 403) { await db.from("tg_subs").delete().eq("chat_id", chat); continue; }   // the user blocked the bot
       // what happened to the last message in this chat, so a "nothing came" can be checked
       const { data: s } = await db.from("tg_subs").select("sent_n").eq("chat_id", chat).maybeSingle();
@@ -57,20 +57,20 @@ async function chatsFor(kind: "shared" | "signals") {
 }
 const notify = async (lines: string[], syms: string[] = []) => sendTo(await chatsFor("shared"), lines, syms);
 
-// commands from Telegram: the "tg" function answers them at once (a webhook); this registers it, and until that works
-// reads them here once a minute (getUpdates)
+// commands and button presses from Telegram: the "tg" function answers them at once (a webhook); this registers it
+// (with the command menu), and until that works reads them here once a minute (getUpdates)
+const UPDATES = ["message", "callback_query"];
 async function tgPoll() {
   const tg = await tgConf(); if (!tg) return;
   // registered: check every 10 minutes that it still is (a new token after /revoke has no webhook yet)
   if (tg.wh_ok) { if (new Date().getUTCMinutes() % 10) return; const i = await tgCall("getWebhookInfo", {}); if (!i?.ok || i.result?.url) return; }
-  const wh = await tgCall("setWebhook", { url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/tg`, secret_token: tg.wh_secret, allowed_updates: ["message"] });
-  if (wh?.ok) { await db.from("tg_config").update({ wh_ok: true }).eq("id", 1); return; }
-  const r = await tgCall("getUpdates", { offset: Number(tg.upd_offset || 0) + 1, timeout: 0, allowed_updates: ["message"] });
+  const wh = await tgCall("setWebhook", { url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/tg`, secret_token: tg.wh_secret, allowed_updates: UPDATES });
+  if (wh?.ok) { await tgCall("setMyCommands", { commands: COMMANDS }); await db.from("tg_config").update({ wh_ok: true }).eq("id", 1); return; }
+  const r = await tgCall("getUpdates", { offset: Number(tg.upd_offset || 0) + 1, timeout: 0, allowed_updates: UPDATES });
   if (!r?.ok || !r.result?.length) return;
   for (const u of r.result) {
-    const chat = u.message?.chat?.id;
-    try { await handleMessage(db, u.message, (t: string) => tgCall("sendMessage", { chat_id: chat, text: t, parse_mode: "HTML", disable_web_page_preview: true }).catch(() => null)); }
-    catch { /* one bad message must not stop the others */ }
+    try { await handleUpdate(db, u, (m: string, b: Record<string, unknown>) => tgCall(m, b).catch(() => null)); }
+    catch { /* one bad update must not stop the others */ }
   }
   await db.from("tg_config").update({ upd_offset: r.result[r.result.length - 1].update_id }).eq("id", 1);
 }
@@ -88,20 +88,31 @@ function freshSignals(rows: any[], min: number, sent: Record<string, number>, no
   sent["_init" + pre] = now;
   return first ? [] : fresh;
 }
-const sigLine = (r: any) => `${r.side === "low" ? "🟢" : "🔴"} <b>${pair(r.sym)}</b> · сила <b>${r.score}</b> · ${esc(r.label)}\n` +
-  `цена ${fp(r.price)} · RSI ${Math.round(r.rsi)} · объём ×${r.volX ? r.volX.toFixed(1) : "—"} · ${r.rev ? "отскок подтверждён" : "ждём подтверждения"}`;
+// one signal: side and coin first, then where the price is and why it counts
+const sigLine = (r: any) => {
+  const long = r.side === "low", toMid = (r.mid / r.price - 1) * 100;
+  return `${long ? "🟢" : "🔴"} <b>${long ? "LONG" : "SHORT"} ${coin(r.sym)}</b> · сила <b>${r.score}</b>\n` +
+    `цена ${fp(r.price)} · до центра ${toMid >= 0 ? "+" : "−"}${Math.abs(toMid).toFixed(1)}%\n` +
+    `RSI ${Math.round(r.rsi)} · объём ${r.volX ? "×" + r.volX.toFixed(1) : "—"} ·${r.rev ? "✔ отскок подтверждён" : "⏳ ждём подтверждения"}`;
+};
+// a signal message: title, the rules it follows in one grey line, up to 15 signals
+const sigMsg = (title: string, rules: string, list: any[]) =>
+  [`${title}\n<i>${rules}</i>`, ...list.slice(0, 15).map(sigLine), ...(list.length > 15 ? [`…и ещё ${list.length - 15} — на сайте`] : [])];
 async function announceSignals(rows: any[], S: any, sent: Record<string, number>, now: number) {
   const fresh = freshSignals(rows, SIG_MIN, sent, now);
   await db.from("bot_state").update({ sig_sent: sent }).eq("id", 1);
-  if (fresh.length) await sendTo(await chatsFor("signals"), [`📡 <b>Новые сигналы ≥ ${SIG_MIN}</b> · ${S.tf}, топ-${S.top} монет`, ...fresh.slice(0, 15).map(sigLine)], fresh.map((r) => r.sym));
+  if (fresh.length) await sendTo(await chatsFor("signals"), sigMsg("📡 <b>Новые сигналы</b> · общие правила", `${S.tf} · топ-${S.top} монет · сила от ${SIG_MIN}`, fresh), fresh.map((r) => r.sym));
 }
-const openedMsg = (p: any) =>
-  `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side} ${pair(p.sym)}</b> — общий бот открыл позицию\n` +
-  `вход ${fp(p.entry)} · тейк ${fp(p.tp)} (${pct(p.tp, p.entry)}) · стоп ${fp(p.sl)} (${pct(p.sl, p.entry)})\n` +
-  `сила сигнала ${p.snap?.score ?? "—"} · риск $${p.risk.toFixed(2)}`;
-const closedMsg = (t: any) =>
-  `${t.pnl > 0 ? "✅" : "❌"} <b>${pair(t.sym)} ${t.side}</b> закрыта: ${t.reason}\n` +
-  `${fp(t.entry)} → ${fp(t.exit)} · PnL ${t.pnl >= 0 ? "+" : "−"}$${Math.abs(t.pnl).toFixed(2)} (${t.r >= 0 ? "+" : "−"}${Math.abs(t.r).toFixed(2)}R) · комиссия $${t.fee.toFixed(2)}`;
+// who: "общий бот" or "ваш бот «…»"
+const openedMsg = (p: any, who = "общий бот") =>
+  `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side} ${coin(p.sym)}</b> — ${who} вошёл\n` +
+  `вход <b>${fp(p.entry)}</b>\n🎯 тейк ${fp(p.tp)} (${pct(p.tp, p.entry)})\n🛑 стоп ${fp(p.sl)} (${pct(p.sl, p.entry)})\n` +
+  `<i>${esc(String(p.note || "").replace(/^«[^»]*» · /, ""))} · риск $${p.risk.toFixed(2)}</i>`;
+const WHY: Record<string, string> = { "тейк": "по тейку", "стоп": "по стопу", "тайм-стоп": "по времени", "вручную": "вручную" };
+const closedMsg = (t: any, who = "общий бот") =>
+  `${t.pnl > 0 ? "✅" : "❌"} <b>${t.side} ${coin(t.sym)}</b> — ${who} закрыл ${WHY[t.reason] || esc(t.reason)}\n` +
+  `${fp(t.entry)} → ${fp(t.exit)} · <b>${usd(t.pnl)}</b>${rr(t.r)}\n` +
+  `<i>в сделке ${dur(t.tclose - t.time)} · комиссия $${t.fee.toFixed(2)}</i>`;
 
 // ---------- shared bot ----------
 async function run() {
@@ -129,7 +140,7 @@ async function run() {
   const upserts = [...res.stillOpen, ...res.opened];
   if (upserts.length) { const { error } = await db.from("positions").upsert(upserts); if (error) throw error; }
   await db.from("bot_state").update({ balance: res.balance, checked_at: new Date(now).toISOString(), scanned: Object.keys(klines).length, last_error: null }).eq("id", 1);
-  await notify([...res.closed.map(closedMsg), ...res.opened.map(openedMsg)], [...res.opened, ...res.closed].map((x: any) => x.sym));
+  await notify([...res.closed.map((t: any) => closedMsg(t)), ...res.opened.map((p: any) => openedMsg(p))], [...res.opened, ...res.closed].map((x: any) => x.sym));
   try { await announceSignals(rows, S, st.sig_sent || {}, now); } catch { /* signals must never break trading */ }
   return { scanned: Object.keys(klines).length, signals: rows.filter((r) => M.wants(r, S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, ticker: undefined as any };
 }
@@ -224,10 +235,10 @@ async function runUserBots(now: number) {
       await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: pname,
         regime: reg ? { state: regName, by: reg.by } : null, last_error: null, ...(sigOn || mktOn ? { sig_sent: sent } : {}) }).eq("id", b.id);
       if (b.tg_chat) await sendTo([b.tg_chat], [
-        ...res.closed.map((t: any) => closedMsg(t).replace("</b> закрыта", "</b> — ваш бот закрыл")),
-        ...res.opened.map((p: any) => openedMsg(p).replace("общий бот открыл позицию", `ваш бот открыл позицию · «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
-      if (mySigs.length) await sendTo([b.tg_chat], [`📡 <b>Сигналы профиля «${esc(pname)}»</b> · ${S.tf}, сила от ${sigMin}`, ...mySigs.slice(0, 15).map(sigLine)], mySigs.map((r: any) => r.sym));
-      if (mktSigs.length) await sendTo([b.tg_chat], [`🔔 <b>Сигналы вашего «Рынка»</b> · ${SM.tf}, ${mktTop} монет, сила от ${SM.minScore}`, ...mktSigs.slice(0, 15).map(sigLine)], mktSigs.map((r: any) => r.sym));
+        ...res.closed.map((t: any) => closedMsg(t, `ваш бот «${esc(pname)}»`)),
+        ...res.opened.map((p: any) => openedMsg(p, `ваш бот «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
+      if (mySigs.length) await sendTo([b.tg_chat], sigMsg(`📡 <b>Сигналы профиля «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, mySigs), mySigs.map((r: any) => r.sym));
+      if (mktSigs.length) await sendTo([b.tg_chat], sigMsg("🔔 <b>Сигналы вашего «Рынка»</b>", `${SM.tf} · ${mktTop} монет · сила от ${SM.minScore} · как колокольчик на сайте`, mktSigs), mktSigs.map((r: any) => r.sym));
       done++;
     } catch (e) {
       await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e), checked_at: new Date(now).toISOString() }).eq("id", b.id);
@@ -256,7 +267,7 @@ Deno.serve(async (req) => {
     // alert only on the first failure in a row, not every minute
     const { data: prev } = await db.from("bot_runs").select("ok").order("ts", { ascending: false }).limit(1);
     await db.from("bot_runs").insert({ ok: false, ms: Date.now() - t0, error: msg });
-    if (prev?.[0]?.ok !== false) await notify([`⚠️ <b>Общий бот: ошибка</b>\n${msg}`]);
+    if (prev?.[0]?.ok !== false) await notify([`⚠️ <b>Общий бот: ошибка</b>\n${esc(msg)}`]);
     return Response.json({ error: msg }, { status: 500 });
   } finally {
     await db.from("bot_runs").delete().lt("ts", new Date(Date.now() - 3 * 864e5).toISOString());
