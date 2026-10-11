@@ -177,6 +177,9 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:var(--tag-t);white-space:nowrap}
 .tag.weak{opacity:.55;filter:saturate(.6)}   /* a confirmed reversal below the bot threshold: visible, but not an invitation */
 .whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity .2s;z-index:3;white-space:nowrap}.whint.show{opacity:1}
+.botnow{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--s1);cursor:pointer;font-size:13.5px}.botnow:hover{border-color:var(--line2)}.botnow:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12.5px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
+@media(max-width:560px){.botnow{display:block}.bn-dot{display:inline-block;margin-right:8px;vertical-align:1px}.bn-main{display:inline}.bn-last,.bn-go{display:block;margin-top:6px}}
 .tag.up{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.lo{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sq{background:var(--accbg);color:var(--acc-t)}
 .tag.upc{background:#c9303d;color:#fff}.tag.loc{background:#16a34a;color:#fff}
 .tag.uo{background:transparent;color:var(--up-t);box-shadow:inset 0 0 0 1px var(--bad-line)}.tag.lout{background:transparent;color:var(--lo-t);box-shadow:inset 0 0 0 1px var(--ok-line)}
@@ -752,6 +755,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <div class="card" data-cf="sig" role="button" tabindex="0" title="Подтверждённые развороты: цена вышла за границу, вернулась, и это подтвердил объём. Нажмите, чтобы показать их."><div class="t">Сигналы</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
       <div class="card" data-cf="sq" role="button" tabindex="0" title="Монеты, которые сейчас вдвое спокойнее обычного. Часто это затишье перед сильным движением. Нажмите, чтобы показать их."><div class="t">Затишье</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">монет без движения</div></div>
     </div>
+    <div class="botnow hidden" id="botNow" role="button" tabindex="0" title="Открыть журнал общего бота"></div>
 
     <div class="grid">
       <div class="panel" id="cpanel">
@@ -1282,7 +1286,7 @@ function renderCards() {
   // "signals" = what a bot would act on: a confirmed reversal with strength at the threshold; weaker ones are counted apart
   const sigN = rows.filter(r => r.rev && r.score >= S.minScore).length, weakN = rows.filter(r => r.rev && r.score < S.minScore).length;
   const plur = (n, f) => f[n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2];
-  $('#c4').textContent = sigN; $('#c4s').textContent = (sigN ? `с силой от ${S.minScore} — бот может войти` : 'сильных сейчас нет — это нормально') + (weakN ? ` · ещё ${weakN} ${plur(weakN, ['слабый', 'слабых', 'слабых'])}` : '');
+  $('#c4').textContent = sigN; $('#c4s').textContent = (sigN ? `с силой от ${S.minScore} — порог бота` : 'сильных сейчас нет — это нормально') + (weakN ? ` · ещё ${weakN} ${plur(weakN, ['слабый', 'слабых', 'слабых'])}` : '');
   const sqN = rows.filter(r => r.squeeze).length;
   $('#c5').textContent = sqN; $('#c5').nextElementSibling.textContent = `${plur(sqN, ['монета', 'монеты', 'монет'])} без движения`;
 }
@@ -1972,6 +1976,27 @@ const allowsReg = (p, r) => { const x = profSet(p);
   if (x.regimeOnly === 'flat' && r !== 'flat') return false;
   if (x.regimeOnly === 'impulse' && r === 'flat') return false;
   return !(x.strategy === 'switch' && r === 'down'); };
+// "Рынок": what the shared bot is doing right now, in one line — in a trade, waiting for its kind of market, or waiting for a signal
+function renderBotNow() {
+  const el = $('#botNow'); if (!el) return;
+  if (!SJ?.checked) { el.classList.add('hidden'); return; }
+  if (!botRegime && !sharedRegAsked) { sharedRegAsked = true; marketRegime().then(r => { botRegime ||= r; renderBotNow(); if (!$('#journal').classList.contains('hidden')) renderJournal(); }).catch(() => {}); }
+  const s = {...SJ.settings, regimeSrc:SJ.settings.regimeSrc || 'majors'}, open = SJ.open || [];
+  const reg = botRegime ? M.regimeOf(botRegime, s) : null, only = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
+  const off = reg && ((only === 'flat' && reg !== 'flat') || (only === 'impulse' && reg === 'flat') || (s.strategy === 'switch' && reg === 'down'));
+  const pos = p => { const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry, u = sg * (last - p.entry) * p.qty - (p.entry + last) * p.qty * M.FEE;
+    return `<span class="bn-pos"><b>${pair(p.sym)}</b> <span class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</span> <span class="${cl(u)}">${usd(u)}</span></span>`; };
+  const now = open.length ? `в сделке: ${open.map(pos).join('')}`
+    : off ? `ждёт: торгует только ${only === 'flat' ? 'в боковике' : 'в импульсе'}, а сейчас ${regPlain(reg)}`
+    : `ждёт сигнала: ${TF_PLAIN[s.tf] || s.tf}, сила от ${s.minScore}`;
+  const last = [...(SJ.closed || [])].sort((a, b) => b.tclose - a.tclose)[0];
+  el.innerHTML = `<span class="bn-dot${open.length ? ' on' : off ? ' wait' : ''}"></span><span class="bn-main"><b>Общий бот</b> ${now}</span>`
+    + (last ? `<span class="bn-last faint">последняя сделка: ${pair(last.sym)} · ${last.reason} · <span class="${cl(last.pnl)}">${usd(last.pnl)}</span> · ${dur(Date.now() - last.tclose)} назад</span>` : '')
+    + '<span class="bn-go">Журнал →</span>';
+  el.classList.remove('hidden');
+}
+$('#botNow').onclick = () => { jMode = 'shared'; save('sr_jmode', jMode); go('journal'); };
+$('#botNow').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#botNow').click(); } };
 // the same "why isn't it trading" for the shared bot: its rules often wait for a flat market, and silence looks like a breakdown
 let sharedRegAsked = false;
 function sharedIdle() {
@@ -2141,7 +2166,7 @@ async function fetchShared() {
       for (const t of closed.filter(t => !seenC.has(t.id))) notifyUser(`Общий бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => { jMode = 'shared'; go('journal'); });
     }
   } catch (e) { if (SJ) SJ.fetchError = String(e.message || e); }
-  renderGuard();
+  renderGuard(); renderBotNow();
   if (!$('#journal').classList.contains('hidden')) renderJournal();
   if (chart) { drawChart(); renderDetail(); }
 }
@@ -2594,6 +2619,7 @@ const CHANGELOG = [
     'Колёсико над графиком «Рынка» больше не мешает листать страницу: нажмите на график (или держите Ctrl), чтобы менять масштаб. Если канал намного шире свечей, график вписывается по свечам, а границы канала подписаны у краёв.',
     'В «Справке» — разделы про Telegram, ручное закрытие позиций и почему бот может ждать; на телефоне форма бэктеста больше не разъезжается.',
     'Telegram: привязанный «Мой бот» теперь присылает и сигналы своего профиля — каждую монету, где сила дошла до порога профиля (одно сообщение на касание). Выключить — /mysignals.',
+    'На «Рынке» под карточками видно, что делает общий бот прямо сейчас: в сделке, ждёт своего рынка или ждёт сигнала, и чем закончилась последняя сделка. Нажмите — откроется его журнал.',
   ]},
   {v:'2.9', date:'7 октября 2026', title:'Общий бот на проверенных правилах, плавность и Бета', items:[
     'Общий бот теперь торгует по правилам, которые лучше всего держались на истории за год: часовые свечи, 50 самых популярных монет, только когда рынок спокойный.',
