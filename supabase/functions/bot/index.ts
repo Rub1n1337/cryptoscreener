@@ -147,7 +147,7 @@ async function run() {
   const klines: Record<string, unknown[]> = {}, rows: any[] = [];
   const limit = Math.min(1000, S.N + 150);
   await pool(list, 10, async (sym) => {
-    try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${S.tf}&limit=${limit}`); klines[sym] = K; const r = M.analyze(sym, K, S, now); if (r) rows.push(r); } catch { /* skip pair */ }
+    try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${S.tf}&limit=${limit}`); klines[sym] = K; const r = M.analyze(sym, K, S, now, true); if (r) rows.push(r); } catch { /* skip pair */ }
   });
 
   const { data: recent } = await db.from("trades").select("sym").gt("tclose", now - M.COOLDOWN * M.TFMS[S.tf]);
@@ -202,8 +202,19 @@ async function runUserBots(now: number) {
     .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
   if (!bots?.length) return 0;
   const reg = await majorsRegime(), ticker = await api("/api/v3/ticker/24hr");
-  const kc = new Map<string, Promise<any>>();   // one download per coin + timeframe for all bots
-  const getK = (s: string, tf: string) => { const key = s + "|" + tf; if (!kc.has(key)) kc.set(key, api(`/api/v3/klines?symbol=${s}&interval=${tf}&limit=450`).catch(() => null)); return kc.get(key)!; };
+  // one download per coin + timeframe for all bots, kept as compact numeric candles [time, open, high, low, close, volume]:
+  // Binance's raw rows (12 strings each) for a few hundred coins ran the function out of resources
+  const kc = new Map<string, Promise<any>>();
+  const compact = (K: any) => Array.isArray(K) ? K.map((k: any) => [k[0], +k[1], +k[2], +k[3], +k[4], +k[5]]) : null;
+  const getK = (s: string, tf: string) => { const key = s + "|" + tf; if (!kc.has(key)) kc.set(key, api(`/api/v3/klines?symbol=${s}&interval=${tf}&limit=450`).then(compact).catch(() => null)); return kc.get(key)!; };
+  // one analysis per coin + channel settings for all bots (most share them); the bots don't need the site's display extras
+  const ac = new Map<string, any>();
+  const analyzeK = (s: string, K: any, S: any) => {
+    if (!K?.length) return null;
+    const key = `${s}|${S.tf}|${S.method}|${S.N}|${S.k}`;
+    if (!ac.has(key)) ac.set(key, M.analyze(s, K, { ...S, N: effN(K.length, S) }, now, true));
+    return ac.get(key);
+  };
   let done = 0;
   const t0 = Date.now();
   for (const b of bots) {
@@ -226,7 +237,7 @@ async function runUserBots(now: number) {
       const open = (pr ?? []).map((x: any) => x.data);
       const Ks: Record<string, any> = {};
       await pool(list, 10, async (s) => { Ks[s] = await getK(s, S.tf); });
-      const rows = list.map((s) => Ks[s]?.length ? M.analyze(s, Ks[s], { ...S, N: effN(Ks[s].length, S) }, now) : null).filter(Boolean);
+      const rows = list.map((s) => analyzeK(s, Ks[s], S)).filter(Boolean);
       const exitK: Record<string, any> = {};
       for (const p of open) exitK[p.sym] = await getK(p.sym, tfOf(p.tfms) || S.tf);
       const { data: rec } = await db.from("user_trades").select("data").eq("bot_id", b.id).gt("tclose", now - M.COOLDOWN * (M.TFMS as any)[S.tf]);
@@ -239,7 +250,7 @@ async function runUserBots(now: number) {
       const keep = [...res.stillOpen, ...res.opened];
       if (keep.length) await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p })));
       // a linked chat also gets the profile's own signals (strength at its threshold), unless switched off with /mysignals
-      const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore), mySigs = sigOn ? freshSignals(rows, sigMin, sent, now) : [];   // a floor of 40: a profile with no threshold would message every touch
+      const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore), mySigs = sigOn ? freshSignals(rows, sigMin, sent, now).map((r) => ({ ...r })) : [];   // a floor of 40: a profile with no threshold would message every touch; copies — the rows are shared between bots
       const took = new Set(res.opened.map((p: any) => p.sym)), held = new Set(res.stillOpen.map((p: any) => p.sym));
       for (const r of mySigs) r.botNote = took.has(r.sym) ? "🤖 бот вошёл в сделку" : held.has(r.sym) ? "🤖 бот уже в сделке по этой монете"
         : `🤖 бот не войдёт: ${whyNot(r, S, res.stillOpen.length + res.opened.length)}`;
@@ -252,7 +263,7 @@ async function runUserBots(now: number) {
         mktTop = Math.round(num(sc.top, 10, 400, 150));
         const lst = M.pickSymbols(ticker, mktTop, [], now), KM: Record<string, any> = {};
         await pool(lst, 10, async (s) => { KM[s] = await getK(s, SM.tf); });
-        const rowsM = lst.map((s) => KM[s]?.length ? M.analyze(s, KM[s], { ...SM, N: effN(KM[s].length, SM) }, now) : null).filter((r: any) => r?.rev);
+        const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r?.rev);
         mktSigs = freshSignals(rowsM, SM.minScore, sent, now, "m:");
       }
       await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: pname,

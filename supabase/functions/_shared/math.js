@@ -32,10 +32,23 @@ export function bands(c, N, k, m) {
     }
     return { mid, up, lo, z };
   }
-  for (let i = N - 1; i < n; i++) {
-    const w = c.slice(i - N + 1, i + 1); let mu, s;
-    if (m === 'robust') { mu = median(w); s = 1.4826 * median(w.map(x => Math.abs(x - mu))); }
-    else { mu = w.reduce((p, x) => p + x, 0) / N; s = Math.sqrt(w.reduce((p, x) => p + (x - mu) ** 2, 0) / N); }
+  if (m === 'robust') {
+    for (let i = N - 1; i < n; i++) {
+      const w = c.slice(i - N + 1, i + 1), mu = median(w), s = 1.4826 * median(w.map(x => Math.abs(x - mu)));
+      mid[i] = mu; up[i] = mu + k*s; lo[i] = mu - k*s; z[i] = s ? (c[i] - mu) / s : 0;
+    }
+    return { mid, up, lo, z };
+  }
+  // classic: running sums over the window instead of re-adding all N values at every bar (the scanner and the bots run this
+  // for hundreds of coins a minute). Values are shifted by the first one so the variance keeps its precision, and the sums are
+  // recomputed from scratch every 512 bars so rounding never piles up: the result matches summing each window to ~1e-12.
+  const c0 = c[0]; let s1 = 0, s2 = 0;
+  for (let i = 0; i < n; i++) {
+    const x = c[i] - c0; s1 += x; s2 += x * x;
+    if (i >= N) { const y = c[i - N] - c0; s1 -= y; s2 -= y * y; }
+    if (i < N - 1) continue;
+    if (i % 512 === 0) { s1 = 0; s2 = 0; for (let j = i - N + 1; j <= i; j++) { const y = c[j] - c0; s1 += y; s2 += y * y; } }
+    const m1 = s1 / N, s = Math.sqrt(Math.max(0, s2 / N - m1 * m1)), mu = m1 + c0;
     mid[i] = mu; up[i] = mu + k*s; lo[i] = mu - k*s; z[i] = s ? (c[i] - mu) / s : 0;
   }
   return { mid, up, lo, z };
@@ -114,10 +127,11 @@ function sdRange(a, from, to) {
   return Math.sqrt(q / n);
 }
 // S = {method, N, k, tf}
-export function analyze(sym, K, S, now = Date.now()) {
+// lite: skip the display-only extras — the bots only need what they trade on
+export function analyze(sym, K, S, now = Date.now(), lite = false) {
   if (K.length < S.N + 10) return null;
   const P = prepare(K, S);
-  return signalAt(P, P.n - 1, sym, now);
+  return signalAt(P, P.n - 1, sym, now, lite);
 }
 export function signalAt(P, i, sym, now, lite = false) {   // lite: skip the display-only extras (backtest)
   const { t, o, h, l, c, v, B, S } = P, p = i - 1;
