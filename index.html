@@ -384,7 +384,7 @@ tr.row.newsig td{animation:rowflash 2.4s ease-out}
 @media(max-width:700px){
   #market .phead{margin-bottom:8px}#market .phead p{display:none}
   .intro{padding:12px 14px;gap:10px;font-size:13px}.intro .h{font-size:14px}.intro ol li:not(:first-child){display:none}.intro ol{padding-left:16px}.intro button{height:36px}
-  .cards>.card{flex:0 0 auto;min-width:112px;padding:9px 12px}.cards .card .s,.cards .meter{display:none}
+  .cards>.card{min-width:0;padding:8px 9px}.cards .card .s,.cards .meter{display:none}
   .cards .card .t{font-size:10px}.cards .card .v{font-size:17px;margin:2px 0 0}
   #market .grid{display:flex;flex-direction:column;align-items:stretch;gap:12px}
   #market .tpanel{order:-1;padding:10px}
@@ -561,8 +561,10 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 @container (max-width:440px){
   .tpanel .coin i{display:none}.tpanel .tag{padding:3px 6px;font-size:10.5px}
   .tpanel table{font-size:12.5px}.tpanel td,.tpanel th{padding-left:4px;padding-right:4px}
-  .tpanel .tablewrap{overflow-x:hidden}
-  /* on a phone keep what matters: coin, range, signal, strength (price is in the chart header) */
+  /* on a phone: coin, range, signal, strength and T½ (price is in the chart header); a wider table scrolls sideways under a pinned coin column */
+  .tpanel .tablewrap{overflow-x:auto}
+  #mhead th:nth-child(2),#tb td:nth-child(2){position:sticky;left:0;z-index:1;background:var(--s1)}
+  #tb tr.row:hover td:nth-child(2){background:var(--s2)}#tb tr.sel td:nth-child(2){background:var(--sel)}
   #mhead th:nth-child(3),#tb td:nth-child(3){display:none}
 }
 .tab .ts{display:none}
@@ -610,16 +612,19 @@ details.dis>.dbody{padding:0 16px 16px}
   .top .tab svg.i{width:20px;height:20px}
   .top .tab .badge{display:none}
   .top .tab .tt.lg{display:none}.top .tab .ts{display:inline}
-  /* summary cards: one swipeable row instead of a screen and a half of tiles */
-  .cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -10px 12px;padding:0 10px 4px;scrollbar-width:none}
-  .cards::-webkit-scrollbar{display:none}
-  .cards>.card{flex:0 0 44%;scroll-snap-align:start;padding:12px 14px}
+  /* summary cards: the market mood on one line, the four filter shortcuts in one row under it — all on screen, nothing to swipe */
+  .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 12px;padding:0}
+  .cards>.card,.cards>.card:nth-child(-n+2){grid-column:auto}   /* the tablet layout spans cards over a 6-column grid */
+  .cards>.card:first-child{grid-column:1/-1!important;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 12px}
+  .cards>.card:first-child .v{font-size:15px}
+  .cards .card .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cards .card .t[data-s]{font-size:0}.cards .card .t[data-s]::after{content:attr(data-s);font-size:10px}
   .cact .search{flex:1 1 100%}.cact .seg{flex:1}.cact .seg .tab{flex:1}
   body{padding-bottom:72px}
   /* no scroll inside the page scroll on phones */
   .tablewrap{max-height:none}
   .wrap{padding:12px 10px 28px}.phead h2{font-size:19px}
-  .hm{display:none}
+  .hm:not(.hl){display:none}   /* T½ stays: it tells a bounce from a trend */
   td,th{padding:8px 5px}
   .ctrl label{flex:1 1 44%}
   .filters>*{min-width:0}.filters>.search{flex:1 1 100%!important}.filters>select{flex:1 1 44%}
@@ -756,8 +761,8 @@ details.dis>.dbody{padding:0 16px 16px}
     </div>
     <div class="cards">
       <div class="card" title="Где сейчас рынок в целом: 50% — монеты в середине своих обычных диапазонов, ближе к 0% — у нижних границ, ближе к 100% — у верхних."><div class="t">Настроение рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s"></div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
-      <div class="card" data-cf="lo" role="button" tabindex="0" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх. Нажмите, чтобы показать их."><div class="t">Дешевле обычного</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
-      <div class="card" data-cf="hi" role="button" tabindex="0" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз. Нажмите, чтобы показать их."><div class="t">Дороже обычного</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
+      <div class="card" data-cf="lo" role="button" tabindex="0" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх. Нажмите, чтобы показать их."><div class="t" data-s="Дешевле">Дешевле обычного</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
+      <div class="card" data-cf="hi" role="button" tabindex="0" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз. Нажмите, чтобы показать их."><div class="t" data-s="Дороже">Дороже обычного</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
       <div class="card" data-cf="sig" role="button" tabindex="0" title="Подтверждённые развороты: цена вышла за границу, вернулась, и это подтвердил объём. Нажмите, чтобы показать их."><div class="t">Сигналы</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
       <div class="card" data-cf="sq" role="button" tabindex="0" title="Монеты, которые сейчас вдвое спокойнее обычного. Часто это затишье перед сильным движением. Нажмите, чтобы показать их."><div class="t">Затишье</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">монет без движения</div></div>
     </div>
@@ -830,7 +835,7 @@ details.dis>.dbody{padding:0 16px 16px}
             <th data-s="label" title="▲/▼ сигнал — подтверждённый разворот; «за каналом» — цена прямо сейчас за границей; «касание» — была за границей недавно; «сжатие» — затишье">Сигнал</th>
             <th data-s="score" title="Сила сигнала 0–100. Яркая — разворот подтверждён, серая — пока нет">Сила</th>
             <th data-s="vol" class="hm hx" title="Объём относительно обычного">Объём</th>
-            <th data-s="hl" class="hm" title="T½ — за сколько монета обычно проходит половину пути обратно к центру канала. Короче — лучше «пружинит». ∞ — тренд, отскок рискован">T½</th>
+            <th data-s="hl" class="hm hl" title="T½ — за сколько монета обычно проходит половину пути обратно к центру канала. Короче — лучше «пружинит». ∞ — тренд, отскок рискован">T½</th>
           </tr></thead>
           <tbody id="tb">
             <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
@@ -1396,7 +1401,7 @@ function renderTable() {
       <td>${r.label ? `<span class="tag ${r.wasRev && !r.rev && r.kind === 'touch' ? (r.side === 'low' ? 'loc' : 'upc') + ' weak' : r.cls + (weak ? ' weak' : '')}"${r.touchTime && (r.rev || r.wasRev) ? ` title="${tip}${sigTip(r)}"` : weak ? ` title="${tip}"` : ''}>${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
       <td>${sc}</td>
       <td class="hm hx" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
-      <td class="hm ${hlCls(r.hl)}" title="${hlTip(r.hl)}">${hl}</td></tr>`;
+      <td class="hm hl ${hlCls(r.hl)}" title="${hlTip(r.hl)}">${hl}</td></tr>`;
   }).join('') || emptyRow();
 }
 

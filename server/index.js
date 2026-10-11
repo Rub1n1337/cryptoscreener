@@ -247,11 +247,26 @@ function stream(group, mkt = 'spot', what = 'both', attempt = 0) {
 
 // ---------- HTTP API for the Beta tab ----------
 const round = x => Math.round(x);
-function send(req, res, code, obj) {
-  const body = JSON.stringify(obj), gz = /gzip/.test(req.headers['accept-encoding'] || '') && body.length > 1024;
-  res.writeHead(code, {'content-type':'application/json; charset=utf-8', 'access-control-allow-origin':'*', 'cache-control':'no-store', ...(gz && {'content-encoding':'gzip'})});
-  res.end(gz ? zlib.gzipSync(body) : body);
+// compression runs off the main thread (gzipSync of a long history would stall the Binance streams for everyone)
+function send(req, res, code, obj, extra = {}) {
+  const body = typeof obj === 'string' ? obj : JSON.stringify(obj), gz = /gzip/.test(req.headers['accept-encoding'] || '') && body.length > 1024;
+  const head = {'content-type':'application/json; charset=utf-8', 'access-control-allow-origin':'*', 'cache-control':'no-store', ...extra};
+  if (!gz) { res.writeHead(code, head); return res.end(body); }
+  zlib.gzip(body, (err, z) => { if (err) { res.writeHead(code, head); return res.end(body); } res.writeHead(code, {...head, 'content-encoding':'gzip'}); res.end(z); });
 }
+// ---------- protection ----------
+// per-address limit: the Beta tab asks ~20 times a minute per chart (the far book every 3 s); 300 leaves room for a few charts and tabs
+const RATE = 300, HITS = new Map();
+const clientIp = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+function allowed(req) {
+  const ip = clientIp(req), now = Date.now(), h = HITS.get(ip);
+  if (!h || now - h.t > 60e3) { HITS.set(ip, {n:1, t:now}); return true; }
+  return ++h.n <= RATE;
+}
+setInterval(() => { const now = Date.now(); for (const [ip, h] of HITS) if (now - h.t > 60e3) HITS.delete(ip); }, 60e3);
+// every open chart asks for the same far book every 3 s: answer from a 2-second cache instead of re-binning the whole book
+const CACHE = new Map(), CACHE_MS = {'/book':2000, '/symbols':10000, '/health':5000};
+setInterval(() => { const now = Date.now(); for (const [k, v] of CACHE) if (now - v.t > 30e3) CACHE.delete(k); }, 30e3);
 const routes = {
   '/health': () => ({ok:true, uptime:Math.round(process.uptime()), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, mkt:c.mkt, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length, liqMin:c.liq.length}))}),
   '/symbols': () => { const of = m => [...coins.values()].filter(c => c.mkt === m).map(c => c.sym); return {symbols:of('spot'), futures:of('fut')}; },
@@ -270,14 +285,25 @@ const routes = {
   '/fp': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, bars:c.fp.filter(b => b.t >= since).map(b => [b.t, b.k0, Array.from(b.buy, round), Array.from(b.sell, round)])}; },
 };
 http.createServer((req, res) => {
-  const u = new URL(req.url, 'http://x'), fn = routes[u.pathname];
   if (req.method === 'OPTIONS') { res.writeHead(204, {'access-control-allow-origin':'*', 'access-control-allow-methods':'GET'}); return res.end(); }
+  if (req.method !== 'GET') return send(req, res, 405, {error:'GET only'});
+  if (!allowed(req)) return send(req, res, 429, {error:'too many requests, slow down'}, {'retry-after':'60'});
+  if (req.url.length > 300) return send(req, res, 414, {error:'url too long'});
+  let u; try { u = new URL(req.url, 'http://x'); } catch { return send(req, res, 400, {error:'bad url'}); }
+  const fn = routes[u.pathname];
   if (!fn) return send(req, res, 404, {error:'not found', routes:Object.keys(routes)});
   // &mkt=fut picks the futures twin; liquidations exist on futures only, so /liq always does
   const sym = (u.searchParams.get('symbol') || '').toUpperCase(), fut = u.searchParams.get('mkt') === 'fut' || u.pathname === '/liq';
+  // the cache key is the route and the coin only: extra query junk must not make new entries
+  const ttl = CACHE_MS[u.pathname], ck = ttl && (['/health', '/symbols'].includes(u.pathname) ? u.pathname : `${u.pathname}|${sym}|${fut}`), hit = ck && CACHE.get(ck);
+  if (hit && Date.now() - hit.t < ttl) return send(req, res, 200, hit.body);
   const needCoin = !['/health', '/symbols'].includes(u.pathname), c = coins.get(cid(sym, fut ? 'fut' : 'spot'));
   if (needCoin && !c) return send(req, res, 404, {error:'symbol not followed', ...routes['/symbols']()});
-  try { send(req, res, 200, fn(u.searchParams, c)); } catch (e) { send(req, res, 500, {error:e.message}); }
+  try {
+    const body = JSON.stringify(fn(u.searchParams, c));
+    if (ck) CACHE.set(ck, {t:Date.now(), body});
+    send(req, res, 200, body);
+  } catch (e) { send(req, res, 500, {error:e.message}); }
 }).listen(PORT, () => log('listening on', PORT));
 
 // ---------- start ----------

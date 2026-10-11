@@ -166,6 +166,7 @@ async function run() {
 }
 
 // ---------- personal bots (one per browser; config = profiles chosen on the site) ----------
+let AN = 0;   // coin analyses in the last run of the personal bots (reported in the response, to watch the load)
 const PROFILE_DEF = { method: "log", N: 210, k: 3, tf: "15m", minScore: 60, strategy: "revert", rr: 0, risk: 0.02, lev: 1, minWidth: 0, maxHL: 0, longOnly: false, coinErMax: 0 };
 // the config comes from the visitor's browser: every value is re-checked before it drives requests or sizing
 const num = (v: unknown, a: number, b: number, d: number) => { const x = Number(v); return Number.isFinite(x) ? Math.min(b, Math.max(a, x)) : d; };
@@ -215,10 +216,14 @@ async function runUserBots(now: number) {
     if (!ac.has(key)) ac.set(key, M.analyze(s, K, { ...S, N: effN(K.length, S) }, now, true));
     return ac.get(key);
   };
+  // a CPU budget per run: the function is stopped by the platform when it computes too much (WORKER_RESOURCE_LIMIT),
+  // which also loses the shared bot's minute. Bots that don't fit wait for the next run — they are first in the fair queue.
+  const BUDGET = 1800;   // distinct coin analyses per run (~1 s of CPU)
+  AN = 0;
   let done = 0;
   const t0 = Date.now();
   for (const b of bots) {
-    if (Date.now() - t0 > 90_000) break;   // leave room before the function's time limit; the rest go first next minute
+    if (Date.now() - t0 > 90_000 || ac.size > BUDGET) break;   // leave room before the time and CPU limits; the rest go first next minute
     try {
       const cfg = b.config || {}, profiles = Array.isArray(cfg.profiles) ? cfg.profiles : [];
       if (!profiles.length) {   // still mark it checked, or it would stay first in the queue forever
@@ -278,12 +283,19 @@ async function runUserBots(now: number) {
       await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e), checked_at: new Date(now).toISOString() }).eq("id", b.id);
     }
   }
+  AN = ac.size;
   return done;
 }
 
+// the run token is cached for 10 minutes; a request without one is refused before any database read
+let SEC: string | null = null, secAt = 0;
 Deno.serve(async (req) => {
-  const { data: sec } = await db.from("bot_secret").select("token").eq("id", 1).single();
-  if (!sec || req.headers.get("x-bot-token") !== sec.token) return new Response("forbidden", { status: 403 });
+  const tok = req.headers.get("x-bot-token");
+  if (!tok) return new Response("forbidden", { status: 403 });
+  const readSec = async () => { const { data } = await db.from("bot_secret").select("token").eq("id", 1).single(); SEC = data?.token ?? null; secAt = Date.now(); };
+  if (!SEC || Date.now() - secAt > 600_000) await readSec();
+  if (tok !== SEC && Date.now() - secAt > 30_000) await readSec();   // the token may have been changed: re-read, at most twice a minute
+  if (!SEC || tok !== SEC) return new Response("forbidden", { status: 403 });
   const { data: locked } = await db.rpc("bot_try_lock", { seconds: 120 });
   if (!locked) return Response.json({ skipped: "another run in progress" });
   const t0 = Date.now();
@@ -294,7 +306,7 @@ Deno.serve(async (req) => {
     let users = 0;
     try { users = await runUserBots(Date.now()); } catch { /* personal bots never break the shared one */ }
     await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed });
-    return Response.json({ ...out, users });
+    return Response.json({ ...out, users, analyses: AN });
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);
