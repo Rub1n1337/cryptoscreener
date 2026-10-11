@@ -58,3 +58,8 @@ begin
     'open', coalesce((select jsonb_agg(data) from user_positions where bot_id = p_id), '[]'::jsonb),
     'closed', coalesce((select jsonb_agg(data order by tclose desc) from (select data, tclose from user_trades where bot_id = p_id order by tclose desc limit 1000) t), '[]'::jsonb)));
 end $$;
+
+-- a linked personal bot can also send its profile's signals (strength at the profile's threshold), one message per band touch
+alter table public.user_bots add column if not exists tg_sig boolean not null default true;
+alter table public.user_bots add column if not exists sig_sent jsonb not null default '{}'::jsonb;
+-- (ub_get then also drops 'sig_sent' from the bot row it returns)

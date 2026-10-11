@@ -51,7 +51,7 @@ async function chatsFor(kind: "shared" | "signals") {
 const notify = async (lines: string[]) => sendTo(await chatsFor("shared"), lines);
 
 // commands from Telegram, read every minute (getUpdates — no webhook to set up)
-const HELP = "Команды:\n/signals — новые сигналы с силой ≥ 60 вкл/выкл\n/shared — сделки общего бота вкл/выкл\n/status — что сейчас включено\n/unlink — отвязать ваш бот с сайта\n/stop — отписаться от всего\n\nЧтобы получать сделки своего бота: на сайте «Журнал» → «Мой бот» → «Подключить Telegram».";
+const HELP = "Команды:\n/signals — новые сигналы с силой ≥ 60 вкл/выкл\n/shared — сделки общего бота вкл/выкл\n/status — что сейчас включено\n/mysignals — сигналы вашего профиля вкл/выкл\n/unlink — отвязать ваш бот с сайта\n/stop — отписаться от всего\n\nЧтобы получать сделки и сигналы своего бота: на сайте «Журнал» → «Мой бот» → «Подключить Telegram».";
 async function tgPoll() {
   const tg = await tgConf(); if (!tg) return;
   const r = await tgCall("getUpdates", { offset: Number(tg.upd_offset || 0) + 1, timeout: 0, allowed_updates: ["message"] });
@@ -68,17 +68,22 @@ async function tgPoll() {
         if (!sub) await db.from("tg_subs").insert({ chat_id: chat, name: name.slice(0, 80) });
         if (/^b[0-9a-f]{18}$/.test(arg)) {   // a link code from the site: this chat gets that bot's trades
           const { data: b } = await db.from("user_bots").select("id, active_profile").eq("tg_code", arg).gt("tg_code_until", new Date().toISOString()).maybeSingle();
-          if (b) { await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ Ваш бот с сайта привязан${b.active_profile ? ` (профиль «${esc(b.active_profile)}»)` : ""}. Сюда будут приходить его сделки.\n\n${HELP}`); }
+          if (b) { await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ Ваш бот с сайта привязан${b.active_profile ? ` (профиль «${esc(b.active_profile)}»)` : ""}. Сюда будут приходить его сделки и новые сигналы его профиля.\n\n${HELP}`); }
           else await say("Ссылка устарела — на сайте нажмите «Подключить Telegram» ещё раз.");
         } else await say(`👋 Это бот <b>Sigma Radar</b>. Сюда будут приходить сделки общего бота и новые сигналы с силой ≥ 60 (по правилам общего бота).\n\n${HELP}`);
-      } else if (!sub && cmd !== "/unlink") await say("Сначала нажмите /start.");
+      } else if (!sub && cmd !== "/unlink" && cmd !== "/mysignals") await say("Сначала нажмите /start.");
+      else if (cmd === "/mysignals") {
+        const { data: bots } = await db.from("user_bots").select("tg_sig").eq("tg_chat", chat);
+        if (!bots?.length) await say("Сначала привяжите своего бота: на сайте «Журнал» → «Мой бот» → «Подключить Telegram».");
+        else { const on = arg ? !/^(off|выкл|0|нет)$/i.test(arg) : !bots[0].tg_sig; await db.from("user_bots").update({ tg_sig: on }).eq("tg_chat", chat); await say(`Сигналы вашего профиля: ${on ? "включены" : "выключены"}.`); }
+      }
       else if (cmd === "/signals" || cmd === "/shared") {
         const k = cmd.slice(1), on = arg ? !/^(off|выкл|0|нет)$/i.test(arg) : !sub[k];
         await db.from("tg_subs").update({ [k]: on }).eq("chat_id", chat);
         await say(`${k === "signals" ? "Сигналы ≥ 60" : "Сделки общего бота"}: ${on ? "включены" : "выключены"}.`);
       } else if (cmd === "/status") {
-        const { data: bots } = await db.from("user_bots").select("active_profile").eq("tg_chat", chat);
-        await say(`Сигналы ≥ 60: ${sub.signals ? "вкл" : "выкл"}\nСделки общего бота: ${sub.shared ? "вкл" : "выкл"}\nВаш бот с сайта: ${bots?.length ? bots.map((x: any) => `привязан${x.active_profile ? ` («${esc(x.active_profile)}»)` : ""}`).join(", ") : "не привязан"}`);
+        const { data: bots } = await db.from("user_bots").select("active_profile, tg_sig").eq("tg_chat", chat);
+        await say(`Сигналы ≥ 60: ${sub.signals ? "вкл" : "выкл"}\nСделки общего бота: ${sub.shared ? "вкл" : "выкл"}\nВаш бот с сайта: ${bots?.length ? bots.map((x: any) => `привязан${x.active_profile ? ` («${esc(x.active_profile)}»)` : ""}, сигналы профиля ${x.tg_sig === false ? "выкл" : "вкл"}`).join(", ") : "не привязан"}`);
       } else if (cmd === "/unlink") {
         await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); await say("Бот с сайта отвязан.");
       } else if (cmd === "/stop") {
@@ -92,18 +97,22 @@ async function tgPoll() {
 
 // new signals with strength ≥ 60 (by the shared bot's rules): one message per touch of a band, not every minute
 const SIG_MIN = 60;
-async function announceSignals(rows: any[], S: any, sent: Record<string, number>, now: number) {
-  const fresh = rows.filter((r) => r.score != null && r.score >= SIG_MIN && r.touchTime && !sent[`${r.sym}:${r.touchTime}`]).sort((a, b) => b.score - a.score);
-  // the very first run only remembers what is there, so nobody gets a pile of old signals ("_init" marks that it has run)
+// signals at the threshold not announced yet (`sent` is updated in place: "SYM:touchTime" → ms, kept 3 days);
+// the very first call only remembers what is there, so nobody gets a pile of old signals ("_init" marks that it has run)
+function freshSignals(rows: any[], min: number, sent: Record<string, number>, now: number) {
+  const fresh = rows.filter((r) => r.score != null && r.score >= min && r.touchTime && !sent[`${r.sym}:${r.touchTime}`]).sort((a, b) => b.score - a.score);
   const first = !sent._init;
   for (const r of fresh) sent[`${r.sym}:${r.touchTime}`] = now;
   for (const k of Object.keys(sent)) if (now - sent[k] > 3 * 864e5) delete sent[k];
   sent._init = now;
+  return first ? [] : fresh;
+}
+const sigLine = (r: any) => `${r.side === "low" ? "🟢" : "🔴"} <b>${pair(r.sym)}</b> · сила <b>${r.score}</b> · ${esc(r.label)}\n` +
+  `цена ${fp(r.price)} · RSI ${Math.round(r.rsi)} · объём ×${r.volX ? r.volX.toFixed(1) : "—"} · ${r.rev ? "отскок подтверждён" : "ждём подтверждения"}`;
+async function announceSignals(rows: any[], S: any, sent: Record<string, number>, now: number) {
+  const fresh = freshSignals(rows, SIG_MIN, sent, now);
   await db.from("bot_state").update({ sig_sent: sent }).eq("id", 1);
-  if (first || !fresh.length) return;
-  const line = (r: any) => `${r.side === "low" ? "🟢" : "🔴"} <b>${pair(r.sym)}</b> · сила <b>${r.score}</b> · ${esc(r.label)}\n` +
-    `цена ${fp(r.price)} · RSI ${Math.round(r.rsi)} · объём ×${r.volX ? r.volX.toFixed(1) : "—"} · ${r.rev ? "отскок подтверждён" : "ждём подтверждения"}`;
-  await sendTo(await chatsFor("signals"), [`📡 <b>Новые сигналы ≥ ${SIG_MIN}</b> · ${S.tf}, топ-${S.top} монет`, ...fresh.slice(0, 15).map(line)]);
+  if (fresh.length) await sendTo(await chatsFor("signals"), [`📡 <b>Новые сигналы ≥ ${SIG_MIN}</b> · ${S.tf}, топ-${S.top} монет`, ...fresh.slice(0, 15).map(sigLine)]);
 }
 const openedMsg = (p: any) =>
   `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side} ${pair(p.sym)}</b> — общий бот открыл позицию\n` +
@@ -177,7 +186,7 @@ async function majorsRegime() {
 async function runUserBots(now: number) {
   // fair queue: the least recently checked bots go first, so with more bots than fit in one run every bot still gets its turn;
   // bots whose owner hasn't opened the site for 30 days are not scheduled
-  const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat").eq("enabled", true)
+  const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat, tg_sig, sig_sent").eq("enabled", true)
     .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
   if (!bots?.length) return 0;
   const reg = await majorsRegime(), ticker = await api("/api/v3/ticker/24hr");
@@ -217,11 +226,14 @@ async function runUserBots(now: number) {
       }
       const keep = [...res.stillOpen, ...res.opened];
       if (keep.length) await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p })));
+      // a linked chat also gets the profile's own signals (strength at its threshold), unless switched off with /mysignals
+      const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore), mySigs = sigOn ? freshSignals(rows, sigMin, sent, now) : [];   // a floor of 40: a profile with no threshold would message every touch
       await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: pname,
-        regime: reg ? { state: regName, by: reg.by } : null, last_error: null }).eq("id", b.id);
+        regime: reg ? { state: regName, by: reg.by } : null, last_error: null, ...(sigOn ? { sig_sent: sent } : {}) }).eq("id", b.id);
       if (b.tg_chat) await sendTo([b.tg_chat], [
         ...res.closed.map((t: any) => closedMsg(t).replace("</b> закрыта", "</b> — ваш бот закрыл")),
         ...res.opened.map((p: any) => openedMsg(p).replace("общий бот открыл позицию", `ваш бот открыл позицию · «${esc(pname)}»`))]);
+      if (mySigs.length) await sendTo([b.tg_chat], [`📡 <b>Сигналы профиля «${esc(pname)}»</b> · ${S.tf}, сила от ${sigMin}`, ...mySigs.slice(0, 15).map(sigLine)]);
       done++;
     } catch (e) {
       await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e), checked_at: new Date(now).toISOString() }).eq("id", b.id);
