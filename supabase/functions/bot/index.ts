@@ -36,11 +36,16 @@ const FOOT = `\n\n<a href="${SITE}">Sigma Radar</a> · бумажная торг
 async function sendTo(chats: (number | string)[], lines: string[], syms: string[] = []) {
   if (!lines.length || !chats.length || !(await tgConf())) return;
   const text = lines.join("\n\n").slice(0, 3900) + FOOT, coins = [...new Set(syms.map((s) => s.replace(/USDT$/, "")))].slice(0, 3);
-  const reply_markup = coins.length ? { inline_keyboard: [coins.map((c) => ({ text: `📈 ${c}`, url: `${SITE}/#market/${c}` }))] } : undefined;
+  // the link is percent-encoded: a coin named in Chinese would otherwise make Telegram refuse the whole message
+  const reply_markup = coins.length ? { inline_keyboard: [coins.map((c) => ({ text: `📈 ${c}`, url: `${SITE}/#market/${encodeURIComponent(c)}` }))] } : undefined;
   for (const chat of [...new Set(chats.map(String))]) {
     try {
-      const r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup });
-      if (r && !r.ok && r.error_code === 403) await db.from("tg_subs").delete().eq("chat_id", chat);   // the user blocked the bot
+      let r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup });
+      if (r && !r.ok && r.error_code === 400 && reply_markup) r = await tgCall("sendMessage", { chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true });   // buttons refused: send without them
+      if (r && !r.ok && r.error_code === 403) { await db.from("tg_subs").delete().eq("chat_id", chat); continue; }   // the user blocked the bot
+      // what happened to the last message in this chat, so a "nothing came" can be checked
+      const { data: s } = await db.from("tg_subs").select("sent_n").eq("chat_id", chat).maybeSingle();
+      if (s) await db.from("tg_subs").update(r?.ok ? { last_ok: new Date().toISOString(), last_err: null, sent_n: (s.sent_n || 0) + 1 } : { last_err: String(r?.description || "нет ответа").slice(0, 200) }).eq("chat_id", chat);
     } catch { /* notifications must never break trading */ }
   }
 }

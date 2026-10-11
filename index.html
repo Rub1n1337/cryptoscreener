@@ -1779,9 +1779,10 @@ function renderDetail() {
 // A profile = which coins + which rules. "Auto" picks the flat or the impulse profile from the BTC/ETH/SOL regime.
 const cleanName = s => String(s || '').replace(/[<>&"'`]/g, '').trim().slice(0, 60) || 'Профиль';
 const PROFILE_DEF = {method:'log', N:210, k:3, tf:'15m', minScore:60, strategy:'revert', rr:0, risk:0.02, lev:1, minWidth:0, maxHL:0, longOnly:false, coinErMax:0, regimeOnly:'any', timeStop:48};
-// p-sw4h: the shared bot's rules since 11.10.2026 — a year of history (top-50, 4h): +0.18R a trade after fees, in the plus on 90/180/365 days
+// p-sw4h: the shared bot's rules since 11.10.2026 — a year of history (top-50, 4h, channel 3.5σ, T½ ≤ 20, flat if ER < 0.25):
+// median +0.38R a trade after fees over 12 random sets of 40 coins, all 12 in the plus (docs/RESEARCH-2026-10.md)
 const PRESETS = [
-  {id:'p-sw4h', name:'Переключатель · 4h (проверен за год)', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'4h', strategy:'switch', rr:2, risk:0.01, lev:3, regimeOnly:'any'}},
+  {id:'p-sw4h', name:'Переключатель · 4h (проверен за год)', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'4h', k:3.5, maxHL:20, erMax:0.25, strategy:'switch', rr:2, risk:0.01, lev:3, regimeOnly:'any'}},
   {id:'p-flat1h', name:'Боковик · 1h', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'1h', rr:2, risk:0.01, lev:3, regimeOnly:'flat'}},
   {id:'p-flat', name:'Боковик · 15m', coins:{mode:'top', top:150}, set:{...PROFILE_DEF}},
   {id:'p-imp', name:'Импульс · 4h', coins:{mode:'top', top:150}, set:{...PROFILE_DEF, tf:'4h', k:3.5, strategy:'breakout', rr:3, longOnly:true}},
@@ -1789,6 +1790,7 @@ const PRESETS = [
 let BP = load('sr_bot', null) || {profiles:PRESETS, mode:'single', active:'p-sw4h', flat:'p-flat1h', impulse:'p-imp', erMax:0.15};
 if (!BP.profiles.some(p => p.id === 'p-flat1h')) BP.profiles.unshift(PRESETS[1]);   // older setups get the presets they miss
 if (!BP.profiles.some(p => p.id === 'p-sw4h')) BP.profiles.unshift(PRESETS[0]);
+BP.profiles.forEach(p => { if (p.id === 'p-sw4h' && p.set.k === 3 && !p.set.maxHL) p.set = {...PRESETS[0].set}; });   // the first version of this preset (one day old) gets the tuned rules
 // the 1h preset no longer holds up over the last year: drop the "проверен за год" its name was saved with
 BP.profiles.forEach(p => { if (p.id === 'p-flat1h' && p.name === 'Боковик · 1h (проверен за год)') p.name = 'Боковик · 1h'; });
 BP.where ||= 'browser';
@@ -2115,7 +2117,7 @@ function renderBotPanel() {
     const roles = auto ? `<div class="roles"><button class="chipb${BP.flat === p.id ? ' on' : ''}" data-role="flat" data-id="${p.id}">${BP.flat === p.id ? '✓ ' : ''}для боковика</button><button class="chipb${BP.impulse === p.id ? ' on' : ''}" data-role="impulse" data-id="${p.id}">${BP.impulse === p.id ? '✓ ' : ''}для импульса</button></div>` : '';
     return `<div class="prof${auto ? '' : ' pick'}${isAct ? ' on' : ''}" data-pick="${p.id}"${auto ? '' : ` role="radio" tabindex="0" aria-checked="${isAct}"`}>
       ${auto ? '' : '<span class="radio"></span>'}
-      <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-sw4h' && !/проверен/.test(p.name) ? ' <span class="tag lo" title="Бэктест за 12 месяцев, топ-50, 4h: в среднем +0.18R на сделку после комиссий; в плюсе и за 90, и за 180 дней">проверен за год</span>' : ''}
+      <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-sw4h' && !/проверен/.test(p.name) ? ' <span class="tag lo" title="Бэктест за 12 месяцев, топ-50, 4h: медиана +0.38R на сделку после комиссий на 12 случайных наборах монет, все 12 в плюсе; сделок мало — около 3 в месяц">проверен за год</span>' : ''}
         <div class="pplain">${profPlain(p)}</div><div class="ptech">${profSummary(p)}</div>${roles}</div>
       <div class="pa"><button data-pb="${p.id}" title="Перенести настройки профиля в бэктест и проверить их на истории">В бэктест</button><button data-pe="${p.id}">Изменить</button><button data-ps="${p.id}" title="Скопировать ссылку на этот профиль, чтобы отправить другу">Поделиться</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
 }
@@ -2612,9 +2614,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 // ---------- changelog ----------
 const CHANGELOG = [
   {v:'2.11', date:'11 октября 2026', title:'Общий бот на новых правилах, Telegram отвечает сразу', items:[
-    'Общий бот перешёл на 4-часовые свечи и «переключатель по режиму рынка»: в боковике ловит отскоки, в росте — пробои вверх, в падении ждёт. На истории за год такие правила дали +11% (старые — минус); подробности — в бэктесте, профиль «Переключатель · 4h».',
+    'Общий бот перешёл на 4-часовые свечи и «переключатель по режиму рынка»: в боковике ловит отскоки, в росте — пробои вверх, в падении ждёт. Настройки доведены по предложению из чата: канал шире (3.5σ), только монеты, которые быстро возвращаются к центру (T½ ≤ 20), боковик — при ER < 0.25. На истории за год медиана +0.38R на сделку, старые правила были в минусе. Сделок мало — около трёх в месяц, зато отбор строже.',
     '«Рынок» и бэктест по умолчанию на том же таймфрейме 4ч, что и общий бот.',
-    'Telegram-бот отвечает на команды сразу, а не через минуту. Под сообщениями о сигналах и сделках — кнопки, открывающие график монеты на сайте.',
+    'Telegram-бот отвечает на команды сразу, а не через минуту. Под сообщениями о сигналах и сделках — кнопки, открывающие график монеты на сайте. /status показывает, сколько сообщений бот уже прислал и когда последнее.',
   ]},
   {v:'2.10', date:'11 октября 2026', title:'Профиль общего бота, бэктест в один клик, ручное закрытие позиций', items:[
     'В журнале общего бота теперь видно, по какому профилю он торгует: таймфрейм, вход, сила сигнала, риск, плечо, фильтр рынка.',

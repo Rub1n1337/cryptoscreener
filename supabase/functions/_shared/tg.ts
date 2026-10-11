@@ -28,7 +28,9 @@ export async function handleMessage(db: any, m: any, say: (t: string) => Promise
     await say(`${k === "signals" ? "Сигналы ≥ 60" : "Сделки общего бота"}: ${on ? "включены" : "выключены"}.`);
   } else if (cmd === "/status") {
     const { data: bots } = await db.from("user_bots").select("active_profile, tg_sig").eq("tg_chat", chat);
-    await say(`Сигналы ≥ 60: ${sub.signals ? "вкл" : "выкл"}\nСделки общего бота: ${sub.shared ? "вкл" : "выкл"}\nВаш бот с сайта: ${bots?.length ? bots.map((x: any) => `привязан${x.active_profile ? ` («${esc(x.active_profile)}»)` : ""}, сигналы профиля ${x.tg_sig === false ? "выкл" : "вкл"}`).join(", ") : "не привязан"}`);
+    const ago = (t: string) => { const m = Math.round((Date.now() - Date.parse(t)) / 6e4); return m < 60 ? `${m} мин назад` : m < 2880 ? `${Math.round(m / 60)} ч назад` : `${Math.round(m / 1440)} дн назад`; };
+    await say(`Сигналы ≥ 60: ${sub.signals ? "вкл" : "выкл"} (правила общего бота)\nСделки общего бота: ${sub.shared ? "вкл" : "выкл"}\nВаш бот с сайта: ${bots?.length ? bots.map((x: any) => `привязан${x.active_profile ? ` («${esc(x.active_profile)}»)` : ""}, сигналы профиля ${x.tg_sig === false ? "выкл" : "вкл"}`).join(", ") : "не привязан"}\n` +
+      `Сообщений отправлено: ${sub.sent_n || 0}${sub.last_ok ? `, последнее ${ago(sub.last_ok)}` : ""}${sub.last_err ? `\n⚠️ Последняя ошибка отправки: ${esc(sub.last_err)}` : ""}\n\nСигналы приходят, только когда сила дошла до порога на таймфрейме правил — колокольчик на сайте считает по настройкам вашего «Рынка», поэтому списки могут отличаться.`);
   } else if (cmd === "/unlink") {
     await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); await say("Бот с сайта отвязан.");
   } else if (cmd === "/stop") {
