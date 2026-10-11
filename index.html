@@ -176,6 +176,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .gauge i{position:absolute;top:1px;width:8px;height:8px;margin-left:-4px;border-radius:50%;z-index:1;box-shadow:0 0 0 2px var(--canvas)}
 .tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:var(--tag-t);white-space:nowrap}
 .tag.weak{opacity:.55;filter:saturate(.6)}   /* a confirmed reversal below the bot threshold: visible, but not an invitation */
+#more.dot{position:relative}#more.dot::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--acc)}   /* table filters are on */
 .whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity .2s;z-index:3;white-space:nowrap}.whint.show{opacity:1}
 .botnow{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--s1);cursor:pointer;font-size:13.5px}.botnow:hover{border-color:var(--line2)}.botnow:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12.5px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
@@ -551,7 +552,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .tpanel{container-type:inline-size}
 @container (max-width:680px){.tpanel .gauge{display:none}.tpanel td,.tpanel th{padding-left:6px;padding-right:6px}.tpanel .coin i{display:none}}
 /* below ~560px the star column goes (favourites are toggled from the chart header) so «Сила» always fits */
-@container (max-width:560px){#mhead th:nth-child(1),#tb td:nth-child(1){display:none}.tpanel .tag{padding:3px 7px;font-size:11px}}
+@container (max-width:560px){#mhead th:nth-child(1),#tb td:nth-child(1):not([colspan]){display:none}.tpanel .tag{padding:3px 7px;font-size:11px}}
 @container (max-width:440px){
   .tpanel .coin i{display:none}.tpanel .tag{padding:3px 6px;font-size:10.5px}
   .tpanel table{font-size:12.5px}.tpanel td,.tpanel th{padding-left:4px;padding-right:4px}
@@ -807,6 +808,10 @@ details.dis>.dbody{padding:0 16px 16px}
         </div>
         <div class="filters hidden" id="morebar">
           <select id="fz" title="Где сейчас цена относительно канала"><option value="">Любое положение</option><option value="lo">У нижней границы</option><option value="hi">У верхней границы</option><option value="out">За границей</option><option value="in">Внутри диапазона</option></select>
+          <select id="fmin" title="Только монеты с силой сигнала не ниже"><option value="0">Любая сила</option><option value="40">Сила от 40</option><option value="50">Сила от 50</option><option value="60">Сила от 60</option><option value="70">Сила от 70</option><option value="80">Сила от 80</option></select>
+          <select id="fhl" title="Только монеты, которые быстро возвращаются к центру: T½ в свечах выбранного таймфрейма"><option value="0">Любой T½</option><option value="20">T½ ≤ 20 свечей</option><option value="40">T½ ≤ 40 свечей</option></select>
+          <select id="fside" title="Сторона касания: LONG — у нижней границы, SHORT — у верхней"><option value="">LONG и SHORT</option><option value="low">Только LONG</option><option value="up">Только SHORT</option></select>
+          <button id="fclear" class="hidden" title="Сбросить все фильтры таблицы">Сбросить</button>
           <select id="fl" class="hidden"><option value="">Все</option><option value="sig">Сигналы</option><option value="touch">Касания</option><option value="sq">Затишье</option><option value="fav">Избранное</option></select>
           <select id="top" title="Сколько самых ликвидных монет проверять"><option value="100">100 монет</option><option value="150">150 монет</option><option value="250">250 монет</option><option value="400">400 монет</option></select>
         </div>
@@ -1321,9 +1326,18 @@ function renderTable() {
   if (!rows.length) { if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
   $('#cntSig').textContent = rows.filter(r => r.rev || r.wasRev).length || ''; $('#cntSq').textContent = rows.filter(r => r.squeeze).length || ''; $('#cntFav').textContent = rows.filter(r => favs.has(r.sym)).length || '';
   const fz = $('#fz').value, fl = $('#fl').value, q = $('#fs').value.trim().toUpperCase();
+  const fmin = +$('#fmin').value, fhl = +$('#fhl').value, fside = $('#fside').value;
   document.querySelectorAll('.card[data-cf]').forEach(c => c.classList.toggle('on', c.dataset.cf === fz || c.dataset.cf === fl));
+  // the extra filters live behind the sliders button: mark it, so a short list never looks like an empty market
+  const extra = [fz, fmin, fhl, fside].filter(Boolean).length;
+  $('#more').classList.toggle('dot', extra > 0); $('#more').title = extra ? `Фильтры включены: ${extra}` : 'Больше колонок и фильтров';
+  $('#fclear').classList.toggle('hidden', !(extra || fl || q));
+  hlOpts('#fhl', S.tf);
   const list = rows.filter(r => {
     if (q && !r.sym.includes(q)) return false;
+    if (fmin && !(r.score >= fmin)) return false;
+    if (fhl && !(isFinite(r.hl) && r.hl <= fhl)) return false;
+    if (fside && r.side !== fside) return false;
     if (fz === 'lo' && r.pB >= 0.1) return false;
     if (fz === 'hi' && r.pB <= 0.9) return false;
     if (fz === 'out' && r.pB >= 0 && r.pB <= 1) return false;
@@ -1356,7 +1370,7 @@ function renderTable() {
       <td>${sc}</td>
       <td class="hm hx" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
       <td class="hm ${hlCls(r.hl)}" title="${hlTip(r.hl)}">${hl}</td></tr>`;
-  }).join('') || '<tr><td colspan="9" class="mute">Нет пар под фильтр</td></tr>';
+  }).join('') || `<tr><td colspan="9" class="mute">Нет монет под эти фильтры${$('#fclear').classList.contains('hidden') ? '' : ' — <button data-fclear>Сбросить фильтры</button>'}</td></tr>`;
 }
 
 // ---------- chart renderer (market chart and trade card) ----------
@@ -2637,6 +2651,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.14', date:'11 октября 2026', title:'Несколько фильтров сразу', items:[
+    'В «Рынке» под кнопкой фильтров (ползунки справа от вкладок) появились фильтры по силе сигнала (от 40 до 80), по T½ (≤ 20 или ≤ 40 свечей, с пересчётом во время) и по стороне (только LONG / только SHORT). Они работают вместе друг с другом, с «Сигналами», «Затишьем», избранным, положением цены и поиском — например, «сигналы с силой от 60 и T½ ≤ 20». Выбор запоминается.',
+    'Когда фильтры включены, на кнопке горит точка, а рядом есть «Сбросить» — короткий список не спутать с пустым рынком.',
+  ]},
   {v:'2.13', date:'11 октября 2026', title:'Срок сигнала и цвет T½', items:[
     'У сигнала виден срок: «касание в 12:00, сигнал виден ещё 45м, до 13:15» — в подсказке метки и в разборе сигнала. Сигнал живёт 5 свечей от касания границы (а не от подтверждения) — это срок для входа; открытую позицию держат до тейка или стопа. На истории выход «когда сигнал пропал» и более долгий срок сигнала давали результат хуже.',
     'Подтверждённый сигнал больше не пропадает из-за одной встречной свечи: он остаётся в таблице как «SHORT · ослаб» (или «LONG · ослаб») и возвращается со следующей свечой в его сторону. Колокольчик не звонит второй раз за тот же сигнал.',
@@ -2877,8 +2895,18 @@ $('#ctitle').onclick = e => {   // favourite toggle in the chart header (the tab
   favs.has(chartSym) ? favs.delete(chartSym) : favs.add(chartSym); save('sr_favs', [...favs]); computeChart(); renderTable();
 };
 $('#ctitle').onclick = e => { if (!e.target.closest('[data-cfav]')) return; favs.has(chartSym) ? favs.delete(chartSym) : favs.add(chartSym); save('sr_favs', [...favs]); computeChart(); renderTable(); };
-['#fz', '#fl'].forEach(s => $(s).onchange = renderTable); $('#fs').oninput = renderTable;
+// the table filters combine (search + quick filter + position + strength + T½ + side) and are remembered
+const TF_FILTERS = ['#fz', '#fmin', '#fhl', '#fside'];
+{ const f = load('sr_tfilt', {}); for (const s of TF_FILTERS) if (f[s] != null && [...$(s).options].some(o => o.value === f[s])) $(s).value = f[s]; }
+const saveFilters = () => save('sr_tfilt', Object.fromEntries(TF_FILTERS.map(s => [s, $(s).value])));
+[...TF_FILTERS, '#fl'].forEach(s => $(s).onchange = () => { saveFilters(); renderTable(); }); $('#fs').oninput = renderTable;
+$('#fclear').onclick = () => {
+  for (const s of TF_FILTERS) $(s).selectedIndex = 0;
+  $('#fs').value = ''; document.querySelector('#flseg [data-fl=""]').click();   // also re-renders
+  saveFilters();
+};
 $('#tb').onclick = e => {
+  if (e.target.closest('[data-fclear]')) { $('#fclear').click(); return; }
   if (e.target.closest('[data-retry]')) { $('#tb').innerHTML = ('<tr class="sk">' + '<td></td>'.repeat(9) + '</tr>').repeat(6); scan(); return; }
   const f = e.target.closest('[data-fav]');
   if (f) { const s = f.dataset.fav; favs.has(s) ? favs.delete(s) : favs.add(s); save('sr_favs', [...favs]); renderTable(); if (s === chartSym) computeChart(); return; }
