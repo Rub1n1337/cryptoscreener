@@ -177,6 +177,11 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:var(--tag-t);white-space:nowrap}
 .tag.weak{opacity:.55;filter:saturate(.6)}   /* a confirmed reversal below the bot threshold: visible, but not an invitation */
 #more.dot{position:relative}#more.dot::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--acc)}   /* table filters are on */
+.filters select.on{border-color:var(--acc);color:var(--text)}   /* a table filter that is set */
+.fchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-2px 0 10px;font-size:12.5px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--acc);background:var(--accbg);color:var(--text);font-size:12.5px;cursor:pointer}
+.chip span{color:var(--mute);font-size:14px;line-height:1}.chip:hover span{color:var(--text)}.chip.clear{border-color:var(--line2);color:var(--mute)}
+@media (pointer:coarse){.chip{height:36px}}
 .whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity .2s;z-index:3;white-space:nowrap}.whint.show{opacity:1}
 .botnow{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--s1);cursor:pointer;font-size:13.5px}.botnow:hover{border-color:var(--line2)}.botnow:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12.5px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
@@ -807,14 +812,14 @@ details.dis>.dbody{padding:0 16px 16px}
           <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
         </div>
         <div class="filters hidden" id="morebar">
-          <select id="fz" title="Где сейчас цена относительно канала"><option value="">Любое положение</option><option value="lo">У нижней границы</option><option value="hi">У верхней границы</option><option value="out">За границей</option><option value="in">Внутри диапазона</option></select>
+          <select id="fz" title="Где сейчас цена относительно канала"><option value="">Любая зона</option><option value="lo">У нижней границы</option><option value="hi">У верхней границы</option><option value="out">За границей</option><option value="in">Внутри диапазона</option></select>
           <select id="fmin" title="Только монеты с силой сигнала не ниже"><option value="0">Любая сила</option><option value="40">Сила от 40</option><option value="50">Сила от 50</option><option value="60">Сила от 60</option><option value="70">Сила от 70</option><option value="80">Сила от 80</option></select>
           <select id="fhl" title="Только монеты, которые быстро возвращаются к центру: T½ в свечах выбранного таймфрейма"><option value="0">Любой T½</option><option value="20">T½ ≤ 20 свечей</option><option value="40">T½ ≤ 40 свечей</option></select>
           <select id="fside" title="Сторона касания: LONG — у нижней границы, SHORT — у верхней"><option value="">LONG и SHORT</option><option value="low">Только LONG</option><option value="up">Только SHORT</option></select>
-          <button id="fclear" class="hidden" title="Сбросить все фильтры таблицы">Сбросить</button>
           <select id="fl" class="hidden"><option value="">Все</option><option value="sig">Сигналы</option><option value="touch">Касания</option><option value="sq">Затишье</option><option value="fav">Избранное</option></select>
           <select id="top" title="Сколько самых ликвидных монет проверять"><option value="100">100 монет</option><option value="150">150 монет</option><option value="250">250 монет</option><option value="400">400 монет</option></select>
         </div>
+        <div class="fchips hidden" id="fchips" aria-live="polite"></div>
         <div class="tablewrap" id="mtable"><table>
           <thead><tr id="mhead">
             <th data-s="fav" title="Избранное — всегда наверху">★</th>
@@ -1307,7 +1312,7 @@ const labelOf = r => r.kind === 'sig' ? (r.side === 'low' ? '▲ LONG' : '▼ SH
   : r.kind === 'out' ? (r.pB > 1 ? 'за границей ↑' : 'за границей ↓')
   : r.kind === 'touch' ? `касание ${r.side === 'low' ? '↓' : '↑'} ${hm(r.touchTime)}` : r.label;
 // the T½ filter counts candles: show what that is in time on the chosen timeframe
-function hlOpts(sel, tf) { for (const o of $(sel).options) if (+o.value) o.textContent = `T½ ≤ ${o.value} свечей (≈ ${dur(+o.value * TFMS[tf])})`; }
+function hlOpts(sel, tf) { for (const o of $(sel).options) if (+o.value) o.textContent = `T½ ≤ ${o.value} (≈ ${dur(+o.value * TFMS[tf])})`; }
 // a signal lives TOUCH_BARS candles from the candle that touched the band: a window for an entry, not a reason to exit
 // a time of day, with «вчера» / «завтра» or the date when it is not today (4h and 1d signals span days)
 const hmDay = t => { const d = Math.round((new Date(t).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 864e5); return (d === 0 ? '' : d === -1 ? 'вчера ' : d === 1 ? 'завтра ' : new Date(t).toLocaleDateString('ru', {day:'numeric', month:'short'}) + ' ') + hm(t); };
@@ -1320,34 +1325,56 @@ const sigTip = r => r.wasRev && !r.rev
 const hlCls = hl => !isFinite(hl) || hl > 40 ? 'neg' : hl <= 20 ? 'pos' : '';
 const hlTip = hl => !isFinite(hl) || hl * TFMS[S.tf] >= 30 * 864e5 ? 'Монета в тренде: к центру канала сейчас не возвращается. Отскок рискован'
   : `${hl.toFixed(0)} свечей ${S.tf}. ${hl <= 20 ? 'Быстро возвращается к центру — фильтр T½ ≤ 20 проходит' : hl <= 40 ? 'Возвращается медленно — проходит только фильтр T½ ≤ 40' : 'Почти не возвращается к центру — отскок рискован'}. Норма зависит от таймфрейма: 20 свечей — это ${dur(20 * TFMS[S.tf])} на ${S.tf}`;
+// ---------- table filters ----------
+// quick filter (the segment above the table), position, strength, T½ and side; with the search they all combine
+const TF_FILTERS = ['#fl', '#fz', '#fmin', '#fhl', '#fside'];
+const esc = s => String(s).replace(/[<>&"]/g, c => ({"<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;"}[c]));   // user text into HTML
+// «ARB», «arb/usdt», «ARB USDT» all find ARB; «USDT» alone is not a coin
+const normQ = v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/USDT$/, '');
+const QUICK = {sig:r => r.rev || r.wasRev, touch:r => r.touch || r.kind === 'out', sq:r => r.squeeze, fav:r => favs.has(r.sym)};
+// every filter but the quick one (the segment counts show how many each quick filter would leave)
+function baseFilter() {
+  const fz = $('#fz').value, q = normQ($('#fs').value), fmin = +$('#fmin').value, fhl = +$('#fhl').value, fside = $('#fside').value;
+  return r => !(q && !base(r.sym).includes(q)) && !(fmin && !(r.score >= fmin)) && !(fhl && !(isFinite(r.hl) && r.hl <= fhl))
+    && !(fside && r.side !== fside)
+    && !(fz === 'lo' && r.pB >= 0.1) && !(fz === 'hi' && r.pB <= 0.9) && !(fz === 'out' && r.pB >= 0 && r.pB <= 1) && !(fz === 'in' && (r.pB < 0 || r.pB > 1));
+}
+// the row above the table: «Показано 2 из 148» and one chip per active filter (a click removes it)
+function renderChips(shown) {
+  const sel = s => $(s).options[$(s).selectedIndex].textContent, q = $('#fs').value.trim();
+  const chips = [...['#fz', '#fmin', '#fhl', '#fside'].filter(s => $(s).selectedIndex > 0).map(s => [s, sel(s)]), ...(q ? [['#fs', `«${q}»`]] : [])];
+  const on = chips.length || $('#fl').value;
+  $('#fchips').classList.toggle('hidden', !on);
+  if (!on) return;
+  $('#fchips').innerHTML = `<span class="mute">Показано <b>${shown}</b> из ${rows.length}</span>`
+    + chips.map(([s, t]) => `<button class="chip" data-unset="${s}" aria-label="Убрать фильтр: ${esc(t)}">${esc(t)}<span aria-hidden="true">×</span></button>`).join('')
+    + (chips.length ? '<button class="chip clear" data-fclear>Сбросить</button>' : '');
+}
+// why the table is empty: a searched coin hidden by the filters is named, so it never looks missing from the market
+function emptyRow() {
+  const q = normQ($('#fs').value), hit = q ? rows.filter(r => base(r.sym).includes(q)).length : 0;
+  const msg = q && !hit ? `Монеты «${esc($('#fs').value.trim())}» нет среди ${rows.length} проверяемых — добавьте больше монет в фильтрах или откройте её через поиск над графиком`
+    : hit ? `«${esc($('#fs').value.trim())}»: ${hit} в списке, но не проходит фильтры — <button data-fclear>Сбросить фильтры</button>`
+    : 'Нет монет под эти фильтры — <button data-fclear>Сбросить фильтры</button>';
+  return `<tr><td colspan="9" class="mute">${msg}</td></tr>`;
+}
 let scanErr = null, flashSyms = new Set();
 function renderTable() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
   if (!rows.length) { if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
-  $('#cntSig').textContent = rows.filter(r => r.rev || r.wasRev).length || ''; $('#cntSq').textContent = rows.filter(r => r.squeeze).length || ''; $('#cntFav').textContent = rows.filter(r => favs.has(r.sym)).length || '';
-  const fz = $('#fz').value, fl = $('#fl').value, q = $('#fs').value.trim().toUpperCase();
-  const fmin = +$('#fmin').value, fhl = +$('#fhl').value, fside = $('#fside').value;
+  save('sr_tfilt', Object.fromEntries(TF_FILTERS.map(s => [s, $(s).value])));
+  const fz = $('#fz').value, fl = $('#fl').value, pass = baseFilter();
+  // segment counts follow the other filters: «Сигналы 2» means two rows will show, not two in the whole market
+  const base0 = rows.filter(pass);
+  $('#cntSig').textContent = base0.filter(QUICK.sig).length || ''; $('#cntSq').textContent = base0.filter(QUICK.sq).length || ''; $('#cntFav').textContent = base0.filter(QUICK.fav).length || '';
   document.querySelectorAll('.card[data-cf]').forEach(c => c.classList.toggle('on', c.dataset.cf === fz || c.dataset.cf === fl));
-  // the extra filters live behind the sliders button: mark it, so a short list never looks like an empty market
-  const extra = [fz, fmin, fhl, fside].filter(Boolean).length;
-  $('#more').classList.toggle('dot', extra > 0); $('#more').title = extra ? `Фильтры включены: ${extra}` : 'Больше колонок и фильтров';
-  $('#fclear').classList.toggle('hidden', !(extra || fl || q));
+  // filters behind the sliders button: a dot on it, an accent on each select that is set
+  const extra = ['#fz', '#fmin', '#fhl', '#fside'].filter(s => $(s).selectedIndex > 0);
+  for (const s of ['#fz', '#fmin', '#fhl', '#fside']) $(s).classList.toggle('on', extra.includes(s));
+  $('#more').classList.toggle('dot', extra.length > 0); $('#more').title = extra.length ? `Фильтры включены: ${extra.length}` : 'Больше колонок и фильтров';
   hlOpts('#fhl', S.tf);
-  const list = rows.filter(r => {
-    if (q && !r.sym.includes(q)) return false;
-    if (fmin && !(r.score >= fmin)) return false;
-    if (fhl && !(isFinite(r.hl) && r.hl <= fhl)) return false;
-    if (fside && r.side !== fside) return false;
-    if (fz === 'lo' && r.pB >= 0.1) return false;
-    if (fz === 'hi' && r.pB <= 0.9) return false;
-    if (fz === 'out' && r.pB >= 0 && r.pB <= 1) return false;
-    if (fz === 'in' && (r.pB < 0 || r.pB > 1)) return false;
-    if (fl === 'sig' && !r.rev && !r.wasRev) return false;
-    if (fl === 'touch' && !r.touch && r.kind !== 'out') return false;
-    if (fl === 'sq' && !r.squeeze) return false;
-    if (fl === 'fav' && !favs.has(r.sym)) return false;
-    return true;
-  });
+  const list = fl && QUICK[fl] ? base0.filter(QUICK[fl]) : base0;
+  renderChips(list.length);
   const kindRank = {sig:4, out:3, touch:2, sq:1, '':0};
   // default order: favourites, then confirmed signals by strength, then the coins furthest from the middle of their range
   const key = r => sortKey === 'ext' ? (favs.has(r.sym) ? 1e3 : 0) + (r.rev ? 100 + (r.score || 0) / 10 : r.wasRev ? 50 : 0) + Math.min(Math.abs(r.pB - 0.5), 5) / 10
@@ -1370,7 +1397,7 @@ function renderTable() {
       <td>${sc}</td>
       <td class="hm hx" style="color:${vc}" title="z объёма ${r.volZ.toFixed(2)}">${r.volX != null ? '×' + r.volX.toFixed(2) : '—'}</td>
       <td class="hm ${hlCls(r.hl)}" title="${hlTip(r.hl)}">${hl}</td></tr>`;
-  }).join('') || `<tr><td colspan="9" class="mute">Нет монет под эти фильтры${$('#fclear').classList.contains('hidden') ? '' : ' — <button data-fclear>Сбросить фильтры</button>'}</td></tr>`;
+  }).join('') || emptyRow();
 }
 
 // ---------- chart renderer (market chart and trade card) ----------
@@ -2651,6 +2678,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.15', date:'12 октября 2026', title:'Фильтры удобнее', items:[
+    'Над таблицей — строка включённых фильтров: «Показано 2 из 148» и по кнопке на каждый фильтр (нажатие убирает его) плюс «Сбросить». Видно, даже когда панель фильтров свёрнута.',
+    'Счётчики у «Сигналы» и «Затишье» учитывают остальные фильтры: цифра на кнопке — столько строк и покажется.',
+    'Поиск понимает «arb», «ARB/USDT», «arb usdt»; Esc очищает его. Если монета есть, но её скрыли фильтры, таблица так и говорит, вместо «ничего нет».',
+    'Включённые фильтры подсвечены; запоминается и выбор «Сигналы / Затишье / ★», и фильтр, выбранный нажатием на карточку сверху.',
+  ]},
   {v:'2.14', date:'11 октября 2026', title:'Несколько фильтров сразу', items:[
     'В «Рынке» под кнопкой фильтров (ползунки справа от вкладок) появились фильтры по силе сигнала (от 40 до 80), по T½ (≤ 20 или ≤ 40 свечей, с пересчётом во время) и по стороне (только LONG / только SHORT). Они работают вместе друг с другом, с «Сигналами», «Затишьем», избранным, положением цены и поиском — например, «сигналы с силой от 60 и T½ ≤ 20». Выбор запоминается.',
     'Когда фильтры включены, на кнопке горит точка, а рядом есть «Сбросить» — короткий список не спутать с пустым рынком.',
@@ -2859,11 +2892,7 @@ document.querySelectorAll('#tfseg .tab').forEach(b => b.onclick = () => {
 });
 $('#cset').onclick = () => { const open = $('#sheet').classList.toggle('hidden') === false; $('#cset').classList.toggle('on', open); };
 // quick filters and "more" (extra columns + filters)
-document.querySelectorAll('#flseg .tab').forEach(b => b.onclick = () => {
-  $('#fl').value = b.dataset.fl;
-  document.querySelectorAll('#flseg .tab').forEach(x => x.classList.toggle('on', x === b));
-  renderTable();
-});
+document.querySelectorAll('#flseg .tab').forEach(b => b.onclick = () => { setFl(b.dataset.fl); renderTable(); });
 const setMore = on => { $('#mtable').classList.toggle('more', on); $('#morebar').classList.toggle('hidden', !on); $('#more').classList.toggle('on', on); save('sr_more', on); };
 $('#more').onclick = () => setMore(!$('#mtable').classList.contains('more'));
 setMore(load('sr_more', false));
@@ -2895,18 +2924,22 @@ $('#ctitle').onclick = e => {   // favourite toggle in the chart header (the tab
   favs.has(chartSym) ? favs.delete(chartSym) : favs.add(chartSym); save('sr_favs', [...favs]); computeChart(); renderTable();
 };
 $('#ctitle').onclick = e => { if (!e.target.closest('[data-cfav]')) return; favs.has(chartSym) ? favs.delete(chartSym) : favs.add(chartSym); save('sr_favs', [...favs]); computeChart(); renderTable(); };
-// the table filters combine (search + quick filter + position + strength + T½ + side) and are remembered
-const TF_FILTERS = ['#fz', '#fmin', '#fhl', '#fside'];
-{ const f = load('sr_tfilt', {}); for (const s of TF_FILTERS) if (f[s] != null && [...$(s).options].some(o => o.value === f[s])) $(s).value = f[s]; }
-const saveFilters = () => save('sr_tfilt', Object.fromEntries(TF_FILTERS.map(s => [s, $(s).value])));
-[...TF_FILTERS, '#fl'].forEach(s => $(s).onchange = () => { saveFilters(); renderTable(); }); $('#fs').oninput = renderTable;
-$('#fclear').onclick = () => {
-  for (const s of TF_FILTERS) $(s).selectedIndex = 0;
-  $('#fs').value = ''; document.querySelector('#flseg [data-fl=""]').click();   // also re-renders
-  saveFilters();
+// the table filters combine (search + quick filter + position + strength + T½ + side); all but the search are remembered
+{ const f = load('sr_tfilt', {}); for (const s of TF_FILTERS) if (f[s] != null && [...$(s).options].some(o => o.value === f[s])) $(s).value = f[s];
+  document.querySelectorAll('#flseg .tab').forEach(x => x.classList.toggle('on', x.dataset.fl === $('#fl').value)); }
+TF_FILTERS.forEach(s => $(s).onchange = renderTable);
+$('#fs').oninput = renderTable;
+$('#fs').onkeydown = e => { if (e.key === 'Escape' && e.target.value) { e.preventDefault(); e.target.value = ''; renderTable(); } };
+const setFl = v => { $('#fl').value = v; document.querySelectorAll('#flseg .tab').forEach(x => x.classList.toggle('on', x.dataset.fl === v)); };
+function clearFilters() { for (const s of TF_FILTERS) $(s).selectedIndex = 0; $('#fs').value = ''; setFl(''); renderTable(); }
+// the row of active filters above the table: each chip removes its filter, «Сбросить» removes all
+$('#fchips').onclick = e => {
+  const c = e.target.closest('[data-unset]');
+  if (c) { const s = c.dataset.unset; if (s === '#fs') $('#fs').value = ''; else if (s === '#fl') setFl(''); else $(s).selectedIndex = 0; renderTable(); }
+  else if (e.target.closest('[data-fclear]')) clearFilters();
 };
 $('#tb').onclick = e => {
-  if (e.target.closest('[data-fclear]')) { $('#fclear').click(); return; }
+  if (e.target.closest('[data-fclear]')) { clearFilters(); return; }
   if (e.target.closest('[data-retry]')) { $('#tb').innerHTML = ('<tr class="sk">' + '<td></td>'.repeat(9) + '</tr>').repeat(6); scan(); return; }
   const f = e.target.closest('[data-fav]');
   if (f) { const s = f.dataset.fav; favs.has(s) ? favs.delete(s) : favs.add(s); save('sr_favs', [...favs]); renderTable(); if (s === chartSym) computeChart(); return; }
