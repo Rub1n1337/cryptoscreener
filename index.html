@@ -2534,11 +2534,22 @@ async function fetchHistory(sym, tf, startT, endT) {
   for (let t = startT; t < endT;) {
     const K = await throttled(`/api/v3/klines?symbol=${sym}&interval=${tf}&startTime=${t}&endTime=${endT - 1}&limit=1000`);
     if (!K.length) break;
-    out.push(...K); t = K[K.length - 1][0] + tfms;
+    // only numbers are kept (open time, o, h, l, c, volume, close time): Binance's 12-field rows of strings took ~4× the memory
+    for (const k of K) out.push([k[0], +k[1], +k[2], +k[3], +k[4], +k[5], k[6]]);
+    t = K[K.length - 1][0] + tfms;
     if (K.length < 1000) break;
   }
-  histCache.set(key, out);
+  histCache.set(key, out); histBars += out.length;
   return out;
+}
+// the history stays for instant reruns, but not without bound: past ~1.5M candles (~150 MB) the oldest downloads go,
+// except the ones the current run uses
+let histBars = 0;
+function trimHistory(keep) {
+  for (const [key, K] of histCache) {
+    if (histBars <= 1.5e6) break;
+    if (!keep(key)) { histCache.delete(key); histBars -= K.length; }
+  }
 }
 // custom coin list: "btc, eth sol" → ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
 const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/[^A-Z0-9]/g, '')).filter(Boolean)
@@ -2583,6 +2594,7 @@ async function runBacktest() {
     if (s.custom && !s.custom.length) throw new Error('список монет пуст');
     const traded = s.custom || M.pickSymbols(await api('/api/v3/ticker/24hr'), s.top, [], now);
     const syms = [...new Set([...traded, ...M.MAJORS])];   // BTC/ETH/SOL are always loaded: they define the market regime
+    trimHistory(key => key.endsWith(`|${s.tf}|${startT}|${endT}`) && syms.includes(key.split('|')[0]));
     const hist = {}; let done = 0;
     await pool(syms, 4, async sym => {
       try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {}
@@ -2689,6 +2701,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.19', date:'12 октября 2026', title:'Бэктест бережёт память', items:[
+    'История свечей для бэктеста хранится в 3–4 раза компактнее, а старые загрузки удаляются, когда их становится слишком много. Раньше каждый новый прогон с другими монетами или таймфреймом добавлял вкладке сотни мегабайт памяти, и браузер начинал тормозить. Повторный запуск с теми же настройками по-прежнему мгновенный.',
+  ]},
   {v:'2.18', date:'12 октября 2026', title:'Бета не грузит процессор в фоне', items:[
     'Если вкладка с «Бетой» свёрнута или в фоне дольше минуты, живые потоки стакана и сделок выключаются, а при возвращении включаются снова со свежим стаканом. Раньше забытая вкладка продолжала обрабатывать по 10 обновлений стакана в секунду на каждый график.',
   ]},
