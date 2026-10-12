@@ -1169,7 +1169,11 @@ const $ = s => document.querySelector(s);
 const DEF = {method:'log', N:210, k:3, tf:'4h', candles:540, top:150, minScore:60, v:4};   // 4h — the same timeframe the shared bot trades, so the market shows what it acts on
 const SCAN_MS = 60000;
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
-const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+// a full browser storage used to fail silently (a long journal would simply stop being saved): say it once
+let saveWarned = false;
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {
+  if (!saveWarned && /quota/i.test(e?.name + e?.message)) { saveWarned = true; setTimeout(() => toast('Браузер не сохраняет данные сайта', 'Хранилище переполнено: новые сделки журнала и настройки не запомнятся после перезагрузки. Освободите место (сбросьте журнал или очистите данные сайта).', 'bad'), 0); }
+} };
 let S = Object.assign({}, DEF, load('sr_settings', {}));
 if (!TFMS[S.tf]) S.tf = DEF.tf;
 if ((S.v || 1) < 2) { S.method = DEF.method; S.v = 2; }
@@ -1228,9 +1232,31 @@ const BASES = ['https://data-api.binance.vision', 'https://api.binance.com'];
 async function api(path) {
   let err;
   for (const b of BASES) {
-    try { const r = await fetch(b + path); if (r.ok) return await r.json(); err = new Error('HTTP ' + r.status); } catch (e) { err = e; }
+    // a hung request must not hold the scan forever (it would never run again): 10 s, then the next host
+    try { const r = await fetch(b + path, {signal:AbortSignal.timeout(10000)}); if (r.ok) return await r.json(); err = new Error('HTTP ' + r.status); } catch (e) { err = e; }
   }
   throw err;
+}
+// candles of the last scan are kept, and the next ones only fetch the newest 3 bars and splice them in:
+// every minute only the last bar changes, so re-downloading 360 bars of ~150 coins (~10 MB a minute) was waste
+const KST = new Map(); let kstSwept = 0;
+async function klines(sym, tf, limit) {
+  const key = sym + '|' + tf, st = KST.get(key), tfms = TFMS[tf];
+  if (Date.now() - kstSwept > 6e4) {   // coins nobody asked for in 10 min (left the list, another timeframe) are dropped
+    kstSwept = Date.now();
+    for (const [k, v] of KST) if (kstSwept - v.used > 6e5) KST.delete(k);
+  }
+  if (st && st.limit >= limit && Date.now() - st.K[st.K.length - 1][0] < 2 * tfms) {
+    const N = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=3`);
+    if (N.length && N[0][0] <= st.K[st.K.length - 1][0]) {   // overlaps the stored bars: no gap
+      const K = st.K.filter(k => k[0] < N[0][0]).concat(N).slice(-st.limit);
+      KST.set(key, {K, limit:st.limit, used:Date.now()});
+      return K.slice(-limit);
+    }
+  }
+  const K = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${limit}`);
+  KST.set(key, {K, limit, used:Date.now()});
+  return K;
 }
 async function pool(items, n, fn) {
   let i = 0;
@@ -1249,7 +1275,7 @@ async function scan() {
     const list = M.pickSymbols(await api('/api/v3/ticker/24hr'), S.top, myOpen().map(p => p.sym), now);
     const limit = Math.min(1000, S.N + 150), res = [], fresh = {}; let done = 0, fails = 0;
     await pool(list, 10, async sym => {
-      try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${limit}`); fresh[sym] = K; const r = M.analyze(sym, K, {...set, N:effN(K.length, set)}); if (r) res.push(r); }
+      try { const K = await klines(sym, tf, limit); fresh[sym] = K; const r = M.analyze(sym, K, {...set, N:effN(K.length, set)}); if (r) res.push(r); }
       catch { fails++; }
       if (++done % 10 === 0) foot.textContent = `сканирую ${done}/${list.length}…`;
     });
@@ -1727,7 +1753,7 @@ async function loadChart(sym) {
   const req = ++chartReq, want = chartSym;
   if (!chart) $('#ctitle').textContent = pair(want) + ' — загрузка…';
   try {
-    const K = await api(`/api/v3/klines?symbol=${want}&interval=${S.tf}&limit=${Math.min(1000, S.candles + S.N + 5)}`);
+    const K = await klines(want, S.tf, Math.min(1000, S.candles + S.N + 5));
     if (req !== chartReq) return; // a newer request superseded this one
     chartK = K; computeChart();
   } catch (e) {
@@ -1886,7 +1912,7 @@ async function marketRegime() {
   const got = {};
   await Promise.all(M.MAJORS.map(async s => {
     try {
-      const c = (await api(`/api/v3/klines?symbol=${s}&interval=1h&limit=200`)).map(k => +k[4]), L = 168, i = c.length - 1;
+      const c = (await klines(s, '1h', 200)).map(k => +k[4]), L = 168, i = c.length - 1;
       let path = 0; for (let j = i - L + 1; j <= i; j++) path += Math.abs(c[j] - c[j - 1]);
       got[s] = {er: path ? Math.abs(c[i] - c[i - L]) / path : 0, ch: c[i] / c[i - L] - 1};
     } catch {}
@@ -1902,7 +1928,7 @@ function activeProfile() {
 }
 // ---------- my bot on the server: this browser holds the secret of its own server bot ----------
 async function rpc(fn, args) {
-  const r = await fetch(SB_URL + 'rpc/' + fn, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json'}, body:JSON.stringify(args)});
+  const r = await fetch(SB_URL + 'rpc/' + fn, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json'}, body:JSON.stringify(args), signal:AbortSignal.timeout(15000)});
   if (!r.ok) throw new Error((await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
@@ -1959,14 +1985,14 @@ async function runBot() {
     else { if (!tickerCache || now - tickerCache.t > 10 * 6e4) tickerCache = {t:now, d:await api('/api/v3/ticker/24hr')}; list = M.pickSymbols(tickerCache.d, P.coins.top, [], now); }
     // the market scan already has these candles when the profile uses the same timeframe and channel
     const same = set.tf === S.tf && set.N === S.N, own = {};
-    await pool(list.filter(s => !(same && cache[s])), 8, async s => { try { own[s] = await api(`/api/v3/klines?symbol=${s}&interval=${set.tf}&limit=${Math.min(1000, set.N + 150)}`); } catch {} });
+    await pool(list.filter(s => !(same && cache[s])), 8, async s => { try { own[s] = await klines(s, set.tf, Math.min(1000, set.N + 150)); } catch {} });
     const kOf = s => (same && cache[s]) || own[s];
     const botRows = list.map(s => { const K = kOf(s); return K ? M.analyze(s, K, {...set, N:effN(K.length, set)}) : null; }).filter(Boolean);
     // exits are checked on each position's own timeframe
     const exitK = {};
     await pool(J.open, 6, async p => {
       const tf = tfOf(p.tfms) || set.tf;
-      exitK[p.sym] = tf === set.tf && kOf(p.sym) ? kOf(p.sym) : tf === S.tf && cache[p.sym] ? cache[p.sym] : await api(`/api/v3/klines?symbol=${p.sym}&interval=${tf}&limit=150`).catch(() => null);
+      exitK[p.sym] = tf === set.tf && kOf(p.sym) ? kOf(p.sym) : tf === S.tf && cache[p.sym] ? cache[p.sym] : await klines(p.sym, tf, 150).catch(() => null);
     });
     const recent = J.closed.filter(x => now - x.tclose < M.COOLDOWN * TFMS[set.tf]).map(x => x.sym);
     const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, S:set, now, allowEntries:J.on, market:botRegime});
@@ -2229,7 +2255,7 @@ function saveForm() {
 
 // ---------- shared bot (read-only from Supabase) ----------
 async function sb(path) {
-  const r = await fetch(SB_URL + path, {headers:{apikey:SB_KEY}, cache:'no-store'});
+  const r = await fetch(SB_URL + path, {headers:{apikey:SB_KEY}, cache:'no-store', signal:AbortSignal.timeout(15000)});
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
@@ -2708,6 +2734,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.21', date:'12 октября 2026', title:'Сайт качает в десятки раз меньше', items:[
+    'Обновление «Рынка» раз в минуту больше не скачивает заново всю историю свечей по каждой монете — только последние свечи. Это около 10 МБ в минуту, которые раньше уходили впустую: меньше трафика (заметно на телефоне) и меньше работы для браузера. То же для графика и бота в браузере.',
+    'В «Бете» кластеры и ликвидации тоже догружаются только за новые минуты.',
+    'Если Binance или сервер долго не отвечает, сайт больше не «зависает» в ожидании: через 10–15 секунд запрос повторяется на другом адресе или при следующем обновлении.',
+    'Если в браузере закончилось место для данных сайта, появится предупреждение — раньше журнал просто молча переставал сохраняться.',
+  ]},
   {v:'2.20', date:'12 октября 2026', title:'Бэктест не путает результаты', items:[
     'Если после расчёта поменять настройки, результат бледнеет, а сверху появляется надпись, что он посчитан для прежних настроек. Раньше на экране могли оказаться новые настройки рядом с цифрами старого прогона.',
     'Смена тайм-стопа теперь тоже учитывается в подсказке над результатом.',
@@ -3411,7 +3443,7 @@ async function loadTf2() {
   const tf = tf2Now(), want = chartSym, req = ++tf2Req;
   document.querySelectorAll('#tf2seg .tab').forEach(b => b.classList.toggle('on', b.dataset.tf2 === tf));
   try {
-    const K = await api(`/api/v3/klines?symbol=${want}&interval=${tf}&limit=${Math.min(1000, S.N + 400)}`);
+    const K = await klines(want, tf, Math.min(1000, S.N + 400));
     if (req !== tf2Req) return;
     const d = parse(K), N = tf === '1d' || tf === '1w' ? Math.max(20, Math.min(S.N, d.c.length - 20)) : S.N;
     if (d.c.length < N + 10) { chart2 = null; $('#tf2stat').textContent = `на ${tf} у монеты мало истории для канала`; renderChart($('#cv2'), null); return; }
@@ -3721,7 +3753,7 @@ setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
 const UPDATE_FILES = [location.pathname, new URL('./supabase/functions/_shared/math.js', location.href).pathname, new URL('./beta.js', location.href).pathname];
 const hashText = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
 const IS_DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // no auto-reload while developing locally
-const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + Date.now(), {cache:'no-store'}).then(r => r.ok ? r.text() : null)))
+const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + Date.now(), {cache:'no-store', signal:AbortSignal.timeout(15000)}).then(r => r.ok ? r.text() : null)))
   .then(ts => ts.includes(null) ? null : hashText(ts.join('\n'))).catch(() => null);
 let selfHash = null;
 fetchVersion().then(h => { selfHash = h; });

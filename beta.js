@@ -15,7 +15,7 @@ const RANGES = [[0, 'авто', 'авто'], [1, '1 день', '1д'], [3, '3 д
 const MAXBARS = 5000;               // candles loaded per chart at most (5 requests)
 const WS = 'wss://stream.binance.com:9443/stream?streams=', WSF_PUB = 'wss://fstream.binance.com/public/stream?streams=', WSF_MKT = 'wss://fstream.binance.com/market/stream?streams=';
 // USDⓈ-M futures: the same endpoints under /fapi/v1 on fapi.binance.com (answers the browser directly)
-async function fapi(path) { const r = await fetch('https://fapi.binance.com' + path); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
+async function fapi(path) { const r = await fetch('https://fapi.binance.com' + path, {signal:AbortSignal.timeout(10000)}); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
 const rest = (p, path) => p.mkt === 'fut' ? fapi(path.replace('/api/v3/', '/fapi/v1/')) : K.api(path);
 // on phones the chart buttons sit above the canvas, so the plot needs no room for them at the top
 const PHONE = matchMedia('(max-width:700px)');
@@ -144,7 +144,7 @@ function srvUrl() {
 }
 async function srv(path) {
   const base = srvUrl(); if (!base) return null;
-  try { const r = await fetch(base + path); return r.ok ? await r.json() : null; } catch { return null; }
+  try { const r = await fetch(base + path, {signal:AbortSignal.timeout(8000)}); return r.ok ? await r.json() : null; } catch { return null; }
 }
 // the server follows the top spot coins and the top futures separately: ask per market
 async function srvHas(sym, mkt = 'spot') {
@@ -472,7 +472,7 @@ class Pane {
     this.prevSym = null; this.prevMkt = null;
     if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); renderChips(); }   // chips show steps in $
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
-    this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp();
+    this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.rows = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp();
   }
   // futures: forced liquidations from the stream (Binance sends the largest per second), drawn as diamonds
   onLiq(o) {
@@ -504,11 +504,24 @@ class Pane {
   // a server answer belongs to this chart only while coin, timeframe and market are the same; futures are asked with &mkt=fut
   key() { return this.sym + this.tf + this.mkt; }
   sq() { return this.mkt === 'fut' ? '&mkt=fut' : ''; }
+  // per-minute rows from our server: the whole history once, then every minute only the new minutes (the last known
+  // one again, it may have been partial). Re-downloading a day of rows a minute per chart was most of the traffic
+  async srvRows(kind, path) {
+    const key = this.key(), from = this.d.t[0], R = this.rows?.[kind]?.key === key ? this.rows[kind] : null;
+    const r = await srv(`${path}&since=${R ? Math.max(from, R.last) : from}`);
+    if (!r?.bars || key !== this.key()) return null;
+    if (R && R.base !== r.base) { this.rows[kind] = null; return this.srvRows(kind, path); }   // the server re-binned: start over
+    const m = R ? R.m : new Map();
+    for (const b of r.bars) m.set(b[0], b);
+    let last = 0; for (const t of m.keys()) { if (t < from) m.delete(t); else if (t > last) last = t; }
+    (this.rows ||= {})[kind] = {key, base:r.base, m, last};
+    return {base:r.base, bars:[...m.values()].sort((a, b) => a[0] - b[0])};
+  }
   // footprint history from our server: market buys / sells per minute and price bin, folded into this chart's candles
   async loadFp() {
     if (!(on('fp') || on('mk')) || !this.d || !(await srvHas(this.sym, this.mkt))) return;
-    const key = this.key(), tf = TFMS[this.tf], r = await srv(`/fp?symbol=${this.sym}${this.sq()}&since=${this.d.t[0]}`);
-    if (!r?.bars || key !== this.key()) return;
+    const tf = TFMS[this.tf], r = await this.srvRows('fp', `/fp?symbol=${this.sym}${this.sq()}`);
+    if (!r) return;
     const hist = new Map();
     for (const [t, k0, buy, sell] of r.bars) {
       const bar = Math.floor(t / tf) * tf; let col = hist.get(bar); if (!col) hist.set(bar, col = new Map());
@@ -619,8 +632,10 @@ class Pane {
     this.heat = heat; this.heatMs = Math.max(this.heatMs, r.cols.length * 6e4); this.hc = null; this.srv = true; this.dirty = true;
   }
   async farBook() {
-    if (!this.srv) return;
-    const key = this.key(), r = await srv(`/book?symbol=${this.sym}${this.sq()}`); if (!r?.bids || key !== this.key()) return;
+    if (!this.srv || this.farBusy) return;   // a slow server must not stack a new request every 3 s
+    this.farBusy = true;
+    const key = this.key(), r = await srv(`/book?symbol=${this.sym}${this.sq()}`).finally(() => { this.farBusy = false; });
+    if (!r?.bids || key !== this.key()) return;
     const far = []; for (const [k, v] of r.bids) far.push([(k + 0.5) * r.base, v, 'b']); for (const [k, v] of r.asks) far.push([(k + 0.5) * r.base, v, 'a']);
     this.far = far; this.farLo = r.minB; this.farHi = r.maxA; this.dirty = true;
   }
@@ -743,8 +758,8 @@ class Pane {
   // liquidation heatmap from our server (it listens to all futures liquidations): per candle and price bin, longs and shorts closed by force
   async loadLiqHeat() {
     if (!on('liqheat') || !this.d || !(await srvHas(this.sym, 'fut'))) return;   // liquidations are futures-only on the server
-    const key = this.key(), tf = TFMS[this.tf], r = await srv(`/liq?symbol=${this.sym}&since=${this.d.t[0]}`);
-    if (!r?.bars || key !== this.key()) return;
+    const tf = TFMS[this.tf], r = await this.srvRows('liq', `/liq?symbol=${this.sym}`);
+    if (!r) return;
     const lh = new Map();
     for (const [t, k0, sh, lg] of r.bars) {
       const bar = Math.floor(t / tf) * tf; let col = lh.get(bar); if (!col) lh.set(bar, col = new Map());
