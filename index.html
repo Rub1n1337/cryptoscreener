@@ -2689,6 +2689,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.18', date:'12 октября 2026', title:'Бета не грузит процессор в фоне', items:[
+    'Если вкладка с «Бетой» свёрнута или в фоне дольше минуты, живые потоки стакана и сделок выключаются, а при возвращении включаются снова со свежим стаканом. Раньше забытая вкладка продолжала обрабатывать по 10 обновлений стакана в секунду на каждый график.',
+  ]},
   {v:'2.17', date:'12 октября 2026', title:'Безопасность', items:[
     'Уведомление о новой версии больше не появляется дважды.',
     'Сайт защищён строже: страница может обращаться только к Binance, нашей базе и серверу стакана, её нельзя встроить в чужой сайт, а служебные файлы больше не публикуются.',
@@ -3599,6 +3602,14 @@ async function betaOpen() {
   try { betaMod ||= await import('./beta.js'); betaPause = betaMod.pause; betaMod.open(window.__sr.kit); }
   catch (e) { toast('Бета не загрузилась', String(e.message || e), 'bad'); }
 }
+// a forgotten background tab must not keep the Beta's live streams (10 book updates a second per chart) busy:
+// after a minute out of sight they close, and come back — with a fresh book — when the tab is looked at again
+let betaBgTimer = null, betaBgPaused = false;
+document.addEventListener('visibilitychange', () => {
+  clearTimeout(betaBgTimer);
+  if (document.hidden) { if (page === 'beta') betaBgTimer = setTimeout(() => { if (document.hidden && page === 'beta' && betaPause) { betaPause(); betaBgPaused = true; } }, 60000); }
+  else if (betaBgPaused) { betaBgPaused = false; if (page === 'beta') betaOpen(); }
+});
 $('#betaForm').onsubmit = async e => {
   e.preventDefault();
   const v = $('#betaPass').value.trim(), err = t => { $('#betaErr').textContent = t; $('#betaPass').select(); };
