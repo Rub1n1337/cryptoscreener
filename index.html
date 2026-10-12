@@ -919,7 +919,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <label class="fl">RR <select id="pfRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
           <label class="fl">Риск на сделку <select id="pfRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
           <label class="fl">Плечо до <select id="pfLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
-          <label class="fl" title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций одновременно <select id="pfSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></label>
+          <label class="fl" title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций одновременно <select id="pfSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
           <label class="fl">Мин. ширина канала <select id="pfW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option></select></label>
           <label class="fl">Фильтр T½ <select id="pfHL"><option value="0">выкл</option><option value="40">T½ ≤ 40</option><option value="20">T½ ≤ 20</option></select></label>
           <label class="fl">Тренд монеты <select id="pfCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
@@ -966,7 +966,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">RR (тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
       <label title="RM: какую долю баланса теряем, если сработал стоп">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
       <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на все позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
-      <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></label>
+      <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
     </div></div>
     <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, режим рынка, фильтры T½ и ширины, канал</span></summary><div class="dbody">
       <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
@@ -2756,6 +2756,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.23', date:'13 октября 2026', title:'Любое число позиций от 1 до 10', items:[
+    'В профиле бота и в бэктесте «Позиций одновременно» теперь можно выбрать любое число от 1 до 10, а не только 1, 2, 3, 5 или 10.',
+  ]},
   {v:'2.22', date:'12 октября 2026', title:'Сколько позиций держит бот', items:[
     'В профиле бота и в бэктесте появилась настройка «Позиций одновременно»: 1, 2, 3, 5 или 10. Раньше бот всегда держал не больше трёх сделок. У существующих профилей остаётся 3.',
     'Плечо делится на все места: при плече 3× и пяти местах каждая позиция не больше 60% баланса. Больше мест — больше сделок, но суммарный риск выше.',

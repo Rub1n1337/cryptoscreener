@@ -8,7 +8,7 @@ export const STABLE = new Set(['USDC','FDUSD','TUSD','BUSD','DAI','USDP','AEUR',
 export const FEE = 0.00075;   // exchange fee per side (taker, with BNB discount)
 export const SLIP = 0.0005;   // slippage on market fills: entry, stop and time-stop exits (TP is a limit order — no slippage)
 export const MAX_OPEN = 3;    // simultaneous positions by default; a profile may set its own (S.maxOpen, 1–10)
-export const SLOTS = [1, 2, 3, 5, 10];
+export const SLOTS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const slotsOf = S => Math.min(10, Math.max(1, Math.round(+S?.maxOpen || MAX_OPEN)));
 export const RISK = 0.02;     // share of balance lost if the stop is hit
 export const TIME_STOP = 48;  // bars until a forced market exit
