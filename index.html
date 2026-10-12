@@ -357,6 +357,24 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .sel-it .sel-def{width:auto;height:32px;padding:0 12px;justify-self:start;border:1px solid var(--line);background:var(--s2);font-size:12px}
 .bl-h{padding:12px 10px 6px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.bl-e{padding:4px 10px 8px;font-size:12.5px}
 @media(max-width:1100px){.bgrid{grid-template-columns:1fr}.blist{max-height:none}}
+/* phone: the Beta bar in three even rows (coin + indicators; market, timeframe, history, layout; drawing tools) and the
+   chart's layers and zoom on one line above it — four ragged rows and three lines of buttons pushed the chart off the screen */
+@media(max-width:700px){
+  .bmain{padding:10px}
+  .bbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:6px}
+  .bbar .bsym{grid-column:1/4}
+  .bbar #bIndBtn{grid-column:4;grid-row:1;justify-content:center}
+  #bMktBtn,#bTfBtn,#bRangeBtn{justify-content:center;min-width:0;font-size:13px}
+  .bbar .bbar-r{grid-column:4;grid-row:2;margin:0}
+  .bbar #bTools{grid-column:1/-1;display:flex;overflow-x:auto;scrollbar-width:none}.bbar #bTools::-webkit-scrollbar{display:none}
+  .bbar #bTools .tab{flex:1 0 auto}
+  .bpane{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:6px}
+  .bpane>.bph{grid-column:1/-1}
+  .bpane>.cvwrap{display:contents}
+  .bpane>.bchips{grid-row:2;grid-column:1;padding-bottom:6px}
+  .bpane .ctools{grid-row:2;grid-column:2;margin:0 0 6px}
+  .bpane .bcv{grid-row:3;grid-column:1/-1}
+}
 @media(max-width:700px){.bbar{gap:6px}.bbar .bsym{flex:1 1 80px;min-width:0}.bbar .pick-btn,.bbar .ind-btn{padding:0 10px}.bbar-r{margin-left:auto}#bLink .ib-t{display:none}.btools .tab,#bLay .tab{min-width:30px;padding:0 6px}#bLink{padding:0 9px}.bbar-r{gap:6px}@media(max-width:420px){.ib-t{display:none}}.bpanes[data-lay]{grid-template-columns:minmax(0,1fr)}.bpanes[data-lay="1"] .bcv{height:58vh}.bpanes[data-lay="2"] .bcv,.bpanes[data-lay="4"] .bcv{height:44vh}.ind-body{grid-template-columns:1fr}.ind-sel{border-left:0;border-top:1px solid var(--line)}.indbox{max-height:92vh}}
 /* ---------- motion: short, soft, and off for people who asked their system for less motion ---------- */
 @keyframes pagein{from{opacity:0;transform:translateY(6px)}}
@@ -901,6 +919,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <label class="fl">RR <select id="pfRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
           <label class="fl">Риск на сделку <select id="pfRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
           <label class="fl">Плечо до <select id="pfLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
+          <label class="fl" title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций одновременно <select id="pfSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></label>
           <label class="fl">Мин. ширина канала <select id="pfW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option></select></label>
           <label class="fl">Фильтр T½ <select id="pfHL"><option value="0">выкл</option><option value="40">T½ ≤ 40</option><option value="20">T½ ≤ 20</option></select></label>
           <label class="fl">Тренд монеты <select id="pfCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
@@ -946,7 +965,8 @@ details.dis>.dbody{padding:0 16px 16px}
       <span class="faint" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;align-self:center;margin-right:4px">Риск-менеджмент</span>
       <label title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">RR (тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
       <label title="RM: какую долю баланса теряем, если сработал стоп">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
-      <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на 3 позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
+      <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на все позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
+      <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></label>
     </div></div>
     <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, режим рынка, фильтры T½ и ширины, канал</span></summary><div class="dbody">
       <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
@@ -1850,7 +1870,7 @@ function renderDetail() {
     verdict = `<b>${r.side === 'low' ? '▲ Разворот вверх' : '▼ Разворот вниз'} подтверждён.</b> Сила ${r.score} из 100 — `
       + (same ? (r.score < bs.minScore ? `ниже порога общего бота (${bs.minScore}), он не войдёт.`
           : SJ.open.some(p => p.sym === chartSym) ? 'общий бот уже в сделке по этой монете.'
-          : SJ.open.length >= M.MAX_OPEN ? `сигнал проходит, но у общего бота заняты все ${M.MAX_OPEN} места — войдёт, когда одно освободится.`
+          : SJ.open.length >= M.slotsOf(bs) ? `сигнал проходит, но у общего бота заняты все места (${M.slotsOf(bs)}) — войдёт, когда одно освободится.`
           : 'общий бот войдёт в сделку на ближайшей проверке рынка.')
         : `${r.score >= 60 ? 'сильный сигнал' : 'слабый сигнал'}. Боты торгуют по своим настройкам${bs ? ` (общий — ${bs.tf}, k = ${bs.k})` : ''}, поэтому могут его не взять.`) + life;
   } else if (r.wasRev && r.kind === 'touch') {
@@ -1878,7 +1898,7 @@ function renderDetail() {
 // ---------- my bot (browser): profiles ----------
 // A profile = which coins + which rules. "Auto" picks the flat or the impulse profile from the BTC/ETH/SOL regime.
 const cleanName = s => String(s || '').replace(/[<>&"'`]/g, '').trim().slice(0, 60) || 'Профиль';
-const PROFILE_DEF = {method:'log', N:210, k:3, tf:'15m', minScore:60, strategy:'revert', rr:0, risk:0.02, lev:1, minWidth:0, maxHL:0, longOnly:false, coinErMax:0, regimeOnly:'any', timeStop:48};
+const PROFILE_DEF = {method:'log', N:210, k:3, tf:'15m', minScore:60, strategy:'revert', rr:0, risk:0.02, lev:1, minWidth:0, maxHL:0, longOnly:false, coinErMax:0, regimeOnly:'any', timeStop:48, maxOpen:3};
 // p-sw4h: the shared bot's rules since 11.10.2026 — a year of history (top-50, 4h, channel 3.5σ, T½ ≤ 20, flat if ER < 0.25):
 // median +0.38R a trade after fees over 12 random sets of 40 coins, all 12 in the plus (docs/RESEARCH-2026-10.md)
 const PRESETS = [
@@ -1905,6 +1925,7 @@ const profSummary = p => { const s = profSet(p);
     + (s.minWidth ? ` · ширина ≥ ${s.minWidth}%` : '') + (s.maxHL ? ` · T½ ≤ ${s.maxHL}` : '') + (s.coinErMax ? ` · без трендовых монет` : '')
     + (s.regimeOnly === 'flat' ? ' · только когда BTC, ETH, SOL во флэте' : s.regimeOnly === 'impulse' ? ' · только в импульсе' : '')
     + (s.timeStop ? ` · тайм-стоп ${s.timeStop} свечей` : ' · без тайм-стопа')
+    + ` · позиций одновременно: ${M.slotsOf(s)}`
     + ` · ${p.coins.mode === 'list' ? p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}`; };
 let botRegime = null, botBusy = false, tickerCache = null, botProfile = null;
 // regime: BTC/ETH/SOL on hourly candles, efficiency ratio over 7 days
@@ -2020,7 +2041,7 @@ function cleanProfile(p) {
     // values offered as lists in the form snap to the nearest option, so editing an imported profile never shows an empty field
     strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:near(s.rr, [0, 1.5, 2, 3], 0), risk:near(s.risk, [0.005, 0.01, 0.02, 0.03], D.risk),
     lev:near(s.lev, [1, 2, 3, 5, 10], 1), minWidth:near(s.minWidth, [0, 3, 5, 8], 0), maxHL:near(s.maxHL, [0, 20, 40], 0), coinErMax:near(s.coinErMax, [0, 0.2, 0.3], 0),
-    longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any'), timeStop:near(s.timeStop ?? 48, [0, 24, 48, 96], 48)};
+    longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any'), timeStop:near(s.timeStop ?? 48, [0, 24, 48, 96], 48), maxOpen:near(s.maxOpen ?? 3, M.SLOTS, 3)};
   const list = Array.isArray(c.list) ? c.list.map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{2,20}USDT$/.test(x)).slice(0, 200) : [];
   return {name:cleanName(p?.name), coins:c.mode === 'list' && list.length ? {mode:'list', list} : {mode:'top', top:[20, 50, 100, 150, 200].includes(+c.top) ? +c.top : 150}, set};
 }
@@ -2112,8 +2133,8 @@ function sharedIdle() {
   if (!SJ?.checked) return '';
   const s = {...SJ.settings, regimeSrc:SJ.settings.regimeSrc || 'majors'};
   if (!botRegime && !sharedRegAsked) { sharedRegAsked = true; marketRegime().then(r => { botRegime ||= r; renderJournal(); }).catch(() => {}); }
-  const reg = botRegime ? M.regimeOf(botRegime, s) : null, open = SJ.open || [];
-  if (open.length >= M.MAX_OPEN) return `<div class="bh-why"><b>Все ${M.MAX_OPEN} места заняты.</b> Новую сделку бот откроет, когда закроется одна из текущих.</div>`;
+  const reg = botRegime ? M.regimeOf(botRegime, s) : null, open = SJ.open || [], slots = M.slotsOf(s);
+  if (open.length >= slots) return `<div class="bh-why"><b>Заняты все места: ${open.length} из ${slots}.</b> Новую сделку бот откроет, когда закроется одна из текущих.</div>`;
   const only = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
   if (reg && ((only === 'flat' && reg !== 'flat') || (only === 'impulse' && reg === 'flat') || (s.strategy === 'switch' && reg === 'down')))
     return `<div class="bh-why"><b>Бот ждёт:</b> ${only === 'flat' ? `он торгует только в боковике, а сейчас ${regPlain(reg)}` : only === 'impulse' ? 'он торгует только в импульсе, а сейчас боковик' : 'в падающем рынке он в сделки не входит'}. Новых сделок не будет, пока рынок не сменится — так правила и задуманы.</div>`;
@@ -2125,8 +2146,8 @@ function sharedIdle() {
 function idleReason(act, reg, srv) {
   const D = srv ? SB_MINE : J;
   if (!D?.checked) return '';
-  const open = D.open || [], closed = D.closed || [];
-  if (open.length >= M.MAX_OPEN) return `<div class="bh-why"><b>Все ${M.MAX_OPEN} места заняты.</b> Новую сделку бот откроет, когда закроется одна из текущих.</div>`;
+  const open = D.open || [], closed = D.closed || [], slots = M.slotsOf(profSet(act));
+  if (open.length >= slots) return `<div class="bh-why"><b>Заняты все места: ${open.length} из ${slots}.</b> Новую сделку бот откроет, когда закроется одна из текущих.</div>`;
   if (reg && !allowsReg(act, reg)) {
     const s = profSet(act), now = regPlain(reg);
     const text = s.regimeOnly === 'flat' ? `профиль «${act.name}» торгует только в боковике, а сейчас ${now}`
@@ -2233,7 +2254,7 @@ function openForm(p) {
   hlOpts('#pfHL', s.tf);
   $('#pfTf').value = s.tf; $('#pfMethod').value = s.method; $('#pfN').value = s.N; $('#pfK').value = s.k; $('#pfStrat').value = s.strategy; $('#pfMin').value = s.minScore;
   $('#pfRR').value = String(s.rr); $('#pfRisk').value = String(Math.round(s.risk * 1000) / 10); $('#pfLev').value = String(s.lev);
-  $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any'; $('#pfTS').value = String(s.timeStop ?? 48);
+  $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any'; $('#pfTS').value = String(s.timeStop ?? 48); $('#pfSlots').value = String(M.slotsOf(s));
   $('#bform').classList.remove('hidden'); $('#bform').scrollIntoView({block:'nearest', behavior:'smooth'});
   formBase = formState(); syncSavebar();
 }
@@ -2245,7 +2266,7 @@ function saveForm() {
     set:{method:$('#pfMethod').value, N:clamp(+$('#pfN').value || 210, 20, 300), k:clamp(+$('#pfK').value || 3, 1, 5), tf:$('#pfTf').value,
          minScore:clamp(+$('#pfMin').value || 0, 0, 100), strategy:$('#pfStrat').value, rr:+$('#pfRR').value || 0, risk:(+$('#pfRisk').value || 2) / 100,
          lev:+$('#pfLev').value || 1, minWidth:+$('#pfW').value || 0, maxHL:+$('#pfHL').value || 0, coinErMax:+$('#pfCoinER').value || 0, longOnly:$('#pfLong').checked,
-         regimeOnly:$('#pfReg').value, timeStop:+$('#pfTS').value}};
+         regimeOnly:$('#pfReg').value, timeStop:+$('#pfTS').value, maxOpen:+$('#pfSlots').value || 3}};
   const i = BP.profiles.findIndex(x => x.id === p.id);
   if (i >= 0) BP.profiles[i] = p; else BP.profiles.push(p);
   formBase = null; syncSavebar();
@@ -2400,6 +2421,7 @@ function renderJournal() {
   $('#jmine').classList.toggle('hidden', jMode !== 'mine');
   renderServer();
   const D = journalData(), shared = jMode === 'shared';
+  const slots = M.slotsOf(shared ? SJ?.settings : profSet(activeProfile()));   // how many positions this bot may hold at once
   if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
@@ -2433,7 +2455,7 @@ function renderJournal() {
        ${journalInsight(D, st)}
      </div>
      ${st.n ? `<div class="statrow">
-       ${card('Сделок', st.n, `открыто ${D.open.length} из ${M.MAX_OPEN}`)}
+       ${card('Сделок', st.n, `открыто ${D.open.length} из ${slots}`)}
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок')}
        ${card('Ср. результат', rr(st.expR) + trend, other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR),'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), 'прибыли / убытки', st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе')}
@@ -2588,7 +2610,7 @@ function btSettings() {
           top:custom ? custom.length : +$('#btTop').value, custom,
           strategy:$('#btStrat').value, longOnly:$('#btLong').checked,
           rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1,
-          erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value};
+          erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value, maxOpen:+$('#btSlots').value || 3};
 }
 function btFill(s) {
   $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0); hlOpts('#btHL', $('#btTf').value);
@@ -2596,7 +2618,7 @@ function btFill(s) {
   $('#btRR').value = String(s.rr || 0); $('#btRisk').value = String(Math.round((s.risk ?? M.RISK) * 1000) / 10); $('#btLev').value = String(s.lev ?? 1);
   $('#btER').value = String(s.erMax ?? 0.15); $('#btReg').value = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
   $('#btSrc').value = s.regimeSrc || 'majors';   // the bot always reads the regime from BTC+ETH+SOL
-  $('#btTS').value = String(s.timeStop ?? 48); $('#btCoinER').value = String(s.coinErMax || 0);
+  $('#btTS').value = String(s.timeStop ?? 48); $('#btSlots').value = String(M.slotsOf(s)); $('#btCoinER').value = String(s.coinErMax || 0);
   btEstimate();
 }
 function btEstimate() {
@@ -2734,6 +2756,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.22', date:'12 октября 2026', title:'Сколько позиций держит бот', items:[
+    'В профиле бота и в бэктесте появилась настройка «Позиций одновременно»: 1, 2, 3, 5 или 10. Раньше бот всегда держал не больше трёх сделок. У существующих профилей остаётся 3.',
+    'Плечо делится на все места: при плече 3× и пяти местах каждая позиция не больше 60% баланса. Больше мест — больше сделок, но суммарный риск выше.',
+    '«Бета» на телефоне: панель стала короче и ровнее — монета и индикаторы в первой строке, рынок, таймфрейм, история и раскладка во второй, инструменты в третьей. Слои и масштаб — в одной строке над графиком, поэтому график начинается выше.',
+  ]},
   {v:'2.21', date:'12 октября 2026', title:'Сайт качает в десятки раз меньше', items:[
     'Обновление «Рынка» раз в минуту больше не скачивает заново всю историю свечей по каждой монете — только последние свечи. Это около 10 МБ в минуту, которые раньше уходили впустую: меньше трафика (заметно на телефоне) и меньше работы для браузера. То же для графика и бота в браузере.',
     'В «Бете» кластеры и ликвидации тоже догружаются только за новые минуты.',
@@ -3324,9 +3351,9 @@ $('#btSave').onclick = async () => {
   const name = await ask({title:'Сохранить как профиль бота', text:'Под этим названием профиль появится в «Мой бот» — там его можно выбрать для торговли.' + diff,
     ok:'Сохранить', input:{value:`${M.STRATEGIES[s.strategy]} · ${s.tf}${s.rr ? ' · 1:' + s.rr : ''}`}});
   if (!name?.trim()) return;
-  const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop} = s;
+  const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop, maxOpen} = s;
   BP.profiles.push({id:'p' + Date.now(), name:cleanName(name), coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
-    set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop}});
+    set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop, maxOpen}});
   saveBP(); renderBotPanel(); syncServerBot();
   toast(`Профиль «${cleanName(name)}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
 };
@@ -3500,7 +3527,7 @@ function profToBacktest(p, who) {
   toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
 }
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots'].forEach(s => $(s).onchange = btEstimate);
 $('#btTf').addEventListener('change', () => hlOpts('#btHL', $('#btTf').value));
 $('#pfTf').addEventListener('change', () => hlOpts('#pfHL', $('#pfTf').value));
 hlOpts('#btHL', $('#btTf').value);

@@ -7,7 +7,9 @@ export const TFMS = { '5m': 3e5, '15m': 9e5, '1h': 36e5, '4h': 144e5, '1d': 864e
 export const STABLE = new Set(['USDC','FDUSD','TUSD','BUSD','DAI','USDP','AEUR','EUR','EURI','USDE','USD1','BFUSD','XUSD','PYUSD','RLUSD','UST','USTC','SUSD','U','PAXG','XAUT','WBTC','WBETH','BNSOL']);
 export const FEE = 0.00075;   // exchange fee per side (taker, with BNB discount)
 export const SLIP = 0.0005;   // slippage on market fills: entry, stop and time-stop exits (TP is a limit order — no slippage)
-export const MAX_OPEN = 3;    // max simultaneous positions
+export const MAX_OPEN = 3;    // simultaneous positions by default; a profile may set its own (S.maxOpen, 1–10)
+export const SLOTS = [1, 2, 3, 5, 10];
+export const slotsOf = S => Math.min(10, Math.max(1, Math.round(+S?.maxOpen || MAX_OPEN)));
 export const RISK = 0.02;     // share of balance lost if the stop is hit
 export const TIME_STOP = 48;  // bars until a forced market exit
 export const COOLDOWN = 4;    // bars before re-entering the same coin
@@ -271,7 +273,7 @@ export function snapshot(r, S) {
            slope: r.slope, brk: r.brk, er: r.er, mkt: r.mkt ?? null, regime: regimeOf(r.mkt, S),
            settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0,
                        rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0, erMax: S.erMax ?? 0.15,
-                       regimeOnly: S.regimeOnly || (S.flatOnly ? 'flat' : 'any'), regimeSrc: S.regimeSrc || 'btc', coinErMax: S.coinErMax || 0, timeStop: S.timeStop ?? TIME_STOP } };
+                       regimeOnly: S.regimeOnly || (S.flatOnly ? 'flat' : 'any'), regimeSrc: S.regimeSrc || 'btc', coinErMax: S.coinErMax || 0, timeStop: S.timeStop ?? TIME_STOP, maxOpen: slotsOf(S) } };
 }
 
 // ---------- trading rules ----------
@@ -290,9 +292,9 @@ export function planEntry(r, balance, S, now) {
   const tpD = S.rr > 0 ? S.rr * slD : brk ? clamp(2 * slD, 0.01, 0.05) : Math.min(room, 0.03);
   if (!(S.rr > 0) && tpD < 0.8 * slD) return null;
   // size: lose S.risk of the balance at the stop, but never exceed the leverage cap
-  // (S.lev × balance shared by MAX_OPEN slots; default 1× → each position ≤ ⅓ of the balance)
+  // (S.lev × balance shared by the profile's slots; default 1× and 3 slots → each position ≤ ⅓ of the balance)
   const risk = S.risk ?? RISK, lev = S.lev ?? 1;
-  const qty = Math.min(balance * risk / (e * slD), balance * lev / MAX_OPEN / e);
+  const qty = Math.min(balance * risk / (e * slD), balance * lev / slotsOf(S) / e);
   if (!(qty > 0)) return null;
   const sl = e * (1 - sg * slD);
   return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf], ts: S.timeStop ?? TIME_STOP,
@@ -344,7 +346,7 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
     const cool = new Set([...recentSyms, ...closed.map(x => x.sym)]);
     const cands = rows.filter(r => wants(r, S) && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
     for (const r of cands) {
-      if (stillOpen.length + opened.length >= MAX_OPEN) break;
+      if (stillOpen.length + opened.length >= slotsOf(S)) break;
       const p = planEntry(r, balance, S, now);
       if (p) opened.push(p);
     }
@@ -394,7 +396,7 @@ const now = () => Date.now();
 // Steps bar by bar through time over all pairs with the live rules: a signal is evaluated at the close of a bar,
 // entry at that close (+slippage), exits checked on the following bars (stop first if both are hit), time stop, cooldown, slot limit.
 export function backtest(hist, S, { start = 10000, from = 0, only = null } = {}) {
-  const tfms = TFMS[S.tf], P = {};
+  const tfms = TFMS[S.tf], P = {}, slots = slotsOf(S);
   for (const [sym, K] of Object.entries(hist)) {
     if (K.length < S.N + 20) continue;
     const Q = prepare(K, S); Q.idx = new Map(Q.t.map((t, i) => [t, i])); P[sym] = Q;
@@ -420,7 +422,7 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
       else if (p.side === 'LONG' ? Q.h[j] >= p.tp : Q.l[j] <= p.tp) close(p, p.tp, 'тейк', T);
       else if (p.ts > 0 && j - p.ei >= p.ts) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
     }
-    if (open.length < MAX_OPEN) {
+    if (open.length < slots) {
       const cands = [], mkt = BTC ? marketOf(s => regAt(s, T)) : null;
       for (const sym of tradable) {
         const Q = P[sym], i = Q.idx.get(T);
@@ -432,7 +434,7 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
       }
       cands.sort((a, b) => b.score - a.score);
       for (const r of cands) {
-        if (open.length >= MAX_OPEN) break;
+        if (open.length >= slots) break;
         const p = planEntry(r, balance, S, T + tfms - 1);
         if (p) { p.ei = r.i; p.id = `${T}${r.sym}`; open.push(p); }
       }

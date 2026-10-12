@@ -146,7 +146,7 @@ function whyNot(r: any, S: any, nOpen: number) {
   if (mode === "revert_trend" && !(r.side === "low" ? r.slope > 0 : r.slope < 0)) return "отскок против тренда канала";
   if (S.minWidth && !((r.up - r.lo) / r.mid * 100 >= S.minWidth)) return `канал уже ${S.minWidth}% (фильтр профиля)`;
   if (S.maxHL && !(isFinite(r.hl) && r.hl <= S.maxHL)) return `T½ ${isFinite(r.hl) ? Math.round(r.hl) + " свечей" : "— тренд"}, а в профиле T½ ≤ ${S.maxHL}`;
-  if (nOpen >= M.MAX_OPEN) return `заняты все ${M.MAX_OPEN} места`;
+  if (nOpen >= M.slotsOf(S)) return `заняты все места (${M.slotsOf(S)})`;
   return "до центра осталось мало места или по монете недавно была сделка";
 }
 // a signal message: title, the rules it follows in one grey line, up to 15 signals
@@ -213,7 +213,8 @@ function cleanSet(s: any = {}) {
     strategy: oneOf(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr: num(s.rr, 0, 10, 0), risk: num(s.risk, 0.001, 0.05, D.risk),
     lev: num(s.lev, 1, 10, 1), minWidth: num(s.minWidth, 0, 30, 0), maxHL: num(s.maxHL, 0, 500, 0), longOnly: s.longOnly === true,
     coinErMax: num(s.coinErMax, 0, 1, 0), regimeOnly: oneOf(s.regimeOnly, ["any", "flat", "impulse"], "any"),
-    timeStop: oneOf(s.timeStop === undefined ? 48 : Number(s.timeStop), [0, 24, 48, 96], 48) };
+    timeStop: oneOf(s.timeStop === undefined ? 48 : Number(s.timeStop), [0, 24, 48, 96], 48),
+    maxOpen: oneOf(s.maxOpen === undefined ? M.MAX_OPEN : Number(s.maxOpen), M.SLOTS, M.MAX_OPEN) };
 }
 const tfOf = (ms: number) => Object.keys(M.TFMS).find((k) => (M.TFMS as any)[k] === ms);
 const effN = (len: number, S: any) => (S.tf === "1d" || S.tf === "1w") ? Math.max(20, Math.min(S.N, len - 20)) : S.N;
