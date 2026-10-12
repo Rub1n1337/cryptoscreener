@@ -273,6 +273,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .bsym{flex:0 1 160px}.bsym input{width:100%}
 .ind-btn{gap:8px;font-weight:600}.ind-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11.5px;font-weight:700}
+#btOut{transition:opacity .2s}#btOut.stale{opacity:.45}
 .bchart{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .bpanes{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);min-width:0}.bpanes[data-lay="2"],.bpanes[data-lay="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bpane{position:relative;min-width:0;border-radius:10px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .15s}
@@ -2576,6 +2577,12 @@ function btEstimate() {
   if (btBusy) return;
   $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom');
   const s = btSettings(), days = +$('#btDays').value, bars = days * 864e5 / TFMS[s.tf] + 450;
+  // a result left on screen after the form changed belongs to the old settings: it fades and says so,
+  // otherwise a screenshot shows one set of settings next to the numbers of another
+  const stale = !!btRes && (JSON.stringify(s) !== JSON.stringify(btRes.settings) || days !== btRes.days);
+  $('#btOut').classList.toggle('stale', stale);
+  if (stale) { $('#btStatus').innerHTML = '<b style="color:var(--acc-t)">Настройки изменены — результат ниже ещё для прежних.</b> Нажмите «Запустить», чтобы пересчитать.'; return; }
+  if (btRes) { $('#btStatus').textContent = btRes.status || ''; return; }   // back to the settings of the result on screen
   if (s.custom && !s.custom.length) { $('#btStatus').textContent = 'Впишите монеты через запятую, например: BTC, ETH, SOL.'; return; }
   const req = Math.ceil(bars / 1000) * s.top;
   const sec = Math.max(5, Math.round(req * 0.2 / 5) * 5);
@@ -2609,7 +2616,7 @@ async function runBacktest() {
     st.textContent = `Готово: ${btRes.pairs} монет, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
-    renderBacktest();
+    btRes.status = st.textContent; renderBacktest();
     if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
     st.textContent = 'Ошибка: ' + (e.message || e);
@@ -2701,6 +2708,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.20', date:'12 октября 2026', title:'Бэктест не путает результаты', items:[
+    'Если после расчёта поменять настройки, результат бледнеет, а сверху появляется надпись, что он посчитан для прежних настроек. Раньше на экране могли оказаться новые настройки рядом с цифрами старого прогона.',
+    'Смена тайм-стопа теперь тоже учитывается в подсказке над результатом.',
+  ]},
   {v:'2.19', date:'12 октября 2026', title:'Бэктест бережёт память', items:[
     'История свечей для бэктеста хранится в 3–4 раза компактнее, а старые загрузки удаляются, когда их становится слишком много. Раньше каждый новый прогон с другими монетами или таймфреймом добавлял вкладке сотни мегабайт памяти, и браузер начинал тормозить. Повторный запуск с теми же настройками по-прежнему мгновенный.',
   ]},
@@ -3457,7 +3468,7 @@ function profToBacktest(p, who) {
   toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
 }
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS'].forEach(s => $(s).onchange = btEstimate);
 $('#btTf').addEventListener('change', () => hlOpts('#btHL', $('#btTf').value));
 $('#pfTf').addEventListener('change', () => hlOpts('#pfHL', $('#pfTf').value));
 hlOpts('#btHL', $('#btTf').value);
