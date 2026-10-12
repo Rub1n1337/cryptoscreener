@@ -917,7 +917,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <label class="fl">Идея входа <select id="pfStrat"><option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму</option></select></label>
           <label class="fl">Мин. сила <input type="number" id="pfMin" min="0" max="100" style="width:76px"></label>
           <label class="fl">RR <select id="pfRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
-          <label class="fl">Риск на сделку <select id="pfRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
+          <label class="fl">Риск на сделку <select id="pfRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
           <label class="fl">Плечо до <select id="pfLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
           <label class="fl" title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций одновременно <select id="pfSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
           <label class="fl">Мин. ширина канала <select id="pfW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option></select></label>
@@ -965,7 +965,7 @@ details.dis>.dbody{padding:0 16px 16px}
     <div class="fields" style="align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
       <span class="faint" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;align-self:center;margin-right:4px">Риск-менеджмент</span>
       <label title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">RR (тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
-      <label title="RM: какую долю баланса теряем, если сработал стоп">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option></select></label>
+      <label title="RM: какую долю баланса теряем, если сработал стоп">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
       <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на все позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
       <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
     </div></div>
@@ -2040,7 +2040,7 @@ function cleanProfile(p) {
   const set = {method:pick(s.method, ['log', 'classic', 'robust', 'ewma'], D.method), N:Math.round(num(s.N, 20, 300, D.N)), k:num(s.k, 1, 5, D.k),
     tf:pick(s.tf, ['5m', '15m', '1h', '4h', '1d'], D.tf), minScore:Math.round(num(s.minScore, 0, 100, D.minScore)),
     // values offered as lists in the form snap to the nearest option, so editing an imported profile never shows an empty field
-    strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:near(s.rr, [0, 1.5, 2, 3], 0), risk:near(s.risk, [0.005, 0.01, 0.02, 0.03], D.risk),
+    strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:near(s.rr, [0, 1.5, 2, 3], 0), risk:near(s.risk, [0.005, 0.01, 0.02, 0.03, 0.04, 0.05], D.risk),
     lev:near(s.lev, [1, 2, 3, 5, 10], 1), minWidth:near(s.minWidth, [0, 3, 5, 8], 0), maxHL:near(s.maxHL, [0, 20, 40], 0), coinErMax:near(s.coinErMax, [0, 0.2, 0.3], 0),
     longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any'), timeStop:near(s.timeStop ?? 48, [0, 24, 48, 96], 48), maxOpen:near(s.maxOpen ?? 3, M.SLOTS, 3)};
   const list = Array.isArray(c.list) ? c.list.map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{2,20}USDT$/.test(x)).slice(0, 200) : [];
@@ -2761,6 +2761,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.25', date:'13 октября 2026', title:'Риск до 5% на сделку', items:[
+    'В профиле бота и в бэктесте риск на сделку теперь можно поднять до 4% и 5%. Чем выше риск, тем глубже просадки: проверьте профиль в бэктесте, прежде чем включать.',
+  ]},
   {v:'2.24', date:'13 октября 2026', title:'Честный бэктест по топу монет', items:[
     'Раньше бэктест брал сегодняшний топ монет и торговал им весь год назад. Но сегодняшний топ уже «знает», какие монеты потом выросли, и это завышало результат.',
     'Теперь по умолчанию «Топ считать: на каждый момент». Загружается набор пошире (для топ-20 — 50 монет), а торгуются только те монеты, что в тот момент были в топе по обороту за последние сутки, — так же, как выбирает живой бот. Старый режим можно включить, он быстрее.',
