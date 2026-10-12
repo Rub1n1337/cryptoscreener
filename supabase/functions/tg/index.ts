@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (!tg?.enabled || !tg.bot_token || secret !== tg.wh_secret) return new Response("forbidden", { status: 403 });
   let u: any; try { u = await req.json(); } catch { return new Response("ok"); }
   const call = (method: string, body: Record<string, unknown>) => fetch(`https://api.telegram.org/bot${tg.bot_token}/${method}`, { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json()).catch(() => null);
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000) }).then((r) => r.json()).catch(() => null);
   try { await handleUpdate(db, u, call); } catch { /* a bad update must not make Telegram retry forever */ }
   return new Response("ok");   // always 200: otherwise Telegram re-sends the same update
 });

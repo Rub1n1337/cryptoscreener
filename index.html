@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- the page may talk only to these hosts: even an injected script could not send the bot's key anywhere else -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Sigma Radar</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b0f17'/><path d='M4 10 Q16 4 28 10' stroke='%23ef4444' stroke-width='2.5' fill='none'/><path d='M4 22 Q16 28 28 22' stroke='%2322c55e' stroke-width='2.5' fill='none'/><path d='M4 18 L10 14 L15 17 L21 11 L28 15' stroke='%23f5b70a' stroke-width='2.5' fill='none'/></svg>">
 <script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
@@ -1207,7 +1209,11 @@ const effN = (len, set = S) => (set.tf === '1d' || set.tf === '1w') ? Math.max(2
 const coin = sym => { const b = base(sym); let h = 0; for (const ch of b) h = (h * 31 + ch.charCodeAt(0)) % 360; return `<span class="coin"><i style="--h:${h}">${b.replace(/^1000+/, '')[0] || '?'}</i><b>${b}</b></span>`; };
 // in-app toasts: kind = ok | bad | warn | info; click runs onClick
 function toast(title, body = '', kind = 'info', onClick, ms = 6000) {
+  // the same message twice at once is noise: keep the one already on screen
+  const key = title + '\n' + body;
+  if ([...$('#toasts').children].some(t => t.dataset.key === key && !t.classList.contains('out'))) return;
   const el = document.createElement('div');
+  el.dataset.key = key;
   el.className = 'toast ' + kind;
   el.innerHTML = `<svg class="i" style="color:var(--${kind === 'ok' ? 'lo' : kind === 'bad' ? 'up' : kind === 'warn' ? 'acc' : 'blue'})"><use href="#i-${kind}"/></svg><div><b>${title}</b>${body ? `<div class="mute">${body}</div>` : ''}</div>`;
   const kill = () => { el.classList.add('out'); setTimeout(() => el.remove(), 200); };
@@ -2683,6 +2689,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.17', date:'12 октября 2026', title:'Безопасность', items:[
+    'Уведомление о новой версии больше не появляется дважды.',
+    'Сайт защищён строже: страница может обращаться только к Binance, нашей базе и серверу стакана, её нельзя встроить в чужой сайт, а служебные файлы больше не публикуются.',
+    'Сервер ботов не зависает, если Binance или Telegram отвечают медленно, и делает паузу, когда Binance просит не торопиться.',
+  ]},
   {v:'2.16', date:'12 октября 2026', title:'Телефон и надёжность', items:[
     'На телефоне карточки сверху помещаются на экран: настроение рынка одной строкой, под ним четыре плитки — дешевле, дороже, сигналы, затишье. Листать вбок больше не нужно.',
     'В таблице на телефоне есть колонка T½. Если таблица не влезает, её можно сдвинуть вбок — колонка с монетой остаётся на месте.',
@@ -3677,16 +3688,19 @@ const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + D
   .then(ts => ts.includes(null) ? null : hashText(ts.join('\n'))).catch(() => null);
 let selfHash = null;
 fetchVersion().then(h => { selfHash = h; });
-let updWarned = false;
+// the timer and a return to the tab can start a check at the same moment: one check at a time, and one countdown only
+let updWarned = false, updBusy = false, reloading = false;
 async function checkUpdate() {
-  if (selfHash == null || IS_DEV) return;
-  const h = await fetchVersion();
-  if (h == null || h === selfHash) return;
+  if (selfHash == null || IS_DEV || updBusy || reloading) return;
+  updBusy = true;
+  let h; try { h = await fetchVersion(); } finally { updBusy = false; }
+  if (reloading || h == null || h === selfHash) return;
   // never reload over unsaved edits or an open dialog — ask once instead
   if (formDirty() || !$('#dlg').classList.contains('hidden')) {
     if (!updWarned) toast('Вышла новая версия сайта', 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
     updWarned = true; return;
   }
+  reloading = true;
   const el = $('#guard'); el.className = 'guard idle';
   let n = 5;
   toast('Вышла новая версия сайта', 'Перезагружаю через 5 секунд — журнал и настройки сохранятся.', 'warn', () => location.reload(), 6000);

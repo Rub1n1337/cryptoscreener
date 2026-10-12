@@ -1,1 +1,9 @@
+# only the site goes to Vercel: index.html, beta.js and the shared strategy math it imports
 server
+docs
+CLAUDE.md
+serve.ps1
+supabase/*.sql
+supabase/functions/bot
+supabase/functions/tg
+supabase/functions/_shared/tg.ts

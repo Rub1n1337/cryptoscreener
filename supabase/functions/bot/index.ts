@@ -7,10 +7,20 @@ import { COMMANDS, SITE, coin, dur, esc, fp, handleUpdate, pct, rr, usd } from "
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const BASES = ["https://data-api.binance.vision", "https://api.binance.com"];
 
+// every exchange call has a deadline: one hanging request must not hold the whole minute (the run would be killed and the next one skipped).
+// When Binance says "too many requests" (429) or bans the address for a while (418), stop asking until it allows again:
+// carrying on is what turns a minute's ban into hours. The pause outlives a run while the function instance stays warm.
+const PAUSE: Record<string, number> = {};
 async function api(path: string) {
   let err: unknown;
   for (const b of BASES) {
-    try { const r = await fetch(b + path); if (r.ok) return await r.json(); err = new Error("HTTP " + r.status + " " + b); } catch (e) { err = e; }
+    if (Date.now() < (PAUSE[b] || 0)) { err = new Error("Binance просит подождать (" + b + ")"); continue; }
+    try {
+      const r = await fetch(b + path, { signal: AbortSignal.timeout(8000) });
+      if (r.ok) return await r.json();
+      if (r.status === 429 || r.status === 418) PAUSE[b] = Date.now() + Math.min(600, Math.max(30, Number(r.headers.get("retry-after")) || 60)) * 1000;
+      err = new Error("HTTP " + r.status + " " + b);
+    } catch (e) { err = e; }
   }
   throw err;
 }
@@ -24,7 +34,7 @@ let TG: any;   // tg_config, read once per run
 async function tgConf() { if (TG === undefined) { const { data } = await db.from("tg_config").select("*").eq("id", 1).maybeSingle(); TG = data?.enabled && data.bot_token ? data : null; } return TG; }
 async function tgCall(method: string, body: unknown) {
   const tg = await tgConf(); if (!tg) return null;
-  const r = await fetch(`https://api.telegram.org/bot${tg.bot_token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const r = await fetch(`https://api.telegram.org/bot${tg.bot_token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000) });
   return await r.json().catch(() => null);
 }
 const FOOT = `\n\n<i>бумажная торговля · не финансовый совет</i>`;
