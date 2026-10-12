@@ -24,6 +24,27 @@ async function api(path: string) {
   }
   throw err;
 }
+// candles are kept between runs while the function instance stays warm, as compact numeric rows [time, open, high, low, close, volume];
+// the next minute fetches only the newest 3 bars of each coin and splices them in (a fresh instance downloads everything once).
+// Re-downloading hundreds of coins × 450 bars every minute was most of a run's time and of Binance's request weight.
+const KC = new Map<string, { K: number[][]; limit: number; used: number }>();
+let kcSwept = 0;
+const compact = (K: any[]) => K.map((k: any) => [k[0], +k[1], +k[2], +k[3], +k[4], +k[5]]);
+async function candles(sym: string, tf: string, limit: number): Promise<number[][]> {
+  const key = sym + "|" + tf, st = KC.get(key), tfms = (M.TFMS as any)[tf], now = Date.now();
+  if (now - kcSwept > 60_000) { kcSwept = now; for (const [k, v] of KC) if (now - v.used > 600_000) KC.delete(k); }   // coins nobody asked for in 10 min
+  if (st && st.K.length && st.limit >= limit && now - st.K[st.K.length - 1][0] < 2 * tfms) {
+    const N = compact(await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=3`));
+    if (N.length && N[0][0] <= st.K[st.K.length - 1][0]) {   // overlaps the kept bars: no gap
+      const K = st.K.filter((k) => k[0] < N[0][0]).concat(N).slice(-st.limit);
+      KC.set(key, { K, limit: st.limit, used: now });
+      return K.slice(-limit);
+    }
+  }
+  const K = compact(await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${limit}`));
+  KC.set(key, { K, limit, used: now });
+  return K;
+}
 async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
   let i = 0;
   await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) await fn(items[i++]); }));
@@ -157,14 +178,15 @@ async function run() {
   const klines: Record<string, unknown[]> = {}, rows: any[] = [];
   const limit = Math.min(1000, S.N + 150);
   await pool(list, 10, async (sym) => {
-    try { const K = await api(`/api/v3/klines?symbol=${sym}&interval=${S.tf}&limit=${limit}`); klines[sym] = K; const r = M.analyze(sym, K, S, now, true); if (r) rows.push(r); } catch { /* skip pair */ }
+    try { const K = await candles(sym, S.tf, limit); klines[sym] = K; const r = M.analyze(sym, K, S, now, true); if (r) rows.push(r); } catch { /* skip pair */ }
   });
 
   const { data: recent } = await db.from("trades").select("sym").gt("tclose", now - M.COOLDOWN * M.TFMS[S.tf]);
   const res = M.botTick({ rows, klines, open: open!, recentSyms: (recent ?? []).map((x: any) => x.sym), balance: st.balance, S, now });
 
   if (res.closed.length) {
-    const { error } = await db.from("trades").insert(res.closed); if (error) throw error;
+    // ignoreDuplicates: if a previous run wrote the trade but failed to remove the position, it closes again here — once
+    const { error } = await db.from("trades").upsert(res.closed, { onConflict: "id", ignoreDuplicates: true }); if (error) throw error;
     const { error: e3 } = await db.from("positions").delete().in("id", res.closed.map((x: any) => x.id)); if (e3) throw e3;
   }
   const upserts = [...res.stillOpen, ...res.opened];
@@ -197,7 +219,7 @@ async function majorsRegime() {
   const got: Record<string, any> = {};
   await Promise.all(M.MAJORS.map(async (s: string) => {
     try {
-      const c = (await api(`/api/v3/klines?symbol=${s}&interval=1h&limit=200`)).map((k: any) => +k[4]), L = 168, i = c.length - 1;
+      const c = (await candles(s, "1h", 200)).map((k) => k[4]), L = 168, i = c.length - 1;
       let path = 0; for (let j = i - L + 1; j <= i; j++) path += Math.abs(c[j] - c[j - 1]);
       got[s] = { er: path ? Math.abs(c[i] - c[i - L]) / path : 0, ch: c[i] / c[i - L] - 1 };
     } catch { /* regime falls back to BTC-only or null */ }
@@ -206,18 +228,16 @@ async function majorsRegime() {
   if (m) m.by = got;
   return m;
 }
-async function runUserBots(now: number) {
+async function runUserBots(now: number, reqStart: number) {
   // fair queue: the least recently checked bots go first, so with more bots than fit in one run every bot still gets its turn;
   // bots whose owner hasn't opened the site for 30 days are not scheduled
   const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat, tg_sig, tg_mkt, sig_sent").eq("enabled", true)
     .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
   if (!bots?.length) return 0;
   const reg = await majorsRegime(), ticker = await api("/api/v3/ticker/24hr");
-  // one download per coin + timeframe for all bots, kept as compact numeric candles [time, open, high, low, close, volume]:
-  // Binance's raw rows (12 strings each) for a few hundred coins ran the function out of resources
+  // one request per coin + timeframe for all bots in this run (compact candles, see candles())
   const kc = new Map<string, Promise<any>>();
-  const compact = (K: any) => Array.isArray(K) ? K.map((k: any) => [k[0], +k[1], +k[2], +k[3], +k[4], +k[5]]) : null;
-  const getK = (s: string, tf: string) => { const key = s + "|" + tf; if (!kc.has(key)) kc.set(key, api(`/api/v3/klines?symbol=${s}&interval=${tf}&limit=450`).then(compact).catch(() => null)); return kc.get(key)!; };
+  const getK = (s: string, tf: string) => { const key = s + "|" + tf; if (!kc.has(key)) kc.set(key, candles(s, tf, 450).catch(() => null)); return kc.get(key)!; };
   // one analysis per coin + channel settings for all bots (most share them); the bots don't need the site's display extras
   const ac = new Map<string, any>();
   const analyzeK = (s: string, K: any, S: any) => {
@@ -231,9 +251,10 @@ async function runUserBots(now: number) {
   const BUDGET = 1800;   // distinct coin analyses per run (~1 s of CPU)
   AN = 0;
   let done = 0;
-  const t0 = Date.now();
   for (const b of bots) {
-    if (Date.now() - t0 > 90_000 || ac.size > BUDGET) break;   // leave room before the time and CPU limits; the rest go first next minute
+    // the deadline counts from the start of the whole request (the shared bot ran first): the run lock lasts 120 s, and a run
+    // that outlives it would overlap the next minute's. The rest go first next minute.
+    if (Date.now() - reqStart > 80_000 || ac.size > BUDGET) break;
     try {
       const cfg = b.config || {}, profiles = Array.isArray(cfg.profiles) ? cfg.profiles : [];
       if (!profiles.length) {   // still mark it checked, or it would stay first in the queue forever
@@ -259,11 +280,14 @@ async function runUserBots(now: number) {
       const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, S, now, market: reg });
       for (const p of res.opened) { p.note = `«${pname}» · ${p.note}`; p.snap.profile = pname; }
       if (res.closed.length) {
-        await db.from("user_trades").insert(res.closed.map((t: any) => ({ bot_id: b.id, id: t.id, tclose: t.tclose, data: t })));
-        await db.from("user_positions").delete().eq("bot_id", b.id).in("id", res.closed.map((t: any) => t.id));
+        // a trade is only removed from the open positions once it is written: a failed write must not lose it (it closes again next minute)
+        const { error: ei } = await db.from("user_trades").upsert(res.closed.map((t: any) => ({ bot_id: b.id, id: t.id, tclose: t.tclose, data: t })), { onConflict: "bot_id,id", ignoreDuplicates: true });
+        if (ei) throw ei;
+        const { error: ed } = await db.from("user_positions").delete().eq("bot_id", b.id).in("id", res.closed.map((t: any) => t.id));
+        if (ed) throw ed;
       }
       const keep = [...res.stillOpen, ...res.opened];
-      if (keep.length) await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p })));
+      if (keep.length) { const { error: eu } = await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p }))); if (eu) throw eu; }
       // a linked chat also gets the profile's own signals (strength at its threshold), unless switched off with /mysignals
       const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore), mySigs = sigOn ? freshSignals(rows, sigMin, sent, now).map((r) => ({ ...r })) : [];   // a floor of 40: a profile with no threshold would message every touch; copies — the rows are shared between bots
       const took = new Set(res.opened.map((p: any) => p.sym)), held = new Set(res.stillOpen.map((p: any) => p.sym));
@@ -313,10 +337,12 @@ Deno.serve(async (req) => {
   try { await tgPoll(); } catch { /* Telegram must never break trading */ }
   try {
     const out = await run();
+    const t1 = Date.now();
     let users = 0;
-    try { users = await runUserBots(Date.now()); } catch { /* personal bots never break the shared one */ }
+    try { users = await runUserBots(Date.now(), t0); } catch { /* personal bots never break the shared one */ }
     await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed });
-    return Response.json({ ...out, users, analyses: AN });
+    // where the time goes (shared bot / personal bots) and how many coins' candles are kept warm between runs
+    return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: Date.now() - t1 }, kept: KC.size });
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);

@@ -1246,7 +1246,7 @@ async function klines(sym, tf, limit) {
     kstSwept = Date.now();
     for (const [k, v] of KST) if (kstSwept - v.used > 6e5) KST.delete(k);
   }
-  if (st && st.limit >= limit && Date.now() - st.K[st.K.length - 1][0] < 2 * tfms) {
+  if (st && st.K.length && st.limit >= limit && Date.now() - st.K[st.K.length - 1][0] < 2 * tfms) {
     const N = await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=3`);
     if (N.length && N[0][0] <= st.K[st.K.length - 1][0]) {   // overlaps the stored bars: no gap
       const K = st.K.filter(k => k[0] < N[0][0]).concat(N).slice(-st.limit);
