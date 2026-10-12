@@ -45,6 +45,9 @@ async function candles(sym: string, tf: string, limit: number): Promise<number[]
   KC.set(key, { K, limit, used: now });
   return K;
 }
+// requests in flight at once: with candles kept, a run is ~600 tiny requests whose time is all waiting for Binance;
+// 25 at a time stays far below its limits (a request weighs 1 of 6000 a minute) and a 429 pauses the host anyway
+const PAR = 25;
 async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
   let i = 0;
   await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) await fn(items[i++]); }));
@@ -177,7 +180,7 @@ async function run() {
 
   const klines: Record<string, unknown[]> = {}, rows: any[] = [];
   const limit = Math.min(1000, S.N + 150);
-  await pool(list, 10, async (sym) => {
+  await pool(list, PAR, async (sym) => {
     try { const K = await candles(sym, S.tf, limit); klines[sym] = K; const r = M.analyze(sym, K, S, now, true); if (r) rows.push(r); } catch { /* skip pair */ }
   });
 
@@ -272,7 +275,7 @@ async function runUserBots(now: number, reqStart: number) {
       const { data: pr } = await db.from("user_positions").select("data").eq("bot_id", b.id);
       const open = (pr ?? []).map((x: any) => x.data);
       const Ks: Record<string, any> = {};
-      await pool(list, 10, async (s) => { Ks[s] = await getK(s, S.tf); });
+      await pool(list, PAR, async (s) => { Ks[s] = await getK(s, S.tf); });
       const rows = list.map((s) => analyzeK(s, Ks[s], S)).filter(Boolean);
       const exitK: Record<string, any> = {};
       for (const p of open) exitK[p.sym] = await getK(p.sym, tfOf(p.tfms) || S.tf);
@@ -301,7 +304,7 @@ async function runUserBots(now: number, reqStart: number) {
           tf: oneOf(sc.tf, ["5m", "15m", "1h", "4h", "1d"], "4h"), minScore: num(sc.minScore, 40, 100, 60) };
         mktTop = Math.round(num(sc.top, 10, 400, 150));
         const lst = M.pickSymbols(ticker, mktTop, [], now), KM: Record<string, any> = {};
-        await pool(lst, 10, async (s) => { KM[s] = await getK(s, SM.tf); });
+        await pool(lst, PAR, async (s) => { KM[s] = await getK(s, SM.tf); });
         const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r?.rev);
         mktSigs = freshSignals(rowsM, SM.minScore, sent, now, "m:");
       }
