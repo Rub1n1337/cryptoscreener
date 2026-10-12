@@ -2630,7 +2630,7 @@ function groupRow(name, list) {
 const groupHead = '<thead><tr><th>Группа</th><th>Сделок</th><th>Winrate</th><th title="Средний результат на сделку в R после комиссий">Ср. результат</th><th>PF</th><th>PnL</th></tr></thead>';
 function renderBacktest() {
   const r = btRes, tr = r.trades, st = M.journalStats(r.start, tr), s = r.settings;
-  $('#btOut').classList.remove('hidden'); $('#btEmpty').classList.add('hidden');
+  $('#btOut').classList.remove('hidden', 'stale'); $('#btEmpty').classList.add('hidden');
   const mid = (r.from + r.to) / 2, h1 = tr.filter(x => x.tclose < mid), h2 = tr.filter(x => x.tclose >= mid);
   const s1 = M.journalStats(r.start, h1), s2 = M.journalStats(r.start, h2);
   let v;
