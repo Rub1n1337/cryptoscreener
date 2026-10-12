@@ -957,6 +957,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="Таймфрейм свечей: на 4ч торгуют общий бот и проверенный профиль">Таймфрейм <select id="btTf"><option value="15m">15м</option><option value="1h">1ч</option><option value="4h">4ч</option></select></label>
       <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></label>
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
+      <label id="btPitL" title="Живой бот каждую минуту берёт топ по обороту за последние сутки. «На каждый момент» делает в прошлом так же: монета торгуется, только пока она в топе. «По сегодняшнему» берёт сегодняшний топ на весь период — быстрее, но завышает результат: сегодняшний топ знает, какие монеты потом выросли">Топ считать <select id="btPit"><option value="pit">на каждый момент — честно</option><option value="now">по сегодняшнему — быстрее, завышает</option></select></label>
       <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
       <button id="btRun" class="primary" style="height:var(--h);padding:0 22px"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
       <div class="btpre" role="group" aria-label="Подставить готовые настройки"><span class="faint">Подставить:</span><button id="btShared" title="Те же правила, по которым торгует общий бот — проверить их на истории">правила общего бота</button><button id="btMine" title="Канал и таймфрейм с вкладки «Рынок»">настройки «Рынка»</button></div>
@@ -2571,8 +2572,8 @@ function closeModal() { $('#modal').classList.add('hidden'); document.body.style
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const histCache = new Map();
 let lastReq = 0, btRes = null, btBusy = false, btHist = null;
-async function throttled(path) { // keep backtest downloads well under Binance's weight limit (≈300 requests/min)
-  const wait = Math.max(0, lastReq + 200 - Date.now()); lastReq = Date.now() + wait;
+async function throttled(path) { // backtest downloads stay well under Binance's weight limit: ≤ 750 requests a minute of weight 2 is a quarter of it
+  const wait = Math.max(0, lastReq + 80 - Date.now()); lastReq = Date.now() + wait;
   if (wait) await sleep(wait);
   return api(path);
 }
@@ -2603,11 +2604,14 @@ function trimHistory(keep) {
 // custom coin list: "btc, eth sol" → ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
 const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/[^A-Z0-9]/g, '')).filter(Boolean)
   .map(x => x.endsWith('USDT') ? x : x + 'USDT'))].slice(0, 300);
+// the honest top needs a wider pool: coins that are in the top today were not always, and the other way round
+const poolOf = n => Math.min(n + 100, Math.round(n * 2.5));
+const coinsLabel = r => r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} монет)` : `${r.pairs} монет`;
 function btSettings() {
   const custom = $('#btTop').value === 'custom' ? parseCoins($('#btCustom').value) : null;
   return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
           minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, minWidth:+$('#btW').value || 0,
-          top:custom ? custom.length : +$('#btTop').value, custom,
+          top:custom ? custom.length : +$('#btTop').value, custom, pit:!custom && $('#btPit').value === 'pit',
           strategy:$('#btStrat').value, longOnly:$('#btLong').checked,
           rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1,
           erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value, maxOpen:+$('#btSlots').value || 3};
@@ -2623,7 +2627,7 @@ function btFill(s) {
 }
 function btEstimate() {
   if (btBusy) return;
-  $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom');
+  $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom'); $('#btPitL').classList.toggle('hidden', $('#btTop').value === 'custom');
   const s = btSettings(), days = +$('#btDays').value, bars = days * 864e5 / TFMS[s.tf] + 450;
   // a result left on screen after the form changed belongs to the old settings: it fades and says so,
   // otherwise a screenshot shows one set of settings next to the numbers of another
@@ -2632,9 +2636,9 @@ function btEstimate() {
   if (stale) { $('#btStatus').innerHTML = '<b style="color:var(--acc-t)">Настройки изменены — результат ниже ещё для прежних.</b> Нажмите «Запустить», чтобы пересчитать.'; return; }
   if (btRes) { $('#btStatus').textContent = btRes.status || ''; return; }   // back to the settings of the result on screen
   if (s.custom && !s.custom.length) { $('#btStatus').textContent = 'Впишите монеты через запятую, например: BTC, ETH, SOL.'; return; }
-  const req = Math.ceil(bars / 1000) * s.top;
-  const sec = Math.max(5, Math.round(req * 0.2 / 5) * 5);
-  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.top} монет. Повторные — мгновенно.`
+  const req = Math.ceil(bars / 1000) * (s.pit ? poolOf(s.top) : s.top);
+  const sec = Math.max(5, Math.round(req * 0.09 / 5) * 5);
+  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.pit ? poolOf(s.top) : s.top} монет. Повторные — мгновенно.`
     + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '');
 }
 async function runBacktest() {
@@ -2647,7 +2651,8 @@ async function runBacktest() {
     const now = Date.now(), endT = Math.floor(now / 36e5) * 36e5;   // whole hours → reruns hit the cache
     const from = endT - days * 864e5, startT = from - 450 * tfms;      // 450 bars of warm-up covers N ≤ 300
     if (s.custom && !s.custom.length) throw new Error('список монет пуст');
-    const traded = s.custom || M.pickSymbols(await api('/api/v3/ticker/24hr'), s.top, [], now);
+    // honest top: a wider pool is loaded and the backtest trades, at each moment, only that moment's top by 24 h turnover
+    const traded = s.custom || M.pickSymbols(await api('/api/v3/ticker/24hr'), s.pit ? poolOf(s.top) : s.top, [], now);
     const syms = [...new Set([...traded, ...M.MAJORS])];   // BTC/ETH/SOL are always loaded: they define the market regime
     trimHistory(key => key.endsWith(`|${s.tf}|${startT}|${endT}`) && syms.includes(key.split('|')[0]));
     const hist = {}; let done = 0;
@@ -2658,10 +2663,10 @@ async function runBacktest() {
     st.textContent = 'Считаю…'; await sleep(30);
     const t0 = performance.now();
     btHist = {hist, from};
-    btRes = M.backtest(hist, s, {start:10000, from, only:traded});
+    btRes = M.backtest(hist, s, {start:10000, from, only:traded, top:s.pit ? s.top : 0});
     btRes.settings = s; btRes.days = days;
-    const miss = traded.filter(x => !hist[x]?.length);
-    st.textContent = `Готово: ${btRes.pairs} монет, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
+    const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length);   // a coin of the wider pool without history simply never makes the top
+    st.textContent = `Готово: ${coinsLabel(btRes)}, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
     btRes.status = st.textContent; renderBacktest();
@@ -2694,7 +2699,7 @@ function renderBacktest() {
   $('#btCards').innerHTML =
     `<div class="hero">
        <div class="htop">
-         <div><div class="t">Итоговый баланс · ${r.days} дней · ${r.pairs} монет</div>
+         <div><div class="t">Итоговый баланс · ${r.days} дней · ${coinsLabel(r)}</div>
            <div class="hv">$${money(r.balance)}</div>
            <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">после комиссий</span></div></div>
          <div class="hside">
@@ -2756,6 +2761,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.24', date:'13 октября 2026', title:'Честный бэктест по топу монет', items:[
+    'Раньше бэктест брал сегодняшний топ монет и торговал им весь год назад. Но сегодняшний топ уже «знает», какие монеты потом выросли, и это завышало результат.',
+    'Теперь по умолчанию «Топ считать: на каждый момент». Загружается набор пошире (для топ-20 — 50 монет), а торгуются только те монеты, что в тот момент были в топе по обороту за последние сутки, — так же, как выбирает живой бот. Старый режим можно включить, он быстрее.',
+    'История для бэктеста загружается примерно вдвое быстрее.',
+  ]},
   {v:'2.23', date:'13 октября 2026', title:'Любое число позиций от 1 до 10', items:[
     'В профиле бота и в бэктесте «Позиций одновременно» теперь можно выбрать любое число от 1 до 10, а не только 1, 2, 3, 5 или 10.',
   ]},
@@ -3530,7 +3540,7 @@ function profToBacktest(p, who) {
   toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
 }
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit'].forEach(s => $(s).onchange = btEstimate);
 $('#btTf').addEventListener('change', () => hlOpts('#btHL', $('#btTf').value));
 $('#pfTf').addEventListener('change', () => hlOpts('#pfHL', $('#pfTf').value));
 hlOpts('#btHL', $('#btTf').value);

@@ -395,7 +395,9 @@ const now = () => Date.now();
 // hist: {sym: klines[]} (closed bars, same tf, warm-up of at least N+100 bars before `from`).
 // Steps bar by bar through time over all pairs with the live rules: a signal is evaluated at the close of a bar,
 // entry at that close (+slippage), exits checked on the following bars (stop first if both are hit), time stop, cooldown, slot limit.
-export function backtest(hist, S, { start = 10000, from = 0, only = null } = {}) {
+// top: trade only the `top` coins with the largest turnover over the previous 24 h at each moment, out of the loaded pool —
+// what the live bot does with Binance's 24 h ticker. Today's top applied to the whole past would know which coins later grew.
+export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 0 } = {}) {
   const tfms = TFMS[S.tf], P = {}, slots = slotsOf(S);
   for (const [sym, K] of Object.entries(hist)) {
     if (K.length < S.N + 20) continue;
@@ -407,6 +409,11 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
   const regAt = (s, T) => { const Q = P[s], i = Q ? Q.idx.get(T) : null; return i != null ? regS[s][i] : null; };
   const tradable = only ? Object.keys(P).filter(s => only.includes(s)) : Object.keys(P);
   const times = [...new Set(Object.values(P).flatMap(Q => Q.t))].filter(t => t >= from).sort((a, b) => a - b);
+  // running sums of quote turnover (volume × close) per coin, for the 24 h window ending with the bar being decided on
+  const day = Math.max(1, Math.round(864e5 / tfms)), QV = {};
+  if (top) for (const s of tradable) { const Q = P[s], q = new Float64Array(Q.n + 1); for (let i = 0; i < Q.n; i++) q[i + 1] = q[i] + Q.v[i] * Q.c[i]; QV[s] = q; }
+  const turnover = (s, T) => { const i = P[s].idx.get(T); return i == null ? 0 : QV[s][i + 1] - QV[s][Math.max(0, i + 1 - day)]; };
+  let active = tradable, activeHour = -1;
   let balance = start;
   const open = [], trades = [], equity = [], lastClose = {};
   const close = (p, exit, reason, T) => {
@@ -422,9 +429,13 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
       else if (p.side === 'LONG' ? Q.h[j] >= p.tp : Q.l[j] <= p.tp) close(p, p.tp, 'тейк', T);
       else if (p.ts > 0 && j - p.ei >= p.ts) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
     }
+    if (top && Math.floor(T / 36e5) !== activeHour) {   // the ranking is refreshed hourly, like a ticker read now and then
+      activeHour = Math.floor(T / 36e5);
+      active = tradable.map(s => [s, turnover(s, T)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, top).map(x => x[0]);
+    }
     if (open.length < slots) {
       const cands = [], mkt = BTC ? marketOf(s => regAt(s, T)) : null;
-      for (const sym of tradable) {
+      for (const sym of active) {
         const Q = P[sym], i = Q.idx.get(T);
         if (i == null || !touchedAt(Q, i) || open.some(p => p.sym === sym)) continue;
         if (lastClose[sym] != null && T - lastClose[sym] < COOLDOWN * tfms) continue;
@@ -442,5 +453,5 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null } = {})
     equity.push([T, balance]);
   }
   for (const p of [...open]) { const Q = P[p.sym]; const j = Q.n - 1; close(p, Q.c[j] * (1 - (p.side === 'LONG' ? 1 : -1) * SLIP), 'конец теста', Q.t[j]); }
-  return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: tradable.length };
+  return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: top || tradable.length, pool: tradable.length };
 }
