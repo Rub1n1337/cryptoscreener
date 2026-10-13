@@ -24,6 +24,13 @@ async function api(path: string) {
   }
   throw err;
 }
+// the 24 h ticker (the coin list) is kept too: when one request fails (a 418 can hit a shared outgoing address for a moment),
+// the run uses the last list if it is under 15 minutes old instead of losing the whole minute
+let TICKER: { t: number; d: any } | null = null;
+async function ticker24() {
+  try { const d = await api("/api/v3/ticker/24hr"); TICKER = { t: Date.now(), d }; return d; }
+  catch (e) { if (TICKER && Date.now() - TICKER.t < 15 * 60_000) return TICKER.d; throw e; }
+}
 // candles are kept between runs while the function instance stays warm, as compact numeric rows [time, open, high, low, close, volume];
 // the next minute fetches only the newest 3 bars of each coin and splices them in (a fresh instance downloads everything once).
 // Re-downloading hundreds of coins × 450 bars every minute was most of a run's time and of Binance's request weight.
@@ -176,7 +183,7 @@ async function run() {
   const S = st.settings;
   const { data: open, error: e2 } = await db.from("positions").select("*");
   if (e2) throw e2;
-  const list = M.pickSymbols(await api("/api/v3/ticker/24hr"), S.top, open!.map((p: any) => p.sym), now);
+  const list = M.pickSymbols(await ticker24(), S.top, open!.map((p: any) => p.sym), now);
 
   const klines: Record<string, unknown[]> = {}, rows: any[] = [];
   const limit = Math.min(1000, S.N + 150);
@@ -238,7 +245,7 @@ async function runUserBots(now: number, reqStart: number) {
   const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat, tg_sig, tg_mkt, sig_sent").eq("enabled", true)
     .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
   if (!bots?.length) return 0;
-  const reg = await majorsRegime(), ticker = await api("/api/v3/ticker/24hr");
+  const reg = await majorsRegime(), ticker = await ticker24();
   // one request per coin + timeframe for all bots in this run (compact candles, see candles())
   const kc = new Map<string, Promise<any>>();
   const getK = (s: string, tf: string) => { const key = s + "|" + tf; if (!kc.has(key)) kc.set(key, candles(s, tf, 450).catch(() => null)); return kc.get(key)!; };
@@ -350,10 +357,10 @@ Deno.serve(async (req) => {
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);
-    // alert only on the first failure in a row, not every minute
-    const { data: prev } = await db.from("bot_runs").select("ok").order("ts", { ascending: false }).limit(1);
+    // alert on the third failure in a row, once: a single lost minute (Binance refusing a shared address for a moment) is not news
+    const { data: prev } = await db.from("bot_runs").select("ok").order("ts", { ascending: false }).limit(3);
     await db.from("bot_runs").insert({ ok: false, ms: Date.now() - t0, error: msg });
-    if (prev?.[0]?.ok !== false) await notify([`⚠️ <b>Общий бот: ошибка</b>\n${esc(msg)}`]);
+    if (prev?.[0]?.ok === false && prev?.[1]?.ok === false && prev?.[2]?.ok !== false) await notify([`⚠️ <b>Общий бот: ошибка три минуты подряд</b>\n${esc(msg)}`]);
     return Response.json({ error: msg }, { status: 500 });
   } finally {
     await db.from("bot_runs").delete().lt("ts", new Date(Date.now() - 3 * 864e5).toISOString());
