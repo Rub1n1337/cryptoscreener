@@ -35,13 +35,22 @@ const HOME = [btn("◀️ Меню", "h")];
 async function ctx(db: any, chat: number) {
   const [{ data: sub }, { data: bots }] = await Promise.all([
     db.from("tg_subs").select("*").eq("chat_id", chat).maybeSingle(),
-    db.from("user_bots").select("id, active_profile, balance, start_balance, regime, config, checked_at, last_error, enabled, tg_sig, tg_mkt").eq("tg_chat", chat).limit(1),
+    db.from("user_bots").select("id, active_profile, balance, start_balance, regime, config, checked_at, last_error, enabled, alerts").eq("tg_chat", chat).limit(1),
   ]);
   return { sub, bot: bots?.[0] || null };
 }
 const profileOf = (bot: any) => { const ps = Array.isArray(bot?.config?.profiles) ? bot.config.profiles : []; return ps.find((p: any) => p.name === bot.active_profile) || ps[0] || null; };
 const sigMinOf = (set: any) => Math.max(40, Number(set?.minScore ?? 60));
-const scanOf = (bot: any) => { const s = bot?.config?.scan; return s && typeof s === "object" ? s : null; };
+// the linked bot's notification settings (user_bots.alerts, see supabase/alerts.sql), with the defaults filled in
+const TOPS = [0, 50, 100, 150, 250];
+const WHEN: Record<string, string> = { confirmed: "Только подтверждённые", touch: "Сразу при касании" };
+const topName = (n: number) => n ? `топ-${n}` : "как у бота";
+function alertsView(bot: any) {
+  const a = bot?.alerts && typeof bot.alerts === "object" ? bot.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {};
+  return { sig: { on: s.on !== false, top: TOPS.includes(Number(s.top)) ? Number(s.top) : 0, when: s.when === "touch" ? "touch" : "confirmed", long: s.sides === "long" },
+    mkt: a.mkt && typeof a.mkt === "object" ? a.mkt : null };
+}
+const mktName = (m: any) => `${esc(String(m.tf))} · топ-${Number(m.top)} · сила от ${Number(m.minScore)}`;
 // market state from BTC/ETH/SOL efficiency ratio over 7 days (stored by the personal bots each minute), at a given threshold
 function regimeOf(by: any, erMax: number) {
   if (!by?.BTCUSDT) return null;
@@ -52,39 +61,42 @@ const REG: Record<string, string> = { flat: "↔️ боковик", up: "📈 �
 
 // ---------- screens ----------
 function home(c: any): Screen {
-  const { sub, bot } = c, sc = scanOf(bot);
-  const lines = [
-    `${mark(!!sub?.signals)} Сигналы ≥ 60 по общим правилам`,
+  const { sub, bot } = c, v = alertsView(bot);
+  const lines = bot ? [
+    `✅ Сделки вашего бота «${esc(bot.active_profile || "—")}»`,
+    `${mark(v.sig.on)} Мои сигналы${v.sig.on ? ` · ${topName(v.sig.top)} · ${WHEN[v.sig.when].toLowerCase()}${v.sig.long ? " · только LONG" : ""}` : ""}`,
+    `${mark(!!v.mkt && v.mkt.on !== false)} Рынок${v.mkt ? ` · ${mktName(v.mkt)}` : " · не настроен"}`,
     `${mark(!!sub?.shared)} Сделки общего бота`,
-    ...(bot ? [
-      `✅ Сделки вашего бота «${esc(bot.active_profile || "—")}»`,
-      `${mark(bot.tg_sig !== false)} Сигналы вашего профиля`,
-      `${mark(bot.tg_mkt !== false && !!sc)} Сигналы вашего «Рынка»${sc ? ` · ${esc(sc.tf)}, ${sc.top} монет` : bot.tg_mkt !== false ? " · откройте сайт, чтобы включить" : ""}`,
-    ] : ["▫️ Ваш бот с сайта — не привязан"]),
-  ];
+  ] : [`${mark(!!sub?.shared)} Сделки общего бота`, "▫️ Ваш бот с сайта — не привязан"];
   return {
     text: `📡 <b>Sigma Radar</b>\nСигналы отскока от статистического канала и бумажные боты по рынку Binance.\n\n<b>Что приходит в этот чат</b>\n${lines.join("\n")}`,
     kb: [[btn("🔔 Уведомления", "n"), btn("❓ Как читать", "?")], [btn("📊 Общий бот", "s"), btn("🤖 Мой бот", "m")], [link("🌐 Открыть сайт")]],
   };
 }
 
-async function notifyScreen(db: any, c: any): Promise<Screen> {
-  const { sub, bot } = c, sc = scanOf(bot), P = profileOf(bot);
-  const { data: st } = await db.from("bot_state").select("settings").eq("id", 1).maybeSingle();
-  const S = st?.settings || {};
+async function notifyScreen(_db: any, c: any): Promise<Screen> {
+  const { sub, bot } = c, v = alertsView(bot), P = profileOf(bot);
   const parts = [
-    `🔔 <b>Уведомления</b>\nНажмите на кнопку, чтобы включить или выключить.`,
-    `<b>Сигналы ≥ 60</b> — касания канала по правилам общего бота (${TFN[S.tf] || S.tf}, топ-${S.top} монет). Одно сообщение на касание.\n<b>Сделки общего бота</b> — его входы и выходы.`,
-    bot ? `<b>Сделки вашего бота</b> приходят всегда, пока он привязан.\n<b>Сигналы профиля</b> — по настройкам «${esc(bot.active_profile || "—")}»${P?.set ? ` (${esc(P.set.tf)}, сила от ${sigMinOf(P.set)})` : ""}.\n` +
-      `<b>Сигналы «Рынка»</b> — то же, что колокольчик на сайте${sc ? ` (${esc(sc.tf)}, ${sc.top} монет, сила от ${sc.minScore})` : ": настройки придут, когда вы откроете сайт"}.`
+    `🔔 <b>Уведомления</b>\nНажмите на кнопку, чтобы изменить.`,
+    bot ? `<b>Сделки вашего бота</b> — входы и выходы, приходят всегда, пока бот привязан.\n\n` +
+      `<b>Мои сигналы</b> — по правилам вашего бота «${esc(bot.active_profile || "—")}»${P?.set ? ` (${esc(P.set.tf)}, сила от ${sigMinOf(P.set)})` : ""}. ` +
+      `Одно сообщение на касание: оно обновляется, когда разворот подтвердился и когда бот вошёл.\n` +
+      `• <b>Монеты</b>: «как у бота» — только те, на которых он торгует; топ-50…250 — шире, для ручной торговли (бот по ним не входит, это написано в сигнале).\n` +
+      `• <b>Только подтверждённые</b> — в момент, когда входит и бот. <b>Сразу при касании</b> — раньше, а о подтверждении придёт короткий ответ.\n\n` +
+      `<b>Рынок</b> — отдельный фильтр со своими настройками канала, только подтверждённые развороты. ` +
+      (v.mkt ? `Сейчас: ${mktName(v.mkt)}. Поменять — на сайте, «Мой бот» → Telegram.` : `Не настроен: на сайте, «Мой бот» → Telegram, нажмите «Рынок с текущими настройками».`)
       : `Сделки и сигналы <b>своего</b> бота с сайта — «🤖 Мой бот» → как привязать.`,
+    `<b>Сделки общего бота</b> — входы и выходы одного бота на всех.`,
     `📬 Отправлено сюда: ${sub?.sent_n || 0}${sub?.last_ok ? ` · последнее ${ago(sub.last_ok)}` : ""}${sub?.last_err ? `\n⚠️ Последняя ошибка отправки: ${esc(sub.last_err)}` : ""}`,
   ];
   return {
     text: parts.join("\n\n"),
     kb: [
-      [btn(`${mark(!!sub?.signals)} Сигналы ≥ 60`, "t:signals"), btn(`${mark(!!sub?.shared)} Сделки общего бота`, "t:shared")],
-      ...(bot ? [[btn(`${mark(bot.tg_sig !== false)} Сигналы профиля`, "t:sig"), btn(`${mark(bot.tg_mkt !== false)} Сигналы «Рынка»`, "t:mkt")]] : []),
+      ...(bot ? [
+        [btn(`${mark(v.sig.on)} Мои сигналы`, "t:sig"), btn(`Монеты: ${topName(v.sig.top)}`, "t:top")],
+        [btn(WHEN[v.sig.when], "t:when"), btn(v.sig.long ? "Только LONG" : "LONG и SHORT", "t:side")],
+        [btn(`${mark(!!v.mkt && v.mkt.on !== false)} Рынок`, "t:mkt"), btn(`${mark(!!sub?.shared)} Сделки общего бота`, "t:shared")],
+      ] : [[btn(`${mark(!!sub?.shared)} Сделки общего бота`, "t:shared")]]),
       HOME,
     ],
   };
@@ -121,7 +133,7 @@ async function sharedScreen(db: any): Promise<Screen> {
 async function mineScreen(db: any, c: any): Promise<Screen> {
   const { bot } = c;
   if (!bot) return {
-    text: `🤖 <b>Мой бот</b>\nВаш бот с сайта ещё не привязан к этому чату. После привязки сюда придут его сделки, сигналы его профиля и сигналы вашего «Рынка» (как колокольчик на сайте).\n\n<b>Как привязать</b>\n1. На сайте откройте «Журнал» → «Мой бот».\n2. Нажмите «На сервере 24/7», чтобы бот работал, даже когда сайт закрыт.\n3. Нажмите «Подключить Telegram» — откроется этот чат, нажмите «Запустить» (Start).`,
+    text: `🤖 <b>Мой бот</b>\nВаш бот с сайта ещё не привязан к этому чату. После привязки сюда придут его сделки и сигналы по его правилам.\n\n<b>Как привязать</b>\n1. На сайте откройте «Журнал» → «Мой бот».\n2. Нажмите «На сервере 24/7», чтобы бот работал, даже когда сайт закрыт.\n3. Нажмите «Подключить Telegram» — откроется этот чат, нажмите «Запустить» (Start).`,
     kb: [[link("🌐 Открыть «Мой бот»", "/#journal")], HOME],
   };
   const [{ data: pos }, { data: tr }] = await Promise.all([
@@ -153,7 +165,9 @@ const help: Screen = {
     `<b>До центра</b> — расстояние до середины канала: туда обычно идёт отскок.\n` +
     `<b>⌛ Войти можно ещё…</b> — сигнал живёт 5 свечей от касания границы (на 15m — 75 минут от касания, не от подтверждения). Это срок для входа, а не для выхода: открытую позицию держат до тейка или стопа.\n` +
     `<b>T½</b> — за сколько монета обычно проходит половину пути к центру. ✅ — быстро (до 20 свечей), ⚠️ — медленно или тренд: отскок рискован.\n` +
-    `<b>✔ отскок подтверждён</b> — свеча закрылась обратно в канал на повышенном объёме. <b>⏳ ждём подтверждения</b> — касание есть, разворота пока нет.\n\n` +
+    `<b>✔ отскок подтверждён</b> — свеча закрылась обратно в канал на повышенном объёме. <b>⏳ ждём подтверждения</b> — касание есть, разворота пока нет.\n` +
+    `<b>Сообщение обновляется</b>: когда разворот подтвердился и когда бот вошёл, меняется тот же сигнал, а не приходит новый.\n` +
+    `<b>✋ для ручной торговли</b> — монета вне списка, на котором торгует ваш бот: он по ней не войдёт.\n\n` +
     `<b>Общий бот</b> — один на всех, торгует по правилам, проверенным на истории. <b>Мой бот</b> — ваш бот с сайта с вашими профилями.\n\n` +
     `<i>Вся торговля бумажная, для изучения. Это не финансовый совет.</i>`,
   kb: [[btn("🔔 Уведомления", "n"), ...HOME]],
@@ -188,7 +202,7 @@ async function onMessage(db: any, m: any, call: Call) {
     if (!c.sub) await db.from("tg_subs").insert({ chat_id: chat, name: chatName(m.chat) });
     if (/^b[0-9a-f]{18}$/.test(arg)) {   // a link code from the site: this chat gets that bot's trades and signals
       const { data: b } = await db.from("user_bots").select("id, active_profile").eq("tg_code", arg).gt("tg_code_until", new Date().toISOString()).maybeSingle();
-      if (b) { await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ <b>Ваш бот с сайта привязан</b>${b.active_profile ? ` · «${esc(b.active_profile)}»` : ""}\nСюда будут приходить его сделки, сигналы его профиля и сигналы вашего «Рынка».`); }
+      if (b) { await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ <b>Ваш бот с сайта привязан</b>${b.active_profile ? ` · «${esc(b.active_profile)}»` : ""}\nСюда будут приходить его сделки и сигналы по его правилам. Что именно присылать — «🔔 Уведомления».`); }
       else await say("⌛ Ссылка устарела — на сайте нажмите «Подключить Telegram» ещё раз.", [[link("🌐 Открыть «Мой бот»", "/#journal")]]);
     }
     c = await ctx(db, chat);
@@ -200,7 +214,8 @@ async function onMessage(db: any, m: any, call: Call) {
   }
   if (!c.sub) return say("Сначала подпишитесь — это бесплатно и отключается в любой момент.", [[btn("▶️ Начать", "go")]]);
   // the old on/off commands still work, then show the notifications screen
-  const tog: Record<string, string> = { "/signals": "signals", "/shared": "shared", "/mysignals": "sig", "/market": "mkt" };
+  if (cmd === "/signals") return say("Общие сигналы больше не рассылаются: включите «Мои сигналы» своего бота — по его правилам и монетам.", [[btn("🔔 Уведомления", "n")]]);
+  const tog: Record<string, string> = { "/shared": "shared", "/mysignals": "sig", "/market": "mkt" };
   if (tog[cmd]) {
     const want = arg ? !/^(off|выкл|0|нет)$/i.test(arg) : undefined;
     const r = await toggle(db, chat, c, tog[cmd], want);
@@ -212,18 +227,28 @@ async function onMessage(db: any, m: any, call: Call) {
   return show(call, chat, await screenFor(db, key, c));
 }
 
-// switches one kind of message; returns a short confirmation, or why it can't
+// changes one setting; returns a short confirmation, or why it can't.
+// shared — the shared bot's trades (this chat's subscription); sig, top, when, side, mkt — the linked bot's alerts
 async function toggle(db: any, chat: number, c: any, k: string, want?: boolean) {
-  const NAMES: Record<string, string> = { signals: "Сигналы ≥ 60", shared: "Сделки общего бота", sig: "Сигналы профиля", mkt: "Сигналы «Рынка»" };
-  let on: boolean;
-  if (k === "signals" || k === "shared") { on = want ?? !c.sub[k]; await db.from("tg_subs").update({ [k]: on }).eq("chat_id", chat); }
-  else {
-    if (!c.bot) return "Сначала привяжите своего бота с сайта — «🤖 Мой бот».";
-    const col = k === "mkt" ? "tg_mkt" : "tg_sig";
-    on = want ?? c.bot[col] === false;   // unset counts as on
-    await db.from("user_bots").update({ [col]: on }).eq("tg_chat", chat);
+  if (k === "shared") {
+    const on = want ?? !c.sub.shared;
+    await db.from("tg_subs").update({ shared: on }).eq("chat_id", chat);
+    return `Сделки общего бота: ${on ? "вкл" : "выкл"}`;
   }
-  return `${NAMES[k]}: ${on ? "вкл" : "выкл"}`;
+  if (!c.bot) return "Сначала привяжите своего бота с сайта — «🤖 Мой бот».";
+  const v = alertsView(c.bot), a = { ...(c.bot.alerts || {}) }, s = { ...(a.sig || {}) };
+  let msg = "";
+  if (k === "sig") { s.on = want ?? !v.sig.on; msg = `Мои сигналы: ${s.on ? "вкл" : "выкл"}`; }
+  else if (k === "top") { s.top = TOPS[(TOPS.indexOf(v.sig.top) + 1) % TOPS.length]; msg = `Монеты: ${topName(s.top)}`; }
+  else if (k === "when") { s.when = v.sig.when === "touch" ? "confirmed" : "touch"; msg = WHEN[s.when]; }
+  else if (k === "side") { s.sides = v.sig.long ? "both" : "long"; msg = s.sides === "long" ? "Только LONG" : "LONG и SHORT"; }
+  else if (k === "mkt") {
+    if (!a.mkt) return "Фильтр «Рынка» ещё не настроен: на сайте в «Мой бот» → Telegram нажмите «Рынок с текущими настройками».";
+    a.mkt = { ...a.mkt, on: want ?? a.mkt.on === false }; msg = `Рынок: ${a.mkt.on ? "вкл" : "выкл"}`;
+  } else return "";
+  a.sig = s;
+  await db.from("user_bots").update({ alerts: a }).eq("id", c.bot.id);
+  return msg;
 }
 
 async function onButton(db: any, q: any, call: Call) {
@@ -235,7 +260,7 @@ async function onButton(db: any, q: any, call: Call) {
   let c = await ctx(db, chat), note = "";
   if (key === "go") { if (!c.sub) await db.from("tg_subs").insert({ chat_id: chat, name: chatName(q.message.chat) }); note = "Подписка включена"; }
   else if (!c.sub) return answer("Вы отписаны — нажмите /start, чтобы вернуться.", true);
-  if (key.startsWith("t:")) { note = await toggle(db, chat, c, key.slice(2)) || ""; if (!c.bot && /^t:(sig|mkt)$/.test(key)) return answer(note, true); }
+  if (key.startsWith("t:")) { note = await toggle(db, chat, c, key.slice(2)) || ""; if (!c.bot && key !== "t:shared") return answer(note, true); }
   if (key === "u!") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); note = "Бот отвязан"; }
   if (key === "s" || (key === "m" && c.bot)) note = "Обновлено";
   c = await ctx(db, chat);

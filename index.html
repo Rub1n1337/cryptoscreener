@@ -554,7 +554,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .bmore{margin:16px 0 0}
 .bopt{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.bopt:first-child{border-top:0;padding-top:0}
 .btg{display:flex;align-items:center;gap:12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--s1)}.btg p{margin:2px 0 0;font-size:12.5px;color:var(--mute)}.btg-i{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--accbg);color:var(--acc);flex:0 0 auto}.btg button{flex:0 0 auto}
-.btg-sig{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:8px;font-size:12.5px;color:var(--mute)}.btg-sig select{height:32px;font-size:12.5px;max-width:100%}
+.btg-set{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;font-size:12.5px;color:var(--mute)}.btg-set select{height:32px;font-size:12.5px;max-width:100%}.btg-set button{height:32px;font-size:12.5px}
 @media(max-width:560px){.btg{flex-wrap:wrap}.btg button{width:100%}}
 .bopt>div{flex:1 1 320px;min-width:0}.bopt b{font-size:14px}.bopt p{margin:3px 0 0;font-size:13px;color:var(--mute);max-width:640px}
 #bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
@@ -1955,9 +1955,8 @@ async function rpc(fn, args) {
   if (!r.ok) throw new Error((await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
-// scan: the "Рынок" settings, so the server can send the same signals as the bell on the site to a linked Telegram chat
-const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax, sigTop:BP.sigTop || 0,
-  scan:{tf:S.tf, top:S.top, minScore:S.minScore, method:S.method, N:S.N, k:S.k}});
+// what the server bot trades by; its Telegram settings are kept apart (alerts, see renderTg)
+const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax});
 let syncTimer;
 function syncServerBot() {   // push profiles/mode to the server bot (debounced)
   if (BP.where !== 'server' || !UB) return;
@@ -1976,7 +1975,7 @@ async function fetchServerBot() {
       for (const t of (r.closed || []).filter(t => !seenC.has(t.id))) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', toJ);
     }
     SB_MINE = {balance:b.balance, start:b.start_balance, open:r.open || [], closed:r.closed || [], on:b.enabled,
-      checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error, tg:!!b.tg_chat};
+      checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error, tg:!!b.tg_chat, alerts:b.alerts || null};
     renderBotPanel();
     if (!$('#journal').classList.contains('hidden')) renderJournal();
     if (chart) drawChart();
@@ -2172,30 +2171,58 @@ function idleReason(act, reg, srv) {
   return '';
 }
 let bprofInit = false;
-// ---------- Telegram: the shared bot's trades and signals ≥ 60 for anyone (/start), my bot's trades once it is linked ----------
+// ---------- Telegram: the shared bot's trades for anyone (/start); my bot's trades and signals once it is linked ----------
 let tgBot;   // the Telegram bot's username, or null when the owner hasn't set it up
 const tgName = async () => tgBot !== undefined ? tgBot : (tgBot = await rpc('tg_bot_name', {}).catch(() => null) || null);
+// what the linked chat gets (user_bots.alerts, edited here and in the Telegram menu): the bot's own signals, by its rules, on its
+// coins or a wider top for trading by hand; "Рынок" — a separate filter whose channel settings are saved only on request
+const AL_TOPS = [0, 50, 100, 150, 250];
+const alertsView = () => { const a = SB_MINE?.alerts || {}, s = a.sig || {};
+  return {sig:{on:s.on !== false, top:AL_TOPS.includes(+s.top) ? +s.top : 0, when:s.when === 'touch' ? 'touch' : 'confirmed', sides:s.sides === 'long' ? 'long' : 'both'}, mkt:a.mkt || null}; };
+async function saveAlerts(a, msg) {
+  try { await rpc('ub_alerts', {p_id:UB.id, p_secret:UB.secret, p_alerts:a}); SB_MINE.alerts = a; renderTg(); toast('Сохранено', msg, 'ok'); }
+  catch (e) { toast('Не удалось сохранить', String(e.message || e), 'bad'); renderTg(); }
+}
 function renderTg() {
   const el = $('#btg'); if (!el) return;
   const srv = BP.where === 'server' && UB, linked = srv && SB_MINE?.tg;
-  const text = !srv ? 'Бот присылает сделки, только когда работает на сервере 24/7.'
-    : linked ? 'Подключено: сделки вашего бота и новые сигналы его профиля приходят сообщениями (сигналы выключаются командой /mysignals). Отключить всё — здесь или /unlink в боте.'
+  const text = !srv ? 'Бот присылает сделки и сигналы, только когда работает на сервере 24/7.'
+    : linked ? 'Подключено: сделки бота приходят всегда, сигналы — по настройкам ниже (их же можно менять в Telegram, «🔔 Уведомления»).'
     : 'Нажмите — откроется Telegram, там нажмите «Start». Через минуту бот подтвердит, что всё связано.';
-  // the bot trades only its profile's coins; its signals may cover more of them, for trading by hand
-  const range = linked ? `<label class="btg-sig" title="Бот входит в сделки только по монетам своего профиля. Сигналы профиля можно получать шире — по тем же правилам, но по большему числу монет, для ручной торговли. В таких сигналах написано, что бот по ним не войдёт">Сигналы профиля — по монетам <select data-tgtop>${
-    [0, 50, 100, 150, 250].map(n => `<option value="${n}"${(BP.sigTop || 0) === n ? ' selected' : ''}>${n ? 'топ-' + n + ' (для ручной торговли)' : 'как у бота'}</option>`).join('')}</select></label>` : '';
-  el.innerHTML = `<span class="btg-i"><svg class="i"><use href="#i-bell"/></svg></span><div style="min-width:0;flex:1"><b>Сделки бота в Telegram</b><p>${text}</p>${range}</div>${
+  let set = '';
+  if (linked) {
+    const v = alertsView(), opt = (vals, cur) => vals.map(([k, t]) => `<option value="${k}"${String(cur) === String(k) ? ' selected' : ''}>${t}</option>`).join(''), m = v.mkt;
+    set = `<div class="btg-set">
+      <label class="fl inl" title="Сигналы по правилам вашего бота: одно сообщение на касание, оно обновляется, когда разворот подтвердился и когда бот вошёл"><input type="checkbox" data-al="on"${v.sig.on ? ' checked' : ''}> Мои сигналы</label>
+      <select data-al="top" title="Бот входит только по своим монетам. Сигналы можно получать шире — по тем же правилам, для ручной торговли; в них написано, что бот не войдёт"${v.sig.on ? '' : ' disabled'}>${opt(AL_TOPS.map(n => [n, n ? `топ-${n} (для ручной торговли)` : 'монеты бота']), v.sig.top)}</select>
+      <select data-al="when" title="«Только подтверждённые» — в момент, когда входит и бот. «Сразу при касании» — раньше, о подтверждении придёт короткий ответ"${v.sig.on ? '' : ' disabled'}>${opt([['confirmed', 'только подтверждённые'], ['touch', 'сразу при касании']], v.sig.when)}</select>
+      <select data-al="sides"${v.sig.on ? '' : ' disabled'}>${opt([['both', 'LONG и SHORT'], ['long', 'только LONG']], v.sig.sides)}</select>
+    </div><div class="btg-set">
+      ${m ? `<label class="fl inl" title="Отдельный фильтр со своими настройками канала, только подтверждённые развороты"><input type="checkbox" data-al="mkt"${m.on !== false ? ' checked' : ''}> Рынок: ${esc(m.tf)} · топ-${+m.top} · сила от ${+m.minScore}</label>` : '<span>Рынок: не настроен</span>'}
+      <button data-tg="mkt" title="Сохранить для Telegram то, что сейчас выбрано на странице «Рынок»: таймфрейм, число монет, силу, модель канала. Дальше сайт их не трогает">${m ? 'Заменить текущими с «Рынка»' : 'Рынок с текущими настройками'}</button>
+    </div>`;
+  }
+  el.innerHTML = `<span class="btg-i"><svg class="i"><use href="#i-bell"/></svg></span><div style="min-width:0;flex:1"><b>Telegram</b><p>${text}</p>${set}</div>${
     !srv ? '<button data-tg="server">Перевести на сервер</button>' : linked ? '<button data-tg="off">Отключить</button>' : '<button data-tg="on" class="primary">Подключить Telegram</button>'}`;
 }
-// how wide the profile signals in Telegram are; the bot itself still trades only its profile's coins
 $('#btg').onchange = e => {
-  const sel = e.target.closest('[data-tgtop]'); if (!sel) return;
-  BP.sigTop = +sel.value || 0; saveBP(); syncServerBot();
-  toast('Сохранено', BP.sigTop ? `Сигналы профиля придут по топ-${BP.sigTop} монет. Бот по-прежнему входит только по монетам профиля.` : 'Сигналы профиля — только по монетам, на которых торгует бот.', 'ok');
+  const f = e.target.closest('[data-al]'); if (!f || !SB_MINE) return;
+  const a = {...(SB_MINE.alerts || {})}, s = {...(a.sig || {})}, k = f.dataset.al;
+  if (k === 'mkt') { a.mkt = {...a.mkt, on:f.checked}; return saveAlerts(a, f.checked ? 'Сигналы «Рынка» включены' : 'Сигналы «Рынка» выключены'); }
+  if (k === 'on') s.on = f.checked; else if (k === 'top') s.top = +f.value || 0; else s[k] = f.value;
+  a.sig = s;
+  saveAlerts(a, k === 'on' ? (f.checked ? 'Мои сигналы включены' : 'Мои сигналы выключены')
+    : k === 'top' ? (s.top ? `Сигналы по топ-${s.top} монет. Бот по-прежнему входит только по своим.` : 'Сигналы только по монетам бота.')
+    : k === 'when' ? (s.when === 'touch' ? 'Сигнал придёт при касании, подтверждение — ответом на него.' : 'Сигнал придёт, когда разворот подтвердится.') : '');
 };
 $('#btg').onclick = async e => {
   const b = e.target.closest('[data-tg]'); if (!b) return;
   if (b.dataset.tg === 'server') { setWhere('server'); return; }
+  if (b.dataset.tg === 'mkt') {   // the "Рынок" page's current channel settings, saved for Telegram until replaced
+    if (!['5m', '15m', '1h', '4h', '1d'].includes(S.tf)) return toast('Недельный таймфрейм в Telegram не поддерживается', 'выберите на «Рынке» от 5м до 1д', 'warn');
+    const m = {on:true, tf:S.tf, top:S.top, minScore:Math.max(40, S.minScore || 60), method:S.method, N:S.N, k:S.k};
+    return saveAlerts({...(SB_MINE?.alerts || {}), mkt:m}, `Рынок: ${m.tf} · топ-${m.top} · сила от ${m.minScore}. Дальше эти настройки меняются только этой кнопкой.`);
+  }
   if (b.dataset.tg === 'off') {
     try { await rpc('ub_tg_unlink', {p_id:UB.id, p_secret:UB.secret}); SB_MINE.tg = false; renderTg(); toast('Telegram отключён', '', 'ok'); }
     catch (err) { toast('Не удалось отключить', String(err.message || err), 'bad'); }
@@ -2771,6 +2798,14 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.27', date:'14 октября 2026', title:'Уведомления в Telegram — проще и без дублей', items:[
+    'Вместо пяти отдельных потоков — понятный набор: сделки вашего бота (всегда), «Мои сигналы» по правилам бота, «Рынок» по желанию и сделки общего бота.',
+    '«Мои сигналы»: можно выбрать монеты (как у бота или шире, топ-50…250, для ручной торговли), когда присылать (только подтверждённые или сразу при касании) и стороны (LONG и SHORT или только LONG).',
+    'Одно касание — одно сообщение. Когда разворот подтвердился или бот вошёл, оно обновляется, а не приходит новое. Если сигнал пришёл при касании, о подтверждении придёт короткий ответ на него.',
+    '«Рынок» больше не меняется сам, когда вы просто смотрите графики: его настройки сохраняются кнопкой «Рынок с текущими настройками». Монета, о которой уже сообщили «Мои сигналы», не повторяется.',
+    'Общие сигналы «≥ 60» больше не рассылаются: их заменили сигналы вашего бота.',
+    'Всё это настраивается в «Мой бот» → Telegram и прямо в Telegram, в меню «🔔 Уведомления».',
+  ]},
   {v:'2.26', date:'14 октября 2026', title:'Сигналы профиля для ручной торговли', items:[
     'В блоке «Сделки бота в Telegram» можно выбрать, по скольким монетам приходят сигналы профиля: как у бота или топ-50, 100, 150, 250. Правила сигналов те же, что у профиля.',
     'Бот при этом входит только по своим монетам. Сигнал по монете вне его списка помечен «✋ для ручной торговли».',
