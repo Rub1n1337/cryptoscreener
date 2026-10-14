@@ -26,8 +26,10 @@ async function api(path: string) {
 }
 // the 24 h ticker (the coin list) is kept too: when one request fails (a 418 can hit a shared outgoing address for a moment),
 // the run uses the last list if it is under 15 minutes old instead of losing the whole minute
+// (the shared bot and the personal bots both ask for it within a run: one request of weight 80 serves both)
 let TICKER: { t: number; d: any } | null = null;
 async function ticker24() {
+  if (TICKER && Date.now() - TICKER.t < 30_000) return TICKER.d;
   try { const d = await api("/api/v3/ticker/24hr"); TICKER = { t: Date.now(), d }; return d; }
   catch (e) { if (TICKER && Date.now() - TICKER.t < 15 * 60_000) return TICKER.d; throw e; }
 }
@@ -69,6 +71,37 @@ const PAR = 25;
 async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
   let i = 0;
   await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) await fn(items[i++]); }));
+}
+
+// ---------- analyses from the collector (server/scan.js on Railway) ----------
+// This function starts fresh every minute, so the candle cache above rarely outlives a run. The collector runs all the time:
+// it keeps the candles, tops them up and answers with the analyses — one request instead of hundreds. Only if both sides
+// run the same math (M.fingerprint) are its answers used; whatever it doesn't answer is done here as before.
+const SCAN_URL = "https://cryptoscreener-production-f6ba.up.railway.app/scan";
+let FPRINT = "";
+const RSTAT = { calls: 0, rows: 0, ms: 0, err: "" };   // reported in the response, to watch it
+const rkey = (sym: string, S: any) => `${sym}|${S.tf}|${S.method}|${S.N}|${S.k}`;
+type Groups = Map<string, { S: any; syms: Set<string> }>;
+function addTask(groups: Groups, S: any, syms: string[]) {
+  const k = `${S.tf}|${S.method}|${S.N}|${S.k}`;
+  if (!groups.has(k)) groups.set(k, { S, syms: new Set() });
+  for (const s of syms) groups.get(k)!.syms.add(s);
+}
+// lazy: for notifications only, the collector may use candles a few minutes old (see LAZY)
+async function remote(groups: Groups, lazy: boolean, now: number, out: Map<string, any>, timeout: number) {
+  if (!groups.size) return;
+  FPRINT ||= M.fingerprint();
+  const tasks = [...groups.values()].map((g) => ({ tf: g.S.tf, method: g.S.method, N: g.S.N, k: g.S.k, syms: [...g.syms], lazy }));
+  const t0 = Date.now();
+  try {
+    const r = await fetch(SCAN_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fp: FPRINT, now, tasks }), signal: AbortSignal.timeout(timeout) });
+    // T½ = ∞ can't travel in JSON: it comes as "__Infinity"
+    const j = JSON.parse(await r.text(), (_k, v) => typeof v === "string" && v.startsWith("__") ? Number(v.slice(2)) : v);
+    if (j.error || !Array.isArray(j.rows)) throw new Error(j.error || "no rows");
+    let n = 0;
+    tasks.forEach((t, i) => { for (const [sym, row] of Object.entries(j.rows[i] || {})) if (row) { out.set(rkey(sym, t), row); n++; } });
+    RSTAT.calls++; RSTAT.rows += n; RSTAT.ms += Date.now() - t0;
+  } catch (e) { RSTAT.err = String((e as Error)?.message ?? e).slice(0, 120); }
 }
 
 // ---------- Telegram (optional: one bot, token in public.tg_config; chats subscribe with /start, see README) ----------
@@ -207,10 +240,17 @@ async function run() {
   if (e2) throw e2;
   const list = M.pickSymbols(await ticker24(), S.top, open!.map((p: any) => p.sym), now);
 
-  const klines: Record<string, unknown[]> = {}, rows: any[] = [];
-  const limit = Math.min(1000, S.N + 150);
+  // analyses from the collector; candles here only for open positions (their exits) and for coins it didn't answer
+  const klines: Record<string, unknown[]> = {}, rows: any[] = [], RM = new Map<string, any>(), groups: Groups = new Map();
+  addTask(groups, S, list);
+  await remote(groups, false, now, RM, 15_000);
+  const limit = Math.min(1000, S.N + 150), held = new Set(open!.map((p: any) => p.sym));
   await pool(list, PAR, async (sym) => {
-    try { const K = await candles(sym, S.tf, limit); klines[sym] = K; const r = M.analyze(sym, K, S, now, true); if (r) rows.push(r); } catch { /* skip pair */ }
+    try {
+      let r = RM.get(rkey(sym, S));
+      if (!r || held.has(sym)) { const K = await candles(sym, S.tf, limit); if (held.has(sym)) klines[sym] = K; r ||= M.analyze(sym, K, S, now, true); }
+      if (r) rows.push(r);
+    } catch { /* skip pair */ }
   });
 
   const { data: recent } = await db.from("trades").select("sym").gt("tclose", now - M.COOLDOWN * M.TFMS[S.tf]);
@@ -223,9 +263,9 @@ async function run() {
   }
   const upserts = [...res.stillOpen, ...res.opened];
   if (upserts.length) { const { error } = await db.from("positions").upsert(upserts); if (error) throw error; }
-  await db.from("bot_state").update({ balance: res.balance, checked_at: new Date(now).toISOString(), scanned: Object.keys(klines).length, last_error: null }).eq("id", 1);
+  await db.from("bot_state").update({ balance: res.balance, checked_at: new Date(now).toISOString(), scanned: rows.length, last_error: null }).eq("id", 1);
   await notify([...res.closed.map((t: any) => closedMsg(t)), ...res.opened.map((p: any) => openedMsg(p))], [...res.opened, ...res.closed].map((x: any) => x.sym));
-  return { scanned: Object.keys(klines).length, signals: rows.filter((r) => M.wants(r, S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, ticker: undefined as any };
+  return { scanned: rows.length, signals: rows.filter((r) => M.wants(r, S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, ticker: undefined as any };
 }
 
 // ---------- personal bots (one per browser; config = profiles chosen on the site) ----------
@@ -288,12 +328,14 @@ async function runUserBots(now: number, reqStart: number) {
   };
   // one analysis per coin + channel settings for all bots (most share them); the bots don't need the site's display extras.
   // Unchanged candles (lazy) keep their analyses from earlier runs, so only refreshed coins cost CPU.
-  const ac = new Map<string, any>();
+  // Analyses the collector sent (RM) come first; a coin it didn't answer is fetched and analysed here.
+  const ac = new Map<string, any>(), RM = new Map<string, any>();
   let computed = 0;
   const analyzeK = (s: string, K: any, S: any) => {
-    if (!K?.length) return null;
-    const key = `${s}|${S.tf}|${S.method}|${S.N}|${S.k}`;
+    const key = rkey(s, S);
     if (ac.has(key)) return ac.get(key);
+    if (RM.has(key)) { ac.set(key, RM.get(key)); return ac.get(key); }
+    if (!K?.length) return null;
     let memo = AW.get(K); if (!memo) AW.set(K, memo = new Map());
     if (!memo.has(key)) { memo.set(key, M.analyze(s, K, { ...S, N: effN(K.length, S) }, now, true)); computed++; }
     ac.set(key, memo.get(key));
@@ -307,28 +349,39 @@ async function runUserBots(now: number, reqStart: number) {
   AN = 0;
   let done = 0;
   const later: any[] = [];   // bots whose signals are checked after everyone's trading
+  // what each bot trades by this minute: the profile (in "auto" — by the market), its settings and coins
+  const plan = (b: any) => {
+    const cfg = b.config || {}, profiles = Array.isArray(cfg.profiles) ? cfg.profiles : [];
+    if (!profiles.length) return null;
+    const byId = (id: string) => profiles.find((p: any) => p.id === id) || profiles[0];
+    const erMax = num(cfg.erMax, 0.05, 0.5, 0.15);
+    const regName = M.regimeOf(reg, { erMax, regimeSrc: "majors" });
+    const P = cfg.mode === "auto" ? byId(regName === "flat" ? cfg.flat : cfg.impulse) : byId(cfg.active);
+    const S = { ...cleanSet(P.set), regimeSrc: "majors", erMax };
+    const pname = String(P.name ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60);
+    const own = Array.isArray(P.coins?.list) ? P.coins.list.filter((s: unknown) => typeof s === "string" && /^[A-Z0-9]{2,20}USDT$/.test(s)).slice(0, 200) : [];
+    const list: string[] = P.coins?.mode === "list" && own.length ? own : M.pickSymbols(ticker, Math.round(num(P.coins?.top, 20, 200, 150)), [], now);
+    return { P, S, pname, list, regName };
+  };
+  // every bot's coins in one request to the collector
+  const plans = new Map<string, any>(), tradeGroups: Groups = new Map();
+  for (const b of bots) { try { const x = plan(b); if (x) { plans.set(b.id, x); addTask(tradeGroups, x.S, x.list); } } catch { /* the loop below reports it */ } }
+  await remote(tradeGroups, false, now, RM, 15_000);
   for (const b of bots) {
     // the deadline counts from the start of the whole request (the shared bot ran first): the run lock lasts 120 s, and a run
     // that outlives it would overlap the next minute's. The rest go first next minute.
     if (over(70_000)) break;
     try {
-      const cfg = b.config || {}, profiles = Array.isArray(cfg.profiles) ? cfg.profiles : [];
-      if (!profiles.length) {   // still mark it checked, or it would stay first in the queue forever
+      const x = plans.get(b.id) ?? plan(b);
+      if (!x) {   // still mark it checked, or it would stay first in the queue forever
         await db.from("user_bots").update({ checked_at: new Date(now).toISOString(), last_error: "нет профилей" }).eq("id", b.id);
         continue;
       }
-      const byId = (id: string) => profiles.find((p: any) => p.id === id) || profiles[0];
-      const erMax = num(cfg.erMax, 0.05, 0.5, 0.15);
-      const regName = M.regimeOf(reg, { erMax, regimeSrc: "majors" });
-      const P = cfg.mode === "auto" ? byId(regName === "flat" ? cfg.flat : cfg.impulse) : byId(cfg.active);
-      const S = { ...cleanSet(P.set), regimeSrc: "majors", erMax };
-      const pname = String(P.name ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60);
-      const own = Array.isArray(P.coins?.list) ? P.coins.list.filter((s: unknown) => typeof s === "string" && /^[A-Z0-9]{2,20}USDT$/.test(s)).slice(0, 200) : [];
-      const list: string[] = P.coins?.mode === "list" && own.length ? own : M.pickSymbols(ticker, Math.round(num(P.coins?.top, 20, 200, 150)), [], now);
+      const { P, S, pname, list, regName } = x;
       const { data: pr } = await db.from("user_positions").select("data").eq("bot_id", b.id);
       const open = (pr ?? []).map((x: any) => x.data);
       const Ks: Record<string, any> = {};
-      await pool(list, PAR, async (s) => { Ks[s] = await getK(s, S.tf); });
+      await pool(list.filter((s: string) => !RM.has(rkey(s, S))), PAR, async (s) => { Ks[s] = await getK(s, S.tf); });
       const rows = list.map((s) => analyzeK(s, Ks[s], S)).filter(Boolean);
       const exitK: Record<string, any> = {};
       for (const p of open) exitK[p.sym] = await getK(p.sym, tfOf(p.tfms) || S.tf);
@@ -359,6 +412,14 @@ async function runUserBots(now: number, reqStart: number) {
   }
   // ---- signals: only for bots with a linked chat, after all trading. A bot skipped here (time or budget) is not lost:
   // a signal is remembered only once it is sent, so it comes next minute while it is still fresh
+  // the wider tops and "Рынок" scans of all linked chats in one request too (lazy: candles may be minutes old)
+  const sigGroups: Groups = new Map();
+  for (const { b, P, S, list } of later) {
+    const A = alertsOf(b);
+    if (A.sig.on && A.sig.top > list.length && P.coins?.mode !== "list") addTask(sigGroups, S, M.pickSymbols(ticker, A.sig.top, [], now));
+    if (A.mkt) addTask(sigGroups, A.mkt, M.pickSymbols(ticker, A.mkt.top, [], now));
+  }
+  await remote(sigGroups, true, now, RM, 15_000);
   for (const { b, P, S, pname, list, rows, res } of later) {
     if (over(80_000)) break;
     try {
@@ -379,7 +440,7 @@ async function runUserBots(now: number, reqStart: number) {
     let sigRows = rows;
     if (A.top > list.length && P.coins?.mode !== "list") {
       const wide = M.pickSymbols(ticker, A.top, [], now).filter((s: string) => !inList.has(s)), KW: Record<string, any> = {};
-      await pool(wide, PAR, async (s) => { KW[s] = await getK(s, S.tf, true); });
+      await pool(wide.filter((s: string) => !RM.has(rkey(s, S))), PAR, async (s) => { KW[s] = await getK(s, S.tf, true); });
       sigRows = [...rows, ...wide.map((s: string) => analyzeK(s, KW[s], S)).filter(Boolean)];
     }
     const entered = new Map<string, number>([...res.stillOpen, ...res.opened].map((p: any) => [p.sym, p.time]));
@@ -422,7 +483,7 @@ async function runUserBots(now: number, reqStart: number) {
   // A coin the bot's own signals already told about (same timeframe, same touch) is not repeated
   async function marketSignals(SM: any, sent: any, chat: any, S: any) {
     const lst = M.pickSymbols(ticker, SM.top, [], now), KM: Record<string, any> = {}, win = M.TOUCH_BARS * (M.TFMS as any)[SM.tf];
-    await pool(lst, PAR, async (s) => { KM[s] = await getK(s, SM.tf, true); });
+    await pool(lst.filter((s) => !RM.has(rkey(s, SM))), PAR, async (s) => { KM[s] = await getK(s, SM.tf, true); });
     const told = new Map<string, number[]>();
     if (SM.tf === S.tf) for (const k of Object.keys(sent)) if (k.startsWith("s:")) { const [, s, t] = k.split(":"); told.set(s, [...(told.get(s) || []), +t]); }
     const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r?.rev && !(told.get(r.sym) || []).some((t) => Math.abs(t - r.touchTime) <= win));
@@ -452,7 +513,7 @@ Deno.serve(async (req) => {
     try { users = await runUserBots(Date.now(), t0); } catch { /* personal bots never break the shared one */ }
     await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed });
     // where the time goes (shared bot / personal bots) and how many coins' candles are kept warm between runs
-    return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: Date.now() - t1 }, kept: KC.size });
+    return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: Date.now() - t1 }, kept: KC.size, remote: RSTAT });
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);
