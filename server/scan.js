@@ -44,7 +44,7 @@ async function api(path) {
 async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({length:n}, async () => { while (i < items.length) await fn(items[i++]); })); }
 const compact = K => K.map(k => [k[0], +k[1], +k[2], +k[3], +k[4], +k[5]]);
 
-// series "SYM|tf" → {K, at: last refresh, used: last asked for, lazy: only ever asked for notifications, an: analyses of this K}
+// series "SYM|tf" → {K, at: last refresh, used: last asked for, tradeAt: last asked for trading (not just notifications), an: analyses}
 const SER = new Map();
 function refresh(key) {
   const s = SER.get(key);
@@ -56,7 +56,7 @@ function refresh(key) {
       if (N.length && N[0][0] <= s.K[s.K.length - 1][0]) { s.K = s.K.filter(k => k[0] < N[0][0]).concat(N).slice(-LIMIT); s.at = Date.now(); s.an = new Map(); return; }
     }
     const K = compact(await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${LIMIT}`));
-    SER.set(key, {K, at:Date.now(), used:s?.used || Date.now(), lazy:s?.lazy ?? true, an:new Map()});
+    SER.set(key, {K, at:Date.now(), used:s?.used || Date.now(), tradeAt:s?.tradeAt || 0, an:new Map()});
   })().finally(() => { const x = SER.get(key); if (x) x.busy = null; });
   if (s) s.busy = job;
   return job;
@@ -72,7 +72,7 @@ setInterval(async () => {
   warming = true;
   try {
     const now = Date.now(), keys = [];
-    for (const [k, s] of SER) { if (now - s.used > 5 * 60e3) SER.delete(k); else if (!s.lazy && now - s.at > 15e3) keys.push(k); }
+    for (const [k, s] of SER) { if (now - s.used > 5 * 60e3) SER.delete(k); else if (now - (s.tradeAt || 0) < 5 * 60e3 && now - s.at > 15e3) keys.push(k); }
     await pool(keys, 10, k => refresh(k).catch(() => {}));
   } finally { warming = false; }
 }, 3e3);
@@ -89,7 +89,7 @@ export async function scan(body) {
   if (want.size > MAX_SERIES) return {error:'too many series'};
   const todo = [...want].filter(([k, lazy]) => stale(SER.get(k), k.split('|')[1], lazy)).map(([k]) => k);
   await pool(todo, 20, k => refresh(k).catch(() => {}));
-  for (const [k, lazy] of want) { const s = SER.get(k); if (s) { s.used = Date.now(); s.lazy = lazy; } }
+  for (const [k, lazy] of want) { const s = SER.get(k); if (s) { s.used = Date.now(); if (!lazy) s.tradeAt = Date.now(); } }
   const t1 = Date.now(), minute = Math.floor(now / 60e3);
   const rows = tasks.map(t => {
     const out = {}, S = {method:t.method, N:+t.N, k:+t.k, tf:t.tf}, ck = `${S.method}|${S.N}|${S.k}`;
