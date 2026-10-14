@@ -554,7 +554,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .bmore{margin:16px 0 0}
 .bopt{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.bopt:first-child{border-top:0;padding-top:0}
 .btg{display:flex;align-items:center;gap:12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--s1)}.btg p{margin:2px 0 0;font-size:12.5px;color:var(--mute)}.btg-i{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--accbg);color:var(--acc);flex:0 0 auto}.btg button{flex:0 0 auto}
-.btg-set{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;font-size:12.5px;color:var(--mute)}.btg-set select{height:32px;font-size:12.5px;max-width:100%}.btg-set button{height:32px;font-size:12.5px}
+.btg-hint{margin:6px 0 0;font-size:12.5px;color:var(--text)}.btg-set{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;font-size:12.5px;color:var(--mute)}.btg-set select{height:32px;font-size:12.5px;max-width:100%}.btg-set button{height:32px;font-size:12.5px}
 @media(max-width:560px){.btg{flex-wrap:wrap}.btg button{width:100%}}
 .bopt>div{flex:1 1 320px;min-width:0}.bopt b{font-size:14px}.bopt p{margin:3px 0 0;font-size:13px;color:var(--mute);max-width:640px}
 #bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
@@ -657,7 +657,7 @@ details.dis>.dbody{padding:0 16px 16px}
   .form{grid-template-columns:1fr}
   .guard{top:62px;right:10px}
 }
-@media(max-width:560px){.prof{flex-wrap:wrap}.prof .pa{width:100%}.prof.pick .pa{padding-left:30px}.prof .pa button{flex:1}.bh-a{width:100%;flex-direction:column}.bh-a button{width:100%}.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
+@media(max-width:560px){.live{white-space:normal;max-width:100%}.prof{flex-wrap:wrap}.prof .pa{width:100%;flex-wrap:wrap}.prof .pa button{flex:1 1 auto;white-space:nowrap}.bh-a{width:100%;flex-direction:column}.bh-a button{width:100%}.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
 /* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){.cmdbtn kbd{display:none}:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}}
 </style>
 </head>
@@ -2177,12 +2177,23 @@ const tgName = async () => tgBot !== undefined ? tgBot : (tgBot = await rpc('tg_
 // what the linked chat gets (user_bots.alerts, edited here and in the Telegram menu): the bot's own signals, by its rules, on its
 // coins or a wider top for trading by hand; "Рынок" — a separate filter whose channel settings are saved only on request
 const AL_TOPS = [0, 50, 100, 150, 250];
-const alertsView = () => { const a = SB_MINE?.alerts || {}, s = a.sig || {};
-  return {sig:{on:s.on !== false, top:AL_TOPS.includes(+s.top) ? +s.top : 0, when:s.when === 'touch' ? 'touch' : 'confirmed', sides:s.sides === 'long' ? 'long' : 'both'}, mkt:a.mkt || null}; };
+const alertsView = () => { const a = SB_MINE?.alerts || {}, s = a.sig || {}, q = a.quiet || {};
+  return {sig:{on:s.on !== false, top:AL_TOPS.includes(+s.top) ? +s.top : 0, when:s.when === 'touch' ? 'touch' : 'confirmed', sides:s.sides === 'long' ? 'long' : 'both'}, mkt:a.mkt || null,
+    quiet:{on:!!q.on, from:Number.isInteger(q.from) ? q.from : 23, to:Number.isInteger(q.to) ? q.to : 8}}; };
+// the owner's time zone goes with every save, so quiet hours are counted in their time (minutes east of UTC)
 async function saveAlerts(a, msg) {
+  a = {...a, quiet:{...(a.quiet || {}), tz:-new Date().getTimezoneOffset()}};
   try { await rpc('ub_alerts', {p_id:UB.id, p_secret:UB.secret, p_alerts:a}); SB_MINE.alerts = a; renderTg(); toast('Сохранено', msg, 'ok'); }
   catch (e) { toast('Не удалось сохранить', String(e.message || e), 'bad'); renderTg(); }
 }
+// one plain sentence about what will come, for the current choice
+function alertsHint(v) {
+  if (!v.sig.on) return 'Сигналы бота выключены — приходят только его сделки.';
+  const coins = v.sig.top ? `по топ-${v.sig.top} монет (бот входит только по своим — в остальных сигналах написано «✋ для ручной торговли»)` : 'по монетам, на которых торгует бот';
+  const when = v.sig.when === 'touch' ? 'сразу при касании границы, а о подтверждении придёт короткий ответ' : 'когда разворот подтвердится — в тот же момент входит и бот';
+  return `Сигнал придёт ${when}, ${coins}${v.sig.sides === 'long' ? ', только LONG' : ''}. Одна монета — одно сообщение: дальше оно обновляется.`;
+}
+const hourLabel = h => String(h).padStart(2, '0') + ':00';
 function renderTg() {
   const el = $('#btg'); if (!el) return;
   const srv = BP.where === 'server' && UB, linked = srv && SB_MINE?.tg;
@@ -2192,14 +2203,19 @@ function renderTg() {
   let set = '';
   if (linked) {
     const v = alertsView(), opt = (vals, cur) => vals.map(([k, t]) => `<option value="${k}"${String(cur) === String(k) ? ' selected' : ''}>${t}</option>`).join(''), m = v.mkt;
+    const hours = Array.from({length:24}, (_, h) => [h, hourLabel(h)]), now = `${S.tf} · ${S.top} монет · сила от ${Math.max(40, S.minScore || 60)}`;
     set = `<div class="btg-set">
-      <label class="fl inl" title="Сигналы по правилам вашего бота: одно сообщение на касание, оно обновляется, когда разворот подтвердился и когда бот вошёл"><input type="checkbox" data-al="on"${v.sig.on ? ' checked' : ''}> Мои сигналы</label>
-      <select data-al="top" title="Бот входит только по своим монетам. Сигналы можно получать шире — по тем же правилам, для ручной торговли; в них написано, что бот не войдёт"${v.sig.on ? '' : ' disabled'}>${opt(AL_TOPS.map(n => [n, n ? `топ-${n} (для ручной торговли)` : 'монеты бота']), v.sig.top)}</select>
-      <select data-al="when" title="«Только подтверждённые» — в момент, когда входит и бот. «Сразу при касании» — раньше, о подтверждении придёт короткий ответ"${v.sig.on ? '' : ' disabled'}>${opt([['confirmed', 'только подтверждённые'], ['touch', 'сразу при касании']], v.sig.when)}</select>
-      <select data-al="sides"${v.sig.on ? '' : ' disabled'}>${opt([['both', 'LONG и SHORT'], ['long', 'только LONG']], v.sig.sides)}</select>
+      <label class="fl inl"><input type="checkbox" data-al="on"${v.sig.on ? ' checked' : ''}> Мои сигналы</label>
+      <select data-al="top" aria-label="По каким монетам"${v.sig.on ? '' : ' disabled'}>${opt(AL_TOPS.map(n => [n, n ? `топ-${n} (для ручной торговли)` : 'монеты бота']), v.sig.top)}</select>
+      <select data-al="when" aria-label="Когда присылать"${v.sig.on ? '' : ' disabled'}>${opt([['confirmed', 'только подтверждённые'], ['touch', 'сразу при касании']], v.sig.when)}</select>
+      <select data-al="sides" aria-label="Стороны"${v.sig.on ? '' : ' disabled'}>${opt([['both', 'LONG и SHORT'], ['long', 'только LONG']], v.sig.sides)}</select>
+    </div><p class="btg-hint">${alertsHint(v)}</p><div class="btg-set">
+      ${m ? `<label class="fl inl"><input type="checkbox" data-al="mkt"${m.on !== false ? ' checked' : ''}> Рынок: ${esc(m.tf)} · топ-${+m.top} · сила от ${+m.minScore}</label>` : '<span>Рынок: не настроен</span>'}
+      <button data-tg="mkt" title="Отдельный фильтр со своими настройками канала, только подтверждённые развороты. Сохраняется то, что сейчас выбрано на странице «Рынок»; дальше сайт эти настройки не трогает">${m ? 'Заменить' : 'Сохранить'}: ${esc(now)}</button>
     </div><div class="btg-set">
-      ${m ? `<label class="fl inl" title="Отдельный фильтр со своими настройками канала, только подтверждённые развороты"><input type="checkbox" data-al="mkt"${m.on !== false ? ' checked' : ''}> Рынок: ${esc(m.tf)} · топ-${+m.top} · сила от ${+m.minScore}</label>` : '<span>Рынок: не настроен</span>'}
-      <button data-tg="mkt" title="Сохранить для Telegram то, что сейчас выбрано на странице «Рынок»: таймфрейм, число монет, силу, модель канала. Дальше сайт их не трогает">${m ? 'Заменить текущими с «Рынка»' : 'Рынок с текущими настройками'}</button>
+      <label class="fl inl"><input type="checkbox" data-al="quiet"${v.quiet.on ? ' checked' : ''}> 🌙 Ночью без звука</label>
+      <select data-al="qfrom" aria-label="С"${v.quiet.on ? '' : ' disabled'}>${opt(hours, v.quiet.from)}</select>–<select data-al="qto" aria-label="До"${v.quiet.on ? '' : ' disabled'}>${opt(hours, v.quiet.to)}</select>
+      <span>сообщения приходят, но беззвучно</span>
     </div>`;
   }
   el.innerHTML = `<span class="btg-i"><svg class="i"><use href="#i-bell"/></svg></span><div style="min-width:0;flex:1"><b>Telegram</b><p>${text}</p>${set}</div>${
@@ -2207,13 +2223,15 @@ function renderTg() {
 }
 $('#btg').onchange = e => {
   const f = e.target.closest('[data-al]'); if (!f || !SB_MINE) return;
-  const a = {...(SB_MINE.alerts || {})}, s = {...(a.sig || {})}, k = f.dataset.al;
+  const a = {...(SB_MINE.alerts || {})}, s = {...(a.sig || {})}, k = f.dataset.al, v = alertsView();
   if (k === 'mkt') { a.mkt = {...a.mkt, on:f.checked}; return saveAlerts(a, f.checked ? 'Сигналы «Рынка» включены' : 'Сигналы «Рынка» выключены'); }
+  if (k === 'quiet' || k === 'qfrom' || k === 'qto') {
+    a.quiet = {...v.quiet, ...(a.quiet || {}), ...(k === 'quiet' ? {on:f.checked} : {[k === 'qfrom' ? 'from' : 'to']:+f.value})};
+    return saveAlerts(a, a.quiet.on ? `С ${hourLabel(a.quiet.from)} до ${hourLabel(a.quiet.to)} сообщения придут без звука.` : 'Ночью — со звуком.');
+  }
   if (k === 'on') s.on = f.checked; else if (k === 'top') s.top = +f.value || 0; else s[k] = f.value;
   a.sig = s;
-  saveAlerts(a, k === 'on' ? (f.checked ? 'Мои сигналы включены' : 'Мои сигналы выключены')
-    : k === 'top' ? (s.top ? `Сигналы по топ-${s.top} монет. Бот по-прежнему входит только по своим.` : 'Сигналы только по монетам бота.')
-    : k === 'when' ? (s.when === 'touch' ? 'Сигнал придёт при касании, подтверждение — ответом на него.' : 'Сигнал придёт, когда разворот подтвердится.') : '');
+  saveAlerts(a, alertsHint({...v, sig:{...v.sig, ...s, on:s.on !== false, top:+s.top || 0}}));
 };
 $('#btg').onclick = async e => {
   const b = e.target.closest('[data-tg]'); if (!b) return;
@@ -2798,6 +2816,14 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.28', date:'14 октября 2026', title:'Сигналы понятнее, без повторов', items:[
+    'Пока цена держится за границей канала, сигнал по монете больше не приходит заново каждую свечу: это одно касание и одно сообщение.',
+    'Если после подтверждения цена снова ушла за границу, сообщение обновится: «отскок не удержался». О новом подтверждении придёт ответ.',
+    'В сигнале теперь видны цель и стоп — где их поставил бы бот, если войти сейчас.',
+    '«🌙 Ночью без звука»: в выбранные часы сообщения приходят беззвучно. Включается в «Мой бот» → Telegram и в Telegram.',
+    'В Telegram в «🔔 Уведомления» есть «👀 Пример сигнала» — что значит каждая строка.',
+    'На телефоне кнопки профиля больше не обрезаются, а строка «данные устарели» не вылезает за край экрана.',
+  ]},
   {v:'2.27', date:'14 октября 2026', title:'Уведомления в Telegram — проще и без дублей', items:[
     'Вместо пяти отдельных потоков — понятный набор: сделки вашего бота (всегда), «Мои сигналы» по правилам бота, «Рынок» по желанию и сделки общего бота.',
     '«Мои сигналы»: можно выбрать монеты (как у бота или шире, топ-50…250, для ручной торговли), когда присылать (только подтверждённые или сразу при касании) и стороны (LONG и SHORT или только LONG).',

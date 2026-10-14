@@ -125,10 +125,13 @@ const keyboard = (syms: string[]) => {
 };
 // one message to one chat; returns its id (0 if it wasn't sent), so it can be updated later.
 // reply: answer that message (a short follow-up that rings, unlike an edit); such follow-ups go without buttons and footer
+// chats in their quiet hours right now: messages still come, without a sound (alerts.quiet, see quietNow)
+const QUIET = new Set<string>();
 async function tgSend(chat: number | string, text: string, syms: string[] = [], reply = 0): Promise<number> {
   if (!(await tgConf())) return 0;
   try {
     const base: any = { chat_id: chat, text: reply ? text : text.slice(0, 3900) + FOOT, parse_mode: "HTML", disable_web_page_preview: true,
+      ...(QUIET.has(String(chat)) ? { disable_notification: true } : {}),
       ...(reply ? { reply_parameters: { message_id: reply, allow_sending_without_reply: true } } : {}) };
     let r = await tgCall("sendMessage", reply ? base : { ...base, reply_markup: keyboard(syms) });
     if (r && !r.ok && r.error_code === 400 && !reply) r = await tgCall("sendMessage", base);   // buttons refused: send without them
@@ -181,8 +184,14 @@ function pruneSent(sent: Record<string, any>, now: number) {
 // signals at the threshold not announced yet (`sent` is updated in place);
 // the very first call only remembers what is there, so nobody gets a pile of old signals ("_init" marks that it has run)
 // pre: a separate memory inside the same object (the "Рынок" feed uses "m:"), with its own first-run marker
-function freshSignals(rows: any[], min: number, sent: Record<string, any>, now: number, pre = "") {
-  const fresh = rows.filter((r) => r.score != null && r.score >= min && r.touchTime && !sent[`${pre}${r.sym}:${r.touchTime}`]).sort((a, b) => b.score - a.score);
+// win: while the price stays beyond the band every new candle is a new touch; touches this close to an announced one are the
+// same episode and are not announced again
+function freshSignals(rows: any[], min: number, sent: Record<string, any>, now: number, pre = "", win = 0) {
+  const told = (r: any) => !!sent[`${pre}${r.sym}:${r.touchTime}`] || (win > 0 && Object.keys(sent).some((k) => {
+    if (!k.startsWith(`${pre}${r.sym}:`)) return false;
+    const t = Number(k.slice(pre.length + r.sym.length + 1)); return Math.abs(t - r.touchTime) <= win;
+  }));
+  const fresh = rows.filter((r) => r.score != null && r.score >= min && r.touchTime && !told(r)).sort((a, b) => b.score - a.score);
   const first = !sent["_init" + pre];
   for (const r of fresh) sent[`${pre}${r.sym}:${r.touchTime}`] = now;
   pruneSent(sent, now);
@@ -198,7 +207,8 @@ const sigLine = (tf: string) => (r: any) => {
   return `${long ? "🟢" : "🔴"} <b>${long ? "LONG" : "SHORT"} ${coin(r.sym)}</b> · сила <b>${r.score}</b>\n` +
     `цена ${fp(r.price)} · до центра ${toMid >= 0 ? "+" : "−"}${Math.abs(toMid).toFixed(1)}%\n` +
     `RSI ${Math.round(r.rsi)} · объём ${r.volX ? "×" + r.volX.toFixed(1) : "—"} · ${r.rev ? "✔ отскок подтверждён" : "⏳ ждём подтверждения"}\n` +
-    `⌛ войти можно ещё ${left > 6e4 ? dur(left) : "минуту"} · T½ ${hl}` + (r.botNote ? `\n${r.botNote}` : "");
+    `⌛ войти можно ещё ${left > 6e4 ? dur(left) : "минуту"} · T½ ${hl}` + (r.lv ? `\n🎯 цель ${fp(r.lv.tp)} (${pct(r.lv.tp, r.lv.e)}) · 🛑 стоп ${fp(r.lv.sl)} (${pct(r.lv.sl, r.lv.e)})` : "") +
+    (r.botNote ? `\n${r.botNote}` : "");
 };
 // why the profile's own bot passes a signal at its threshold — so a signal it doesn't take is not a mystery
 function whyNot(r: any, S: any, nOpen: number) {
@@ -288,14 +298,21 @@ function cleanSet(s: any = {}) {
 // a linked chat's notification settings (user_bots.alerts, see supabase/alerts.sql), re-checked like the config
 const SIG_TOPS = [0, 50, 100, 150, 250];
 function alertsOf(b: any) {
-  const a = b.alerts && typeof b.alerts === "object" ? b.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {}, m = a.mkt;
+  const a = b.alerts && typeof b.alerts === "object" ? b.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {}, m = a.mkt, q = a.quiet;
   return {
+    // quiet hours in the owner's time zone (tz: minutes east of UTC, set by the site; Moscow when unknown)
+    quiet: q && typeof q === "object" && q.on ? { from: Math.round(num(q.from, 0, 23, 23)), to: Math.round(num(q.to, 0, 23, 8)), tz: Math.round(num(q.tz, -720, 840, 180)) } : null,
     sig: { on: s.on !== false, top: oneOf(Math.round(Number(s.top) || 0), SIG_TOPS, 0), when: oneOf(s.when, ["confirmed", "touch"], "confirmed"), long: s.sides === "long" },
     mkt: m && typeof m === "object" && m.on !== false ? {
       method: oneOf(m.method, ["log", "classic", "robust", "ewma"], "log"), N: Math.round(num(m.N, 20, 300, 210)), k: num(m.k, 1, 5, 3),
       tf: oneOf(m.tf, ["5m", "15m", "1h", "4h", "1d"], "4h"), minScore: num(m.minScore, 40, 100, 60), top: Math.round(num(m.top, 10, 400, 150)) } : null,
   };
 }
+const quietNow = (q: any) => {
+  if (!q) return false;
+  const h = Math.floor(((Date.now() / 6e4 + q.tz) % 1440 + 1440) % 1440 / 60);
+  return q.from <= q.to ? h >= q.from && h < q.to : h >= q.from || h < q.to;
+};
 const tfOf = (ms: number) => Object.keys(M.TFMS).find((k) => (M.TFMS as any)[k] === ms);
 const effN = (len: number, S: any) => (S.tf === "1d" || S.tf === "1w") ? Math.max(20, Math.min(S.N, len - 20)) : S.N;
 // market regime the same way the site does it: BTC/ETH/SOL on 1h, efficiency ratio over 7 days
@@ -317,6 +334,7 @@ async function runUserBots(now: number, reqStart: number) {
   // bots whose owner hasn't opened the site for 30 days are not scheduled
   const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat, alerts, sig_sent").eq("enabled", true)
     .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
+  QUIET.clear();   // recomputed per chat below, each run
   if (!bots?.length) return 0;
   const reg = await majorsRegime(), ticker = await ticker24();
   // one request per coin + timeframe for all bots in this run (compact candles, see candles()); lazy: notify-only, may be minutes old
@@ -400,6 +418,7 @@ async function runUserBots(now: number, reqStart: number) {
       await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: pname,
         regime: reg ? { state: regName, by: reg.by } : null, last_error: null }).eq("id", b.id);
       if (b.tg_chat) {
+        if (quietNow(alertsOf(b).quiet)) QUIET.add(String(b.tg_chat));
         await sendTo([b.tg_chat], [
           ...res.closed.map((t: any) => closedMsg(t, `ваш бот «${esc(pname)}»`)),
           ...res.opened.map((p: any) => openedMsg(p, `ваш бот «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
@@ -433,10 +452,13 @@ async function runUserBots(now: number, reqStart: number) {
   return done;
 
   // the bot's own signals: the same rules it trades by, on its coins or a wider top (for trading by hand).
-  // One message per touch of a band, updated as it develops: 1 — touched, waiting for the reversal; 2 — reversal confirmed;
-  // 3 — the bot entered. An edit doesn't ring, so a confirmation of a signal sent at the touch also comes as a short reply.
+  // One message per episode — while the price stays beyond the band every new candle is a new touch, and touches of the same side
+  // within TOUCH_BARS candles of each other are one episode. The message is updated as it develops: 1 — touched, waiting for the
+  // reversal; 2 — reversal confirmed; 3 — the bot entered. If a confirmed bounce fails (the price is beyond the band again) it says
+  // so and goes back to waiting. An edit doesn't ring, so a confirmation of a signal sent at the touch also comes as a short reply.
   async function mySignals(A: any, sent: any, chat: any, P: any, S: any, pname: string, list: string[], rows: any[], res: any) {
     const sigMin = Math.max(40, S.minScore), inList = new Set(list);   // a floor of 40: a profile with no threshold would message every touch
+    const tfms = (M.TFMS as any)[S.tf], win = M.TOUCH_BARS * tfms;
     let sigRows = rows;
     if (A.top > list.length && P.coins?.mode !== "list") {
       const wide = M.pickSymbols(ticker, A.top, [], now).filter((s: string) => !inList.has(s)), KW: Record<string, any> = {};
@@ -446,19 +468,41 @@ async function runUserBots(now: number, reqStart: number) {
     const entered = new Map<string, number>([...res.stillOpen, ...res.opened].map((p: any) => [p.sym, p.time]));
     const first = !sent["_init:s"];
     sent["_init:s"] = now;
+    // the episode a touch belongs to: the same touch, or an earlier one of this coin and side close enough to it
+    const episode = (r: any) => {
+      const exact = sent[`s:${r.sym}:${r.touchTime}`];
+      if (exact && typeof exact === "object") return exact;
+      for (const k of Object.keys(sent)) {
+        if (!k.startsWith(`s:${r.sym}:`)) continue;
+        const v = sent[k];
+        if (v && typeof v === "object" && (!v.sd || v.sd === r.side) && Math.abs(Number(k.slice(r.sym.length + 3)) - r.touchTime) <= win) return v;
+      }
+      return null;
+    };
     const fresh: any[] = [], upd: any[] = [];
     for (const r of sigRows) {
       if (!r.touchTime || r.score == null) continue;
-      const key = `s:${r.sym}:${r.touchTime}`, prev = sent[key];
+      const key = `s:${r.sym}:${r.touchTime}`, prev = episode(r);
       const stage = inList.has(r.sym) && (entered.get(r.sym) ?? 0) >= r.touchTime ? 3 : r.rev ? 2 : 1;
-      if (prev && typeof prev === "object") { if (stage > prev.st) upd.push({ r, prev, stage }); continue; }
+      if (prev) {
+        const newTouch = prev.tt != null && prev.tt !== r.touchTime;
+        sent[key] = prev; prev.tt = r.touchTime; prev.t = now;
+        if (stage > prev.st) upd.push({ r, prev, stage });
+        else if (newTouch && prev.st === 2 && stage === 1) upd.push({ r, prev, stage, failed: true });   // the bounce didn't hold
+        continue;
+      }
       if (r.score < sigMin || (A.long && r.side !== "low") || (A.when === "confirmed" && stage < 2)) continue;
       fresh.push({ r, key, stage });
     }
     const note = (r: any, stage: number) => !inList.has(r.sym) ? `✋ для ручной торговли: бот торгует топ-${list.length}, по этой монете не войдёт`
       : stage === 3 ? "🤖 бот вошёл в сделку" : entered.has(r.sym) ? "🤖 бот уже в сделке по этой монете"
       : stage === 1 ? "🤖 бот ждёт подтверждения разворота" : `🤖 бот не войдёт: ${whyNot(r, S, entered.size)}`;
-    const text = (r: any, stage: number) => `📡 <b>«${esc(pname)}»</b> · ${S.tf}\n${sigLine(S.tf)({ ...r, botNote: note(r, stage) })}`;
+    // levels as the bot would set them now (the regime decides the strategy for "переключатель")
+    const text = (r: any, stage: number, failed = false) => {
+      const x = { ...r, mkt: r.mkt ?? reg }, lv = stage < 3 ? M.levels(x, S) : null;
+      return `📡 <b>«${esc(pname)}»</b> · ${S.tf}\n${sigLine(S.tf)({ ...x, lv, botNote: note(r, stage) })}` +
+        (failed ? "\n⚠️ <b>отскок не удержался</b>: цена снова за границей канала — ждём нового подтверждения" : "");
+    };
     fresh.sort((a, b) => b.r.score - a.r.score);
     let n = 0;
     const rest: any[] = [];
@@ -466,14 +510,15 @@ async function runUserBots(now: number, reqStart: number) {
       // the first run only remembers; a signal the bot entered on at once is told by the trade message itself
       let mid = 0;
       if (!first && x.stage < 3) { if (n++ < 6) mid = await tgSend(chat, text(x.r, x.stage), [x.r.sym]); else rest.push(x); }
-      sent[x.key] = { t: now, st: x.stage, mid };
+      sent[x.key] = { t: now, st: x.stage, mid, sd: x.r.side, tt: x.r.touchTime };
     }
     // more than 6 at once: the rest in one list, without updates
     if (rest.length) await sendTo([chat], sigMsg(`📡 <b>Ещё сигналы «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, rest.map((x) => ({ ...x.r, botNote: note(x.r, x.stage) })), S.tf), rest.map((x) => x.r.sym));
     for (const x of upd) {
       if (x.prev.mid && !first) {
-        await tgEdit(chat, x.prev.mid, text(x.r, x.stage), [x.r.sym]);
-        if (x.prev.st === 1) await tgSend(chat, `✔ <b>${x.r.side === "low" ? "LONG" : "SHORT"} ${coin(x.r.sym)}</b> — разворот подтверждён${x.stage === 3 ? ", бот вошёл" : ""}`, [], x.prev.mid);
+        await tgEdit(chat, x.prev.mid, text(x.r, x.stage, x.failed), [x.r.sym]);
+        const what = x.failed ? "отскок не удержался, ждём нового подтверждения" : x.prev.st === 1 ? `разворот подтверждён${x.stage === 3 ? ", бот вошёл" : ""}` : "";
+        if (what) await tgSend(chat, `${x.failed ? "⚠️" : "✔"} <b>${x.r.side === "low" ? "LONG" : "SHORT"} ${coin(x.r.sym)}</b> — ${what}`, [], x.prev.mid);
       }
       x.prev.st = x.stage;
     }
@@ -487,7 +532,7 @@ async function runUserBots(now: number, reqStart: number) {
     const told = new Map<string, number[]>();
     if (SM.tf === S.tf) for (const k of Object.keys(sent)) if (k.startsWith("s:")) { const [, s, t] = k.split(":"); told.set(s, [...(told.get(s) || []), +t]); }
     const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r?.rev && !(told.get(r.sym) || []).some((t) => Math.abs(t - r.touchTime) <= win));
-    const mktSigs = freshSignals(rowsM, SM.minScore, sent, now, "m:");
+    const mktSigs = freshSignals(rowsM, SM.minScore, sent, now, "m:", win).map((r: any) => ({ ...r, lv: M.levels({ ...r, mkt: reg }, SM) }));
     if (mktSigs.length) await sendTo([chat], sigMsg("🔔 <b>Рынок</b>", `${SM.tf} · топ-${SM.top} · сила от ${SM.minScore} · только подтверждённые развороты`, mktSigs, SM.tf), mktSigs.map((r: any) => r.sym));
   }
 }

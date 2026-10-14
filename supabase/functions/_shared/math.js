@@ -290,9 +290,9 @@ export function snapshot(r, S) {
 }
 
 // ---------- trading rules ----------
-export function planEntry(r, balance, S, now) {
-  const side = wants(r, S);
-  if (!side) return null;
+// entry, stop and take profit for a signal on this side — what planEntry trades, and what a signal message shows for trading
+// by hand; null when there is too little left to earn
+export function levels(r, S, side = r.side === 'low' ? 'LONG' : 'SHORT') {
   const sg = side === 'LONG' ? 1 : -1, brk = modeOf(r, S).startsWith('breakout');
   const e = r.price * (1 + sg * SLIP);   // market entry pays slippage
   const slD = clamp(1.5 * r.atr / e, 0.008, 0.025);
@@ -304,12 +304,20 @@ export function planEntry(r, balance, S, now) {
   // otherwise bounce → exactly the centre (at most 3%; no artificial floor that would put it past the centre), breakout → 2× the stop (1–5%)
   const tpD = S.rr > 0 ? S.rr * slD : brk ? clamp(2 * slD, 0.01, 0.05) : Math.min(room, 0.03);
   if (!(S.rr > 0) && tpD < 0.8 * slD) return null;
+  return { side, sg, brk, e, slD, tpD, sl: e * (1 - sg * slD), tp: e * (1 + sg * tpD) };
+}
+export function planEntry(r, balance, S, now) {
+  const side = wants(r, S);
+  if (!side) return null;
+  const L = levels(r, S, side);
+  if (!L) return null;
+  const { sg, brk, e, slD, tpD } = L;
   // size: lose S.risk of the balance at the stop, but never exceed the leverage cap
   // (S.lev × balance shared by the profile's slots; default 1× and 3 slots → each position ≤ ⅓ of the balance)
   const risk = S.risk ?? RISK, lev = S.lev ?? 1;
   const qty = Math.min(balance * risk / (e * slD), balance * lev / slotsOf(S) / e);
   if (!(qty > 0)) return null;
-  const sl = e * (1 - sg * slD);
+  const sl = L.sl;
   return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf], ts: S.timeStop ?? TIME_STOP,
            risk: Math.abs(e - sl) * qty, snap: { ...snapshot(r, S), lev: e * qty / balance, riskPct: Math.abs(e - sl) * qty / balance * 100 },
            note: `${brk ? (sg > 0 ? 'пробой вверх' : 'пробой вниз') : r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · сила ${r.score}` };

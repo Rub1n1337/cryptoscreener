@@ -47,9 +47,26 @@ const WHEN: Record<string, string> = { confirmed: "Только подтверж
 const topName = (n: number) => n ? `топ-${n}` : "как у бота";
 function alertsView(bot: any) {
   const a = bot?.alerts && typeof bot.alerts === "object" ? bot.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {};
+  const q = a.quiet && typeof a.quiet === "object" ? a.quiet : {};
   return { sig: { on: s.on !== false, top: TOPS.includes(Number(s.top)) ? Number(s.top) : 0, when: s.when === "touch" ? "touch" : "confirmed", long: s.sides === "long" },
-    mkt: a.mkt && typeof a.mkt === "object" ? a.mkt : null };
+    mkt: a.mkt && typeof a.mkt === "object" ? a.mkt : null,
+    quiet: { on: !!q.on, from: Number.isInteger(q.from) ? q.from : 23, to: Number.isInteger(q.to) ? q.to : 8, tz: Number.isFinite(q.tz) ? q.tz : 180 } };
 }
+const hh = (h: number) => String(h).padStart(2, "0") + ":00";
+const quietName = (q: any) => `${hh(q.from)}–${hh(q.to)}`;
+// what a signal looks like, with every line explained (the "👀 Пример сигнала" button)
+const EXAMPLE = `👀 <b>Пример сигнала</b> — не настоящий, цифры для примера\n\n` +
+  `📡 <b>«Мой профиль»</b> · 1h\n🟢 <b>LONG SOL</b> · сила <b>67</b>\nцена $142.30 · до центра +2.4%\nRSI 28 · объём ×2.1 · ✔ отскок подтверждён\n` +
+  `⌛ войти можно ещё 3 ч · T½ 9 ч ✅\n🎯 цель $145.70 (+2.39%) · 🛑 стоп $140.20 (−1.48%)\n🤖 бот не войдёт: заняты все места (3)\n\n` +
+  `<b>Что тут что</b>\n` +
+  `• <b>«Мой профиль» · 1h</b> — по правилам какого профиля и на каком таймфрейме.\n` +
+  `• <b>сила</b> — насколько выразительное касание, 0–100.\n` +
+  `• <b>до центра</b> — куда обычно идёт отскок: середина канала.\n` +
+  `• <b>✔ / ⏳</b> — разворот подтверждён или его ещё ждём.\n` +
+  `• <b>⌛</b> — сколько ещё вход актуален; <b>T½</b> — как быстро монета обычно возвращается к центру.\n` +
+  `• <b>🎯 цель и 🛑 стоп</b> — где их поставил бы бот, если войти сейчас.\n` +
+  `• <b>🤖</b> — что делает ваш бот: вошёл, почему не войдёт, или «✋ для ручной торговли», если монета вне его списка.\n\n` +
+  `Это же сообщение потом обновляется: ⏳ → ✔ подтверждён → бот вошёл. Если отскок не удержался, оно так и скажет.`;
 const mktName = (m: any) => `${esc(String(m.tf))} · топ-${Number(m.top)} · сила от ${Number(m.minScore)}`;
 // market state from BTC/ETH/SOL efficiency ratio over 7 days (stored by the personal bots each minute), at a given threshold
 function regimeOf(by: any, erMax: number) {
@@ -84,9 +101,10 @@ async function notifyScreen(_db: any, c: any): Promise<Screen> {
       `• <b>Монеты</b>: «как у бота» — только те, на которых он торгует; топ-50…250 — шире, для ручной торговли (бот по ним не входит, это написано в сигнале).\n` +
       `• <b>Только подтверждённые</b> — в момент, когда входит и бот. <b>Сразу при касании</b> — раньше, а о подтверждении придёт короткий ответ.\n\n` +
       `<b>Рынок</b> — отдельный фильтр со своими настройками канала, только подтверждённые развороты. ` +
-      (v.mkt ? `Сейчас: ${mktName(v.mkt)}. Поменять — на сайте, «Мой бот» → Telegram.` : `Не настроен: на сайте, «Мой бот» → Telegram, нажмите «Рынок с текущими настройками».`)
+      (v.mkt ? `Сейчас: ${mktName(v.mkt)}. Поменять — на сайте, «Мой бот» → Telegram.` : `Не настроен: на сайте откройте «Рынок» с нужными настройками, затем «Мой бот» → Telegram → «Сохранить» в строке «Рынок».`)
       : `Сделки и сигналы <b>своего</b> бота с сайта — «🤖 Мой бот» → как привязать.`,
-    `<b>Сделки общего бота</b> — входы и выходы одного бота на всех.`,
+    `<b>Сделки общего бота</b> — входы и выходы одного бота на всех.` +
+      (bot ? `\n<b>🌙 Ночью без звука</b> — с ${hh(v.quiet.from)} до ${hh(v.quiet.to)} по вашему времени сообщения приходят беззвучно, ничего не теряется.` : ""),
     `📬 Отправлено сюда: ${sub?.sent_n || 0}${sub?.last_ok ? ` · последнее ${ago(sub.last_ok)}` : ""}${sub?.last_err ? `\n⚠️ Последняя ошибка отправки: ${esc(sub.last_err)}` : ""}`,
   ];
   return {
@@ -96,6 +114,7 @@ async function notifyScreen(_db: any, c: any): Promise<Screen> {
         [btn(`${mark(v.sig.on)} Мои сигналы`, "t:sig"), btn(`Монеты: ${topName(v.sig.top)}`, "t:top")],
         [btn(WHEN[v.sig.when], "t:when"), btn(v.sig.long ? "Только LONG" : "LONG и SHORT", "t:side")],
         [btn(`${mark(!!v.mkt && v.mkt.on !== false)} Рынок`, "t:mkt"), btn(`${mark(!!sub?.shared)} Сделки общего бота`, "t:shared")],
+        [btn(`${mark(v.quiet.on)} 🌙 Ночью без звука ${quietName(v.quiet)}`, "t:quiet"), btn("👀 Пример сигнала", "+ex")],
       ] : [[btn(`${mark(!!sub?.shared)} Сделки общего бота`, "t:shared")]]),
       HOME,
     ],
@@ -242,8 +261,9 @@ async function toggle(db: any, chat: number, c: any, k: string, want?: boolean) 
   else if (k === "top") { s.top = TOPS[(TOPS.indexOf(v.sig.top) + 1) % TOPS.length]; msg = `Монеты: ${topName(s.top)}`; }
   else if (k === "when") { s.when = v.sig.when === "touch" ? "confirmed" : "touch"; msg = WHEN[s.when]; }
   else if (k === "side") { s.sides = v.sig.long ? "both" : "long"; msg = s.sides === "long" ? "Только LONG" : "LONG и SHORT"; }
+  else if (k === "quiet") { a.quiet = { ...v.quiet, on: want ?? !v.quiet.on }; msg = a.quiet.on ? `Ночью без звука: ${quietName(a.quiet)}` : "Ночью — со звуком"; }
   else if (k === "mkt") {
-    if (!a.mkt) return "Фильтр «Рынка» ещё не настроен: на сайте в «Мой бот» → Telegram нажмите «Рынок с текущими настройками».";
+    if (!a.mkt) return "Фильтр «Рынка» ещё не настроен: на сайте в «Мой бот» → Telegram нажмите «Сохранить» в строке «Рынок».";
     a.mkt = { ...a.mkt, on: want ?? a.mkt.on === false }; msg = `Рынок: ${a.mkt.on ? "вкл" : "выкл"}`;
   } else return "";
   a.sig = s;
@@ -260,6 +280,7 @@ async function onButton(db: any, q: any, call: Call) {
   let c = await ctx(db, chat), note = "";
   if (key === "go") { if (!c.sub) await db.from("tg_subs").insert({ chat_id: chat, name: chatName(q.message.chat) }); note = "Подписка включена"; }
   else if (!c.sub) return answer("Вы отписаны — нажмите /start, чтобы вернуться.", true);
+  if (key === "ex") { await answer(); return call("sendMessage", { chat_id: chat, text: EXAMPLE, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: [[btn("🔔 Уведомления", "+n")]] } }); }
   if (key.startsWith("t:")) { note = await toggle(db, chat, c, key.slice(2)) || ""; if (!c.bot && key !== "t:shared") return answer(note, true); }
   if (key === "u!") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); note = "Бот отвязан"; }
   if (key === "s" || (key === "m" && c.bot)) note = "Обновлено";
