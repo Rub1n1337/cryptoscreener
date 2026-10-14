@@ -554,6 +554,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .bmore{margin:16px 0 0}
 .bopt{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.bopt:first-child{border-top:0;padding-top:0}
 .btg{display:flex;align-items:center;gap:12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--s1)}.btg p{margin:2px 0 0;font-size:12.5px;color:var(--mute)}.btg-i{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:var(--accbg);color:var(--acc);flex:0 0 auto}.btg button{flex:0 0 auto}
+.btg-sig{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:8px;font-size:12.5px;color:var(--mute)}.btg-sig select{height:32px;font-size:12.5px;max-width:100%}
 @media(max-width:560px){.btg{flex-wrap:wrap}.btg button{width:100%}}
 .bopt>div{flex:1 1 320px;min-width:0}.bopt b{font-size:14px}.bopt p{margin:3px 0 0;font-size:13px;color:var(--mute);max-width:640px}
 #bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
@@ -1955,7 +1956,7 @@ async function rpc(fn, args) {
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
 // scan: the "Рынок" settings, so the server can send the same signals as the bell on the site to a linked Telegram chat
-const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax,
+const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax, sigTop:BP.sigTop || 0,
   scan:{tf:S.tf, top:S.top, minScore:S.minScore, method:S.method, N:S.N, k:S.k}});
 let syncTimer;
 function syncServerBot() {   // push profiles/mode to the server bot (debounced)
@@ -2177,12 +2178,21 @@ const tgName = async () => tgBot !== undefined ? tgBot : (tgBot = await rpc('tg_
 function renderTg() {
   const el = $('#btg'); if (!el) return;
   const srv = BP.where === 'server' && UB, linked = srv && SB_MINE?.tg;
-  el.innerHTML = `<span class="btg-i"><svg class="i"><use href="#i-bell"/></svg></span><div style="min-width:0;flex:1"><b>Сделки бота в Telegram</b><p>${
-    !srv ? 'Бот присылает сделки, только когда работает на сервере 24/7.'
+  const text = !srv ? 'Бот присылает сделки, только когда работает на сервере 24/7.'
     : linked ? 'Подключено: сделки вашего бота и новые сигналы его профиля приходят сообщениями (сигналы выключаются командой /mysignals). Отключить всё — здесь или /unlink в боте.'
-    : 'Нажмите — откроется Telegram, там нажмите «Start». Через минуту бот подтвердит, что всё связано.'}</p></div>${
+    : 'Нажмите — откроется Telegram, там нажмите «Start». Через минуту бот подтвердит, что всё связано.';
+  // the bot trades only its profile's coins; its signals may cover more of them, for trading by hand
+  const range = linked ? `<label class="btg-sig" title="Бот входит в сделки только по монетам своего профиля. Сигналы профиля можно получать шире — по тем же правилам, но по большему числу монет, для ручной торговли. В таких сигналах написано, что бот по ним не войдёт">Сигналы профиля — по монетам <select data-tgtop>${
+    [0, 50, 100, 150, 250].map(n => `<option value="${n}"${(BP.sigTop || 0) === n ? ' selected' : ''}>${n ? 'топ-' + n + ' (для ручной торговли)' : 'как у бота'}</option>`).join('')}</select></label>` : '';
+  el.innerHTML = `<span class="btg-i"><svg class="i"><use href="#i-bell"/></svg></span><div style="min-width:0;flex:1"><b>Сделки бота в Telegram</b><p>${text}</p>${range}</div>${
     !srv ? '<button data-tg="server">Перевести на сервер</button>' : linked ? '<button data-tg="off">Отключить</button>' : '<button data-tg="on" class="primary">Подключить Telegram</button>'}`;
 }
+// how wide the profile signals in Telegram are; the bot itself still trades only its profile's coins
+$('#btg').onchange = e => {
+  const sel = e.target.closest('[data-tgtop]'); if (!sel) return;
+  BP.sigTop = +sel.value || 0; saveBP(); syncServerBot();
+  toast('Сохранено', BP.sigTop ? `Сигналы профиля придут по топ-${BP.sigTop} монет. Бот по-прежнему входит только по монетам профиля.` : 'Сигналы профиля — только по монетам, на которых торгует бот.', 'ok');
+};
 $('#btg').onclick = async e => {
   const b = e.target.closest('[data-tg]'); if (!b) return;
   if (b.dataset.tg === 'server') { setWhere('server'); return; }
@@ -2761,6 +2771,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.26', date:'14 октября 2026', title:'Сигналы профиля для ручной торговли', items:[
+    'В блоке «Сделки бота в Telegram» можно выбрать, по скольким монетам приходят сигналы профиля: как у бота или топ-50, 100, 150, 250. Правила сигналов те же, что у профиля.',
+    'Бот при этом входит только по своим монетам. Сигнал по монете вне его списка помечен «✋ для ручной торговли».',
+  ]},
   {v:'2.25', date:'13 октября 2026', title:'Риск до 5% на сделку', items:[
     'В профиле бота и в бэктесте риск на сделку теперь можно поднять до 4% и 5%. Чем выше риск, тем глубже просадки: проверьте профиль в бэктесте, прежде чем включать.',
   ]},

@@ -300,9 +300,20 @@ async function runUserBots(now: number, reqStart: number) {
       const keep = [...res.stillOpen, ...res.opened];
       if (keep.length) { const { error: eu } = await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p }))); if (eu) throw eu; }
       // a linked chat also gets the profile's own signals (strength at its threshold), unless switched off with /mysignals
-      const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore), mySigs = sigOn ? freshSignals(rows, sigMin, sent, now).map((r) => ({ ...r })) : [];   // a floor of 40: a profile with no threshold would message every touch; copies — the rows are shared between bots
+      const sigOn = b.tg_chat && b.tg_sig !== false, sent = b.sig_sent || {}, sigMin = Math.max(40, S.minScore);   // a floor of 40: a profile with no threshold would message every touch
+      // the profile's signals may cover more coins than it trades (sigTop, for trading by hand): the same rules on a wider top;
+      // the bot still enters only its own coins, and such a signal says so
+      const sigTop = Math.round(num(cfg.sigTop, 0, 250, 0)), inList = new Set(list);
+      let sigRows = rows;
+      if (sigOn && sigTop > list.length && P.coins?.mode !== "list") {
+        const wide = M.pickSymbols(ticker, sigTop, [], now), KW: Record<string, any> = {};
+        await pool(wide.filter((s) => !inList.has(s)), PAR, async (s) => { KW[s] = await getK(s, S.tf); });
+        sigRows = [...rows, ...wide.filter((s) => !inList.has(s)).map((s) => analyzeK(s, KW[s], S)).filter(Boolean)];
+      }
+      const mySigs = sigOn ? freshSignals(sigRows, sigMin, sent, now).map((r) => ({ ...r })) : [];   // copies — the rows are shared between bots
       const took = new Set(res.opened.map((p: any) => p.sym)), held = new Set(res.stillOpen.map((p: any) => p.sym));
-      for (const r of mySigs) r.botNote = took.has(r.sym) ? "🤖 бот вошёл в сделку" : held.has(r.sym) ? "🤖 бот уже в сделке по этой монете"
+      for (const r of mySigs) r.botNote = !inList.has(r.sym) ? `✋ для ручной торговли: монета вне топ-${list.length} профиля, бот по ней не входит`
+        : took.has(r.sym) ? "🤖 бот вошёл в сделку" : held.has(r.sym) ? "🤖 бот уже в сделке по этой монете"
         : `🤖 бот не войдёт: ${whyNot(r, S, res.stillOpen.length + res.opened.length)}`;
       // the owner's "Рынок" settings (sent by the site): the same signals as the bell there — a confirmed reversal at the threshold
       const sc = cfg.scan, mktOn = !!(b.tg_chat && b.tg_mkt !== false && sc && typeof sc === "object");
@@ -321,7 +332,7 @@ async function runUserBots(now: number, reqStart: number) {
       if (b.tg_chat) await sendTo([b.tg_chat], [
         ...res.closed.map((t: any) => closedMsg(t, `ваш бот «${esc(pname)}»`)),
         ...res.opened.map((p: any) => openedMsg(p, `ваш бот «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
-      if (mySigs.length) await sendTo([b.tg_chat], sigMsg(`📡 <b>Сигналы профиля «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, mySigs, S.tf), mySigs.map((r: any) => r.sym));
+      if (mySigs.length) await sendTo([b.tg_chat], sigMsg(`📡 <b>Сигналы профиля «${esc(pname)}»</b>`, `${S.tf} · ${sigRows === rows ? "монеты бота" : "топ-" + sigTop + " (бот — только топ-" + list.length + ")"} · сила от ${sigMin}`, mySigs, S.tf), mySigs.map((r: any) => r.sym));
       if (mktSigs.length) await sendTo([b.tg_chat], sigMsg("🔔 <b>Сигналы вашего «Рынка»</b>", `${SM.tf} · ${mktTop} монет · сила от ${SM.minScore} · как колокольчик на сайте`, mktSigs, SM.tf), mktSigs.map((r: any) => r.sym));
       done++;
     } catch (e) {
