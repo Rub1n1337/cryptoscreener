@@ -207,6 +207,19 @@ export function signalAt(P, i, sym, now, lite = false) {   // lite: skip the dis
   return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, age: touch ? i - touch.j : null, wasRev, rev, score, comps, checks, exc, volX, volZ,
            label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side, slope, brk, er, erCh };
 }
+// a fingerprint of how the signal math behaves: the same synthetic candles through every channel model, hashed.
+// The bot compares it with the collector's copy (server/scan.js) before trusting analyses computed there
+export function fingerprint() {
+  const K = []; let p = 100;
+  for (let i = 0; i < 400; i++) {
+    const o = p; p *= 1 + 0.01 * Math.sin(i * 0.37) + 0.004 * Math.cos(i * 1.7);
+    K.push([i * 36e5, o, Math.max(o, p) * (1 + 0.003 * (1 + Math.sin(i))), Math.min(o, p) * (1 - 0.003 * (1 + Math.cos(i * 0.5))), p, 1000 + 500 * Math.sin(i * 0.11) + (i % 17 ? 0 : 4000)]);
+  }
+  const out = ['log', 'classic', 'robust', 'ewma'].map(method => analyze('X', K, { method, N: 210, k: 2, tf: '1h' }, K[K.length - 1][0] + 18e5, true));
+  const s = JSON.stringify(out, (k, v) => typeof v === 'number' ? (Number.isFinite(v) ? +v.toPrecision(10) : String(v)) : v);
+  let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36) + TOUCH_BARS;
+}
 export const erBars = tf => Math.min(300, Math.round(7 * 864e5 / TFMS[tf]));
 export function erSeries(c, L) {
   const out = Array(c.length).fill(null);

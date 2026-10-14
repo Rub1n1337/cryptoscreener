@@ -11,6 +11,7 @@ import zlib from 'node:zlib';
 import WebSocket from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
+import { scan, encode } from './scan.js';
 
 const PORT = +process.env.PORT || 8080;
 const TOP = +process.env.TOP || 20;                       // how many of the most traded USDT pairs to follow
@@ -285,7 +286,18 @@ const routes = {
   '/fp': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, bars:c.fp.filter(b => b.t >= since).map(b => [b.t, b.k0, Array.from(b.buy, round), Array.from(b.sell, round)])}; },
 };
 http.createServer((req, res) => {
-  if (req.method === 'OPTIONS') { res.writeHead(204, {'access-control-allow-origin':'*', 'access-control-allow-methods':'GET'}); return res.end(); }
+  if (req.method === 'OPTIONS') { res.writeHead(204, {'access-control-allow-origin':'*', 'access-control-allow-methods':'GET, POST', 'access-control-allow-headers':'content-type'}); return res.end(); }
+  // the Supabase bot's candles and analyses (scan.js): a JSON body, answered gzipped
+  if (req.method === 'POST' && req.url === '/scan') {
+    if (!allowed(req)) return send(req, res, 429, {error:'too many requests, slow down'}, {'retry-after':'60'});
+    let size = 0; const parts = [];
+    req.on('data', d => { size += d.length; if (size > 256e3) req.destroy(); else parts.push(d); });
+    req.on('end', async () => {
+      let body; try { body = JSON.parse(Buffer.concat(parts).toString()); } catch { return send(req, res, 400, {error:'bad json'}); }
+      try { send(req, res, 200, encode(await scan(body))); } catch (e) { send(req, res, 500, {error:e.message}); }
+    });
+    return;
+  }
   if (req.method !== 'GET') return send(req, res, 405, {error:'GET only'});
   if (!allowed(req)) return send(req, res, 429, {error:'too many requests, slow down'}, {'retry-after':'60'});
   if (req.url.length > 300) return send(req, res, 414, {error:'url too long'});
