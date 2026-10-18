@@ -1004,7 +1004,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <th>Закрыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Выход</th><th class="hm">Размер</th><th>Причина выхода</th><th class="hm">Длит.</th><th class="hm">PnL до ком.</th><th class="hm">Комиссия</th><th>PnL</th><th>R</th><th class="hm">Сила</th>
         </tr></thead><tbody id="btTrades"></tbody></table></div>
       </div>
-      <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: пары берутся из сегодняшнего топа по объёму (монеты, которые выпали из топа, не попадают); исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Прошлое не гарантирует будущего.</div>
+      <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: монеты, которых сегодня нет на Binance, в бэктест не попадают; в режиме «по сегодняшнему» берётся сегодняшний топ на весь период, это завышает результат. Исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Прошлое не гарантирует будущего.</div>
     </div>
   </section>
 
@@ -2659,8 +2659,10 @@ function trimHistory(keep) {
 // custom coin list: "btc, eth sol" → ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
 const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/[^A-Z0-9]/g, '')).filter(Boolean)
   .map(x => x.endsWith('USDT') ? x : x + 'USDT'))].slice(0, 300);
-// the honest top needs a wider pool: coins that are in the top today were not always, and the other way round
-const poolOf = n => Math.min(n + 100, Math.round(n * 2.5));
+// the honest top needs a wide pool: over a year ~200 different coins pass through the top-20 by 24 h turnover (listings, short
+// spikes). A pool of today's top-50 left most of them out, so the result was too high and changed with the day it was run
+// (Oct 2026, profile 1h/top-20: pool 50 → +0.55R…+0.75R depending on the day, 150 → +0.27R, 200–300 → +0.24R, stable)
+const poolOf = n => Math.min(400, Math.max(150, n * 2));
 const coinsLabel = r => r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} монет)` : `${r.pairs} монет`;
 function btSettings() {
   const custom = $('#btTop').value === 'custom' ? parseCoins($('#btCustom').value) : null;
@@ -2816,6 +2818,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.29', date:'19 октября 2026', title:'Честный бэктест — без скачков от дня к дню', items:[
+    'Результат честного бэктеста («топ на каждый момент») менялся в зависимости от дня запуска: монеты брались только из сегодняшнего топ-50, и монета, выпавшая из него, исчезала из бэктеста вместе со всеми своими сделками за год.',
+    'Теперь набор шире — от 150 монет: за год через топ-20 по обороту проходит около двухсот разных монет (новые листинги, короткие всплески), и живой бот торгует и их. Результат больше не скачет от дня к дню.',
+    'Цифры стали ниже и честнее. Пример: профиль 1h, топ-20, RR 1:3 за год — было +0.55…+0.75R на сделку в зависимости от дня, стало около +0.24R. Первый запуск дольше (около 2 минут), повторные — мгновенно.',
+  ]},
   {v:'2.28', date:'14 октября 2026', title:'Сигналы понятнее, без повторов', items:[
     'Пока цена держится за границей канала, сигнал по монете больше не приходит заново каждую свечу: это одно касание и одно сообщение.',
     'Если после подтверждения цена снова ушла за границу, сообщение обновится: «отскок не удержался». О новом подтверждении придёт ответ.',
