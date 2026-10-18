@@ -78,7 +78,7 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
 // it keeps the candles, tops them up and answers with the analyses — one request instead of hundreds. Only if both sides
 // run the same math (M.fingerprint) are its answers used; whatever it doesn't answer is done here as before.
 const SCAN_URL = "https://cryptoscreener-production-f6ba.up.railway.app/scan";
-let FPRINT = "";
+let FPRINT = "", SCAN_TOK = "";
 const RSTAT = { calls: 0, rows: 0, ms: 0, err: "" };   // reported in the response, to watch it
 const rkey = (sym: string, S: any) => `${sym}|${S.tf}|${S.method}|${S.N}|${S.k}`;
 type Groups = Map<string, { S: any; syms: Set<string> }>;
@@ -94,7 +94,9 @@ async function remote(groups: Groups, lazy: boolean, now: number, out: Map<strin
   const tasks = [...groups.values()].map((g) => ({ tf: g.S.tf, method: g.S.method, N: g.S.N, k: g.S.k, syms: [...g.syms], lazy }));
   const t0 = Date.now();
   try {
-    const r = await fetch(SCAN_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ fp: FPRINT, now, tasks }), signal: AbortSignal.timeout(timeout) });
+    // the collector answers only this bot: the token is bot_secret.scan here and SCAN_TOKEN on Railway
+    const r = await fetch(SCAN_URL, { method: "POST", headers: { "content-type": "application/json", ...(SCAN_TOK ? { "x-scan-token": SCAN_TOK } : {}) },
+      body: JSON.stringify({ fp: FPRINT, now, tasks }), signal: AbortSignal.timeout(timeout) });
     // T½ = ∞ can't travel in JSON: it comes as "__Infinity"
     const j = JSON.parse(await r.text(), (_k, v) => typeof v === "string" && v.startsWith("__") ? Number(v.slice(2)) : v);
     if (j.error || !Array.isArray(j.rows)) throw new Error(j.error || "no rows");
@@ -136,9 +138,8 @@ async function tgSend(chat: number | string, text: string, syms: string[] = [], 
     let r = await tgCall("sendMessage", reply ? base : { ...base, reply_markup: keyboard(syms) });
     if (r && !r.ok && r.error_code === 400 && !reply) r = await tgCall("sendMessage", base);   // buttons refused: send without them
     if (r && !r.ok && r.error_code === 403) { await db.from("tg_subs").delete().eq("chat_id", chat); return 0; }   // the user blocked the bot
-    // what happened to the last message in this chat, so a "nothing came" can be checked
-    const { data: s } = await db.from("tg_subs").select("sent_n").eq("chat_id", chat).maybeSingle();
-    if (s) await db.from("tg_subs").update(r?.ok ? { last_ok: new Date().toISOString(), last_err: null, sent_n: (s.sent_n || 0) + 1 } : { last_err: String(r?.description || "нет ответа").slice(0, 200) }).eq("chat_id", chat);
+    // what happened to the last message in this chat, so a "nothing came" can be checked (one statement, see tg_sent)
+    await db.rpc("tg_sent", { p_chat: Number(chat), p_ok: !!r?.ok, p_err: r?.ok ? null : String(r?.description || "нет ответа") });
     return r?.ok ? Number(r.result?.message_id) || 0 : 0;
   } catch { return 0; }   // notifications must never break trading
 }
@@ -146,9 +147,11 @@ async function tgEdit(chat: number | string, mid: number, text: string, syms: st
   try { await tgCall("editMessageText", { chat_id: chat, message_id: mid, text: text.slice(0, 3900) + FOOT, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: keyboard(syms) }); }
   catch { /* an old or deleted message just stays as it was */ }
 }
+// many chats (the shared bot's trades go to every subscriber): 8 at a time — one by one, a few hundred chats would take
+// minutes and push the run past its lock; Telegram allows ~30 messages a second
 async function sendTo(chats: (number | string)[], lines: string[], syms: string[] = []) {
   if (!lines.length || !chats.length) return;
-  for (const chat of [...new Set(chats.map(String))]) await tgSend(chat, lines.join("\n\n"), syms);
+  await pool([...new Set(chats.map(String))], 8, async (chat) => { await tgSend(chat, lines.join("\n\n"), syms); });
 }
 // who gets the shared bot's trades: every subscribed chat that kept them on (plus the owner's old single chat, if set)
 async function chatsFor(kind: "shared") {
@@ -254,7 +257,7 @@ async function run() {
   const klines: Record<string, unknown[]> = {}, rows: any[] = [], RM = new Map<string, any>(), groups: Groups = new Map();
   addTask(groups, S, list);
   await remote(groups, false, now, RM, 15_000);
-  const limit = Math.min(1000, S.N + 150), held = new Set(open!.map((p: any) => p.sym));
+  const limit = Math.min(1000, Math.max(M.BARS, S.N + 150)), held = new Set(open!.map((p: any) => p.sym));
   await pool(list, PAR, async (sym) => {
     try {
       let r = RM.get(rkey(sym, S));
@@ -266,16 +269,12 @@ async function run() {
   const { data: recent } = await db.from("trades").select("sym").gt("tclose", now - M.COOLDOWN * M.TFMS[S.tf]);
   const res = M.botTick({ rows, klines, open: open!, recentSyms: (recent ?? []).map((x: any) => x.sym), balance: st.balance, S, now });
 
-  if (res.closed.length) {
-    // ignoreDuplicates: if a previous run wrote the trade but failed to remove the position, it closes again here — once
-    const { error } = await db.from("trades").upsert(res.closed, { onConflict: "id", ignoreDuplicates: true }); if (error) throw error;
-    const { error: e3 } = await db.from("positions").delete().in("id", res.closed.map((x: any) => x.id)); if (e3) throw e3;
-  }
+  // trades, positions and balance in one transaction (bot_commit): a failure half-way can't lose a trade's P&L any more
   const upserts = [...res.stillOpen, ...res.opened];
-  if (upserts.length) { const { error } = await db.from("positions").upsert(upserts); if (error) throw error; }
-  await db.from("bot_state").update({ balance: res.balance, checked_at: new Date(now).toISOString(), scanned: rows.length, last_error: null }).eq("id", 1);
+  const { error } = await db.rpc("bot_commit", { p_closed: res.closed, p_open: upserts, p_balance: res.balance, p_checked: new Date(now).toISOString(), p_scanned: rows.length });
+  if (error) throw error;
   await notify([...res.closed.map((t: any) => closedMsg(t)), ...res.opened.map((p: any) => openedMsg(p))], [...res.opened, ...res.closed].map((x: any) => x.sym));
-  return { scanned: rows.length, signals: rows.filter((r) => M.wants(r, S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, ticker: undefined as any };
+  return { scanned: rows.length, signals: rows.filter((r) => M.wants(M.tradeRow(r), S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, ticker: undefined as any };
 }
 
 // ---------- personal bots (one per browser; config = profiles chosen on the site) ----------
@@ -331,9 +330,15 @@ async function majorsRegime() {
 }
 async function runUserBots(now: number, reqStart: number) {
   // fair queue: the least recently checked bots go first, so with more bots than fit in one run every bot still gets its turn;
-  // bots whose owner hasn't opened the site for 30 days are not scheduled
-  const { data: bots } = await db.from("user_bots").select("id, config, balance, tg_chat, alerts, sig_sent").eq("enabled", true)
-    .gt("last_seen", new Date(now - 30 * 864e5).toISOString()).order("checked_at", { ascending: true, nullsFirst: true }).limit(40);
+  // bots whose owner hasn't opened the site for 30 days, or that have no profile, are not scheduled.
+  // Bots holding positions go first every minute: an exit at the stop must not wait for the queue to come round
+  const RUN = 40, FIELDS = "id, config, balance, tg_chat, alerts, sig_sent", seen = new Date(now - 30 * 864e5).toISOString();
+  const { data: held } = await db.from("user_positions").select("bot_id");
+  const heldIds = [...new Set((held ?? []).map((x: any) => x.bot_id))].slice(0, RUN);
+  const { data: first } = heldIds.length ? await db.from("user_bots").select(FIELDS).eq("enabled", true).in("id", heldIds) : { data: [] };
+  const { data: rest } = await db.from("user_bots").select(FIELDS).eq("enabled", true).gt("last_seen", seen).not("config->profiles->0", "is", null)
+    .order("checked_at", { ascending: true, nullsFirst: true }).limit(RUN);
+  const bots = [...(first ?? []), ...(rest ?? []).filter((b: any) => !heldIds.includes(b.id))].slice(0, RUN);
   QUIET.clear();   // recomputed per chat below, each run
   if (!bots?.length) return 0;
   const reg = await majorsRegime(), ticker = await ticker24();
@@ -406,17 +411,10 @@ async function runUserBots(now: number, reqStart: number) {
       const { data: rec } = await db.from("user_trades").select("data").eq("bot_id", b.id).gt("tclose", now - M.COOLDOWN * (M.TFMS as any)[S.tf]);
       const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, S, now, market: reg });
       for (const p of res.opened) { p.note = `«${pname}» · ${p.note}`; p.snap.profile = pname; }
-      if (res.closed.length) {
-        // a trade is only removed from the open positions once it is written: a failed write must not lose it (it closes again next minute)
-        const { error: ei } = await db.from("user_trades").upsert(res.closed.map((t: any) => ({ bot_id: b.id, id: t.id, tclose: t.tclose, data: t })), { onConflict: "bot_id,id", ignoreDuplicates: true });
-        if (ei) throw ei;
-        const { error: ed } = await db.from("user_positions").delete().eq("bot_id", b.id).in("id", res.closed.map((t: any) => t.id));
-        if (ed) throw ed;
-      }
-      const keep = [...res.stillOpen, ...res.opened];
-      if (keep.length) { const { error: eu } = await db.from("user_positions").upsert(keep.map((p: any) => ({ bot_id: b.id, id: p.id, data: p }))); if (eu) throw eu; }
-      await db.from("user_bots").update({ balance: res.balance, checked_at: new Date(now).toISOString(), active_profile: pname,
-        regime: reg ? { state: regName, by: reg.by } : null, last_error: null }).eq("id", b.id);
+      // trades, positions and balance in one transaction (ub_commit); a manual close sent meanwhile survives it
+      const { error: ec } = await db.rpc("ub_commit", { p_bot: b.id, p_closed: res.closed, p_keep: [...res.stillOpen, ...res.opened], p_balance: res.balance,
+        p_profile: pname, p_regime: reg ? { state: regName, by: reg.by } : null, p_checked: new Date(now).toISOString() });
+      if (ec) throw ec;
       if (b.tg_chat) {
         if (quietNow(alertsOf(b).quiet)) QUIET.add(String(b.tg_chat));
         await sendTo([b.tg_chat], [
@@ -480,8 +478,11 @@ async function runUserBots(now: number, reqStart: number) {
       return null;
     };
     const fresh: any[] = [], upd: any[] = [];
-    for (const r of sigRows) {
-      if (!r.touchTime || r.score == null) continue;
+    // "confirmed" is the bot's own moment: the reversal held to the close of the next candle (M.tradeRow, as the backtest)
+    const conf = (r: any) => { const c = M.tradeRow({ ...r, mkt: r.mkt ?? reg }); return c?.rev ? c : null; };
+    for (const r0 of sigRows) {
+      if (!r0.touchTime || r0.score == null) continue;
+      const c = conf(r0), r = c ? { ...r0, rev: true, score: c.score } : { ...r0, rev: false, rev0: r0.rev };
       const key = `s:${r.sym}:${r.touchTime}`, prev = episode(r);
       const stage = inList.has(r.sym) && (entered.get(r.sym) ?? 0) >= r.touchTime ? 3 : r.rev ? 2 : 1;
       if (prev) {
@@ -496,7 +497,8 @@ async function runUserBots(now: number, reqStart: number) {
     }
     const note = (r: any, stage: number) => !inList.has(r.sym) ? `✋ для ручной торговли: бот торгует топ-${list.length}, по этой монете не войдёт`
       : stage === 3 ? "🤖 бот вошёл в сделку" : entered.has(r.sym) ? "🤖 бот уже в сделке по этой монете"
-      : stage === 1 ? "🤖 бот ждёт подтверждения разворота" : `🤖 бот не войдёт: ${whyNot(r, S, entered.size)}`;
+      : stage === 1 ? (r.rev0 ? "🤖 разворот есть, бот решит по закрытию свечи: войдёт, если цена удержится в канале" : "🤖 бот ждёт подтверждения разворота")
+      : `🤖 бот не войдёт: ${whyNot(conf(r) ?? r, S, entered.size)}`;
     // levels as the bot would set them now (the regime decides the strategy for "переключатель")
     const text = (r: any, stage: number, failed = false) => {
       const x = { ...r, mkt: r.mkt ?? reg }, lv = stage < 3 ? M.levels(x, S) : null;
@@ -531,7 +533,8 @@ async function runUserBots(now: number, reqStart: number) {
     await pool(lst.filter((s) => !RM.has(rkey(s, SM))), PAR, async (s) => { KM[s] = await getK(s, SM.tf, true); });
     const told = new Map<string, number[]>();
     if (SM.tf === S.tf) for (const k of Object.keys(sent)) if (k.startsWith("s:")) { const [, s, t] = k.split(":"); told.set(s, [...(told.get(s) || []), +t]); }
-    const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r?.rev && !(told.get(r.sym) || []).some((t) => Math.abs(t - r.touchTime) <= win));
+    // confirmed the way the bots confirm: on the closed candle (M.tradeRow)
+    const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r && M.tradeRow(r)?.rev && !(told.get(r.sym) || []).some((t) => Math.abs(t - r.touchTime) <= win));
     const mktSigs = freshSignals(rowsM, SM.minScore, sent, now, "m:", win).map((r: any) => ({ ...r, lv: M.levels({ ...r, mkt: reg }, SM) }));
     if (mktSigs.length) await sendTo([chat], sigMsg("🔔 <b>Рынок</b>", `${SM.tf} · топ-${SM.top} · сила от ${SM.minScore} · только подтверждённые развороты`, mktSigs, SM.tf), mktSigs.map((r: any) => r.sym));
   }
@@ -542,11 +545,13 @@ let SEC: string | null = null, secAt = 0;
 Deno.serve(async (req) => {
   const tok = req.headers.get("x-bot-token");
   if (!tok) return new Response("forbidden", { status: 403 });
-  const readSec = async () => { const { data } = await db.from("bot_secret").select("token").eq("id", 1).single(); SEC = data?.token ?? null; secAt = Date.now(); };
+  const readSec = async () => { const { data } = await db.from("bot_secret").select("token, scan").eq("id", 1).single(); SEC = data?.token ?? null; SCAN_TOK = data?.scan ?? ""; secAt = Date.now(); };
   if (!SEC || Date.now() - secAt > 600_000) await readSec();
   if (tok !== SEC && Date.now() - secAt > 30_000) await readSec();   // the token may have been changed: re-read, at most twice a minute
   if (!SEC || tok !== SEC) return new Response("forbidden", { status: 403 });
-  const { data: locked } = await db.rpc("bot_try_lock", { seconds: 120 });
+  // the lock is this run's: a run that outlives it can't release the next run's lock (bot_unlock checks the id)
+  const runId = crypto.randomUUID();
+  const { data: locked } = await db.rpc("bot_lock", { p_run: runId, seconds: 120 });
   if (!locked) return Response.json({ skipped: "another run in progress" });
   const t0 = Date.now();
   TG = undefined;   // re-read the Telegram settings every run
@@ -569,6 +574,6 @@ Deno.serve(async (req) => {
     return Response.json({ error: msg }, { status: 500 });
   } finally {
     await db.from("bot_runs").delete().lt("ts", new Date(Date.now() - 3 * 864e5).toISOString());
-    await db.from("bot_state").update({ lock_until: null }).eq("id", 1);
+    await db.rpc("bot_unlock", { p_run: runId });
   }
 });

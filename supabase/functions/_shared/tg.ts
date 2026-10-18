@@ -133,7 +133,7 @@ async function sharedScreen(db: any): Promise<Screen> {
   const [{ data: st }, { data: pos }, { data: tr }, { data: rg }] = await Promise.all([
     db.from("bot_state").select("settings, balance, start_balance, checked_at, last_error").eq("id", 1).maybeSingle(),
     db.from("positions").select("*"),
-    db.from("trades").select("sym, side, pnl, r, reason, tclose").order("tclose", { ascending: false }),
+    db.from("trades").select("sym, side, pnl, r, reason, tclose").order("tclose", { ascending: false }).limit(2000),   // the stats line: capped, a long history must not slow a button
     db.from("user_bots").select("regime").not("regime", "is", null).order("checked_at", { ascending: false }).limit(1),
   ]);
   const S = st?.settings || {}, reg = regimeOf(rg?.[0]?.regime?.by, S.erMax ?? 0.15), ts = tr ?? [];
@@ -157,7 +157,7 @@ async function mineScreen(db: any, c: any): Promise<Screen> {
   };
   const [{ data: pos }, { data: tr }] = await Promise.all([
     db.from("user_positions").select("data").eq("bot_id", bot.id),
-    db.from("user_trades").select("data").eq("bot_id", bot.id).order("tclose", { ascending: false }),
+    db.from("user_trades").select("data").eq("bot_id", bot.id).order("tclose", { ascending: false }).limit(2000),
   ]);
   const P = profileOf(bot), set = P?.set || {}, ts = (tr ?? []).map((x: any) => x.data), op = (pos ?? []).map((x: any) => x.data);
   const auto = bot.config?.mode === "auto", reg = bot.regime?.state;
@@ -184,7 +184,7 @@ const help: Screen = {
     `<b>До центра</b> — расстояние до середины канала: туда обычно идёт отскок.\n` +
     `<b>⌛ Войти можно ещё…</b> — сигнал живёт 5 свечей от касания границы (на 15m — 75 минут от касания, не от подтверждения). Это срок для входа, а не для выхода: открытую позицию держат до тейка или стопа.\n` +
     `<b>T½</b> — за сколько монета обычно проходит половину пути к центру. ✅ — быстро (до 20 свечей), ⚠️ — медленно или тренд: отскок рискован.\n` +
-    `<b>✔ отскок подтверждён</b> — свеча закрылась обратно в канал на повышенном объёме. <b>⏳ ждём подтверждения</b> — касание есть, разворота пока нет.\n` +
+    `<b>✔ отскок подтверждён</b> — разворотная свеча на повышенном объёме, и цена удержалась в канале до закрытия следующей свечи. В этот момент входит бот, так же считает и бэктест. <b>⏳ ждём подтверждения</b> — касание есть, разворота пока нет.\n` +
     `<b>Сообщение обновляется</b>: когда разворот подтвердился и когда бот вошёл, меняется тот же сигнал, а не приходит новый.\n` +
     `<b>✋ для ручной торговли</b> — монета вне списка, на котором торгует ваш бот: он по ней не войдёт.\n\n` +
     `<b>Общий бот</b> — один на всех, торгует по правилам, проверенным на истории. <b>Мой бот</b> — ваш бот с сайта с вашими профилями.\n\n` +

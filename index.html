@@ -1874,7 +1874,9 @@ function renderDetail() {
       + (same ? (r.score < bs.minScore ? `ниже порога общего бота (${bs.minScore}), он не войдёт.`
           : SJ.open.some(p => p.sym === chartSym) ? 'общий бот уже в сделке по этой монете.'
           : SJ.open.length >= M.slotsOf(bs) ? `сигнал проходит, но у общего бота заняты все места (${M.slotsOf(bs)}) — войдёт, когда одно освободится.`
-          : 'общий бот войдёт в сделку на ближайшей проверке рынка.')
+          // bots decide on a closed candle, as the backtest does (math.js tradeRow)
+          : M.tradeRow(r)?.rev ? 'общий бот войдёт в сделку на ближайшей проверке рынка.'
+          : `общий бот решит по закрытию этой свечи (через ${dur(chartK[chartK.length - 1][0] + TFMS[S.tf] - Date.now())}): войдёт, если цена удержится в канале.`)
         : `${r.score >= 60 ? 'сильный сигнал' : 'слабый сигнал'}. Боты торгуют по своим настройкам${bs ? ` (общий — ${bs.tf}, k = ${bs.k})` : ''}, поэтому могут его не взять.`) + life;
   } else if (r.wasRev && r.kind === 'touch') {
     verdict = `<b>${r.side === 'low' ? '▲ Разворот вверх' : '▼ Разворот вниз'} ослаб.</b> Он был подтверждён, но последняя свеча закрылась против него, поэтому сила сейчас ${r.score} — без подтверждения. Следующая свеча в сторону сделки вернёт сигнал; бот по ослабшему сигналу не входит.` + life;
@@ -2484,7 +2486,7 @@ function renderJournal() {
   $('#jdesc').innerHTML = shared
     ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
       <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
-        <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Сделки общего бота и новые сигналы с силой ≥ 60 — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>${sharedIdle()}`
+        <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Входы и выходы общего бота — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>${sharedIdle()}`
     : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
   tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
@@ -2664,7 +2666,25 @@ const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/)
 // spikes). A pool of today's top-50 left most of them out, so the result was too high and changed with the day it was run
 // (Oct 2026, profile 1h/top-20: pool 50 → +0.55R…+0.75R depending on the day, 150 → +0.27R, 200–300 → +0.24R, stable)
 const poolOf = n => Math.min(400, Math.max(150, n * 2));
-const coinsLabel = r => r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} монет)` : `${r.pairs} монет`;
+// coins delisted from Binance during the test period: without them "the top at each moment" is built from survivors only.
+// In Oct 2026 about 40 USDT pairs delisted within a year had days of $10M+ turnover (TON up to $295M, OM $28M).
+// Pairs that no longer trade (stale ticker) get one daily-candle request each; their best day's turnover is cached for the day.
+// A delisted coin joins the pool when its best day beats today's 24 h turnover of the weakest coin already in it.
+async function delistedFor(tk, from, minQV, say) {
+  const now = Date.now(), day = Math.floor(now / 864e5);
+  let c = load('sr_delisted', null);
+  if (!c || c.day !== day || c.from > from) {
+    const gone = tk.filter(x => x.symbol.endsWith('USDT') && !M.STABLE.has(x.symbol.slice(0, -4)) && !(x.closeTime > now - 864e5)).map(x => x.symbol);
+    const qv = {}; let n = 0;
+    await pool(gone, 6, async s => {
+      try { const K = await api(`/api/v3/klines?symbol=${s}&interval=1d&startTime=${from}&limit=1000`); if (K.length) qv[s] = Math.max(...K.map(k => +k[7])); } catch {}
+      say(`Ищу монеты, снятые с биржи за период: ${++n}/${gone.length}…`);
+    });
+    c = {day, from, qv}; save('sr_delisted', c);
+  }
+  return Object.entries(c.qv).filter(([, q]) => q >= minQV).map(([s]) => s);
+}
+const coinsLabel = r =>r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} монет)` : `${r.pairs} монет`;
 function btSettings() {
   const custom = $('#btTop').value === 'custom' ? parseCoins($('#btCustom').value) : null;
   return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
@@ -2710,7 +2730,13 @@ async function runBacktest() {
     const from = endT - days * 864e5, startT = from - 450 * tfms;      // 450 bars of warm-up covers N ≤ 300
     if (s.custom && !s.custom.length) throw new Error('список монет пуст');
     // honest top: a wider pool is loaded and the backtest trades, at each moment, only that moment's top by 24 h turnover
-    const traded = s.custom || M.pickSymbols(await api('/api/v3/ticker/24hr'), s.pit ? poolOf(s.top) : s.top, [], now);
+    const tk = s.custom ? null : await api('/api/v3/ticker/24hr');
+    let traded = s.custom || M.pickSymbols(tk, s.pit ? poolOf(s.top) : s.top, [], now), gone = [];
+    if (s.pit) {   // plus the coins delisted meanwhile (see delistedFor)
+      const weakest = +(tk.find(x => x.symbol === traded[traded.length - 1])?.quoteVolume || 0);
+      gone = (await delistedFor(tk, from, weakest, t => { st.textContent = t; })).filter(x => !traded.includes(x));
+      traded = [...traded, ...gone];
+    }
     const syms = [...new Set([...traded, ...M.MAJORS])];   // BTC/ETH/SOL are always loaded: they define the market regime
     trimHistory(key => key.endsWith(`|${s.tf}|${startT}|${endT}`) && syms.includes(key.split('|')[0]));
     const hist = {}; let done = 0;
@@ -2724,7 +2750,8 @@ async function runBacktest() {
     btRes = M.backtest(hist, s, {start:10000, from, only:traded, top:s.pit ? s.top : 0});
     btRes.settings = s; btRes.days = days;
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length);   // a coin of the wider pool without history simply never makes the top
-    st.textContent = `Готово: ${coinsLabel(btRes)}, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
+    const goneN = gone.filter(x => hist[x]?.length).length;
+    st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
     btRes.status = st.textContent; renderBacktest();
@@ -2819,6 +2846,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.31', date:'19 октября 2026', title:'Бот входит так же, как бэктест; бэктест честнее', items:[
+    'Боты теперь входят в тот же момент, что и бэктест: по закрытию свечи после разворота, если цена удержалась в канале. Раньше вход был на свечу раньше, так что бэктест проверял немного другую стратегию.',
+    'Бэктест «топ на каждый момент» учитывает монеты, которые за период сняли с Binance (за год их больше 50). Без них итог был завышен: правила общего бота на топ-20 за год давали +0.14R на сделку, с ними −0.04R.',
+    'Telegram: «✔ разворот подтверждён» приходит в момент, когда входит бот. Если разворот уже виден, но свеча ещё не закрылась, сигнал так и скажет.',
+    'Закрытие позиции вручную больше не теряется, если совпало с проверкой рынка; баланс бота не может разойтись со сделками.',
+    'Пароль владельца беты проверяет только сервер.',
+  ]},
   {v:'2.30', date:'19 октября 2026', title:'Новый логотип', items:[
     'Σ нарисована как канал, по которому работает радар: сверху красная граница, снизу зелёная, а жёлтая линия цены доходит до границы и возвращается к середине.',
   ]},
@@ -3758,12 +3792,11 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- Beta: a password-gated tab for tools under test; its code (beta.js) loads only after unlocking ----------
-// The owner password is checked in the page (it keeps casual visitors out, not a security boundary); temporary codes are checked by the server.
-// Two ways in: the owner's password (checked here, permanent) or a temporary code SR-XXXX-XXXX issued by the owner —
-// codes are checked by Supabase (beta_redeem), expire on their own and can be revoked; the page re-checks on every open.
-const BETA_HASH = '93bc5d02dc2a24b5365347573b6f5115f069ca1097f319a1041c2a6c770079e0';
+// Two ways in: the owner's password (permanent) or a temporary code SR-XXXX-XXXX issued by the owner. Both are checked by
+// Supabase (beta_owner, beta_redeem); the page holds no hash of the password. Codes expire on their own and can be revoked;
+// the page re-checks a code on every open. The tab's data is public market data, so the lock keeps visitors out of a tool
+// under test rather than guarding a secret.
 let betaMod = null, betaPause = null, betaOwnerPass = '', betaTimer = null;   // the owner password stays in memory only
-const sha256 = async s => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)))].map(b => b.toString(16).padStart(2, '0')).join('');
 const betaState = () => { const s = load('sr_beta', false); return s === true ? {owner:true} : s && s.exp > Date.now() ? s : null; };
 const normCode = v => { const s = v.toUpperCase().replace(/[\s_]/g, ''); const m = s.match(/^SR-?([A-Z0-9]{4})-?([A-Z0-9]{4})$/); return m ? `SR-${m[1]}-${m[2]}` : s; };
 function betaExpire(msg) {
@@ -3801,9 +3834,14 @@ $('#betaForm').onsubmit = async e => {
   e.preventDefault();
   const v = $('#betaPass').value.trim(), err = t => { $('#betaErr').textContent = t; $('#betaPass').select(); };
   if (!v) return err('Введите пароль или код');
-  if (await sha256(v.toLowerCase()) === BETA_HASH) { betaOwnerPass = v; $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true); return betaOpen(); }
   const code = normCode(v), btn = e.submitter || $('#betaForm button'); btn.disabled = true;
   try {
+    // anything not shaped like a code is the owner's password
+    if (!/^SR-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) {
+      const o = await rpc('beta_owner', {p_admin:v});
+      if (!o?.ok) return err('Неверный пароль или код (после 5 ошибок — пауза 15 минут)');
+      betaOwnerPass = v; $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true); return betaOpen();
+    }
     const r = await rpc('beta_redeem', {p_code:code});
     if (!r?.ok) return err(r?.error || 'Неверный пароль или код');
     const exp = Date.parse(r.expires_at); save('sr_beta', {code, exp}); $('#betaErr').textContent = ''; $('#betaPass').value = '';

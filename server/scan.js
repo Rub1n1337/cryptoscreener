@@ -4,7 +4,12 @@
 // — a few hundred KB instead of tens of MB of candles. The bot falls back to doing it all itself when this doesn't answer.
 const MATH_URL = process.env.MATH_URL || 'https://cryptoscreener-topaz.vercel.app/supabase/functions/_shared/math.js';
 const BASES = ['https://data-api.binance.vision', 'https://api.binance.com'];
-const LIMIT = 450;   // bars kept per coin and timeframe (what the bot's channels need)
+const LIMIT = () => M?.BARS || 450;   // bars kept per coin and timeframe (math.js BARS: the same length everywhere)
+// Binance weight: full downloads are capped per minute (a 450-bar request weighs 2 of the ~6000 a minute this address may use);
+// beyond it a series is skipped and the bot computes that coin itself, instead of this address getting banned
+const FULL_PER_MIN = 900;
+let fullMin = 0, fullN = 0;
+const fullBudget = () => { const m = Math.floor(Date.now() / 60e3); if (m !== fullMin) { fullMin = m; fullN = 0; } return ++fullN <= FULL_PER_MIN; };
 const FRESH = 20e3;  // a series refreshed less than this long ago counts as current
 // how stale notify-only series may be (the bot marks them lazy): a signal stays enterable for 5 candles
 const LAZY = {'5m':0, '15m':0, '1h':3 * 60e3, '4h':5 * 60e3, '1d':15 * 60e3};
@@ -53,9 +58,10 @@ function refresh(key) {
   const job = (async () => {
     if (s?.K.length && Date.now() - s.K[s.K.length - 1][0] < 2 * tfms) {
       const N = compact(await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=3`));
-      if (N.length && N[0][0] <= s.K[s.K.length - 1][0]) { s.K = s.K.filter(k => k[0] < N[0][0]).concat(N).slice(-LIMIT); s.at = Date.now(); s.an = new Map(); return; }
+      if (N.length && N[0][0] <= s.K[s.K.length - 1][0]) { s.K = s.K.filter(k => k[0] < N[0][0]).concat(N).slice(-LIMIT()); s.at = Date.now(); s.an = new Map(); return; }
     }
-    const K = compact(await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${LIMIT}`));
+    if (!fullBudget()) throw new Error('download budget spent this minute');
+    const K = compact(await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${LIMIT()}`));
     SER.set(key, {K, at:Date.now(), used:s?.used || Date.now(), tradeAt:s?.tradeAt || 0, an:new Map()});
   })().finally(() => { const x = SER.get(key); if (x) x.busy = null; });
   if (s) s.busy = job;
@@ -80,8 +86,9 @@ setInterval(async () => {
 // body: {fp, now, tasks:[{tf, method, N, k, syms:[...], lazy}]} → {fp, rows:[{sym: analysis | null}, …] one per task}
 export async function scan(body) {
   const m = await math(), t0 = Date.now();
-  if (!FP || body?.fp !== FP) return {error:'math mismatch', fp:FP};
-  const now = +body.now || Date.now(), tasks = (Array.isArray(body.tasks) ? body.tasks : []).slice(0, MAX_TASKS)
+  if (!FP || body?.fp !== FP) return {error:'math mismatch'};   // the fingerprint itself is not told: it would be a key to this endpoint
+  // the bot's run time; a value far from ours is not trusted (analyses are cached for the minute and shared)
+  const now = Math.abs(+body.now - Date.now()) < 120e3 ? +body.now : Date.now(), tasks = (Array.isArray(body.tasks) ? body.tasks : []).slice(0, MAX_TASKS)
     .filter(t => t && m.TFMS[t.tf] && t.tf !== '1w' && Array.isArray(t.syms))
     .map(t => ({...t, syms:t.syms.slice(0, MAX_SYMS).filter(s => typeof s === 'string' && /^[A-Z0-9]{2,20}USDT$/.test(s))}));
   const want = new Map();   // key → lazy: a series any task needs for trading is kept fresh

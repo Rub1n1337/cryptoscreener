@@ -130,11 +130,23 @@ function sdRange(a, from, to) {
 }
 // S = {method, N, k, tf}
 // lite: skip the display-only extras — the bots only need what they trade on
+// atClose: the last closed bar judged exactly as the backtest judges it (bar fully elapsed). The bots enter on that one, not on
+// the forming bar, so a live entry happens when the backtest's would: a bar after the reversal candle, if the price held in the
+// channel to its close. Before 2.31 the bots entered as soon as the reversal candle closed, a bar earlier than every backtest.
+// null when there is no forming bar (the last bar is already closed: the row itself is that judgement); false when the closed
+// bar gives nothing to judge.
 export function analyze(sym, K, S, now = Date.now(), lite = false) {
   if (K.length < S.N + 10) return null;
-  const P = prepare(K, S);
-  return signalAt(P, P.n - 1, sym, now, lite);
+  const P = prepare(K, S), i = P.n - 1, r = signalAt(P, i, sym, now, lite);
+  if (r) r.atClose = P.t[i] + TFMS[S.tf] <= now ? null : (i - 1 >= S.N + 9 && signalAt(P, i - 1, sym, P.t[i], true)) || false;
+  return r;
 }
+// the row the bots trade on: the closed-bar judgement at the current price (an entry is filled now, not at the last close).
+// A row without atClose (an older collector) is traded as it is.
+export const tradeRow = r => !r || r.atClose === false ? null : r.atClose == null ? r : { ...r.atClose, price: r.price, mkt: r.mkt };
+// history kept per coin and timeframe by the bots and the collector: one length, so indicators that depend on where the series
+// starts (RSI, EWMA) give the same strength everywhere
+export const BARS = 450;
 export function signalAt(P, i, sym, now, lite = false) {   // lite: skip the display-only extras (backtest)
   const { t, o, h, l, c, v, B, S } = P, p = i - 1;
   if (i < S.N + 9) return null;
@@ -215,7 +227,12 @@ export function fingerprint() {
     const o = p; p *= 1 + 0.01 * Math.sin(i * 0.37) + 0.004 * Math.cos(i * 1.7);
     K.push([i * 36e5, o, Math.max(o, p) * (1 + 0.003 * (1 + Math.sin(i))), Math.min(o, p) * (1 - 0.003 * (1 + Math.cos(i * 0.5))), p, 1000 + 500 * Math.sin(i * 0.11) + (i % 17 ? 0 : 4000)]);
   }
-  const out = ['log', 'classic', 'robust', 'ewma'].map(method => analyze('X', K, { method, N: 210, k: 2, tf: '1h' }, K[K.length - 1][0] + 18e5, true));
+  // every channel model on 1h, plus the timeframes and band widths the bots use, mid-bar and after a bar's close
+  // (with and without the closed-bar judgement atClose): a change in any of these branches changes the fingerprint
+  const at = tf => K.map(k => [k[0] / 36e5 * TFMS[tf], k[1], k[2], k[3], k[4], k[5]]), last = (Q, tf, f) => Q[Q.length - 1][0] + f * TFMS[tf];
+  const run = (method, N, k, tf, f) => { const Q = at(tf); return analyze('X', Q, { method, N, k, tf }, last(Q, tf, f), true); };
+  const out = [...['log', 'classic', 'robust', 'ewma'].map(m => run(m, 210, 2, '1h', 0.5)),
+    run('log', 210, 3.5, '4h', 0.5), run('log', 210, 3, '4h', 1.5), run('log', 120, 2.5, '1d', 0.25), run('robust', 60, 3, '15m', 0.9)];
   const s = JSON.stringify(out, (k, v) => typeof v === 'number' ? (Number.isFinite(v) ? +v.toPrecision(10) : String(v)) : v);
   let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36) + TOUCH_BARS;
@@ -365,7 +382,8 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
     const mkt = market !== undefined ? market : marketOf(s => { const x = rows.find(r => r.sym === s); return x ? { er: x.er, ch: x.erCh } : null; });
     for (const r of rows) r.mkt = mkt;
     const cool = new Set([...recentSyms, ...closed.map(x => x.sym)]);
-    const cands = rows.filter(r => wants(r, S) && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
+    // entries are decided on the last closed bar, like the backtest (see analyze, tradeRow)
+    const cands = rows.map(tradeRow).filter(r => r && wants(r, S) && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
     for (const r of cands) {
       if (stillOpen.length + opened.length >= slotsOf(S)) break;
       const p = planEntry(r, balance, S, now);
