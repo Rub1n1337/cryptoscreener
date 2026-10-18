@@ -6,7 +6,8 @@
 <!-- the page may talk only to these hosts: even an injected script could not send the bot's key anywhere else -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Sigma Radar</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230b0f17'/><path d='M4 10 Q16 4 28 10' stroke='%23ef4444' stroke-width='2.5' fill='none'/><path d='M4 22 Q16 28 28 22' stroke='%2322c55e' stroke-width='2.5' fill='none'/><path d='M4 18 L10 14 L15 17 L21 11 L28 15' stroke='%23f5b70a' stroke-width='2.5' fill='none'/></svg>">
+<!-- the logo: Σ drawn as the channel — top band red, bottom band green, the price (gold) out to the band and back to the centre -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23161b26'/><path d='M47 15H17' stroke='%23f0525f' stroke-width='7' stroke-linecap='round'/><path d='M17 49H47' stroke='%2322c55e' stroke-width='7' stroke-linecap='round'/><path d='M17 15L34 32L17 49' stroke='%23f5b70a' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -735,7 +736,7 @@ details.dis>.dbody{padding:0 16px 16px}
 </svg>
 <header class="top"><div class="topin">
   <a class="brand" href="#market">
-    <svg width="26" height="26" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#161b26"/><path d="M5 10 Q16 4 27 10" stroke="#f0525f" stroke-width="2.5" fill="none"/><path d="M5 22 Q16 28 27 22" stroke="#22c55e" stroke-width="2.5" fill="none"/><path d="M5 18 L10 14 L15 17 L21 11 L27 15" stroke="#f5b70a" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--s2)"/><path d="M47 15H17" style="stroke:var(--up)" stroke-width="5.5" stroke-linecap="round"/><path d="M17 49H47" style="stroke:var(--lo)" stroke-width="5.5" stroke-linecap="round"/><path d="M17 15L34 32L17 49" style="stroke:var(--acc)" stroke-width="5.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="34" cy="32" r="4.5" style="fill:var(--acc)"/></svg>
     <span class="bt">Sigma Radar</span><small id="hdr"></small>
   </a>
   <nav class="tabs">
@@ -2818,6 +2819,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.30', date:'19 октября 2026', title:'Новый логотип', items:[
+    'Σ нарисована как канал, по которому работает радар: сверху красная граница, снизу зелёная, а жёлтая линия цены доходит до границы и возвращается к середине.',
+  ]},
   {v:'2.29', date:'19 октября 2026', title:'Честный бэктест — без скачков от дня к дню', items:[
     'Результат честного бэктеста («топ на каждый момент») менялся в зависимости от дня запуска: монеты брались только из сегодняшнего топ-50, и монета, выпавшая из него, исчезала из бэктеста вместе со всеми своими сделками за год.',
     'Теперь набор шире — от 150 монет: за год через топ-20 по обороту проходит около двухсот разных монет (новые листинги, короткие всплески), и живой бот торгует и их. Результат больше не скачет от дня к дню.',
