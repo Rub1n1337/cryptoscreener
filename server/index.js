@@ -261,7 +261,7 @@ const RATE = 300, HITS = new Map();
 // Railway's proxy puts the caller's address in X-Real-IP; X-Forwarded-For can be started by the caller, so it is only a fallback
 const clientIp = req => String(req.headers['x-real-ip'] || req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 const SCAN_TOKEN = process.env.SCAN_TOKEN || '';
-if (!SCAN_TOKEN) console.log('SCAN_TOKEN is not set: POST /scan is open to anyone (set it to bot_secret.scan from Supabase)');
+if (!SCAN_TOKEN) console.log('SCAN_TOKEN is not set: POST /scan is closed (503) until it is (set it to bot_secret.scan from Supabase)');
 function allowed(req) {
   const ip = clientIp(req), now = Date.now(), h = HITS.get(ip);
   if (!h || now - h.t > 60e3) { HITS.set(ip, {n:1, t:now}); return true; }
@@ -292,8 +292,11 @@ http.createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, {'access-control-allow-origin':'*', 'access-control-allow-methods':'GET, POST', 'access-control-allow-headers':'content-type'}); return res.end(); }
   // the Supabase bot's candles and analyses (scan.js): a JSON body, answered gzipped
   if (req.method === 'POST' && req.url === '/scan') {
-    // only the Supabase bot may make this service download and compute (SCAN_TOKEN = bot_secret.scan in Supabase)
-    if (SCAN_TOKEN && req.headers['x-scan-token'] !== SCAN_TOKEN) return send(req, res, 403, {error:'forbidden'});
+    // only the Supabase bot may make this service download and compute (SCAN_TOKEN = bot_secret.scan in Supabase). Without the
+    // variable the route stays shut (503) instead of open to anyone: one forgotten setting must not reopen it; the bot then
+    // computes everything itself
+    if (!SCAN_TOKEN) return send(req, res, 503, {error:'scan is not configured'});
+    if (req.headers['x-scan-token'] !== SCAN_TOKEN) return send(req, res, 403, {error:'forbidden'});
     if (!allowed(req)) return send(req, res, 429, {error:'too many requests, slow down'}, {'retry-after':'60'});
     let size = 0; const parts = [];
     req.on('data', d => { size += d.length; if (size > 256e3) req.destroy(); else parts.push(d); });

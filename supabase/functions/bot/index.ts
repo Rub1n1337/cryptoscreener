@@ -182,7 +182,10 @@ async function tgPoll() {
 // what a chat was already told: `sent` maps "<feed>SYM:touchTime" to the time it was sent (a number), or for the bot's own
 // signals ("s:") to {t, st: stage, mid: message id}; entries are kept 3 days
 function pruneSent(sent: Record<string, any>, now: number) {
-  for (const k of Object.keys(sent)) { const v = sent[k]; if (now - (typeof v === "number" ? v : Number(v?.t) || 0) > 3 * 864e5) delete sent[k]; }
+  for (const k of Object.keys(sent)) {
+    if (k.startsWith("_init")) continue;   // the first-run markers stay: losing one would swallow a minute of signals as a "first run"
+    const v = sent[k]; if (now - (typeof v === "number" ? v : Number(v?.t) || 0) > 3 * 864e5) delete sent[k];
+  }
 }
 // signals at the threshold not announced yet (`sent` is updated in place);
 // the very first call only remembers what is there, so nobody gets a pile of old signals ("_init" marks that it has run)
@@ -198,7 +201,7 @@ function freshSignals(rows: any[], min: number, sent: Record<string, any>, now: 
   const first = !sent["_init" + pre];
   for (const r of fresh) sent[`${pre}${r.sym}:${r.touchTime}`] = now;
   pruneSent(sent, now);
-  sent["_init" + pre] = now;
+  if (first) sent["_init" + pre] = now;   // once: a marker rewritten every minute made the memory look changed every minute
   return first ? [] : fresh;
 }
 // one signal: side and coin first, then where the price is and why it counts; last — how long it can still be entered
@@ -267,14 +270,19 @@ async function run() {
   });
 
   const { data: recent } = await db.from("trades").select("sym").gt("tclose", now - M.COOLDOWN * M.TFMS[S.tf]);
-  const res = M.botTick({ rows, klines, open: open!, recentSyms: (recent ?? []).map((x: any) => x.sym), balance: st.balance, S, now });
+  // the regime it trades by, measured as the backtest does on its timeframe (undefined: botTick takes it from the rows)
+  const mkt = await regimeOn(S.tf, now) ?? undefined;
+  const res = M.botTick({ rows, klines, open: open!, recentSyms: (recent ?? []).map((x: any) => x.sym), balance: st.balance, S, now, market: mkt });
 
-  // trades, positions and balance in one transaction (bot_commit): a failure half-way can't lose a trade's P&L any more
+  // trades, positions and balance in one transaction (bot_commit): a failure half-way can't lose a trade's P&L any more.
+  // The regime is kept too: the site and Telegram explain what the bot waits for by it, not by a regime of their own
   const upserts = [...res.stillOpen, ...res.opened];
-  const { error } = await db.rpc("bot_commit", { p_closed: res.closed, p_open: upserts, p_balance: res.balance, p_checked: new Date(now).toISOString(), p_scanned: rows.length });
+  const { error } = await db.rpc("bot_commit", { p_closed: res.closed, p_open: upserts, p_balance: res.balance, p_checked: new Date(now).toISOString(), p_scanned: rows.length,
+    p_regime: mkt ? { tf: S.tf, erMax: S.erMax ?? 0.15, state: M.regimeOf(mkt, S), by: mkt.by } : null });
   if (error) throw error;
-  await notify([...res.closed.map((t: any) => closedMsg(t)), ...res.opened.map((p: any) => openedMsg(p))], [...res.opened, ...res.closed].map((x: any) => x.sym));
-  return { scanned: rows.length, signals: rows.filter((r) => M.wants(M.tradeRow(r), S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, ticker: undefined as any };
+  // its Telegram messages go out after the personal bots have traded (see Deno.serve): a long subscriber list must not hold them up
+  const notes = { lines: [...res.closed.map((t: any) => closedMsg(t)), ...res.opened.map((p: any) => openedMsg(p))], syms: [...res.opened, ...res.closed].map((x: any) => x.sym) };
+  return { scanned: rows.length, signals: rows.filter((r) => M.wants(M.tradeRow(r), S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, notes };
 }
 
 // ---------- personal bots (one per browser; config = profiles chosen on the site) ----------
@@ -299,34 +307,38 @@ const SIG_TOPS = [0, 50, 100, 150, 250];
 function alertsOf(b: any) {
   const a = b.alerts && typeof b.alerts === "object" ? b.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {}, m = a.mkt, q = a.quiet;
   return {
-    // quiet hours in the owner's time zone (tz: minutes east of UTC, set by the site; Moscow when unknown)
-    quiet: q && typeof q === "object" && q.on ? { from: Math.round(num(q.from, 0, 23, 23)), to: Math.round(num(q.to, 0, 23, 8)), tz: Math.round(num(q.tz, -720, 840, 180)) } : null,
+    // quiet hours in the owner's time zone: zone (an IANA name like "Europe/Berlin", set by the site — follows summer time), or the
+    // older tz (minutes east of UTC at the moment of saving; Moscow when unknown)
+    quiet: q && typeof q === "object" && q.on ? { from: Math.round(num(q.from, 0, 23, 23)), to: Math.round(num(q.to, 0, 23, 8)), tz: Math.round(num(q.tz, -720, 840, 180)),
+      zone: typeof q.zone === "string" && /^[A-Za-z]+(\/[A-Za-z0-9_+\-]+){0,2}$/.test(q.zone) ? q.zone : null } : null,
     sig: { on: s.on !== false, top: oneOf(Math.round(Number(s.top) || 0), SIG_TOPS, 0), when: oneOf(s.when, ["confirmed", "touch"], "confirmed"), long: s.sides === "long" },
     mkt: m && typeof m === "object" && m.on !== false ? {
       method: oneOf(m.method, ["log", "classic", "robust", "ewma"], "log"), N: Math.round(num(m.N, 20, 300, 210)), k: num(m.k, 1, 5, 3),
       tf: oneOf(m.tf, ["5m", "15m", "1h", "4h", "1d"], "4h"), minScore: num(m.minScore, 40, 100, 60), top: Math.round(num(m.top, 10, 400, 150)) } : null,
   };
 }
+const zoneHour = (zone: string) => { try { return Number(new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "numeric", hourCycle: "h23" }).format(new Date())); } catch { return NaN; } };
 const quietNow = (q: any) => {
   if (!q) return false;
-  const h = Math.floor(((Date.now() / 6e4 + q.tz) % 1440 + 1440) % 1440 / 60);
+  const zh = q.zone ? zoneHour(q.zone) : NaN;
+  const h = Number.isFinite(zh) ? zh : Math.floor(((Date.now() / 6e4 + q.tz) % 1440 + 1440) % 1440 / 60);
   return q.from <= q.to ? h >= q.from && h < q.to : h >= q.from || h < q.to;
 };
 const tfOf = (ms: number) => Object.keys(M.TFMS).find((k) => (M.TFMS as any)[k] === ms);
 const effN = (len: number, S: any) => (S.tf === "1d" || S.tf === "1w") ? Math.max(20, Math.min(S.N, len - 20)) : S.N;
-// market regime the same way the site does it: BTC/ETH/SOL on 1h, efficiency ratio over 7 days
-async function majorsRegime() {
-  const got: Record<string, any> = {};
-  await Promise.all(M.MAJORS.map(async (s: string) => {
-    try {
-      const c = (await candles(s, "1h", 200)).map((k) => k[4]), L = 168, i = c.length - 1;
-      let path = 0; for (let j = i - L + 1; j <= i; j++) path += Math.abs(c[j] - c[j - 1]);
-      got[s] = { er: path ? Math.abs(c[i] - c[i - L]) / path : 0, ch: c[i] / c[i - L] - 1 };
-    } catch { /* regime falls back to BTC-only or null */ }
-  }));
-  const m: any = M.marketOf((s: string) => got[s] || null);
-  if (m) m.by = got;
-  return m;
+// the market regime of a timeframe as the backtest computes it (M.marketOn: BTC/ETH/SOL, closed candles), once per run and
+// timeframe. Every bot trades by the regime of its own timeframe; "the market now" (the auto mode's choice of profile, the site's
+// line) is 1h. Before 2.34 the personal bots used 1h for everything, which on 4h disagreed with the backtest ~30% of the time
+let REGS = new Map<string, Promise<any>>();
+function regimeOn(tf: string, now: number) {
+  if (!REGS.has(tf)) REGS.set(tf, (async () => {
+    const C: Record<string, number[]> = {};
+    await Promise.all(M.MAJORS.map(async (s: string) => {
+      try { C[s] = M.closedCloses(await candles(s, tf, M.BARS), tf, now); } catch { /* that major is left out */ }
+    }));
+    return M.marketOn((s: string) => C[s] || null, tf);
+  })());
+  return REGS.get(tf)!;
 }
 async function runUserBots(now: number, reqStart: number) {
   // fair queue: the least recently checked bots go first, so with more bots than fit in one run every bot still gets its turn;
@@ -341,7 +353,7 @@ async function runUserBots(now: number, reqStart: number) {
   const bots = [...(first ?? []), ...(rest ?? []).filter((b: any) => !heldIds.includes(b.id))].slice(0, RUN);
   QUIET.clear();   // recomputed per chat below, each run
   if (!bots?.length) return 0;
-  const reg = await majorsRegime(), ticker = await ticker24();
+  const reg = await regimeOn("1h", now), ticker = await ticker24();   // "the market now": the auto mode picks the profile by it
   // one request per coin + timeframe for all bots in this run (compact candles, see candles()); lazy: notify-only, may be minutes old
   const kc = new Map<string, Promise<any>>();
   const getK = (s: string, tf: string, lazy = false) => {
@@ -380,7 +392,9 @@ async function runUserBots(now: number, reqStart: number) {
     const erMax = num(cfg.erMax, 0.05, 0.5, 0.15);
     const regName = M.regimeOf(reg, { erMax, regimeSrc: "majors" });
     const P = cfg.mode === "auto" ? byId(regName === "flat" ? cfg.flat : cfg.impulse) : byId(cfg.active);
-    const S = { ...cleanSet(P.set), regimeSrc: "majors", erMax };
+    // the flat / impulse border is the profile's own when it has one (a shared profile carries it; "проверен за год" was tested
+    // at 0.25), else the bot's common one
+    const S = { ...cleanSet(P.set), regimeSrc: "majors", erMax: P.set?.erMax != null ? num(P.set.erMax, 0.05, 0.5, 0.15) : erMax };
     const pname = String(P.name ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60);
     const own = Array.isArray(P.coins?.list) ? P.coins.list.filter((s: unknown) => typeof s === "string" && /^[A-Z0-9]{2,20}USDT$/.test(s)).slice(0, 200) : [];
     const list: string[] = P.coins?.mode === "list" && own.length ? own : M.pickSymbols(ticker, Math.round(num(P.coins?.top, 20, 200, 150)), [], now);
@@ -389,6 +403,9 @@ async function runUserBots(now: number, reqStart: number) {
   // every bot's coins in one request to the collector
   const plans = new Map<string, any>(), tradeGroups: Groups = new Map();
   for (const b of bots) { try { const x = plan(b); if (x) { plans.set(b.id, x); addTask(tradeGroups, x.S, x.list); } } catch { /* the loop below reports it */ } }
+  // the regime each profile trades by: on its own timeframe (one per timeframe for all bots)
+  const REGT: Record<string, any> = {};
+  await Promise.all([...new Set([...plans.values()].map((x: any) => x.S.tf))].map(async (tf) => { REGT[tf] = await regimeOn(tf, now); }));
   await remote(tradeGroups, false, now, RM, 15_000);
   for (const b of bots) {
     // the deadline counts from the start of the whole request (the shared bot ran first): the run lock lasts 120 s, and a run
@@ -409,11 +426,14 @@ async function runUserBots(now: number, reqStart: number) {
       const exitK: Record<string, any> = {};
       for (const p of open) exitK[p.sym] = await getK(p.sym, tfOf(p.tfms) || S.tf);
       const { data: rec } = await db.from("user_trades").select("data").eq("bot_id", b.id).gt("tclose", now - M.COOLDOWN * (M.TFMS as any)[S.tf]);
-      const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, S, now, market: reg });
+      const mkt = REGT[S.tf] ?? undefined;   // undefined: botTick takes it from the BTC/ETH/SOL rows
+      const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, S, now, market: mkt });
       for (const p of res.opened) { p.note = `«${pname}» · ${p.note}`; p.snap.profile = pname; }
-      // trades, positions and balance in one transaction (ub_commit); a manual close sent meanwhile survives it
+      // trades, positions and balance in one transaction (ub_commit); a manual close sent meanwhile survives it.
+      // regime: "the market now" (1h) for the site's line, and `trade` — what the profile trades by on its timeframe
       const { error: ec } = await db.rpc("ub_commit", { p_bot: b.id, p_closed: res.closed, p_keep: [...res.stillOpen, ...res.opened], p_balance: res.balance,
-        p_profile: pname, p_regime: reg ? { state: regName, by: reg.by } : null, p_checked: new Date(now).toISOString() });
+        p_profile: pname, p_regime: reg ? { state: regName, by: reg.by, trade: mkt ? { tf: S.tf, erMax: S.erMax, state: M.regimeOf(mkt, S), by: mkt.by } : null } : null,
+        p_checked: new Date(now).toISOString() });
       if (ec) throw ec;
       if (b.tg_chat) {
         if (quietNow(alertsOf(b).quiet)) QUIET.add(String(b.tg_chat));
@@ -440,10 +460,11 @@ async function runUserBots(now: number, reqStart: number) {
   for (const { b, P, S, pname, list, rows, res } of later) {
     if (over(80_000)) break;
     try {
-      const A = alertsOf(b), sent = b.sig_sent || {}, chat = b.tg_chat;
+      const A = alertsOf(b), sent = b.sig_sent || {}, chat = b.tg_chat, before = JSON.stringify(sent);
       if (A.sig.on) await mySignals(A.sig, sent, chat, P, S, pname, list, rows, res);
       if (A.mkt) await marketSignals(A.mkt, sent, chat, S);
-      if (A.sig.on || A.mkt) await db.from("user_bots").update({ sig_sent: sent }).eq("id", b.id);
+      // written only when something changed: up to ~20 KB a bot, every minute, was a new copy of the row for nothing
+      if ((A.sig.on || A.mkt) && JSON.stringify(sent) !== before) await db.from("user_bots").update({ sig_sent: sent }).eq("id", b.id);
     } catch { /* signals must never break trading */ }
   }
   AN = computed;
@@ -465,7 +486,8 @@ async function runUserBots(now: number, reqStart: number) {
     }
     const entered = new Map<string, number>([...res.stillOpen, ...res.opened].map((p: any) => [p.sym, p.time]));
     const first = !sent["_init:s"];
-    sent["_init:s"] = now;
+    if (first) sent["_init:s"] = now;   // set once: rewriting it every minute made the memory "change" every minute
+    const mktT = REGT[S.tf] ?? reg;     // the regime this profile trades by (its timeframe)
     // the episode a touch belongs to: the same touch, or an earlier one of this coin and side close enough to it
     const episode = (r: any) => {
       const exact = sent[`s:${r.sym}:${r.touchTime}`];
@@ -479,7 +501,7 @@ async function runUserBots(now: number, reqStart: number) {
     };
     const fresh: any[] = [], upd: any[] = [];
     // "confirmed" is the bot's own moment: the reversal held to the close of the next candle (M.tradeRow, as the backtest)
-    const conf = (r: any) => { const c = M.tradeRow({ ...r, mkt: r.mkt ?? reg }); return c?.rev ? c : null; };
+    const conf = (r: any) => { const c = M.tradeRow({ ...r, mkt: r.mkt ?? mktT }); return c?.rev ? c : null; };
     for (const r0 of sigRows) {
       if (!r0.touchTime || r0.score == null) continue;
       const c = conf(r0), r = c ? { ...r0, rev: true, score: c.score } : { ...r0, rev: false, rev0: r0.rev };
@@ -487,7 +509,8 @@ async function runUserBots(now: number, reqStart: number) {
       const stage = inList.has(r.sym) && (entered.get(r.sym) ?? 0) >= r.touchTime ? 3 : r.rev ? 2 : 1;
       if (prev) {
         const newTouch = prev.tt != null && prev.tt !== r.touchTime;
-        sent[key] = prev; prev.tt = r.touchTime; prev.t = now;
+        // t keeps a running episode from being pruned (3 days): refreshed hourly, not every minute
+        sent[key] = prev; prev.tt = r.touchTime; if (now - (Number(prev.t) || 0) > 36e5) prev.t = now;
         if (stage > prev.st) upd.push({ r, prev, stage });
         else if (newTouch && prev.st === 2 && stage === 1) upd.push({ r, prev, stage, failed: true });   // the bounce didn't hold
         continue;
@@ -501,7 +524,7 @@ async function runUserBots(now: number, reqStart: number) {
       : `🤖 бот не войдёт: ${whyNot(conf(r) ?? r, S, entered.size)}`;
     // levels as the bot would set them now (the regime decides the strategy for "переключатель")
     const text = (r: any, stage: number, failed = false) => {
-      const x = { ...r, mkt: r.mkt ?? reg }, lv = stage < 3 ? M.levels(x, S) : null;
+      const x = { ...r, mkt: r.mkt ?? mktT }, lv = stage < 3 ? M.levels(x, S) : null;
       return `📡 <b>«${esc(pname)}»</b> · ${S.tf}\n${sigLine(S.tf)({ ...x, lv, botNote: note(r, stage) })}` +
         (failed ? "\n⚠️ <b>отскок не удержался</b>: цена снова за границей канала — ждём нового подтверждения" : "");
     };
@@ -555,15 +578,18 @@ Deno.serve(async (req) => {
   if (!locked) return Response.json({ skipped: "another run in progress" });
   const t0 = Date.now();
   TG = undefined;   // re-read the Telegram settings every run
+  REGS = new Map();   // regimes are measured afresh every run (a warm instance would keep the last minute's)
   try { await tgPoll(); } catch { /* Telegram must never break trading */ }
   try {
-    const out = await run();
+    const { notes, ...out } = await run();
     const t1 = Date.now();
     let users = 0;
     try { users = await runUserBots(Date.now(), t0); } catch { /* personal bots never break the shared one */ }
+    const t2 = Date.now();
+    try { await notify(notes.lines, notes.syms); } catch { /* the trades are written; a failed message must not fail the run */ }
     await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed });
-    // where the time goes (shared bot / personal bots) and how many coins' candles are kept warm between runs
-    return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: Date.now() - t1 }, kept: KC.size, remote: RSTAT });
+    // where the time goes (shared bot / personal bots / the shared bot's messages) and how many coins' candles are kept warm
+    return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: t2 - t1, notify: Date.now() - t2 }, kept: KC.size, remote: RSTAT });
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);

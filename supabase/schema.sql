@@ -57,7 +57,7 @@ create table if not exists public.bot_state (
   id integer default 1 not null,
   balance double precision default 10000 not null,
   start_balance double precision default 10000 not null,
-  settings jsonb default '{"N": 210, "k": 3, "tf": "15m", "top": 150, "method": "log", "minScore": 60}'::jsonb not null,
+  settings jsonb default '{"N": 210, "k": 3.5, "rr": 2, "tf": "4h", "lev": 3, "top": 50, "risk": 0.01, "erMax": 0.25, "maxHL": 20, "method": "log", "minScore": 60, "strategy": "switch", "timeStop": 48, "regimeSrc": "majors", "regimeOnly": "any"}'::jsonb not null,
   checked_at timestamp with time zone,
   last_error text,
   scanned integer,

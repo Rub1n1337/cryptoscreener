@@ -147,7 +147,8 @@ export function analyze(sym, K, S, now = Date.now(), lite = false) {
 }
 // the row the bots trade on: the closed-bar judgement at the current price (an entry is filled now, not at the last close).
 // A row without atClose (an older collector) is traded as it is.
-export const tradeRow = r => !r || r.atClose === false ? null : r.atClose == null ? r : { ...r.atClose, price: r.price, mkt: r.mkt };
+export const tradeRow = r => !r || r.atClose === false ? null : r.atClose == null ? r
+  : { ...r.atClose, price: r.price, mkt: r.mkt, barHi: r.barHi, barLo: r.barLo };
 // history kept per coin and timeframe by the bots and the collector: one length, so indicators that depend on where the series
 // starts (RSI, EWMA) give the same strength everywhere
 export const BARS = 450;
@@ -221,7 +222,8 @@ export function signalAt(P, i, sym, now, lite = false) {   // lite: skip the dis
   else if (touch) { kind = 'touch'; label = touch.side === 'low' ? 'касание низа' : 'касание верха'; cls = touch.side === 'low' ? 'lo' : 'up'; }
   else if (squeeze) { kind = 'sq'; label = 'сжатие'; cls = 'sq'; }
   return { sym, price: c[i], pB, z: B.z[i], rsi: r, hl, squeeze, comp, touch, touchTime: touch ? t[touch.j] : null, age: touch ? i - touch.j : null, wasRev, rev, score, comps, checks, exc, volX, volZ,
-           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side, slope, brk, er, erCh };
+           label, cls, kind, mid: B.mid[i], up: B.up[i], lo: B.lo[i], atr: P.A[i], side: touch?.side, slope, brk, er, erCh,
+           barHi: h[i], barLo: l[i] };   // the bar's range so far: a position remembers it at entry (see checkExit)
 }
 // a fingerprint of how the signal math behaves: the same synthetic candles through every channel model, hashed.
 // The bot compares it with the collector's copy (server/scan.js) before trusting analyses computed there
@@ -261,6 +263,24 @@ export function regimeOf(mkt, S) {
 }
 // builds the market-regime object from per-coin {er, ch} values keyed by symbol
 export const marketOf = get => { const b = get('BTCUSDT'); if (!b) return null; return { er: b.er, ch: b.ch, majors: MAJORS.map(get).filter(Boolean) }; };
+// the market regime on a timeframe exactly as the backtest sees it: ER of BTC, ETH and SOL over erBars(tf) bars (7 days, at most
+// 300 bars) at the last closed bar. closesOf(sym) → closes of closed bars, oldest first. Every bot decides by the regime of its own
+// timeframe: before 2.34 the personal bots always used 1h candles, and on 4h that disagreed with the backtest ~30% of the time.
+// by: each major's {er, ch}; tf: the timeframe it was measured on
+export function marketOn(closesOf, tf) {
+  const L = erBars(tf), by = {};
+  for (const s of MAJORS) {
+    const c = closesOf(s); if (!c || c.length <= L) continue;
+    const i = c.length - 1; let path = 0;
+    for (let j = i - L + 1; j <= i; j++) path += Math.abs(c[j] - c[j - 1]);
+    by[s] = { er: path ? Math.abs(c[i] - c[i - L]) / path : 0, ch: c[i] / c[i - L] - 1 };
+  }
+  const m = marketOf(s => by[s] || null);
+  if (m) { m.by = by; m.tf = tf; }
+  return m;
+}
+// closes of the candles that have closed by `now` (rows [openTime, o, h, l, c, …], numbers or Binance's strings)
+export const closedCloses = (K, tf, now) => K.filter(k => +k[0] + TFMS[tf] <= now).map(k => +k[4]);
 
 // ---------- strategies ----------
 // S.strategy: 'revert' (bounce off a band back to the centre, default), 'revert_trend' (bounce only in the direction
@@ -340,16 +360,24 @@ export function planEntry(r, balance, S, now) {
   if (!(qty > 0)) return null;
   const sl = L.sl;
   return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf], ts: S.timeStop ?? TIME_STOP,
+           ...(isFinite(r.barHi) && isFinite(r.barLo) ? { bh: r.barHi, bl: r.barLo } : {}),
            risk: Math.abs(e - sl) * qty, snap: { ...snapshot(r, S), lev: e * qty / balance, riskPct: Math.abs(e - sl) * qty / balance * 100 },
            note: `${brk ? (sg > 0 ? 'пробой вверх' : 'пробой вниз') : r.side === 'low' ? 'отскок от низа' : 'откат от верха'} · сила ${r.score}` };
 }
 // returns {exit, reason} or null; updates p.last
 export function checkExit(p, K, now) {
   const sg = p.side === 'LONG' ? 1 : -1;
-  const start = Math.floor(p.time / p.tfms) * p.tfms + p.tfms;   // bars fully after the entry
+  const bar0 = Math.floor(p.time / p.tfms) * p.tfms, start = bar0 + p.tfms;   // the bar of the entry; bars fully after it
   for (const k of K) {
-    if (k[0] < start) continue;
-    const hi = +k[2], lo = +k[3];
+    if (k[0] < bar0) continue;
+    let hi = +k[2], lo = +k[3];
+    // the bar the bot entered on: a bar's high only rises and its low only falls, so whatever goes beyond the range it had at the
+    // entry (bh / bl, kept by planEntry) happened after it. Before 2.34 this bar was skipped and a wick to the stop or the take
+    // between two checks went unseen; positions without bh / bl still skip it
+    if (k[0] < start) {
+      if (p.bh == null || p.bl == null) continue;
+      hi = hi > p.bh ? hi : -Infinity; lo = lo < p.bl ? lo : Infinity;
+    }
     // if one bar touched both levels we assume the stop came first (pessimistic)
     if (p.side === 'LONG' ? lo <= p.sl : hi >= p.sl) return { exit: p.sl * (1 - sg * SLIP), reason: 'стоп' };
     if (p.side === 'LONG' ? hi >= p.tp : lo <= p.tp) return { exit: p.tp, reason: 'тейк' };
@@ -392,8 +420,9 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
   }
   const opened = [];
   if (allowEntries) {
-    // market regime for every signal comes from the BTC/ETH/SOL rows (or a regime passed in by the caller)
-    const mkt = market !== undefined ? market : marketOf(s => { const x = rows.find(r => r.sym === s); return x ? { er: x.er, ch: x.erCh } : null; });
+    // market regime for every signal: passed in by the caller (marketOn on the profile's timeframe), or else from the BTC/ETH/SOL
+    // rows — at their last closed bar, as the backtest and the entries themselves (tradeRow)
+    const mkt = market !== undefined ? market : marketOf(s => { const x = tradeRow(rows.find(r => r.sym === s)); return x ? { er: x.er, ch: x.erCh } : null; });
     for (const r of rows) r.mkt = mkt;
     const cool = new Set([...recentSyms, ...closed.map(x => x.sym)]);
     // entries are decided on the last closed bar, like the backtest (see analyze, tradeRow)

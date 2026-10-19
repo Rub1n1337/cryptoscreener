@@ -50,7 +50,8 @@ function alertsView(bot: any) {
   const q = a.quiet && typeof a.quiet === "object" ? a.quiet : {};
   return { sig: { on: s.on !== false, top: TOPS.includes(Number(s.top)) ? Number(s.top) : 0, when: s.when === "touch" ? "touch" : "confirmed", long: s.sides === "long" },
     mkt: a.mkt && typeof a.mkt === "object" ? a.mkt : null,
-    quiet: { on: !!q.on, from: Number.isInteger(q.from) ? q.from : 23, to: Number.isInteger(q.to) ? q.to : 8, tz: Number.isFinite(q.tz) ? q.tz : 180 } };
+    quiet: { on: !!q.on, from: Number.isInteger(q.from) ? q.from : 23, to: Number.isInteger(q.to) ? q.to : 8, tz: Number.isFinite(q.tz) ? q.tz : 180,
+      ...(typeof q.zone === "string" ? { zone: q.zone } : {}) } };   // the zone stays when the menu toggles quiet hours
 }
 const hh = (h: number) => String(h).padStart(2, "0") + ":00";
 const quietName = (q: any) => `${hh(q.from)}–${hh(q.to)}`;
@@ -130,18 +131,18 @@ const stats = (ts: any[]) => { const n = ts.length, w = ts.filter((t) => t.pnl >
 const balLine = (b: number, s: number) => `Баланс <b>${money(b)}</b>${s ? ` (${pct(b, s)} с ${money(s)})` : ""}`;
 
 async function sharedScreen(db: any): Promise<Screen> {
-  const [{ data: st }, { data: pos }, { data: tr }, { data: rg }] = await Promise.all([
-    db.from("bot_state").select("settings, balance, start_balance, checked_at, last_error").eq("id", 1).maybeSingle(),
+  const [{ data: st }, { data: pos }, { data: tr }] = await Promise.all([
+    db.from("bot_state").select("settings, balance, start_balance, checked_at, last_error, regime").eq("id", 1).maybeSingle(),
     db.from("positions").select("*"),
     db.from("trades").select("sym, side, pnl, r, reason, tclose").order("tclose", { ascending: false }).limit(2000),   // the stats line: capped, a long history must not slow a button
-    db.from("user_bots").select("regime").not("regime", "is", null).order("checked_at", { ascending: false }).limit(1),
   ]);
-  const S = st?.settings || {}, reg = regimeOf(rg?.[0]?.regime?.by, S.erMax ?? 0.15), ts = tr ?? [];
+  // the regime the shared bot itself trades by (its timeframe, kept by every run) — not "the market now" of someone's personal bot
+  const S = st?.settings || {}, reg = st?.regime?.state ?? regimeOf(st?.regime?.by, S.erMax ?? 0.15), ts = tr ?? [];
   const doing = S.strategy !== "switch" ? "" : reg === "flat" ? " → ищет отскоки от границ канала" : reg === "up" ? " → ищет пробои вверх (только LONG)" : reg === "down" ? " → не входит, ждёт" : "";
   const parts = [
     `📊 <b>Общий бот</b> — один на всех, торгует на бумаге\n<i>${esc(STRAT[S.strategy] || S.strategy)} · ${TFN[S.tf] || S.tf} · топ-${S.top} монет · сила от ${S.minScore}</i>`,
     `${balLine(st?.balance ?? 0, st?.start_balance ?? 10000)}\n${stats(ts)}`,
-    reg ? `<b>Рынок сейчас:</b> ${REG[reg]}${doing}` : "",
+    reg ? `<b>Рынок сейчас</b> <i>(по ${TFN[st?.regime?.tf] || TFN[S.tf] || S.tf}-свечам, как торгует бот)</i><b>:</b> ${REG[reg]}${doing}` : "",
     pos?.length ? `<b>Открытые позиции</b>\n${pos.map(posLine).join("\n")}` : "Открытых позиций нет — бот ждёт сигнала.",
     ts.length ? `<b>Последние сделки</b>\n${ts.slice(0, 3).map(tradeLine).join("\n")}` : "",
     st?.last_error ? `⚠️ Ошибка: ${esc(st.last_error)}` : `<i>проверен ${ago(st?.checked_at)}</i>`,

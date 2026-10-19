@@ -162,3 +162,27 @@ begin
   delete from beta_fails where coalesce(locked_until, now() - interval '2 days') < now() - interval '1 day';
   return n + m;
 end $$;
+
+-- Applied 19.10.2026 (migration regime_fin_entry_bar), 2.34:
+-- the shared bot keeps the regime it trades by (its timeframe) for the site and Telegram to explain it; a trade keeps the borrowing
+-- interest apart (fin); a position keeps the range of its entry bar at the entry (bh / bl, see math.js checkExit)
+alter table public.bot_state add column if not exists regime jsonb;
+grant select (regime) on public.bot_state to anon, authenticated;
+alter table public.trades add column if not exists fin double precision;
+alter table public.positions add column if not exists bh double precision, add column if not exists bl double precision;
+drop function if exists public.bot_commit(jsonb, jsonb, float8, timestamptz, int);
+create function public.bot_commit(p_closed jsonb, p_open jsonb, p_balance float8, p_checked timestamptz, p_scanned int, p_regime jsonb default null)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  insert into trades select * from jsonb_populate_recordset(null::trades, coalesce(p_closed, '[]')) on conflict (id) do nothing;
+  delete from positions where id in (select t->>'id' from jsonb_array_elements(coalesce(p_closed, '[]')) t);
+  insert into positions select * from jsonb_populate_recordset(null::positions, coalesce(p_open, '[]'))
+    on conflict (id) do update set sym = excluded.sym, side = excluded.side, entry = excluded.entry, last = excluded.last, tp = excluded.tp,
+      sl = excluded.sl, qty = excluded.qty, time = excluded.time, tfms = excluded.tfms, note = excluded.note, risk = excluded.risk, snap = excluded.snap, ts = excluded.ts,
+      bh = excluded.bh, bl = excluded.bl;
+  update bot_state set balance = p_balance, checked_at = p_checked, scanned = p_scanned, last_error = null, regime = coalesce(p_regime, regime) where id = 1;
+end $$;
+revoke all on function public.bot_commit(jsonb, jsonb, float8, timestamptz, int, jsonb) from public, anon, authenticated;
+-- the default for a fresh database is the shared bot's current rules (4h "switch", validated over a year)
+alter table public.bot_state alter column settings set default
+  '{"N": 210, "k": 3.5, "rr": 2, "tf": "4h", "lev": 3, "top": 50, "risk": 0.01, "erMax": 0.25, "maxHL": 20, "method": "log", "minScore": 60, "strategy": "switch", "timeStop": 48, "regimeSrc": "majors", "regimeOnly": "any"}'::jsonb;
