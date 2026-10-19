@@ -1109,7 +1109,13 @@ details.dis>.dbody{padding:0 16px 16px}
       <h3>Уведомления</h3>
       <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они придут, даже когда вкладка свёрнута. Рядом — кнопка звука.</p>
       <h3>Telegram</h3>
-      <p>В журнале общего бота нажмите «Получать в Telegram», в боте — «Start». Придут сделки общего бота и новые сигналы с силой от 60 (по одному сообщению на касание границы). Чтобы получать сделки и сигналы своего профиля, переведите «Мой бот» на сервер и нажмите «Подключить Telegram». В боте всё делается кнопками: /menu — главное меню, /notify — что присылать (вкл/выкл одним нажатием), /bot и /mybot — баланс и позиции ботов, /help — как читать сигналы, /stop — отписаться.</p>
+      <p>В журнале общего бота нажмите «Получать в Telegram», в боте — «Start»: будут приходить сделки общего бота. Чтобы получать своё, переведите «Мой бот» на сервер и нажмите «Подключить Telegram». Тогда придут:</p>
+      <ul>
+        <li><b>сделки вашего бота</b> — входы и выходы;</li>
+        <li><b>«Мои сигналы»</b> — касания и развороты по правилам вашего бота: на его монетах или шире, топ-50…250 для ручной торговли. Одно сообщение на касание: оно обновляется, когда разворот подтвердился и когда бот вошёл. Можно получать только подтверждённые или сразу при касании, только LONG;</li>
+        <li><b>«Рынок»</b> — отдельный фильтр со своими настройками канала, только подтверждённые развороты. Настройте «Рынок» как нужно и сохраните его в «Мой бот» → Telegram.</li>
+      </ul>
+      <p>Ночью сообщения могут приходить без звука. В боте всё делается кнопками: /menu — главное меню, /notify — что присылать (вкл/выкл одним нажатием), /bot и /mybot — баланс и позиции ботов, /help — как читать сигналы, /stop — отписаться.</p>
       <h3>График</h3>
       <ul>
         <li><b>Масштаб и время:</b> нажмите на график и крутите колёсико (или держите Ctrl), либо кнопки − + в углу графика, перетаскивание или стрелки ← →; на телефоне — два пальца и свайп. ⟲ — обычный вид, «к последней свече →» — вернуться к текущему моменту.</li>
@@ -1938,12 +1944,14 @@ let SB_MINE = null;               // the server bot's journal, when it runs on t
 const saveBP = () => save('sr_bot', BP);
 const profById = id => BP.profiles.find(p => p.id === id) || BP.profiles[0];
 // the flat / impulse border: the profile's own when it has one (presets, shared links and saved backtests carry it), else the bot's
-// common one. Before 2.34 the common one always won, so a shared profile backtested differently for people with different settings
-const profSet = p => ({...PROFILE_DEF, ...p.set, regimeSrc:'majors', erMax:p.set?.erMax ?? BP.erMax});
+// common one. Before 2.34 the common one always won, so a shared profile backtested differently for people with different settings.
+// The regime is read from BTC, ETH and SOL, or from BTC alone when the profile was backtested that way (regimeSrc, since 2.35)
+const profSet = p => ({...PROFILE_DEF, ...p.set, regimeSrc:p.set?.regimeSrc === 'btc' ? 'btc' : 'majors', erMax:p.set?.erMax ?? BP.erMax});
 const profSummary = p => { const s = profSet(p);
   return `${s.tf} · ${METHOD_NAME[s.method]} ${s.N}/${s.k} · ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · сила ≥ ${s.minScore} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}×`
     + (s.minWidth ? ` · ширина ≥ ${s.minWidth}%` : '') + (s.maxHL ? ` · T½ ≤ ${s.maxHL}` : '') + (s.coinErMax ? ` · без трендовых монет` : '')
-    + (s.regimeOnly === 'flat' ? ' · только когда BTC, ETH, SOL во флэте' : s.regimeOnly === 'impulse' ? ' · только в импульсе' : '')
+    + (s.regimeOnly === 'flat' ? ` · только когда ${s.regimeSrc === 'btc' ? 'BTC' : 'BTC, ETH, SOL'} во флэте` : s.regimeOnly === 'impulse' ? ' · только в импульсе' : '')
+    + (s.regimeSrc === 'btc' && (s.strategy === 'switch' || s.regimeOnly === 'impulse') ? ' · режим рынка по BTC' : '')
     + (p.set?.erMax != null && (s.strategy === 'switch' || s.regimeOnly !== 'any') ? ` · боковик при ER < ${s.erMax}` : '')
     + (s.timeStop ? ` · тайм-стоп ${s.timeStop} свечей` : ' · без тайм-стопа')
     + ` · позиций одновременно: ${M.slotsOf(s)}`
@@ -2071,7 +2079,8 @@ function cleanProfile(p) {
     lev:near(s.lev, [1, 2, 3, 5, 10], 1), minWidth:near(s.minWidth, [0, 3, 5, 8], 0), maxHL:near(s.maxHL, [0, 20, 40], 0), coinErMax:near(s.coinErMax, [0, 0.2, 0.3], 0),
     longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any'), timeStop:near(s.timeStop ?? 48, [0, 24, 48, 96], 48), maxOpen:near(s.maxOpen ?? 3, M.SLOTS, 3),
     // the profile's own flat / impulse border travels with it; a profile without one uses the receiver's common setting
-    ...(s.erMax != null && isFinite(+s.erMax) ? {erMax:near(s.erMax, [0.1, 0.15, 0.25], 0.15)} : {})};   // the values the selects offer
+    ...(s.erMax != null && isFinite(+s.erMax) ? {erMax:near(s.erMax, [0.1, 0.15, 0.25], 0.15)} : {}),   // the values the selects offer
+    ...(s.regimeSrc === 'btc' ? {regimeSrc:'btc'} : {})};   // the regime from BTC alone, as it was backtested
   const list = Array.isArray(c.list) ? c.list.map(x => String(x).toUpperCase()).filter(x => /^[A-Z0-9]{2,20}USDT$/.test(x)).slice(0, 200) : [];
   return {name:cleanName(p?.name), coins:c.mode === 'list' && list.length ? {mode:'list', list} : {mode:'top', top:[20, 50, 100, 150, 200].includes(+c.top) ? +c.top : 150}, set};
 }
@@ -2189,8 +2198,10 @@ function idleReason(act, reg, srv) {
     const text = s.regimeOnly === 'flat' ? `профиль «${act.name}» торгует только в боковике, а сейчас ${now}`
       : s.regimeOnly === 'impulse' ? `профиль «${act.name}» торгует только в импульсе, а сейчас боковик`
       : `в падающем рынке профиль «${act.name}» в сделки не входит`;
-    // another profile that would trade now — judged by the regime of its own timeframe (known once measured)
-    const regOf = p => { const sp = profSet(p); if (sp.tf === s.tf) return reg; const m = regNow(sp.tf, renderBotPanel); return m ? M.regimeOf(m, sp) : null; };
+    // another profile that would trade now — judged by the regime of its own timeframe with its own border and source (known
+    // once measured; the same timeframe is not enough, a profile can have its own border)
+    const same = sp => sp.tf === s.tf && sp.erMax === s.erMax && sp.regimeSrc === s.regimeSrc;
+    const regOf = p => { const sp = profSet(p), m = regNow(sp.tf, renderBotPanel); return m ? M.regimeOf(m, sp) : same(sp) ? reg : null; };
     const alt = BP.profiles.find(p => p.id !== act.id && regOf(p) && allowsReg(p, regOf(p)));
     let acts = '';
     if (alt && BP.mode === 'auto') acts = `<button data-act="slot:${reg === 'flat' ? 'flat' : 'impulse'}:${alt.id}">Брать «${alt.name}» в ${reg === 'flat' ? 'боковике' : 'импульсе'}</button>`;
@@ -2317,8 +2328,11 @@ function renderBotPanel() {
   const live = on ? `<div style="margin-top:6px">${liveTag(checked, 3 * 60e3, 'проверка рынка')}</div>` : '';
   const why = on ? idleReason(act, regT, srv) : '';
   const ers = botRegime ? M.MAJORS.map(s => `${base(s)} ${botRegime.by?.[s] ? botRegime.by[s].er.toFixed(2) : '—'}`).join(', ') : '';
-  // the profile decides by its own timeframe: when that is not 1h, say what the market looks like there
-  const own = sAct.tf !== '1h' && regT ? ` Профиль «${act.name}» решает по ${TF_BY[sAct.tf] || sAct.tf}: там <b>${regPlain(regT)}</b>.` : '';
+  // the profile decides by its own timeframe, border and source: when they differ from the line above, say what it sees
+  const usesReg = sAct.strategy === 'switch' || (sAct.regimeOnly || 'any') !== 'any';
+  const notes = [sAct.erMax !== BP.erMax ? `боковик — при ER < ${sAct.erMax}` : '', sAct.regimeSrc === 'btc' ? 'режим — по BTC' : ''].filter(Boolean);
+  const own = usesReg && regT && (sAct.tf !== '1h' || notes.length)
+    ? ` Профиль «${act.name}» решает по ${TF_BY[sAct.tf] || sAct.tf}${notes.length ? ` (${notes.join(', ')})` : ''}: там <b>${regPlain(regT)}</b>.` : '';
   const market = reg ? `<div class="bh-m" title="ER за 7 дней по часовым свечам: ${ers}. Боковик — когда у всех трёх меньше ${BP.erMax}">Рынок сейчас: <b>${regPlain(reg)}</b> — ${reg === 'flat' ? 'BTC, ETH и SOL ходят в коридоре' : 'крупные монеты в сильном движении'}.${BP.mode === 'auto' ? ` Поэтому бот взял профиль «${act.name}».` : ''}${own}</div>` : '';
   const btns = !on ? `<button class="primary" data-act="on">Продолжить торговлю</button>`
     : srv ? `<button data-act="off">Поставить на паузу</button>`
@@ -2368,8 +2382,10 @@ function saveForm() {
          lev:+$('#pfLev').value || 1, minWidth:+$('#pfW').value || 0, maxHL:+$('#pfHL').value || 0, coinErMax:+$('#pfCoinER').value || 0, longOnly:$('#pfLong').checked,
          regimeOnly:$('#pfReg').value, timeStop:+$('#pfTS').value, maxOpen:+$('#pfSlots').value || 3}};
   const i = BP.profiles.findIndex(x => x.id === p.id);
-  // the profile's own flat / impulse border (from a preset, a link or a saved backtest) is not in the form: it stays as it was
+  // the profile's own flat / impulse border and regime source (from a preset, a link or a saved backtest) are not in the form:
+  // they stay as they were
   if (i >= 0 && BP.profiles[i].set?.erMax != null) p.set.erMax = BP.profiles[i].set.erMax;
+  if (i >= 0 && BP.profiles[i].set?.regimeSrc === 'btc') p.set.regimeSrc = 'btc';
   if (i >= 0) BP.profiles[i] = p; else BP.profiles.push(p);
   formBase = null; syncSavebar();
   saveBP(); $('#bform').classList.add('hidden'); renderBotPanel(); renderJournal(); syncServerBot();
@@ -2911,6 +2927,14 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.35', date:'19 октября 2026', title:'Профиль торгует так, как его проверил бэктест', items:[
+    'Если в бэктесте режим рынка определялся только по BTC, сохранённый профиль это помнит, и бот торгует так же. Раньше бот всегда смотрел на BTC, ETH и SOL и лишь предупреждал о разнице.',
+    '«Проверить в бэктесте» для профиля без своей границы боковика берёт ту, с которой торгует бот. Раньше бэктест всегда подставлял 0.15.',
+    '«Бот ждёт» предлагает другой профиль, только если тот действительно торгует при таком рынке — с учётом его таймфрейма и его границы боковика.',
+    'Когда у профиля своя граница боковика или режим по BTC, строка «Рынок сейчас» пишет, что видит сам профиль.',
+    '«Справка» про Telegram описывает, что приходит сейчас: сделки общего бота, а после привязки своего — его сделки, «Мои сигналы» и «Рынок».',
+    'Новая версия сайта не перезагружает вкладку, пока открыта карточка сделки, — сначала предлагает обновиться.',
+  ]},
   {v:'2.34', date:'19 октября 2026', title:'«Мой бот» видит рынок так же, как бэктест', items:[
     'Боковик или тренд «Мой бот» теперь определяет на таймфрейме своего профиля, как бэктест этого профиля. Раньше он всегда смотрел на часовые свечи, и для профилей на 4h это расходилось с бэктестом примерно в трети случаев. «Рынок сейчас» и выбор профиля в авто-режиме по-прежнему по часовым свечам; если профиль на другом таймфрейме, панель пишет, что рынок там.',
     'Граница боковика теперь часть профиля: её переносит ссылка «Поделиться» и сохраняет бэктест. «Переключатель · 4h (проверен за год)» работает с той границей, с которой его проверяли (0.25).',
@@ -3564,16 +3588,15 @@ $('#blist').onkeydown = e => { const c = e.target.closest('.prof.pick'); if (c &
 // backtest → bot: keep the tested settings as a profile
 $('#btSave').onclick = async () => {
   const s = btSettings(), usesReg = s.regimeOnly !== 'any' || s.strategy === 'switch';
-  // the profile keeps the tested flat / impulse border; the live bot always reads the regime from BTC+ETH+SOL on the profile's
-  // timeframe — say so when the test looked at BTC alone
-  const diff = usesReg && s.regimeSrc !== 'majors'
-    ? ` Учтите: бот определяет режим рынка по BTC, ETH и SOL, а в этом тесте был только BTC.` : '';
-  const name = await ask({title:'Сохранить как профиль бота', text:'Под этим названием профиль появится в «Мой бот» — там его можно выбрать для торговли.' + diff,
+  // the profile keeps how the market regime was tested — the flat / impulse border and BTC alone or BTC+ETH+SOL — and the bot
+  // reads it the same way, on the profile's timeframe
+  const name = await ask({title:'Сохранить как профиль бота', text:'Под этим названием профиль появится в «Мой бот» — там его можно выбрать для торговли.',
     ok:'Сохранить', input:{value:`${M.STRATEGIES[s.strategy]} · ${s.tf}${s.rr ? ' · 1:' + s.rr : ''}`}});
   if (!name?.trim()) return;
   const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop, maxOpen, erMax} = s;
   BP.profiles.push({id:'p' + Date.now(), name:cleanName(name), coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
-    set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop, maxOpen, ...(usesReg ? {erMax} : {})}});
+    set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop, maxOpen,
+      ...(usesReg ? {erMax, ...(s.regimeSrc === 'btc' ? {regimeSrc:'btc'} : {})} : {})}});
   saveBP(); renderBotPanel(); syncServerBot();
   toast(`Профиль «${cleanName(name)}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
 };
@@ -3738,10 +3761,10 @@ $('#btVerdict').addEventListener('click', e => {
 });
 $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); toast('Подставлены настройки «Рынка»', `${S.tf}, канал ${S.N}/${S.k}, топ-50 монет. Нажмите «Запустить».`, 'ok'); };
 // the shared bot's rules as a profile, for showing them and for the backtest
-const sharedProf = () => ({name:'Общий бот', coins:{mode:'top', top:SJ.settings.top || 150}, set:SJ.settings});
+const sharedProf = () => ({name:'Общий бот', coins:{mode:'top', top:SJ.settings.top || 150}, set:{...SJ.settings, erMax:SJ.settings.erMax ?? 0.15}});
 // a profile (or the shared bot's rules) → the backtest form, then the backtest page: check it on history in one click
 function btFromProf(p) {   // fill the backtest form from a profile: rules and coins
-  btFill(p.set);
+  btFill(profSet(p));   // as the bot trades it: a profile without its own flat / impulse border uses the bot's (it was always 0.15 here)
   const c = p.coins || {};
   if (c.mode === 'list' && c.list?.length) { $('#btTop').value = 'custom'; $('#btCustom').value = c.list.map(s => s.replace(/USDT$/, '')).join(', '); }
   else { const tops = [...$('#btTop').options].map(o => +o.value).filter(Boolean), want = +(c.top || 50); $('#btTop').value = String(tops.reduce((a, b) => Math.abs(b - want) < Math.abs(a - want) ? b : a)); }
@@ -4057,9 +4080,12 @@ async function checkUpdate() {
   let h; try { h = await fetchVersion(); } finally { updBusy = false; }
   if (reloading || h == null || h === selfHash) return;
   if (btBusy) return;   // a backtest downloading a year of history is not cut off: the next check (3 min) reloads after it
-  // never reload over unsaved edits or an open dialog — ask once instead
-  if (formDirty() || !$('#dlg').classList.contains('hidden')) {
-    if (!updWarned) toast('Вышла новая версия сайта', 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
+  // never reload over unsaved edits, an open dialog or an open trade card — ask once instead (the next check after they close
+  // reloads by itself)
+  const dirty = formDirty();
+  if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden')) {
+    if (!updWarned) toast('Вышла новая версия сайта', dirty ? 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.'
+      : 'Обновите страницу, когда закончите — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
     updWarned = true; return;
   }
   reloading = true;

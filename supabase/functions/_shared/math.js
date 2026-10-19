@@ -226,19 +226,40 @@ export function signalAt(P, i, sym, now, lite = false) {   // lite: skip the dis
            barHi: h[i], barLo: l[i] };   // the bar's range so far: a position remembers it at entry (see checkExit)
 }
 // a fingerprint of how the signal math behaves: the same synthetic candles through every channel model, hashed.
-// The bot compares it with the collector's copy (server/scan.js) before trusting analyses computed there
+// The bot compares it with the collector's copy (server/scan.js) before trusting analyses computed there.
+// The candles swing, fade into a quiet stretch (a squeeze) and get sharp drops, jumps and rebounds through the bands, so
+// touches, confirmed reversals and breakouts of both sides happen and the strength formula is in the hash too. The extra
+// volumes of those bars are picked so that some sit just above and some just below the volume thresholds of a reversal and a
+// breakout, and the fade crosses the squeeze threshold: moving any of them either way changes the fingerprint.
+// Before 2.35 the price never reached a band, and a change of the strength weights or of these rules went unnoticed.
+const FP_EVENTS = { 236: [0.9, 900], 237: [1.05, 350], 238: [1.04, 1400], 240: [1, 60], 258: [1.11, 700], 259: [0.95, 250], 260: [0.96, 2200],
+  280: [0.93, 900], 281: [1.05, 3000], 300: [1.08, 300], 301: [0.955, 1100], 318: [0.94, 950], 319: [1.05, 500], 343: [1.07, 400],
+  344: [0.95, 1600], 396: [0.9, 1800], 397: [1.02, 700], 398: [1.03, 1200] };   // bar: [price factor, extra volume]
 export function fingerprint() {
   const K = []; let p = 100;
   for (let i = 0; i < 400; i++) {
-    const o = p; p *= 1 + 0.01 * Math.sin(i * 0.37) + 0.004 * Math.cos(i * 1.7);
-    K.push([i * 36e5, o, Math.max(o, p) * (1 + 0.003 * (1 + Math.sin(i))), Math.min(o, p) * (1 - 0.003 * (1 + Math.cos(i * 0.5))), p, 1000 + 500 * Math.sin(i * 0.11) + (i % 17 ? 0 : 4000)]);
+    const o = p, [ev, xv] = FP_EVENTS[i] || [1, 0], calm = i < 302 ? 1 : i < 332 ? 1 - 0.8 * (i - 302) / 30 : i < 390 ? 0.2 : 1;
+    p *= (1 + calm * (0.01 * Math.sin(i * 0.37) + 0.004 * Math.cos(i * 1.7))) * ev;
+    K.push([i * 36e5, o, Math.max(o, p) * (1 + calm * 0.003 * (1 + Math.sin(i))), Math.min(o, p) * (1 - calm * 0.003 * (1 + Math.cos(i * 0.5))), p,
+      1000 + 500 * Math.sin(i * 0.11) + (i % 17 ? 0 : 4000) + xv]);
   }
   // every channel model on 1h, plus the timeframes and band widths the bots use, mid-bar and after a bar's close
   // (with and without the closed-bar judgement atClose): a change in any of these branches changes the fingerprint
   const at = tf => K.map(k => [k[0] / 36e5 * TFMS[tf], k[1], k[2], k[3], k[4], k[5]]), last = (Q, tf, f) => Q[Q.length - 1][0] + f * TFMS[tf];
   const run = (method, N, k, tf, f) => { const Q = at(tf); return analyze('X', Q, { method, N, k, tf }, last(Q, tf, f), true); };
+  // and every bar from the first sharp move on, judged as the backtest judges it, in brief: the touch, the strength and its
+  // parts, the checks, the breakout
+  const sweep = (method, N, k, tf) => {
+    const P = prepare(at(tf), { method, N, k, tf }), rows = [];
+    for (let i = Math.max(N + 9, 225); i < P.n; i++) {
+      const r = signalAt(P, i, 'X', P.t[i] + TFMS[tf], true);
+      rows.push(r && [r.touch?.side, r.age, r.score, r.rev, r.checks, r.comps, r.brk?.side, r.kind, r.squeeze]);
+    }
+    return rows;
+  };
   const out = [...['log', 'classic', 'robust', 'ewma'].map(m => run(m, 210, 2, '1h', 0.5)),
-    run('log', 210, 3.5, '4h', 0.5), run('log', 210, 3, '4h', 1.5), run('log', 120, 2.5, '1d', 0.25), run('robust', 60, 3, '15m', 0.9)];
+    run('log', 210, 3.5, '4h', 0.5), run('log', 210, 3, '4h', 1.5), run('log', 120, 2.5, '1d', 0.25), run('robust', 60, 3, '15m', 0.9),
+    sweep('log', 210, 2, '1h'), sweep('robust', 60, 3, '15m'), sweep('classic', 120, 2.5, '1d')];
   const s = JSON.stringify(out, (k, v) => typeof v === 'number' ? (Number.isFinite(v) ? +v.toPrecision(10) : String(v)) : v);
   let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return (h >>> 0).toString(36) + TOUCH_BARS;

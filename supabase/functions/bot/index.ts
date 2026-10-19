@@ -343,14 +343,17 @@ function regimeOn(tf: string, now: number) {
 async function runUserBots(now: number, reqStart: number) {
   // fair queue: the least recently checked bots go first, so with more bots than fit in one run every bot still gets its turn;
   // bots whose owner hasn't opened the site for 30 days, or that have no profile, are not scheduled.
-  // Bots holding positions go first every minute: an exit at the stop must not wait for the queue to come round
-  const RUN = 40, FIELDS = "id, config, balance, tg_chat, alerts, sig_sent", seen = new Date(now - 30 * 864e5).toISOString();
-  const { data: held } = await db.from("user_positions").select("bot_id");
-  const heldIds = [...new Set((held ?? []).map((x: any) => x.bot_id))].slice(0, RUN);
-  const { data: first } = heldIds.length ? await db.from("user_bots").select(FIELDS).eq("enabled", true).in("id", heldIds) : { data: [] };
+  // Bots holding positions go first every minute: an exit at the stop must not wait for the queue to come round. They too are
+  // taken least recently checked first (they used to come in table order, so past 40 the same ones went first every minute and
+  // the rest never ran), and KEEP places stay for bots without positions, or those would never get one
+  const RUN = 40, KEEP = 10, FIELDS = "id, config, balance, tg_chat, alerts, sig_sent", seen = new Date(now - 30 * 864e5).toISOString();
+  const oldest = { ascending: true, nullsFirst: true };
+  const { data: held } = await db.from("user_bots").select(`${FIELDS}, user_positions!inner(bot_id)`).eq("enabled", true).order("checked_at", oldest).limit(RUN);
+  const heldIds = new Set((held ?? []).map((b: any) => b.id));
   const { data: rest } = await db.from("user_bots").select(FIELDS).eq("enabled", true).gt("last_seen", seen).not("config->profiles->0", "is", null)
-    .order("checked_at", { ascending: true, nullsFirst: true }).limit(RUN);
-  const bots = [...(first ?? []), ...(rest ?? []).filter((b: any) => !heldIds.includes(b.id))].slice(0, RUN);
+    .order("checked_at", oldest).limit(RUN);
+  const others = (rest ?? []).filter((b: any) => !heldIds.has(b.id));
+  const bots = [...(held ?? []).slice(0, Math.max(RUN - KEEP, RUN - others.length)), ...others].slice(0, RUN);
   QUIET.clear();   // recomputed per chat below, each run
   if (!bots?.length) return 0;
   const reg = await regimeOn("1h", now), ticker = await ticker24();   // "the market now": the auto mode picks the profile by it
@@ -393,8 +396,9 @@ async function runUserBots(now: number, reqStart: number) {
     const regName = M.regimeOf(reg, { erMax, regimeSrc: "majors" });
     const P = cfg.mode === "auto" ? byId(regName === "flat" ? cfg.flat : cfg.impulse) : byId(cfg.active);
     // the flat / impulse border is the profile's own when it has one (a shared profile carries it; "проверен за год" was tested
-    // at 0.25), else the bot's common one
-    const S = { ...cleanSet(P.set), regimeSrc: "majors", erMax: P.set?.erMax != null ? num(P.set.erMax, 0.05, 0.5, 0.15) : erMax };
+    // at 0.25), else the bot's common one; the regime is read from BTC+ETH+SOL unless the profile was tested on BTC alone
+    const S = { ...cleanSet(P.set), regimeSrc: P.set?.regimeSrc === "btc" ? "btc" : "majors",
+      erMax: P.set?.erMax != null ? num(P.set.erMax, 0.05, 0.5, 0.15) : erMax };
     const pname = String(P.name ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60);
     const own = Array.isArray(P.coins?.list) ? P.coins.list.filter((s: unknown) => typeof s === "string" && /^[A-Z0-9]{2,20}USDT$/.test(s)).slice(0, 200) : [];
     const list: string[] = P.coins?.mode === "list" && own.length ? own : M.pickSymbols(ticker, Math.round(num(P.coins?.top, 20, 200, 150)), [], now);
