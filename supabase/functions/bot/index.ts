@@ -241,7 +241,7 @@ const WHY: Record<string, string> = { "тейк": "по тейку", "стоп":
 const closedMsg = (t: any, who = "общий бот") =>
   `${t.pnl > 0 ? "✅" : "❌"} <b>${t.side} ${coin(t.sym)}</b> — ${who} закрыл ${WHY[t.reason] || esc(t.reason)}\n` +
   `${fp(t.entry)} → ${fp(t.exit)} · <b>${usd(t.pnl)}</b>${rr(t.r)}\n` +
-  `<i>в сделке ${dur(t.tclose - t.time)} · комиссия $${t.fee.toFixed(2)}</i>`;
+  `<i>в сделке ${dur(t.tclose - t.time)} · комиссия${t.fin ? " и заём" : ""} $${t.fee.toFixed(2)}</i>`;
 
 // ---------- shared bot ----------
 async function run() {

@@ -1005,7 +1005,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <th>Закрыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Выход</th><th class="hm">Размер</th><th>Причина выхода</th><th class="hm">Длит.</th><th class="hm">PnL до ком.</th><th class="hm">Комиссия</th><th>PnL</th><th>R</th><th class="hm">Сила</th>
         </tr></thead><tbody id="btTrades"></tbody></table></div>
       </div>
-      <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: монеты, которых сегодня нет на Binance, в бэктест не попадают; в режиме «по сегодняшнему» берётся сегодняшний топ на весь период, это завышает результат. Исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Прошлое не гарантирует будущего.</div>
+      <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: в режиме «на каждый момент» учтены и монеты, которые за период сняли с Binance; в режиме «по сегодняшнему» их нет, а сегодняшний топ берётся на весь период — это завышает результат. Исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Комиссия 0.075% за сторону, проскальзывание 0.05%, заём под шорт и плечо — 0.03% в сутки (оценка: реальная ставка бывает выше, особенно по альткоинам). Прошлое не гарантирует будущего.</div>
     </div>
   </section>
 
@@ -2518,7 +2518,7 @@ function renderJournal() {
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок')}
        ${card('Ср. результат', rr(st.expR) + trend, other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR),'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), 'прибыли / убытки', st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе')}
-       ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа. Если комиссии больше прибыли до них — стратегия работает на биржу')}
+       ${card('Комиссии и заём', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа: комиссия и проценты за заём под шорты и плечо. Если это больше прибыли до них — стратегия работает на биржу')}
        ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика')}
      </div>` : ''}`;
   // the balance counts to its new value instead of jumping (only when it actually changed)
@@ -2577,7 +2577,8 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
     ${row('Комиссия в R', risk ? '−' + (fee / risk).toFixed(2) + 'R' : '—', 'neg')}
     ${isOpen ? '' : row('Причина выхода', reasonTag(x.reason))}
     ${row(isOpen ? 'PnL до комиссий сейчас' : 'PnL до комиссий', usd(gross), cl(gross))}
-    ${row('Комиссия', usd(-fee), 'neg')}
+    ${row(x.fin ? 'Комиссия и заём' : 'Комиссия', usd(-fee), 'neg')}
+    ${x.fin ? row('из них заём под позицию', usd(-x.fin), 'neg') : ''}
     ${row(isOpen ? 'PnL сейчас' : 'PnL после комиссий', usd(net), cl(net))}
     ${row('Результат', rr(risk ? net / risk : null), cl(net))}
   </div>`;
@@ -2790,7 +2791,14 @@ function renderBacktest() {
   else if (st.expR > 0 && s1.expR > 0 && s2.expR > 0) v = `<b class="pos">У настроек есть преимущество:</b> средний результат ${rr(st.expR)} на сделку после комиссий, и он положительный в обеих половинах периода (${rr(s1.expR)} и ${rr(s2.expR)}). Хороший знак, но проверьте и на другом периоде.`;
   else if (st.expR > 0) v = `<b style="color:var(--acc)">В плюсе, но нестабильно:</b> в целом ${rr(st.expR)} на сделку, а по половинам периода ${rr(s1.expR)} и ${rr(s2.expR)}. Похоже на удачный отрезок, а не на устойчивое преимущество.`;
   else v = `<b class="neg">На этих настройках стратегия убыточна:</b> ${rr(st.expR)} на сделку после комиссий.${st.gross > 0 ? ` До комиссий она была в плюсе (${usd(st.gross)}), но комиссии (${usd(-st.fees)}) съели всё — нужны более крупные ходы на сделку.` : ''}`;
-  const vk = st.n < 30 ? 'info' : st.expR > 0 && s1.expR > 0 && s2.expR > 0 ? 'ok' : st.expR > 0 ? 'warn' : 'bad';
+  let vk = st.n < 30 ? 'info' : st.expR > 0 && s1.expR > 0 && s2.expR > 0 ? 'ok' : st.expR > 0 ? 'warn' : 'bad';
+  // "today's top" over the whole past knows which coins later grew: its verdict is never green, and the honest run is one click
+  // away (Oct 2026: a profile showed +0.67R here and +0.11R honestly, and was taken for a sure thing)
+  if (!s.pit && !s.custom) {
+    v = `<b style="color:var(--acc)">Итог завышен: монеты взяты по сегодняшнему топу.</b> По всему периоду гоняются монеты, которые в топе сегодня, — они уже выросли и не исчезли с биржи. Монеты, которые тогда были в топе, а потом рухнули или были сняты, сюда не попали, а живой бот торговал бы и ими. Без поправки: ${rr(st.expR)} на сделку.`
+      + `<div style="margin-top:8px"><button class="primary" data-honest>Проверить честно — топ на каждый момент</button></div>`;
+    if (vk === 'ok' || vk === 'info') vk = 'warn';
+  }
   $('#btVerdict').className = 'banner ' + vk;
   $('#btVerdict').innerHTML = `<svg class="i"><use href="#i-${vk === 'info' ? 'info' : vk}"/></svg><div>${v}</div>`;
   const card = (t, val, sub, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${val}</div><div class="s">${sub}</div></div>`;
@@ -2812,7 +2820,7 @@ function renderBacktest() {
      ${st.n ? `<div class="statrow">
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`)}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. +${usd(st.avgWin, false)} / ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей / сумма убытков')}
-       ${card('Комиссии', usd(-st.fees), `до них ${usd(st.gross)}`, 'neg', 'Сколько забрала биржа за все сделки')}
+       ${card('Комиссии и заём', usd(-st.fees), `до них ${usd(st.gross)}`, 'neg', 'Комиссия биржи и проценты за заём под шорты и плечо, за все сделки')}
        ${card('Комиссия в R', st.feeR == null ? '—' : '−' + st.feeR.toFixed(2) + 'R', 'на каждую сделку', st.feeR > 0.1 ? 'neg' : '', 'Какую долю риска сделки съедает комиссия. Чем меньше стоп и чем больше плечо, тем больше эта доля')}
        ${card('Плечо', st.lev == null ? '—' : st.lev.toFixed(2) + '×', `средний размер позиции к балансу · до ${s.lev}×`, '', 'Размер позиции, делённый на баланс. Комиссия считается от размера позиции')}
        ${card('Сделок в день', (st.n / r.days).toFixed(1), `в сделке в среднем ${dur(st.avgHold)}`)}
@@ -2860,6 +2868,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.33', date:'19 октября 2026', title:'Бэктест не выдаёт завышенный итог за хороший', items:[
+    'В режиме «по сегодняшнему топу» результат больше не бывает зелёным: сверху написано, что итог завышен и почему, и есть кнопка «Проверить честно», которая сразу пересчитывает «на каждый момент».',
+    'Учтены проценты за заём: шорт на споте берёт монеты в долг, а плечо — деньги. Это примерно 0.03% в сутки от занятой суммы; у профилей с шортами и плечом результат станет немного ниже. В карточке сделки заём показан отдельной строкой.',
+    'Вкладка больше не перезагружается сама посреди бэктеста, когда выходит новая версия сайта, — дождётся конца.',
+  ]},
   {v:'2.32', date:'19 октября 2026', title:'Бэктест: одинаковые настройки — одинаковый итог', items:[
     'Повторный запуск с теми же настройками больше не даёт другую цифру. Набор монет для «топа на каждый момент» фиксируется на сутки, а не берётся заново при каждом запуске.',
     'Если историю какой-то монеты скачать не удалось (слабая сеть, Binance просит подождать), бэктест пробует ещё два раза. Раньше такая монета молча выпадала и меняла итог; теперь, если она так и не скачалась, рядом с результатом написано, какие монеты не загрузились.',
@@ -3664,6 +3677,12 @@ if (tf2On) setTf2(true);
 attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
 
 $('#btRun').onclick = runBacktest;
+// "Проверить честно" under an inflated (today's top) result
+$('#btVerdict').addEventListener('click', e => {
+  if (!e.target.closest('[data-honest]') || btBusy) return;
+  $('#btPit').value = 'pit'; $('#btPit').dispatchEvent(new Event('change', {bubbles:true}));
+  runBacktest();
+});
 $('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); toast('Подставлены настройки «Рынка»', `${S.tf}, канал ${S.N}/${S.k}, топ-50 монет. Нажмите «Запустить».`, 'ok'); };
 // the shared bot's rules as a profile, for showing them and for the backtest
 const sharedProf = () => ({name:'Общий бот', coins:{mode:'top', top:SJ.settings.top || 150}, set:SJ.settings});
@@ -3949,6 +3968,7 @@ async function checkUpdate() {
   updBusy = true;
   let h; try { h = await fetchVersion(); } finally { updBusy = false; }
   if (reloading || h == null || h === selfHash) return;
+  if (btBusy) return;   // a backtest downloading a year of history is not cut off: the next check (3 min) reloads after it
   // never reload over unsaved edits or an open dialog — ask once instead
   if (formDirty() || !$('#dlg').classList.contains('hidden')) {
     if (!updWarned) toast('Вышла новая версия сайта', 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);

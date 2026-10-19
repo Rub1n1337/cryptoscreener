@@ -147,3 +147,18 @@ end $$;
 -- ---------- nothing the site doesn't read ----------
 revoke select on public.tg_subs from anon, authenticated;
 revoke select on public.trades_archive from anon, authenticated;
+
+-- Applied 19.10.2026 (migration cleanup_rate_tables): the nightly cleanup also empties the per-address counters
+create or replace function public.cleanup_abandoned_bots() returns integer language plpgsql security definer set search_path = public as $$
+declare n integer; m integer;
+begin
+  delete from user_bots where last_seen < now() - interval '90 days' and tg_chat is null;
+  get diagnostics n = row_count;
+  delete from user_bots where created_at < now() - interval '1 day' and tg_chat is null
+    and (case when jsonb_typeof(config->'profiles') = 'array' then jsonb_array_length(config->'profiles') else 0 end) = 0;
+  get diagnostics m = row_count;
+  -- per-address counters (rate limits, beta login attempts) only matter for an hour or so
+  delete from rl where since < now() - interval '1 day';
+  delete from beta_fails where coalesce(locked_until, now() - interval '2 days') < now() - interval '1 day';
+  return n + m;
+end $$;

@@ -14,6 +14,10 @@ export const RISK = 0.02;     // share of balance lost if the stop is hit
 export const TIME_STOP = 48;  // bars until a forced market exit
 export const COOLDOWN = 4;    // bars before re-entering the same coin
 export const MIN_ROOM = 0.8;    // a bounce needs at least this × the stop distance left to the centre (see planEntry)
+// borrowing: a short on spot borrows the whole position, a leveraged long borrows what exceeds its share of the balance
+// (balance / slots). Interest per day on the borrowed amount — an estimate (Binance margin: USDT ~5–10% a year, altcoins
+// for shorts often more). Before 2.33 it was not counted at all, which flattered shorts and leverage.
+export const BORROW_DAY = 0.0003;
 
 export const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 export const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
@@ -359,12 +363,22 @@ export function checkExit(p, K, now) {
   if (ts > 0 && now - p.time > ts * p.tfms) return { exit: c * (1 - sg * SLIP), reason: 'тайм-стоп' };
   return null;
 }
+// borrowed amount of a position (see BORROW_DAY): from what it stored at entry, so positions already open are priced too
+// (snap.lev = position / balance at entry, snap.settings.maxOpen = slots); a position without them borrows nothing extra
+export function borrowedOf(p) {
+  const size = p.entry * p.qty;
+  if (p.side === 'SHORT') return size;
+  const lev = +p.snap?.lev, slots = +p.snap?.settings?.maxOpen || MAX_OPEN;
+  return lev > 0 ? Math.max(0, size - size / lev / slots) : 0;
+}
 export function closeTrade(p, exit, reason, now) {
   const sg = p.side === 'LONG' ? 1 : -1;
-  const gross = sg * (exit - p.entry) * p.qty, fee = (p.entry + exit) * p.qty * FEE, pnl = gross - fee;
+  // fee: the exchange's commission plus the interest on what was borrowed for the time in the trade (fin, shown apart)
+  const fin = borrowedOf(p) * BORROW_DAY * Math.max(0, now - p.time) / 864e5;
+  const gross = sg * (exit - p.entry) * p.qty, fee = (p.entry + exit) * p.qty * FEE + fin, pnl = gross - fee;
   const risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
   return { id: p.id, sym: p.sym, side: p.side, entry: p.entry, exit, tp: p.tp, sl: p.sl, qty: p.qty, time: p.time, tclose: now,
-           reason, fee, gross, pnl, r: risk ? pnl / risk : null, note: p.note, snap: p.snap ?? null };
+           reason, fee, fin, gross, pnl, r: risk ? pnl / risk : null, note: p.note, snap: p.snap ?? null };
 }
 // one bot step: manage exits, then open new positions. Pure — the caller persists the result.
 export function botTick({ rows, klines, open, recentSyms, balance, S, now, allowEntries = true, market }) {
