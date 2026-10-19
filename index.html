@@ -2858,6 +2858,15 @@ function renderBacktest() {
       + `<div style="margin-top:8px"><button class="primary" data-honest>Проверить честно — топ на каждый момент</button></div>`;
     if (vk === 'ok' || vk === 'info') vk = 'warn';
   }
+  // a hand-made list can carry the same hindsight: picked now, it keeps the coins that are big today or that the strategy won on
+  // (Oct 2026: a list "of coins that were always in the top" made $228k a year with green here; the honest top-20 with the same
+  // rules made $10.8k). A plus is never green; the comparison with the honest top of about the same size is one click away
+  else if (s.custom && st.expR > 0) {
+    const tops = [...$('#btTop').options].map(o => +o.value).filter(Boolean), n = tops.reduce((a, b) => Math.abs(b - s.custom.length) < Math.abs(a - s.custom.length) ? b : a);
+    v = `<b style="color:var(--acc)">Итог может быть завышен: монеты выбраны вручную.</b> Бэктест не знает, почему в списке именно они. Если их выбрали сейчас — потому что они в топе или на них стратегия выигрывала, — в список не попали монеты, которые тогда были в топе, а потом упали, а живой бот год назад так выбрать не мог. Без поправки: ${rr(st.expR)} на сделку${st.n < 30 ? `, и сделок всего ${st.n} — для выводов мало` : ''}.`
+      + `<div style="margin-top:8px"><button class="primary" data-honest="${n}">Сравнить с честным топ-${n} на каждый момент</button></div>`;
+    if (vk === 'ok' || vk === 'info') vk = 'warn';
+  }
   $('#btVerdict').className = 'banner ' + vk;
   $('#btVerdict').innerHTML = `<svg class="i"><use href="#i-${vk === 'info' ? 'info' : vk}"/></svg><div>${v}</div>`;
   const card = (t, val, sub, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${val}</div><div class="s">${sub}</div></div>`;
@@ -2927,6 +2936,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.36', date:'19 октября 2026', title:'Свой список монет не выдаёт подгонку за преимущество', items:[
+    'Бэктест по своему списку монет больше не показывает зелёное «есть преимущество». Если список составлен сейчас — из монет, которые в топе или на которых стратегия выигрывала, — в нём нет монет, которые тогда были в топе, а потом упали, и итог завышен. Под результатом кнопка: сравнить с честным топом того же размера на каждый момент.',
+  ]},
   {v:'2.35', date:'19 октября 2026', title:'Профиль торгует так, как его проверил бэктест', items:[
     'Если в бэктесте режим рынка определялся только по BTC, сохранённый профиль это помнит, и бот торгует так же. Раньше бот всегда смотрел на BTC, ETH и SOL и лишь предупреждал о разнице.',
     '«Проверить в бэктесте» для профиля без своей границы боковика берёт ту, с которой торгует бот. Раньше бэктест всегда подставлял 0.15.',
@@ -3755,7 +3767,10 @@ attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom
 $('#btRun').onclick = runBacktest;
 // "Проверить честно" under an inflated (today's top) result
 $('#btVerdict').addEventListener('click', e => {
-  if (!e.target.closest('[data-honest]') || btBusy) return;
+  const b = e.target.closest('[data-honest]');
+  if (!b || btBusy) return;
+  // from a hand-made list: the honest top of about its size (the list stays in its field, to go back to)
+  if (b.dataset.honest) { $('#btTop').value = b.dataset.honest; $('#btTop').dispatchEvent(new Event('change', {bubbles:true})); }
   $('#btPit').value = 'pit'; $('#btPit').dispatchEvent(new Event('change', {bubbles:true}));
   runBacktest();
 });
