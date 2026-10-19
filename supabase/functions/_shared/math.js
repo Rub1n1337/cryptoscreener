@@ -307,12 +307,14 @@ export const closedCloses = (K, tf, now) => K.filter(k => +k[0] + TFMS[tf] <= no
 // S.strategy: 'revert' (bounce off a band back to the centre, default), 'revert_trend' (bounce only in the direction
 // of the channel's trend), 'breakout' (trade in the direction of a fresh close beyond a band). S.longOnly skips shorts.
 export const STRATEGIES = { revert: 'Отскок от полосы', revert_trend: 'Отскок по тренду', breakout: 'Пробой полосы', switch: 'Переключатель по режиму рынка' };
-// 'switch': BTC flat → bounce off a band; BTC trending up → breakout, LONG only; BTC trending down → stay out
+// 'switch': BTC flat → bounce off a band; BTC trending up → breakout, LONG only; BTC trending down → stay out.
+// An unknown regime (BTC's candles did not load) stays out too: no data is not a flat market. Before 2.37 it traded bounces then.
+// The backtest always has the regime (BTC is loaded with enough history), so its results do not change
 export function modeOf(r, S) {
   const st = S.strategy || 'revert';
   if (st !== 'switch') return st;
   const reg = regimeOf(r.mkt, S);
-  return reg === 'up' ? 'breakout_long' : reg === 'down' ? 'none' : 'revert';
+  return reg === 'up' ? 'breakout_long' : reg === 'flat' ? 'revert' : 'none';
 }
 // returns 'LONG' / 'SHORT' if this signal is tradable under S, else null
 export function wants(r, S) {

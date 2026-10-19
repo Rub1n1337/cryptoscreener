@@ -148,10 +148,12 @@ async function tgEdit(chat: number | string, mid: number, text: string, syms: st
   catch { /* an old or deleted message just stays as it was */ }
 }
 // many chats (the shared bot's trades go to every subscriber): 8 at a time — one by one, a few hundred chats would take
-// minutes and push the run past its lock; Telegram allows ~30 messages a second
+// minutes and push the run past its lock; Telegram allows ~30 messages a second. Returns how many chats got it
 async function sendTo(chats: (number | string)[], lines: string[], syms: string[] = []) {
-  if (!lines.length || !chats.length) return;
-  await pool([...new Set(chats.map(String))], 8, async (chat) => { await tgSend(chat, lines.join("\n\n"), syms); });
+  if (!lines.length || !chats.length) return 0;
+  let ok = 0;
+  await pool([...new Set(chats.map(String))], 8, async (chat) => { if (await tgSend(chat, lines.join("\n\n"), syms)) ok++; });
+  return ok;
 }
 // who gets the shared bot's trades: every subscribed chat that kept them on (plus the owner's old single chat, if set)
 async function chatsFor(kind: "shared") {
@@ -192,9 +194,11 @@ function pruneSent(sent: Record<string, any>, now: number) {
 // pre: a separate memory inside the same object (the "Рынок" feed uses "m:"), with its own first-run marker
 // win: while the price stays beyond the band every new candle is a new touch; touches this close to an announced one are the
 // same episode and are not announced again
+// a key is told when it holds the time it went out; {t, retry} is a message Telegram did not take, tried again (see marketSignals)
+const isTold = (v: any) => v != null && !(typeof v === "object" && v.retry && !v.mid);
 function freshSignals(rows: any[], min: number, sent: Record<string, any>, now: number, pre = "", win = 0) {
-  const told = (r: any) => !!sent[`${pre}${r.sym}:${r.touchTime}`] || (win > 0 && Object.keys(sent).some((k) => {
-    if (!k.startsWith(`${pre}${r.sym}:`)) return false;
+  const told = (r: any) => isTold(sent[`${pre}${r.sym}:${r.touchTime}`]) || (win > 0 && Object.keys(sent).some((k) => {
+    if (!k.startsWith(`${pre}${r.sym}:`) || !isTold(sent[k])) return false;
     const t = Number(k.slice(pre.length + r.sym.length + 1)); return Math.abs(t - r.touchTime) <= win;
   }));
   const fresh = rows.filter((r) => r.score != null && r.score >= min && r.touchTime && !told(r)).sort((a, b) => b.score - a.score);
@@ -219,6 +223,7 @@ const sigLine = (tf: string) => (r: any) => {
 // why the profile's own bot passes a signal at its threshold — so a signal it doesn't take is not a mystery
 function whyNot(r: any, S: any, nOpen: number) {
   const mode = M.modeOf(r, S), reg = M.regimeOf(r.mkt, S), only = S.regimeOnly || "any";
+  if (S.strategy === "switch" && reg == null) return "режим рынка сейчас неизвестен (не загрузились свечи BTC) — «переключатель» ждёт";
   if (mode === "none") return "рынок падает — «переключатель» в падении не торгует";
   if (mode === "breakout_long") return "рынок растёт — «переключатель» берёт только пробои вверх";
   if (only === "flat" && reg !== "flat") return "профиль торгует только в боковике";
@@ -492,16 +497,23 @@ async function runUserBots(now: number, reqStart: number) {
     const first = !sent["_init:s"];
     if (first) sent["_init:s"] = now;   // set once: rewriting it every minute made the memory "change" every minute
     const mktT = REGT[S.tf] ?? reg;     // the regime this profile trades by (its timeframe)
-    // the episode a touch belongs to: the same touch, or an earlier one of this coin and side close enough to it
-    const episode = (r: any) => {
-      const exact = sent[`s:${r.sym}:${r.touchTime}`];
-      if (exact && typeof exact === "object") return exact;
+    // the episode a touch belongs to: the same touch, or an earlier one of this coin and side close enough to it → [key, state].
+    // One key per episode: the memory is stored as JSON, where two keys of one object come back as two copies that drift apart
+    // (a stale copy could later say "отскок не удержался" about a trade the bot had entered). Copies left from before are
+    // dropped here, the most recent one (latest touch) is kept
+    const episode = (r: any): [string, any] | null => {
+      const ek = `s:${r.sym}:${r.touchTime}`;
+      if (sent[ek] && typeof sent[ek] === "object") return [ek, sent[ek]];
+      let best: [string, any] | null = null;
       for (const k of Object.keys(sent)) {
         if (!k.startsWith(`s:${r.sym}:`)) continue;
         const v = sent[k];
-        if (v && typeof v === "object" && (!v.sd || v.sd === r.side) && Math.abs(Number(k.slice(r.sym.length + 3)) - r.touchTime) <= win) return v;
+        if (!(v && typeof v === "object" && (!v.sd || v.sd === r.side) && Math.abs(Number(k.slice(r.sym.length + 3)) - r.touchTime) <= win)) continue;
+        if (best && (Number(best[1].tt) || 0) >= (Number(v.tt) || 0)) { delete sent[k]; continue; }
+        if (best) delete sent[best[0]];
+        best = [k, v];
       }
-      return null;
+      return best;
     };
     const fresh: any[] = [], upd: any[] = [];
     // "confirmed" is the bot's own moment: the reversal held to the close of the next candle (M.tradeRow, as the backtest)
@@ -509,10 +521,14 @@ async function runUserBots(now: number, reqStart: number) {
     for (const r0 of sigRows) {
       if (!r0.touchTime || r0.score == null) continue;
       const c = conf(r0), r = c ? { ...r0, rev: true, score: c.score } : { ...r0, rev: false, rev0: r0.rev };
-      const key = `s:${r.sym}:${r.touchTime}`, prev = episode(r);
+      const key = `s:${r.sym}:${r.touchTime}`;
+      let ep = episode(r), retry = 0;
+      // its first message did not get through (see below): the signal goes out again as new
+      if (ep && !isTold(ep[1])) { retry = ep[1].retry; delete sent[ep[0]]; ep = null; }
       const stage = inList.has(r.sym) && (entered.get(r.sym) ?? 0) >= r.touchTime ? 3 : r.rev ? 2 : 1;
-      if (prev) {
-        const newTouch = prev.tt != null && prev.tt !== r.touchTime;
+      if (ep) {
+        const prev = ep[1], newTouch = prev.tt != null && prev.tt !== r.touchTime;
+        if (ep[0] !== key) delete sent[ep[0]];
         // t keeps a running episode from being pruned (3 days): refreshed hourly, not every minute
         sent[key] = prev; prev.tt = r.touchTime; if (now - (Number(prev.t) || 0) > 36e5) prev.t = now;
         if (stage > prev.st) upd.push({ r, prev, stage });
@@ -520,7 +536,7 @@ async function runUserBots(now: number, reqStart: number) {
         continue;
       }
       if (r.score < sigMin || (A.long && r.side !== "low") || (A.when === "confirmed" && stage < 2)) continue;
-      fresh.push({ r, key, stage });
+      fresh.push({ r, key, stage, retry });
     }
     const note = (r: any, stage: number) => !inList.has(r.sym) ? `✋ для ручной торговли: бот торгует топ-${list.length}, по этой монете не войдёт`
       : stage === 3 ? "🤖 бот вошёл в сделку" : entered.has(r.sym) ? "🤖 бот уже в сделке по этой монете"
@@ -535,14 +551,24 @@ async function runUserBots(now: number, reqStart: number) {
     fresh.sort((a, b) => b.r.score - a.r.score);
     let n = 0;
     const rest: any[] = [];
+    // a message Telegram did not take (a time-out, too many requests) is not remembered as told: the next run sends it again.
+    // Three tries at most — a message it keeps refusing must not be retried every minute forever. Before 2.37 a failed
+    // message was remembered as sent and the signal was lost
+    const remember = (x: any, mid: number, ok: boolean) => {
+      sent[x.key] = ok || x.retry >= 2 ? { t: now, st: x.stage, mid, sd: x.r.side, tt: x.r.touchTime }
+        : { t: now, st: x.stage, mid: 0, sd: x.r.side, tt: x.r.touchTime, retry: x.retry + 1 };
+    };
     for (const x of fresh) {
       // the first run only remembers; a signal the bot entered on at once is told by the trade message itself
-      let mid = 0;
-      if (!first && x.stage < 3) { if (n++ < 6) mid = await tgSend(chat, text(x.r, x.stage), [x.r.sym]); else rest.push(x); }
-      sent[x.key] = { t: now, st: x.stage, mid, sd: x.r.side, tt: x.r.touchTime };
+      if (first || x.stage === 3) { remember(x, 0, true); continue; }
+      if (n++ < 6) { const mid = await tgSend(chat, text(x.r, x.stage), [x.r.sym]); remember(x, mid, mid > 0); }
+      else rest.push(x);
     }
     // more than 6 at once: the rest in one list, without updates
-    if (rest.length) await sendTo([chat], sigMsg(`📡 <b>Ещё сигналы «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, rest.map((x) => ({ ...x.r, botNote: note(x.r, x.stage) })), S.tf), rest.map((x) => x.r.sym));
+    if (rest.length) {
+      const ok = await sendTo([chat], sigMsg(`📡 <b>Ещё сигналы «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, rest.map((x) => ({ ...x.r, botNote: note(x.r, x.stage) })), S.tf), rest.map((x) => x.r.sym)) > 0;
+      for (const x of rest) remember(x, 0, ok);
+    }
     for (const x of upd) {
       if (x.prev.mid && !first) {
         await tgEdit(chat, x.prev.mid, text(x.r, x.stage, x.failed), [x.r.sym]);
@@ -559,11 +585,17 @@ async function runUserBots(now: number, reqStart: number) {
     const lst = M.pickSymbols(ticker, SM.top, [], now), KM: Record<string, any> = {}, win = M.TOUCH_BARS * (M.TFMS as any)[SM.tf];
     await pool(lst.filter((s) => !RM.has(rkey(s, SM))), PAR, async (s) => { KM[s] = await getK(s, SM.tf, true); });
     const told = new Map<string, number[]>();
-    if (SM.tf === S.tf) for (const k of Object.keys(sent)) if (k.startsWith("s:")) { const [, s, t] = k.split(":"); told.set(s, [...(told.get(s) || []), +t]); }
+    if (SM.tf === S.tf) for (const k of Object.keys(sent)) if (k.startsWith("s:") && isTold(sent[k])) { const [, s, t] = k.split(":"); told.set(s, [...(told.get(s) || []), +t]); }
     // confirmed the way the bots confirm: on the closed candle (M.tradeRow)
     const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r && M.tradeRow(r)?.rev && !(told.get(r.sym) || []).some((t) => Math.abs(t - r.touchTime) <= win));
+    // tries of the signals whose list Telegram did not take before (freshSignals overwrites them)
+    const tries: Record<string, number> = {};
+    for (const [k, v] of Object.entries(sent)) if (k.startsWith("m:") && !isTold(v)) tries[k] = (v as any).retry;
     const mktSigs = freshSignals(rowsM, SM.minScore, sent, now, "m:", win).map((r: any) => ({ ...r, lv: M.levels({ ...r, mkt: reg }, SM) }));
-    if (mktSigs.length) await sendTo([chat], sigMsg("🔔 <b>Рынок</b>", `${SM.tf} · топ-${SM.top} · сила от ${SM.minScore} · только подтверждённые развороты`, mktSigs, SM.tf), mktSigs.map((r: any) => r.sym));
+    if (mktSigs.length && !(await sendTo([chat], sigMsg("🔔 <b>Рынок</b>", `${SM.tf} · топ-${SM.top} · сила от ${SM.minScore} · только подтверждённые развороты`, mktSigs, SM.tf), mktSigs.map((r: any) => r.sym)))) {
+      // not delivered: tried again next run, three tries at most (as the bot's own signals)
+      for (const r of mktSigs) { const k = `m:${r.sym}:${r.touchTime}`, n = (tries[k] || 0) + 1; if (n < 3) sent[k] = { t: now, retry: n }; }
+    }
   }
 }
 
@@ -582,6 +614,7 @@ Deno.serve(async (req) => {
   if (!locked) return Response.json({ skipped: "another run in progress" });
   const t0 = Date.now();
   TG = undefined;   // re-read the Telegram settings every run
+  Object.assign(RSTAT, { calls: 0, rows: 0, ms: 0, err: "" });   // the collector's answers of this run (a warm instance kept the last one's)
   REGS = new Map();   // regimes are measured afresh every run (a warm instance would keep the last minute's)
   try { await tgPoll(); } catch { /* Telegram must never break trading */ }
   try {
@@ -591,7 +624,10 @@ Deno.serve(async (req) => {
     try { users = await runUserBots(Date.now(), t0); } catch { /* personal bots never break the shared one */ }
     const t2 = Date.now();
     try { await notify(notes.lines, notes.syms); } catch { /* the trades are written; a failed message must not fail the run */ }
-    await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed });
+    // the run is fine, but when the collector did not answer the bot computed everything itself: said in `error` of an ok run,
+    // so «Работа сервера» shows it (it used to be visible only in this response, and only as a longer run)
+    await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed,
+      error: RSTAT.err ? `коллектор: ${RSTAT.err}` : null });
     // where the time goes (shared bot / personal bots / the shared bot's messages) and how many coins' candles are kept warm
     return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: t2 - t1, notify: Date.now() - t2 }, kept: KC.size, remote: RSTAT });
   } catch (e) {

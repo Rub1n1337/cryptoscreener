@@ -233,7 +233,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .guard:not(.open){display:none}
 
 /* ---------- server strip ---------- */
-.strip{display:flex;gap:1.5px;height:18px;margin:8px 0}.strip i{flex:1;border-radius:2px;background:var(--s3)}.strip i.ok{background:#16a34a}.strip i.err{background:#dc2626}
+.strip{display:flex;gap:1.5px;height:18px;margin:8px 0}.strip i{flex:1;border-radius:2px;background:var(--s3)}.strip i.ok{background:#16a34a}.strip i.err{background:#dc2626}.strip i.warn{background:var(--acc)}
 
 /* ---------- docs ---------- */
 .doc{line-height:1.6}.doc p,.doc li{max-width:820px}.doc h3{color:var(--text);font-size:17px;margin:26px 0 8px}.doc h3:first-child{margin-top:0}
@@ -2445,19 +2445,20 @@ function renderServer() {
   const nowMin = Math.floor(Date.now() / 6e4), cells = [];
   for (let m = nowMin - 119; m <= nowMin; m++) {
     const r = byMin.get(m);
-    cells.push(`<i class="${r ? (r.ok ? 'ok' : 'err') : ''}" title="${new Date(m * 6e4).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'})} — ${r ? (r.ok ? `ок, ${r.ms} мс, пар ${r.scanned}, сигналов ${r.signals}` : 'ошибка: ' + r.error) : 'нет прогона'}"></i>`);
+    // amber: the run went fine, but the collector did not answer and the bot computed everything itself (its note is in `error`)
+    cells.push(`<i class="${r ? (r.ok ? (r.error ? 'warn' : 'ok') : 'err') : ''}" title="${new Date(m * 6e4).toLocaleTimeString('ru', {hour:'2-digit', minute:'2-digit'})} — ${r ? (r.ok ? `ок, ${r.ms} мс, пар ${r.scanned}, сигналов ${r.signals}${r.error ? ' · ' + esc(r.error) + ', бот посчитал сам' : ''}` : 'ошибка: ' + esc(r.error)) : 'нет прогона'}"></i>`);
   }
   const win = runs.filter(r => Date.now() - Date.parse(r.ts) < 4 * 36e5);
   const okN = win.filter(r => r.ok).length, expected = Math.min(240, Math.max(1, Math.round((Date.now() - (runs.length ? Date.parse(runs[runs.length - 1].ts) : Date.now())) / 6e4) + 1));
   const avgMs = okN ? win.filter(r => r.ok).reduce((a, r) => a + r.ms, 0) / okN : null;
-  const lastErr = runs.find(r => !r.ok);
+  const lastErr = runs.find(r => !r.ok), noColl = win.filter(r => r.ok && r.error).length;
   const share = okN / expected * 100, st = share >= 95 ? '' : share >= 80 ? 'idle' : 'bad';
   const wasOpen = el.querySelector('details')?.open ? ' open' : '';
   el.innerHTML = `<details class="dis"${wasOpen}><summary><span class="sdot ${st}"></span>${st ? 'Сервер работает с перебоями' : 'Сервер работает'} <span class="mute">· ${share.toFixed(0)}% проверок успешны за 4 часа</span></summary>
-    <div class="dbody"><div class="mute" style="font-size:12px">Каждая клетка — одна минута за последние 2 часа: зелёная — проверка рынка прошла, красная — ошибка, серая — проверки не было.</div>
+    <div class="dbody"><div class="mute" style="font-size:12px">Каждая клетка — одна минута за последние 2 часа: зелёная — проверка рынка прошла, жёлтая — прошла, но коллектор не ответил и бот посчитал всё сам (дольше, но так же), красная — ошибка, серая — проверки не было.</div>
     <div class="strip">${cells.join('')}</div>
     <div class="mute" style="font-size:12px">${okN} из ${expected} проверок · в среднем ${avgMs == null ? '—' : (avgMs / 1000).toFixed(1) + ' с'} ·
-      ${lastErr ? `последняя ошибка ${dt(Date.parse(lastErr.ts))}: <span class="neg">${lastErr.error}</span>` : 'ошибок нет'}</div></div></details>`;
+      ${lastErr ? `последняя ошибка ${dt(Date.parse(lastErr.ts))}: <span class="neg">${esc(lastErr.error)}</span>` : 'ошибок нет'}${noColl ? ` · без коллектора: ${noColl}` : ''}</div></div></details>`;
 }
 
 // ---------- journal ----------
@@ -2936,6 +2937,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.37', date:'19 октября 2026', title:'Сигналы не теряются, «переключатель» не гадает', items:[
+    'Если Telegram не принял сообщение с сигналом (сбой связи, перегрузка), бот пробует отправить его ещё раз на следующей минуте, до трёх раз. Раньше такой сигнал считался отправленным и пропадал.',
+    'Одно касание больше не может прислать ложное «отскок не удержался» по сделке, в которую бот уже вошёл.',
+    '«Переключатель» ждёт, если режим рынка неизвестен (не загрузились свечи BTC), а не торгует отскоки наугад. В Telegram так и написано, почему бот не входит.',
+    '«Работа сервера»: жёлтая клетка — проверка прошла, но коллектор не ответил и бот посчитал всё сам.',
+  ]},
   {v:'2.36', date:'19 октября 2026', title:'Свой список монет не выдаёт подгонку за преимущество', items:[
     'Бэктест по своему списку монет больше не показывает зелёное «есть преимущество». Если список составлен сейчас — из монет, которые в топе или на которых стратегия выигрывала, — в нём нет монет, которые тогда были в топе, а потом упали, и итог завышен. Под результатом кнопка: сравнить с честным топом того же размера на каждый момент.',
   ]},
