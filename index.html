@@ -2731,7 +2731,12 @@ async function runBacktest() {
     if (s.custom && !s.custom.length) throw new Error('список монет пуст');
     // honest top: a wider pool is loaded and the backtest trades, at each moment, only that moment's top by 24 h turnover
     const tk = s.custom ? null : await api('/api/v3/ticker/24hr');
-    let traded = s.custom || M.pickSymbols(tk, s.pit ? poolOf(s.top) : s.top, [], now), gone = [];
+    // the pool is fixed for the day: picked by live 24 h turnover it changed from run to run at its edge, and so did the result
+    // with the same settings (Oct 2026: 106k, then 142k a minute later)
+    const day = Math.floor(now / 864e5), want = s.pit ? poolOf(s.top) : s.top, pk = load('sr_pool', null);
+    const live = s.custom ? null : pk?.day === day && pk.n === want && Array.isArray(pk.list) ? pk.list : M.pickSymbols(tk, want, [], now);
+    if (live && !(pk?.day === day && pk.n === want)) save('sr_pool', {day, n:want, list:live});
+    let traded = s.custom || live, gone = [];
     if (s.pit) {   // plus the coins delisted meanwhile (see delistedFor)
       const weakest = +(tk.find(x => x.symbol === traded[traded.length - 1])?.quoteVolume || 0);
       gone = (await delistedFor(tk, from, weakest, t => { st.textContent = t; })).filter(x => !traded.includes(x));
@@ -2744,16 +2749,25 @@ async function runBacktest() {
       try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {}
       st.textContent = `Загружаю историю: ${++done}/${syms.length} пар…`;
     });
+    // a coin whose download failed (a phone on a weak network, Binance asking to slow down) used to drop out silently and
+    // change the result; it gets two more tries, and whatever still fails is named next to the result
+    let failed = syms.filter(x => !hist[x]);
+    for (let round = 1; round <= 2 && failed.length; round++) {
+      st.textContent = `Догружаю ${failed.length} пар (попытка ${round + 1})…`; await sleep(1500 * round);
+      for (const sym of failed) { try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {} }
+      failed = failed.filter(x => !hist[x]);
+    }
     st.textContent = 'Считаю…'; await sleep(30);
     const t0 = performance.now();
     btHist = {hist, from};
     btRes = M.backtest(hist, s, {start:10000, from, only:traded, top:s.pit ? s.top : 0});
     btRes.settings = s; btRes.days = days;
-    const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length);   // a coin of the wider pool without history simply never makes the top
+    const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
     const goneN = gone.filter(x => hist[x]?.length).length;
     st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
-      + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '');
+      + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '')
+      + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} монет (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '');
     btRes.status = st.textContent; renderBacktest();
     if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
@@ -2846,6 +2860,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.32', date:'19 октября 2026', title:'Бэктест: одинаковые настройки — одинаковый итог', items:[
+    'Повторный запуск с теми же настройками больше не даёт другую цифру. Набор монет для «топа на каждый момент» фиксируется на сутки, а не берётся заново при каждом запуске.',
+    'Если историю какой-то монеты скачать не удалось (слабая сеть, Binance просит подождать), бэктест пробует ещё два раза. Раньше такая монета молча выпадала и меняла итог; теперь, если она так и не скачалась, рядом с результатом написано, какие монеты не загрузились.',
+  ]},
   {v:'2.31', date:'19 октября 2026', title:'Бот входит так же, как бэктест; бэктест честнее', items:[
     'Боты теперь входят в тот же момент, что и бэктест: по закрытию свечи после разворота, если цена удержалась в канале. Раньше вход был на свечу раньше, так что бэктест проверял немного другую стратегию.',
     'Бэктест «топ на каждый момент» учитывает монеты, которые за период сняли с Binance (за год их больше 50). Без них итог был завышен: правила общего бота на топ-20 за год давали +0.14R на сделку, с ними −0.04R.',
