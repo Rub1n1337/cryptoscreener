@@ -400,8 +400,8 @@ async function runUserBots(now: number, reqStart: number) {
     const erMax = num(cfg.erMax, 0.05, 0.5, 0.15);
     const regName = M.regimeOf(reg, { erMax, regimeSrc: "majors" });
     const P = cfg.mode === "auto" ? byId(regName === "flat" ? cfg.flat : cfg.impulse) : byId(cfg.active);
-    // the flat / impulse border is the profile's own when it has one (a shared profile carries it; "проверен за год" was tested
-    // at 0.25), else the bot's common one; the regime is read from BTC+ETH+SOL unless the profile was tested on BTC alone
+    // the flat / impulse border is the profile's own when it has one (a shared profile carries it; the 4h switch preset was
+    // picked at 0.25), else the bot's common one; the regime is read from BTC+ETH+SOL unless the profile was tested on BTC alone
     const S = { ...cleanSet(P.set), regimeSrc: P.set?.regimeSrc === "btc" ? "btc" : "majors",
       erMax: P.set?.erMax != null ? num(P.set.erMax, 0.05, 0.5, 0.15) : erMax };
     const pname = String(P.name ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60);

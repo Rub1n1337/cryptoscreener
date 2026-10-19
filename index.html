@@ -959,7 +959,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="«Отскок» — от границы к обычной цене (как у ботов сейчас); «Отскок по тренду» — только по направлению движения; «Пробой» — вслед за выходом за границу">Идея входа <select id="btStrat">
         <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму рынка</option>
       </select></label>
-      <label title="Таймфрейм свечей: на 4ч торгуют общий бот и проверенный профиль">Таймфрейм <select id="btTf"><option value="15m">15м</option><option value="1h">1ч</option><option value="4h">4ч</option></select></label>
+      <label title="Таймфрейм свечей: на 4ч торгуют общий бот и профиль «Переключатель · 4h»">Таймфрейм <select id="btTf"><option value="15m">15м</option><option value="1h">1ч</option><option value="4h">4ч</option></select></label>
       <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></label>
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
       <label id="btPitL" title="Живой бот каждую минуту берёт топ по обороту за последние сутки. «На каждый момент» делает в прошлом так же: монета торгуется, только пока она в топе. «По сегодняшнему» берёт сегодняшний топ на весь период — быстрее, но завышает результат: сегодняшний топ знает, какие монеты потом выросли">Топ считать <select id="btPit"><option value="pit">на каждый момент — честно</option><option value="now">по сегодняшнему — быстрее, завышает</option></select></label>
@@ -1923,10 +1923,11 @@ function renderDetail() {
 // A profile = which coins + which rules. "Auto" picks the flat or the impulse profile from the BTC/ETH/SOL regime.
 const cleanName = s => String(s || '').replace(/[<>&"'`]/g, '').trim().slice(0, 60) || 'Профиль';
 const PROFILE_DEF = {method:'log', N:210, k:3, tf:'15m', minScore:60, strategy:'revert', rr:0, risk:0.02, lev:1, minWidth:0, maxHL:0, longOnly:false, coinErMax:0, regimeOnly:'any', timeStop:48, maxOpen:3};
-// p-sw4h: the shared bot's rules since 11.10.2026 — a year of history (top-50, 4h, channel 3.5σ, T½ ≤ 20, flat if ER < 0.25):
-// median +0.38R a trade after fees over 12 random sets of 40 coins, all 12 in the plus (docs/RESEARCH-2026-10.md)
+// p-sw4h: the shared bot's rules since 11.10.2026 (top-50, 4h, channel 3.5σ, T½ ≤ 20, flat if ER < 0.25). They were picked on
+// today's top-50 traded all year (+0.38R a trade); on the top-50 of each moment, delisted coins included, they lose in each of
+// three years (−0.30…−0.42R), so the preset is no longer called tested (docs/RESEARCH-2026-10.md, 19.10)
 const PRESETS = [
-  {id:'p-sw4h', name:'Переключатель · 4h (проверен за год)', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'4h', k:3.5, maxHL:20, erMax:0.25, strategy:'switch', rr:2, risk:0.01, lev:3, regimeOnly:'any'}},
+  {id:'p-sw4h', name:'Переключатель · 4h', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'4h', k:3.5, maxHL:20, erMax:0.25, strategy:'switch', rr:2, risk:0.01, lev:3, regimeOnly:'any'}},
   {id:'p-flat1h', name:'Боковик · 1h', coins:{mode:'top', top:50}, set:{...PROFILE_DEF, tf:'1h', rr:2, risk:0.01, lev:3, regimeOnly:'flat'}},
   {id:'p-flat', name:'Боковик · 15m', coins:{mode:'top', top:150}, set:{...PROFILE_DEF}},
   {id:'p-imp', name:'Импульс · 4h', coins:{mode:'top', top:150}, set:{...PROFILE_DEF, tf:'4h', k:3.5, strategy:'breakout', rr:3, longOnly:true}},
@@ -1935,8 +1936,8 @@ let BP = load('sr_bot', null) || {profiles:PRESETS, mode:'single', active:'p-sw4
 if (!BP.profiles.some(p => p.id === 'p-flat1h')) BP.profiles.unshift(PRESETS[1]);   // older setups get the presets they miss
 if (!BP.profiles.some(p => p.id === 'p-sw4h')) BP.profiles.unshift(PRESETS[0]);
 BP.profiles.forEach(p => { if (p.id === 'p-sw4h' && p.set.k === 3 && !p.set.maxHL) p.set = {...PRESETS[0].set}; });   // the first version of this preset (one day old) gets the tuned rules
-// the 1h preset no longer holds up over the last year: drop the "проверен за год" its name was saved with
-BP.profiles.forEach(p => { if (p.id === 'p-flat1h' && p.name === 'Боковик · 1h (проверен за год)') p.name = 'Боковик · 1h'; });
+// presets that did not hold up on an honest check: drop the "проверен за год" their names were saved with
+BP.profiles.forEach(p => { if ((p.id === 'p-flat1h' || p.id === 'p-sw4h') && / \(проверен за год\)$/.test(p.name)) p.name = p.name.replace(/ \(проверен за год\)$/, ''); });
 BP.where ||= 'browser';
 BP.profiles.forEach(p => { p.name = cleanName(p.name); });
 let UB = load('sr_ubot', null);   // {id, secret} of this browser's server bot
@@ -2354,7 +2355,7 @@ function renderBotPanel() {
     const roles = auto ? `<div class="roles"><button class="chipb${BP.flat === p.id ? ' on' : ''}" data-role="flat" data-id="${p.id}">${BP.flat === p.id ? '✓ ' : ''}для боковика</button><button class="chipb${BP.impulse === p.id ? ' on' : ''}" data-role="impulse" data-id="${p.id}">${BP.impulse === p.id ? '✓ ' : ''}для импульса</button></div>` : '';
     return `<div class="prof${auto ? '' : ' pick'}${isAct ? ' on' : ''}" data-pick="${p.id}"${auto ? '' : ` role="radio" tabindex="0" aria-checked="${isAct}"`}>
       ${auto ? '' : '<span class="radio"></span>'}
-      <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-sw4h' && !/проверен/.test(p.name) ? ' <span class="tag lo" title="Бэктест за 12 месяцев, топ-50, 4h: медиана +0.38R на сделку после комиссий на 12 случайных наборах монет, все 12 в плюсе; сделок мало — около 3 в месяц">проверен за год</span>' : ''}
+      <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-sw4h' ? ' <span class="tag" title="Правила общего бота. Честная проверка — топ-50 монет на каждый момент, включая снятые с биржи, — в минусе все три последних года: −0.42R, −0.40R и −0.30R на сделку. Прежние «+0.38R за год» получались только на сегодняшнем топ-50, который год назад знать было нельзя">не подтверждён</span>' : ''}
         <div class="pplain">${profPlain(p)}</div><div class="ptech">${profSummary(p)}</div>${roles}</div>
       <div class="pa"><button data-pb="${p.id}" title="Перенести настройки профиля в бэктест и проверить их на истории">В бэктест</button><button data-pe="${p.id}">Изменить</button><button data-ps="${p.id}" title="Скопировать ссылку на этот профиль, чтобы отправить другу">Поделиться</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
 }
@@ -2937,6 +2938,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.38', date:'19 октября 2026', title:'Правила общего бота больше не называются проверенными', items:[
+    'Профиль «Переключатель · 4h» (на его правилах торгует общий бот) больше не помечен «проверен за год». Мы проверили его честно: в каждый момент торгуется топ-50 монет того времени, включая снятые с биржи. Все три последних года он в минусе: −0.42R, −0.40R и −0.30R на сделку, депозит теряет около половины.',
+    'Прежние «+0.38R за год» получались, потому что весь год торговались монеты из сегодняшнего топа. Год назад бот не мог знать, какие монеты в нём окажутся.',
+    'Больше всего теряют сделки по монетам, которые ненадолго попадают в топ по обороту, обычно на резком скачке. Таких сделок три четверти.',
+    'Вся торговля по-прежнему бумажная. Проверить самим: «Бэктест» → «правила общего бота».',
+  ]},
   {v:'2.37', date:'19 октября 2026', title:'Сигналы не теряются, «переключатель» не гадает', items:[
     'Если Telegram не принял сообщение с сигналом (сбой связи, перегрузка), бот пробует отправить его ещё раз на следующей минуте, до трёх раз. Раньше такой сигнал считался отправленным и пропадал.',
     'Одно касание больше не может прислать ложное «отскок не удержался» по сделке, в которую бот уже вошёл.',
