@@ -2933,7 +2933,7 @@ const CHANGELOG = [
     '«Бот ждёт» предлагает другой профиль, только если тот действительно торгует при таком рынке — с учётом его таймфрейма и его границы боковика.',
     'Когда у профиля своя граница боковика или режим по BTC, строка «Рынок сейчас» пишет, что видит сам профиль.',
     '«Справка» про Telegram описывает, что приходит сейчас: сделки общего бота, а после привязки своего — его сделки, «Мои сигналы» и «Рынок».',
-    'Новая версия сайта не перезагружает вкладку, пока открыта карточка сделки, — сначала предлагает обновиться.',
+    'Новая версия сайта не перезагружает вкладку, пока открыта карточка сделки или «Бета», — сначала предлагает обновиться.',
   ]},
   {v:'2.34', date:'19 октября 2026', title:'«Мой бот» видит рынок так же, как бэктест', items:[
     'Боковик или тренд «Мой бот» теперь определяет на таймфрейме своего профиля, как бэктест этого профиля. Раньше он всегда смотрел на часовые свечи, и для профилей на 4h это расходилось с бэктестом примерно в трети случаев. «Рынок сейчас» и выбор профиля в авто-режиме по-прежнему по часовым свечам; если профиль на другом таймфрейме, панель пишет, что рынок там.',
@@ -4080,10 +4080,10 @@ async function checkUpdate() {
   let h; try { h = await fetchVersion(); } finally { updBusy = false; }
   if (reloading || h == null || h === selfHash) return;
   if (btBusy) return;   // a backtest downloading a year of history is not cut off: the next check (3 min) reloads after it
-  // never reload over unsaved edits, an open dialog or an open trade card — ask once instead (the next check after they close
-  // reloads by itself)
+  // never reload over unsaved edits, an open dialog, an open trade card or «Бета» (live order books: a reload re-syncs them) —
+  // ask once instead (the next check after they close or the page changes reloads by itself)
   const dirty = formDirty();
-  if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden')) {
+  if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || page === 'beta') {
     if (!updWarned) toast('Вышла новая версия сайта', dirty ? 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.'
       : 'Обновите страницу, когда закончите — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
     updWarned = true; return;
