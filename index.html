@@ -1932,6 +1932,11 @@ const PRESETS = [
   {id:'p-flat', name:'Боковик · 15m', coins:{mode:'top', top:150}, set:{...PROFILE_DEF}},
   {id:'p-imp', name:'Импульс · 4h', coins:{mode:'top', top:150}, set:{...PROFILE_DEF, tf:'4h', k:3.5, strategy:'breakout', rr:3, longOnly:true}},
 ];
+// no preset has held up on an honest check (the top of each moment, delisted coins included, several years), so each says so;
+// the shared bot's one with its numbers
+const presetTag = p => !PRESETS.some(x => x.id === p.id) ? '' : ` <span class="tag" title="${p.id === 'p-sw4h'
+  ? 'Правила общего бота. Честная проверка — топ-50 монет на каждый момент, включая снятые с биржи, — в минусе все три последних года: −0.42R, −0.40R и −0.30R на сделку. Прежние «+0.38R за год» получались только на сегодняшнем топ-50, который год назад знать было нельзя'
+  : 'Готовый пример настроек, а не проверенная стратегия: честной проверкой на нескольких годах (топ монет на каждый момент, включая снятые с биржи) не подтверждён. Проверьте его в бэктесте'}">не подтверждён</span>`;
 let BP = load('sr_bot', null) || {profiles:PRESETS, mode:'single', active:'p-sw4h', flat:'p-flat1h', impulse:'p-imp', erMax:0.15};
 if (!BP.profiles.some(p => p.id === 'p-flat1h')) BP.profiles.unshift(PRESETS[1]);   // older setups get the presets they miss
 if (!BP.profiles.some(p => p.id === 'p-sw4h')) BP.profiles.unshift(PRESETS[0]);
@@ -2051,9 +2056,12 @@ async function runBot() {
       const tf = tfOf(p.tfms) || set.tf;
       exitK[p.sym] = tf === set.tf && kOf(p.sym) ? kOf(p.sym) : tf === S.tf && cache[p.sym] ? cache[p.sym] : await klines(p.sym, tf, 150).catch(() => null);
     });
+    // it trades by the regime of the profile's own timeframe, as the backtest of that profile does. Awaited before the journal
+    // is read: an await between reading J.open / J.balance and writing them back let a manual close made meanwhile be undone
+    // (the position came back and its P&L was lost). The pause after a trade counts that close too
+    const market = (await regimeOn(set.tf)) ?? undefined;
     const recent = J.closed.filter(x => now - x.tclose < M.COOLDOWN * TFMS[set.tf]).map(x => x.sym);
-    // it trades by the regime of the profile's own timeframe, as the backtest of that profile does
-    const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, S:set, now, allowEntries:J.on, market:(await regimeOn(set.tf)) ?? undefined});
+    const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, S:set, now, allowEntries:J.on, market});
     for (const p of res.opened) { p.note = `«${P.name}» · ${p.note}`; p.snap.profile = P.name; }
     J.open = [...res.stillOpen, ...res.opened];
     J.closed = [...res.closed, ...J.closed];
@@ -2355,7 +2363,7 @@ function renderBotPanel() {
     const roles = auto ? `<div class="roles"><button class="chipb${BP.flat === p.id ? ' on' : ''}" data-role="flat" data-id="${p.id}">${BP.flat === p.id ? '✓ ' : ''}для боковика</button><button class="chipb${BP.impulse === p.id ? ' on' : ''}" data-role="impulse" data-id="${p.id}">${BP.impulse === p.id ? '✓ ' : ''}для импульса</button></div>` : '';
     return `<div class="prof${auto ? '' : ' pick'}${isAct ? ' on' : ''}" data-pick="${p.id}"${auto ? '' : ` role="radio" tabindex="0" aria-checked="${isAct}"`}>
       ${auto ? '' : '<span class="radio"></span>'}
-      <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${p.id === 'p-sw4h' ? ' <span class="tag" title="Правила общего бота. Честная проверка — топ-50 монет на каждый момент, включая снятые с биржи, — в минусе все три последних года: −0.42R, −0.40R и −0.30R на сделку. Прежние «+0.38R за год» получались только на сегодняшнем топ-50, который год назад знать было нельзя">не подтверждён</span>' : ''}
+      <div style="min-width:0;flex:1"><b>${p.name}</b>${isAct ? ` <span class="tag sq">${on ? 'торгует сейчас' : 'выбран'}</span>` : ''}${presetTag(p)}
         <div class="pplain">${profPlain(p)}</div><div class="ptech">${profSummary(p)}</div>${roles}</div>
       <div class="pa"><button data-pb="${p.id}" title="Перенести настройки профиля в бэктест и проверить их на истории">В бэктест</button><button data-pe="${p.id}">Изменить</button><button data-ps="${p.id}" title="Скопировать ссылку на этот профиль, чтобы отправить другу">Поделиться</button><button data-pd="${p.id}"${BP.profiles.length < 2 ? ' disabled' : ''} aria-label="Удалить профиль ${p.name}">Удалить</button></div></div>`; }).join('');
 }
@@ -2431,7 +2439,7 @@ function renderGuard() {
   const stale = age > 5 * 60000;
   const state = !ok || stale ? 'bad' : SJ.error ? 'idle' : 'ok';
   el.className = 'guard' + (state === 'ok' ? '' : ' ' + state) + open;
-  const msg = !ok ? 'Есть позиция без тейка или стопа!' : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${SJ.error}` : 'Общий бот работает 24/7, у всех позиций есть тейк и стоп.';
+  const msg = !ok ? 'Есть позиция без тейка или стопа!' : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${esc(SJ.error)}` : 'Общий бот работает 24/7, у всех позиций есть тейк и стоп.';
   el.innerHTML = `<b>${ok && !stale ? 'ВСЁ В ПОРЯДКЕ' : 'ВНИМАНИЕ'}</b> ${msg}
     <span>Общий бот: проверка рынка ${SJ.checked ? ago(age) + ' назад' : '—'}, позиций ${SJ.open.length}, за 24 ч ${usd(s.pnl24)}</span><span>${mineTxt}</span>`;
   pill(state, state === 'ok' ? `Общий бот · ${SJ.open.length} поз.` : state === 'bad' ? 'Бот не отвечает' : 'Ошибка бота');
@@ -2805,6 +2813,10 @@ async function runBacktest() {
       traded = [...traded, ...gone];
     }
     const syms = [...new Set([...traded, ...M.MAJORS])];   // BTC/ETH/SOL are always loaded: they define the market regime
+    // a run is held in memory whole: 15m × a year × a wide pool is ~14M candles, more than a phone (and many laptops) can hold,
+    // and the tab used to crash with nothing said. ~3M candles (~600 MB with the computed series) is where it stops
+    const bars = syms.length * Math.ceil((endT - startT) / tfms);
+    if (bars > 3e6) throw new Error(`слишком большой прогон: ${syms.length} монет × ${Math.round((endT - startT) / tfms)} свечей ≈ ${(bars / 1e6).toFixed(1)} млн свечей, вкладке не хватит памяти. Возьмите период короче, таймфрейм крупнее или меньше монет`);
     trimHistory(key => key.endsWith(`|${s.tf}|${startT}|${endT}`) && syms.includes(key.split('|')[0]));
     const hist = {}; let done = 0;
     await pool(syms, 4, async sym => {
@@ -2938,6 +2950,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.39', date:'20 октября 2026', title:'Ручное закрытие без двойного учёта, бэктест без падений', items:[
+    'Мой бот в браузере: если закрыть позицию вручную как раз тогда, когда бот проверял рынок, сделка могла записаться дважды, а баланс посчитаться неверно. Иногда закрытая позиция даже возвращалась. Теперь так не бывает.',
+    'Бэктест не запускает прогон, которому не хватит памяти: например, 15-минутки за год на топ-200 — это около 14 млн свечей. Раньше вкладка просто падала, теперь сайт говорит, что уменьшить.',
+    'Все готовые профили помечены «не подтверждён»: ни один не прошёл честную проверку на нескольких годах.',
+    'Telegram: если правка сообщения о сигнале не прошла, бот попробует ещё раз. Раньше сигнал мог так и остаться «ждём подтверждения».',
+  ]},
   {v:'2.38', date:'19 октября 2026', title:'Правила общего бота больше не называются проверенными', items:[
     'Профиль «Переключатель · 4h» (на его правилах торгует общий бот) больше не помечен «проверен за год». Мы проверили его честно: в каждый момент торгуется топ-50 монет того времени, включая снятые с биржи. Все три последних года он в минусе: −0.42R, −0.40R и −0.30R на сделку, депозит теряет около половины.',
     'Прежние «+0.38R за год» получались, потому что весь год торговались монеты из сегодняшнего топа. Год назад бот не мог знать, какие монеты в нём окажутся.',
@@ -3337,9 +3355,12 @@ async function closeMine(id) {
     setTimeout(fetchServerBot, 65e3); return;
   }
   const now = Date.now(); let net = 0;
-  for (const p of open) {
-    let px; try { px = +(await api(`/api/v3/ticker/price?symbol=${p.sym}`)).price; } catch {}
-    if (!(px > 0)) { toast(`Нет цены ${pair(p.sym)}`, 'Позиция осталась открытой — попробуйте ещё раз.', 'bad'); continue; }
+  for (const p0 of open) {
+    let px; try { px = +(await api(`/api/v3/ticker/price?symbol=${p0.sym}`)).price; } catch {}
+    if (!(px > 0)) { toast(`Нет цены ${pair(p0.sym)}`, 'Позиция осталась открытой — попробуйте ещё раз.', 'bad'); continue; }
+    // the bot may have run while the confirmation was open or the price was loading: it may have closed this position by its
+    // stop or take already. Closing the old copy again recorded a second trade and counted its P&L twice
+    const p = J.open.find(x => x.id === p0.id); if (!p) continue;
     const t = M.closeTrade(p, px * (1 - (p.side === 'LONG' ? 1 : -1) * M.SLIP), 'вручную', now);
     J.open = J.open.filter(x => x.id !== p.id); J.closed = [t, ...J.closed]; J.balance += t.pnl; net += t.pnl;
   }

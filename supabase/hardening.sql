@@ -183,6 +183,7 @@ begin
   update bot_state set balance = p_balance, checked_at = p_checked, scanned = p_scanned, last_error = null, regime = coalesce(p_regime, regime) where id = 1;
 end $$;
 revoke all on function public.bot_commit(jsonb, jsonb, float8, timestamptz, int, jsonb) from public, anon, authenticated;
--- the default for a fresh database is the shared bot's current rules (4h "switch", validated over a year)
+-- the default for a fresh database is the shared bot's current rules (4h "switch"). Not an edge: on an honest top of each
+-- moment they lose in each of 2023-24, 2024-25 and 2025-26 (docs/RESEARCH-2026-10.md)
 alter table public.bot_state alter column settings set default
   '{"N": 210, "k": 3.5, "rr": 2, "tf": "4h", "lev": 3, "top": 50, "risk": 0.01, "erMax": 0.25, "maxHL": 20, "method": "log", "minScore": 60, "strategy": "switch", "timeStop": 48, "regimeSrc": "majors", "regimeOnly": "any"}'::jsonb;

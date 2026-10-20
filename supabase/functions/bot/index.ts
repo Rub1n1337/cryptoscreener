@@ -143,9 +143,12 @@ async function tgSend(chat: number | string, text: string, syms: string[] = [], 
     return r?.ok ? Number(r.result?.message_id) || 0 : 0;
   } catch { return 0; }   // notifications must never break trading
 }
+// true when the message now shows this text ("not modified": it already did)
 async function tgEdit(chat: number | string, mid: number, text: string, syms: string[] = []) {
-  try { await tgCall("editMessageText", { chat_id: chat, message_id: mid, text: text.slice(0, 3900) + FOOT, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: keyboard(syms) }); }
-  catch { /* an old or deleted message just stays as it was */ }
+  try {
+    const r = await tgCall("editMessageText", { chat_id: chat, message_id: mid, text: text.slice(0, 3900) + FOOT, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: keyboard(syms) });
+    return !!r?.ok || /not modified/i.test(String(r?.description || ""));
+  } catch { return false; }   // an old or deleted message just stays as it was
 }
 // many chats (the shared bot's trades go to every subscriber): 8 at a time — one by one, a few hundred chats would take
 // minutes and push the run past its lock; Telegram allows ~30 messages a second. Returns how many chats got it
@@ -569,13 +572,19 @@ async function runUserBots(now: number, reqStart: number) {
       const ok = await sendTo([chat], sigMsg(`📡 <b>Ещё сигналы «${esc(pname)}»</b>`, `${S.tf} · сила от ${sigMin}`, rest.map((x) => ({ ...x.r, botNote: note(x.r, x.stage) })), S.tf), rest.map((x) => x.r.sym)) > 0;
       for (const x of rest) remember(x, 0, ok);
     }
+    // an update counts as told when the message was edited or the short reply got through (the reply alone says it); when both
+    // failed (Telegram busy for a moment) the stage stays and the next run tries again, three times at most. Before 2.39 the
+    // stage moved on regardless, and a signal could stay at «ждём подтверждения» after the bot had seen the reversal
     for (const x of upd) {
+      let told = true;
       if (x.prev.mid && !first) {
-        await tgEdit(chat, x.prev.mid, text(x.r, x.stage, x.failed), [x.r.sym]);
+        const edited = await tgEdit(chat, x.prev.mid, text(x.r, x.stage, x.failed), [x.r.sym]);
         const what = x.failed ? "отскок не удержался, ждём нового подтверждения" : x.prev.st === 1 ? `разворот подтверждён${x.stage === 3 ? ", бот вошёл" : ""}` : "";
-        if (what) await tgSend(chat, `${x.failed ? "⚠️" : "✔"} <b>${x.r.side === "low" ? "LONG" : "SHORT"} ${coin(x.r.sym)}</b> — ${what}`, [], x.prev.mid);
+        const replied = what ? await tgSend(chat, `${x.failed ? "⚠️" : "✔"} <b>${x.r.side === "low" ? "LONG" : "SHORT"} ${coin(x.r.sym)}</b> — ${what}`, [], x.prev.mid) > 0 : false;
+        told = edited || replied || !what;   // no reply: confirmed → entered, which the trade message tells anyway
       }
-      x.prev.st = x.stage;
+      // a failed bounce moves back to waiting either way: kept at «confirmed», a later confirmation would not count as news
+      if (told || x.failed || (x.prev.ue = (x.prev.ue || 0) + 1) >= 3) { x.prev.st = x.stage; delete x.prev.ue; }
     }
     pruneSent(sent, now);
   }
