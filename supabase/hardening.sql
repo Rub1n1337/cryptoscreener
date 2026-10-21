@@ -9,11 +9,14 @@ $$;
 create table if not exists public.rl (k text primary key, n int not null, since timestamptz not null);
 alter table public.rl enable row level security;
 revoke all on public.rl from anon, authenticated;
--- true while key k was used at most `lim` times in the current window
+-- true while key k was used at most `lim` times in the current window.
+-- The key is $1 and the conflict is named by its constraint: the parameter k and the column k share a name, and
+-- `values (k, …) on conflict (k)` failed on every call with "column reference k is ambiguous": from 19.10, when the limit was
+-- added, to 2.40 no server bot could be created and no beta code redeemed (both go through this)
 create or replace function public._rl(k text, lim int, win interval) returns boolean language plpgsql security definer set search_path = public as $$
 declare x public.rl;
 begin
-  insert into public.rl values (k, 1, now()) on conflict (k) do update
+  insert into public.rl values ($1, 1, now()) on conflict on constraint rl_pkey do update
     set n = case when rl.since < now() - win then 1 else rl.n + 1 end,
         since = case when rl.since < now() - win then now() else rl.since end
   returning * into x;
