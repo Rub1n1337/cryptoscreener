@@ -10,16 +10,20 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23161b26'/><path d='M47 15H17' stroke='%23f0525f' stroke-width='7' stroke-linecap='round'/><path d='M17 49H47' stroke='%2322c55e' stroke-width='7' stroke-linecap='round'/><path d='M17 15L34 32L17 49' stroke='%23f5b70a' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- the font must not hold up the first paint: Google Fonts is slow or blocked for some visitors (Russia, VPNs), and a
+     render-blocking stylesheet kept the page blank meanwhile. It loads in the background; the system font shows until then -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 <style>
 /* ---------- design tokens ---------- */
 :root{
   --bg:#0a0d14;--s1:#10141d;--s2:#161b26;--s3:#1d2331;--line:#222a39;--line2:#2c3547;
-  --text:#e7eaf0;--mute:#8d97aa;--faint:#5c6679;
+  --text:#e7eaf0;--mute:#8d97aa;--faint:#7a849a;   /* faint text: 4.6–5.2:1 on the page and cards (was #5c6679, ~3:1 — below WCAG AA for small text) */
   --acc:#f5b70a;--accbg:rgba(245,183,10,.12);--up:#f0525f;--lo:#22c55e;--blue:#5b8cff;--violet:#a78bfa;--mid:#64748b;
   --panel:var(--s1);--panel2:var(--s2);
   --r:12px;--r-s:8px;--h:34px;
   --shadow:0 10px 30px rgba(0,0,0,.35);
+  --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#16a34a;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags, server cells, focus ring */
   --topbg:rgba(10,13,20,.82);--navbg:rgba(10,13,20,.96);--backdrop:rgba(3,6,12,.7);--ring:rgba(255,255,255,.05);
   --hover:#3a4458;--row-line:#171d29;--sel:#182033;--gauge:#2a3650;--canvas:#0b0f17;
   --intro:linear-gradient(135deg,#151c2c,#121722);--intro-line:#26314a;
@@ -35,9 +39,10 @@
 }
 :root[data-theme=light]{
   --bg:#f4f5f8;--s1:#ffffff;--s2:#f3f4f7;--s3:#e8ebf0;--line:#e3e6ec;--line2:#d2d8e1;
-  --text:#11161f;--mute:#5a6375;--faint:#7c8596;
+  --text:#11161f;--mute:#5a6375;--faint:#687183;   /* 4.5–4.9:1 on white and the page (was #7c8596, ~3.4:1) */
   --acc:#c28a00;--accbg:rgba(194,138,0,.12);--up:#d42a3a;--lo:#15803d;--blue:#2f6bf0;--violet:#7c3aed;--mid:#64748b;
   --shadow:0 10px 30px rgba(15,23,42,.12);
+  --focus:rgba(47,107,240,.55);
   --topbg:rgba(244,245,248,.85);--navbg:rgba(255,255,255,.96);--backdrop:rgba(15,23,42,.35);--ring:rgba(15,23,42,.06);
   --hover:#b9c1ce;--row-line:#edf0f4;--sel:#fff6dc;--gauge:#dfe5ef;--canvas:#ffffff;
   --intro:linear-gradient(135deg,#fffaf0,#f6f8fc);--intro-line:#ecdcb4;
@@ -100,9 +105,9 @@ button{cursor:pointer;font-weight:500;display:inline-flex;align-items:center;jus
 button:hover{background:var(--s3);border-color:var(--hover)}
 button:disabled{opacity:.5;cursor:wait}
 button.primary{background:var(--acc);border-color:var(--acc);color:#1a1300;font-weight:650}
-button.primary:hover{background:#ffc62e;border-color:#ffc62e}
+button.primary:hover{background:var(--acc-h);border-color:var(--acc-h)}
 button.icon{width:var(--h);padding:0;color:var(--mute)}button.icon.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
-input:not([type=checkbox]):not([type=range]):focus,select:focus,button:focus-visible{outline:2px solid rgba(91,140,255,.55);outline-offset:1px}
+input:not([type=checkbox]):not([type=range]):focus,select:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 input::placeholder{color:var(--faint)}
 input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
 input[type=range]{padding:0;width:120px;accent-color:var(--acc)}
@@ -116,6 +121,8 @@ input[type=range]{padding:0;width:120px;accent-color:var(--acc)}
 .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
 kbd{font:11px/1 ui-monospace,monospace;color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:2px 5px}
 .seg{display:inline-flex;background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px;margin-bottom:14px}
+/* «Выбираю сам / Автоматически по рынку» ran 23px past a 320px screen: on narrow screens the two halves share the width and wrap */
+@media(max-width:380px){#bmode{display:flex;max-width:100%}#bmode .tab{flex:1 1 0;min-width:0;white-space:normal;height:auto;min-height:36px;line-height:1.2;padding:5px 8px;text-align:center}}
 .seg .tab{height:32px}
 /* backtest form */
 .form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:stretch;margin-bottom:12px}
@@ -172,7 +179,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .coin{display:inline-flex;align-items:center;gap:8px}
 .coin i{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;background:hsl(var(--h) 55% 38%)}
 .favbtn{height:32px;width:32px;padding:0;border-radius:50%;font-size:17px;color:var(--faint);background:transparent;border-color:transparent}.favbtn:hover{color:var(--acc);background:var(--s2)}.favbtn.on{color:var(--acc)}
-.star{color:var(--faint);cursor:pointer;font-size:15px}.star:hover{color:var(--mute)}.star.on{color:var(--acc)}
+.star{color:var(--faint);cursor:pointer;font-size:15px}.star{height:auto;padding:0;border:0;background:none;line-height:1;font-weight:400;min-width:0}   /* a button now (keyboard, screen readers); the touch padding below still wins */.star:hover{color:var(--mute)}.star.on{color:var(--acc)}
 .gauge{display:inline-block;width:64px;height:10px;position:relative;vertical-align:middle;margin-right:8px;background:var(--s3);border-radius:5px}
 .gauge::before{content:"";position:absolute;left:14.3%;right:14.3%;top:0;bottom:0;background:var(--gauge);border-left:1px solid var(--lo);border-right:1px solid var(--up)}
 .gauge::after{content:"";position:absolute;left:50%;top:2px;bottom:2px;border-left:1px dashed var(--mid)}
@@ -190,13 +197,16 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12.5px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
 @media(max-width:560px){.botnow{display:block}.bn-dot{display:inline-block;margin-right:8px;vertical-align:1px}.bn-main{display:inline}.bn-last,.bn-go{display:block;margin-top:6px}}
 .tag.up{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.lo{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sq{background:var(--accbg);color:var(--acc-t)}
-.tag.upc{background:#c9303d;color:#fff}.tag.loc{background:#16a34a;color:#fff}
+.tag.upc{background:var(--sig-up);color:#fff}.tag.loc{background:var(--sig-lo);color:#fff}
 .tag.uo{background:transparent;color:var(--up-t);box-shadow:inset 0 0 0 1px var(--bad-line)}.tag.lout{background:transparent;color:var(--lo-t);box-shadow:inset 0 0 0 1px var(--ok-line)}
 .tag.tp{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sl{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.ts{background:var(--s3);color:var(--tag-t)}
 .tbl-err{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 12px;text-align:center;white-space:normal}.tbl-err button{margin-top:8px}
 .sk td{color:transparent}
 .sk td::after{content:"";display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:sk 1.2s infinite}
 @keyframes sk{to{background-position:-200% 0}}
+#refresh.busy{color:var(--acc)}#refresh.busy svg{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+#btStatus.busy::before{content:"";display:inline-block;width:11px;height:11px;margin-right:8px;vertical-align:-1px;border:2px solid var(--line2);border-top-color:var(--acc);border-radius:50%;animation:spin .9s linear infinite}
+.btmore td{text-align:center;padding:12px}.btmore button{width:100%;max-width:320px}
 
 /* ---------- signal breakdown ---------- */
 .detail{margin-top:12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
@@ -233,7 +243,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .guard:not(.open){display:none}
 
 /* ---------- server strip ---------- */
-.strip{display:flex;gap:1.5px;height:18px;margin:8px 0}.strip i{flex:1;border-radius:2px;background:var(--s3)}.strip i.ok{background:#16a34a}.strip i.err{background:#dc2626}.strip i.warn{background:var(--acc)}
+.strip{display:flex;gap:1.5px;height:18px;margin:8px 0}.strip i{flex:1;border-radius:2px;background:var(--s3)}.strip i.ok{background:var(--sig-lo)}.strip i.err{background:var(--bad)}.strip i.warn{background:var(--acc)}
 
 /* ---------- docs ---------- */
 .doc{line-height:1.6}.doc p,.doc li{max-width:820px}.doc h3{color:var(--text);font-size:17px;margin:26px 0 8px}.doc h3:first-child{margin-top:0}
@@ -290,7 +300,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .pick-btn{gap:6px;font-weight:600}.pick-btn .i{width:15px;height:15px}.pick-btn[aria-pressed=true]{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 .btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12.5px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre button{flex:1}}
 .ctools .ct-yauto{display:none}.ctools .ct-yauto.show{display:inline-flex;color:var(--acc);border-color:var(--warn-line)}
-.bcv:focus,.bcv:focus-visible{outline:none}
+.bcv:focus{outline:none}.bcv:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}   /* keyboard focus stays visible in the one-chart layout too (the pane outline shows only in multi-chart layouts) */
 .bpop.help{width:min(380px,calc(100vw - 32px))}.hks{display:grid;gap:7px}.hk{display:grid;grid-template-columns:128px 1fr;gap:10px;font-size:12.5px;line-height:1.35}.hk b{font-weight:650}.hk span{color:var(--mute)}
 .ind-lbl{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--mute);margin:-2px 0 10px;cursor:pointer}.ind-lbl input{accent-color:var(--blue)}
 .ind-chip{display:inline-flex;gap:6px;align-items:center}.ind-chip .i{width:14px;height:14px}.btools .tab .i,.ctools .i{width:17px;height:17px}.ctools .ct-yauto.show{width:auto;padding:0 9px;gap:5px;font-size:12px;font-weight:600}#bLay .tab .i{width:17px;height:17px}.sel-it button .i{width:15px;height:15px}
@@ -636,7 +646,9 @@ details.dis>.dbody{padding:0 16px 16px}
   .top .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--navbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));overflow:visible;flex:none}
   .top .tab{flex:1;flex-direction:column;height:auto;gap:3px;padding:6px 2px;font-size:10.5px;min-width:0}
   .top .tab svg.i{width:20px;height:20px}
-  .top .tab .badge{display:none}
+  .top .tab .badge{display:none}.top .tab{position:relative}
+  /* a new version still shows as a dot over the «Новое» icon (the badge with the number is hidden here) */
+  .top .tab #ver.fresh{display:block;position:absolute;top:4px;left:calc(50% + 7px);font-size:0;padding:0;background:none;min-width:0}.top .tab #ver.fresh::after{margin:0}
   .top .tab .tt.lg{display:none}.top .tab .ts{display:inline}
   /* summary cards: the market mood on one line, the four filter shortcuts in one row under it — all on screen, nothing to swipe */
   .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 12px;padding:0}
@@ -646,7 +658,7 @@ details.dis>.dbody{padding:0 16px 16px}
   .cards .card .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cards .card .t[data-s]{font-size:0}.cards .card .t[data-s]::after{content:attr(data-s);font-size:10px}
   .cact .search{flex:1 1 100%}.cact .seg{flex:1}.cact .seg .tab{flex:1}
-  body{padding-bottom:72px}
+  body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}   /* the tab bar grows by the home-indicator inset */
   /* no scroll inside the page scroll on phones */
   .tablewrap{max-height:none}
   .wrap{padding:12px 10px 28px}.phead h2{font-size:19px}
@@ -662,7 +674,11 @@ details.dis>.dbody{padding:0 16px 16px}
   .guard{top:62px;right:10px}
 }
 @media(max-width:560px){.live{white-space:normal;max-width:100%}.prof{flex-wrap:wrap}.prof .pa{width:100%;flex-wrap:wrap}.prof .pa button{flex:1 1 auto;white-space:nowrap}.bh-a{width:100%;flex-direction:column}.bh-a button{width:100%}.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:19px}}
-/* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){.cmdbtn kbd{display:none}:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}}
+/* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){.cmdbtn kbd{display:none}:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}
+  .pseg button,.bhint button,.ind-chip,.bh-why button{min-height:36px}.chipb{height:36px!important}.ind-it button{width:36px;height:36px}
+  .sel-it button,.bpop .pcols button{width:36px;height:36px}.bchip button{width:36px;height:36px;margin:-7px}   /* a bigger target, the chip keeps its size */
+  /* iOS zooms the page into any text field under 16px and leaves it zoomed */
+  input:not([type=checkbox]):not([type=range]),select,textarea{font-size:16px!important}}
 </style>
 </head>
 <body>
@@ -864,6 +880,10 @@ details.dis>.dbody{padding:0 16px 16px}
             <th data-s="hl" class="hm hl" title="T½ — за сколько монета обычно проходит половину пути обратно к центру канала. Короче — лучше «пружинит». ∞ — тренд, отскок рискован">T½</th>
           </tr></thead>
           <tbody id="tb">
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
+            <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
             <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
             <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
             <tr class="sk"><td></td><td></td><td></td><td></td><td class="hm hx"></td><td></td><td></td><td class="hm hx"></td><td class="hm hx"></td></tr>
@@ -1175,7 +1195,7 @@ details.dis>.dbody{padding:0 16px 16px}
 </div>
 
 <!-- TRADE CARD -->
-<div class="modal hidden" id="modal">
+<div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
   <div class="mbox">
     <div class="mhead"><h2 id="mtitle">—</h2><span class="mute" id="mmeta"></span><button id="mclose" title="Закрыть (Esc)" aria-label="Закрыть карточку">✕</button></div>
     <div class="mgrid">
@@ -1304,6 +1324,8 @@ let rows = [], cache = {}, scanning = false, scanQueued = false, lastScan = 0, f
 async function scan() {
   if (scanning) { scanQueued = true; return; }
   scanning = true; scanQueued = false;
+  // the refresh button turns while a scan runs: a press used to show nothing (the progress was only in the footer)
+  $('#refresh').classList.add('busy'); $('#refresh').setAttribute('aria-busy', 'true');
   const foot = $('#foot'), tf = S.tf, set = {...S};
   try {
     foot.textContent = 'загружаю список пар…';
@@ -1342,6 +1364,7 @@ async function scan() {
     scanErr = e.message || 'нет связи'; renderTable();
   }
   scanning = false;
+  $('#refresh').classList.remove('busy'); $('#refresh').removeAttribute('aria-busy');
   tickFoot();
   if (scanQueued) scan();
 }
@@ -1461,7 +1484,7 @@ function renderTable() {
     : sortKey === 'fav' ? (favs.has(r.sym) ? 1 : 0) : sortKey === 'vol' ? (r.volX ?? -1) : sortKey === 'score' ? (r.score ?? -1)
     : sortKey === 'label' ? kindRank[r.kind] : sortKey === 'hl' ? (isFinite(r.hl) ? -r.hl : -1e9) : r[sortKey];
   list.sort((a, b) => { const x = key(a), y = key(b); return (typeof x === 'string' ? x.localeCompare(y) : x - y) * sortDir; });
-  document.querySelectorAll('#mhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === sortKey); th.dataset.dir = th.dataset.s === sortKey ? (sortDir > 0 ? 'asc' : 'desc') : ''; });
+  document.querySelectorAll('#mhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === sortKey); th.dataset.dir = th.dataset.s === sortKey ? (sortDir > 0 ? 'asc' : 'desc') : ''; th.setAttribute('aria-sort', th.dataset.s === sortKey ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'); });
   $('#tb').innerHTML = list.map(r => {
     // T½ longer than a month (or none at all) means the coin is trending, not coming back: say so instead of "∞" or "460 д"
     const hlMs = r.hl * TFMS[S.tf], hl = isFinite(hlMs) && hlMs < 30 * 864e5 ? dur(hlMs) : 'тренд';
@@ -1470,7 +1493,7 @@ function renderTable() {
     const weak = r.rev && r.score < S.minScore, tip = weak ? `Сила ${r.score} ниже порога ${S.minScore} — бот по такому сигналу не войдёт. ` : '';
     const vc = r.volZ >= 1 ? 'var(--acc)' : r.volZ <= -1 ? 'var(--faint)' : 'inherit';
     return `<tr tabindex="0" class="row${r.sym === chartSym ? ' sel' : ''}${flashSyms.has(r.sym) ? ' newsig' : ''}" data-sym="${r.sym}">
-      <td><span class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}">${favs.has(r.sym) ? '★' : '☆'}</span></td>
+      <td><button class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}" aria-pressed="${favs.has(r.sym)}" aria-label="${favs.has(r.sym) ? 'Убрать из избранного' : 'В избранное'}: ${pair(r.sym)}">${favs.has(r.sym) ? '★' : '☆'}</button></td>
       <td>${coin(r.sym)}</td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
       <td class="hm hx ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
       <td>${r.label ? `<span class="tag ${r.wasRev && !r.rev && r.kind === 'touch' ? (r.side === 'low' ? 'loc' : 'upc') + ' weak' : r.cls + (weak ? ' weak' : '')}"${r.touchTime && (r.rev || r.wasRev) ? ` title="${tip}${sigTip(r)}"` : weak ? ` title="${tip}"` : ''}>${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
@@ -1702,6 +1725,11 @@ function viewRange(n, minFrom, view, defSpan) {
   const to = n - 1 - endOff;
   return {from: to - span + 1, to, span, endOff};
 }
+// one redraw per frame, however many mouse, wheel, touch, slider or resize events arrive: a 120 Hz mouse used to redraw the
+// whole chart 120 times a second, and dragging N from 20 to 300 recomputed the channel 280 times
+const perFrame = f => { let id = 0; return () => { if (!id) id = requestAnimationFrame(() => { id = 0; f(); }); }; };
+const drawChartSoon = perFrame(() => drawChart()), drawChart2Soon = perFrame(() => drawChart2()), drawCardSoon = perFrame(() => drawCard());
+const computeChartSoon = perFrame(() => computeChart());
 // api.state() → {n, minFrom, defSpan, view, geo}; api.set(view) stores the view and redraws
 function attachZoom(cv, api) {
   let drag = null;
@@ -2020,6 +2048,8 @@ async function fetchServerBot() {
     if (chart) drawChart();
   } catch (e) {
     if (/forbidden/.test(e.message)) { UB = null; save('sr_ubot', null); toast('Серверный бот не найден', 'включите режим «На сервере» заново', 'warn'); }
+    // any other failure (no connection, a timeout, a server error) was dropped and the panel kept old numbers as if fresh
+    else if (SB_MINE) { SB_MINE.fetchError = String(e.message || e); renderGuard(); }
   }
 }
 async function setWhere(w) {
@@ -2315,7 +2345,18 @@ $('#btg').onclick = async e => {
     setTimeout(fetchServerBot, 70e3);
   } catch (err) { w?.close(); toast('Не удалось подключить', String(err.message || err), 'bad'); }
 };
-function renderBotPanel() {
+// rewriting a block's HTML drops the keyboard focus inside it, and the profile list and the journal are redrawn every
+// 30-60 s: the focused element is found again by its id and data- attributes and focused back
+function keepFocus(fn) {
+  const a = document.activeElement;
+  if (!a || a === document.body) return fn();
+  const key = a.tagName.toLowerCase() + [...a.attributes].filter(x => x.name === 'id' || x.name.startsWith('data-')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
+  const r = fn();
+  if (!a.isConnected && key.includes('[')) document.querySelector(key)?.focus({preventScroll:true});
+  return r;
+}
+function renderBotPanel() { return keepFocus(renderBotPanelNow); }
+function renderBotPanelNow() {
   renderTg();
   $('#bER').value = String(BP.erMax);
   document.querySelectorAll('#bmode .tab').forEach(b => b.classList.toggle('on', b.dataset.m === BP.mode));
@@ -2380,6 +2421,7 @@ function openForm(p) {
   $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any'; $('#pfTS').value = String(s.timeStop ?? 48); $('#pfSlots').value = String(M.slotsOf(s));
   $('#bform').classList.remove('hidden'); $('#bform').scrollIntoView({block:'nearest', behavior:'smooth'});
   formBase = formState(); syncSavebar();
+  if (!isPhone()) setTimeout(() => { $('#pfName').focus({preventScroll:true}); $('#pfName').select(); }, 0);   // on a phone the keyboard would cover the form
 }
 function saveForm() {
   const listMode = $('#pfCoins').value === 'list', list = parseCoins($('#pfList').value);
@@ -2398,6 +2440,7 @@ function saveForm() {
   if (i >= 0) BP.profiles[i] = p; else BP.profiles.push(p);
   formBase = null; syncSavebar();
   saveBP(); $('#bform').classList.add('hidden'); renderBotPanel(); renderJournal(); syncServerBot();
+  document.querySelector(`#blist [data-pick="${p.id}"]`)?.focus({preventScroll:true});   // the focus was on the form that just closed
   toast(`Профиль «${p.name}» сохранён`, i >= 0 ? 'изменения применятся со следующей проверки рынка' : 'нажмите на него в списке профилей, чтобы бот торговал по нему', 'ok');
 }
 
@@ -2407,6 +2450,7 @@ async function sb(path) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.json();
 }
+let sharedErr = '';   // the last failed request for the shared bot's data ('' after a good one)
 async function fetchShared() {
   try {
     const [st, open, closed, runs] = await Promise.all([
@@ -2423,26 +2467,37 @@ async function fetchShared() {
       for (const p of open.filter(p => !seenO.has(p.id))) notifyUser(`Общий бот: ${p.side} ${pair(p.sym)}`, `вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', () => { jMode = 'shared'; go('journal'); });
       for (const t of closed.filter(t => !seenC.has(t.id))) notifyUser(`Общий бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => { jMode = 'shared'; go('journal'); });
     }
-  } catch (e) { if (SJ) SJ.fetchError = String(e.message || e); }
+    sharedErr = '';
+  } catch (e) { sharedErr = String(e.message || e); if (SJ) SJ.fetchError = sharedErr; }   // kept and said (renderGuard), not swallowed
   renderGuard(); renderBotNow();
   if (!$('#journal').classList.contains('hidden')) renderJournal();
   if (chart) { drawChart(); renderDetail(); }
 }
 function renderGuard() {
   const el = $('#guard'), MD = BP.where === 'server' ? SB_MINE : J, mine = MD ? M.journalStats(MD.start, MD.closed) : null;
-  const mineTxt = MD ? `Мой бот (${BP.where === 'server' ? 'на сервере' : 'в этой вкладке'}): ${MD.on ? 'торгует' : 'на паузе'}, позиций ${MD.open.length}, за 24 ч ${usd(mine.pnl24)}` : 'Мой бот: загружаю…';
+  const mineTxt = MD ? `Мой бот (${BP.where === 'server' ? 'на сервере' : 'в этой вкладке'}): ${MD.on ? 'торгует' : 'на паузе'}, позиций ${MD.open.length}, за 24 ч ${usd(mine.pnl24)}`
+      + (MD.fetchError ? ` · не удалось обновить, показано состояние ${MD.checked ? ago(Date.now() - MD.checked) + ' назад' : 'с прошлой загрузки'}` : '')
+    : 'Мой бот: загружаю…';
   const open = el.classList.contains('open') ? ' open' : '';
   const pill = (state, txt) => { $('#guardPill').className = 'pill ' + state; $('#guardTxt').textContent = txt; };
-  if (!SJ) { el.className = 'guard idle' + open; el.innerHTML = `<b>СОСТОЯНИЕ БОТОВ</b> Загружаю общего бота… <span>${mineTxt}</span>`; pill('idle', 'Загрузка…'); return; }
+  if (!SJ) {
+    el.className = 'guard idle' + open;
+    el.innerHTML = `<b>СОСТОЯНИЕ БОТОВ</b> ${sharedErr ? `Не удалось загрузить общего бота (${esc(sharedErr.slice(0, 90))}), пробую снова.` : 'Загружаю общего бота…'} <span>${mineTxt}</span>`;
+    pill('idle', sharedErr ? 'Нет связи с сервером' : 'Загрузка…'); return;
+  }
   const age = Date.now() - SJ.checked, s = M.journalStats(SJ.start, SJ.closed);
   const ok = [...SJ.open, ...myOpen()].every(p => isFinite(p.tp) && isFinite(p.sl));
   const stale = age > 5 * 60000;
-  const state = !ok || stale ? 'bad' : SJ.error ? 'idle' : 'ok';
+  // our own request failed: what is shown is the last good data, and "the bot is not answering" would blame the wrong side
+  const netErr = SJ.fetchError;
+  const state = !ok ? 'bad' : netErr ? 'idle' : stale ? 'bad' : SJ.error ? 'idle' : 'ok';
   el.className = 'guard' + (state === 'ok' ? '' : ' ' + state) + open;
-  const msg = !ok ? 'Есть позиция без тейка или стопа!' : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${esc(SJ.error)}` : 'Общий бот работает 24/7, у всех позиций есть тейк и стоп.';
+  const msg = !ok ? 'Есть позиция без тейка или стопа!'
+    : netErr ? `Не удалось обновить данные с сервера (${esc(netErr.slice(0, 90))}): показано состояние ${ago(age)} назад, пробую снова.`
+    : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${esc(SJ.error)}` : 'Общий бот работает 24/7, у всех позиций есть тейк и стоп.';
   el.innerHTML = `<b>${ok && !stale ? 'ВСЁ В ПОРЯДКЕ' : 'ВНИМАНИЕ'}</b> ${msg}
     <span>Общий бот: проверка рынка ${SJ.checked ? ago(age) + ' назад' : '—'}, позиций ${SJ.open.length}, за 24 ч ${usd(s.pnl24)}</span><span>${mineTxt}</span>`;
-  pill(state, state === 'ok' ? `Общий бот · ${SJ.open.length} поз.` : state === 'bad' ? 'Бот не отвечает' : 'Ошибка бота');
+  pill(state, state === 'ok' ? `Общий бот · ${SJ.open.length} поз.` : state === 'bad' ? (ok ? 'Бот не отвечает' : 'Нет тейка или стопа') : netErr ? 'Нет связи с сервером' : 'Ошибка бота');
 }
 
 // server health of the shared bot: one cell per minute for the last 2 hours
@@ -2544,7 +2599,8 @@ function journalInsight(D, st) {
   }
   return txt ? `<div class="insight"><svg class="i"><use href="#i-info"/></svg><span>${txt}</span></div>` : '';
 }
-function renderJournal() {
+function renderJournal() { return keepFocus(renderJournalNow); }
+function renderJournalNow() {
   document.querySelectorAll('.jm').forEach(b => b.classList.toggle('on', b.dataset.m === jMode));
   $('#jmine').classList.toggle('hidden', jMode !== 'mine');
   renderServer();
@@ -2603,7 +2659,7 @@ function renderJournal() {
   }).join('') || '<tr><td colspan="12" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
   $('#jcloseAll').classList.toggle('hidden', jMode !== 'mine' || D.open.filter(p => !p.closeReq).length < 2);
   const list = D.closed.map(M.normTrade).sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * jDir; });
-  document.querySelectorAll('#jhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === jSort); th.dataset.dir = th.dataset.s === jSort ? (jDir > 0 ? 'asc' : 'desc') : ''; });
+  document.querySelectorAll('#jhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === jSort); th.dataset.dir = th.dataset.s === jSort ? (jDir > 0 ? 'asc' : 'desc') : ''; th.setAttribute('aria-sort', th.dataset.s === jSort ? (jDir > 0 ? 'ascending' : 'descending') : 'none'); });
   $('#jclosed').innerHTML = list.map(x => `<tr tabindex="0" class="row" data-kind="closed" data-id="${x.id}" title="Открыть карточку сделки"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
@@ -2612,7 +2668,7 @@ function renderJournal() {
 }
 
 // ---------- trade card ----------
-let tcard = null; // {d, opts}
+let tcard = null, zmT = null; // {d, opts}; the trade chart's zoom controls
 function openTrade(kind, id) {
   const D = journalData();
   const raw = (kind === 'open' ? D.open : D.closed).find(x => String(x.id) === String(id));
@@ -2623,6 +2679,8 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   const set = x.snap?.settings || fallback;
   const tf = x.snap?.settings?.tf || tfOf(x.tfms) || set.tf, tfms = TFMS[tf];
   const sg = x.side === 'LONG' ? 1 : -1;
+  // the card takes the focus (a keyboard or screen-reader user lands in it) and gives it back to what opened it on close
+  if ($('#modal').classList.contains('hidden')) { modalBack = document.activeElement; requestAnimationFrame(() => $('#mclose').focus({preventScroll:true})); }
   $('#modal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
   $('#mtitle').textContent = `${pair(x.sym)} — ${isOpen ? 'открытая позиция' : 'сделка'}`;
   $('#mmeta').textContent = `${x.side} · ${who} · ${isOpen ? 'открыта ' + dt(x.time) : dt(x.time) + ' → ' + dt(x.tclose)} · ${tf}`;
@@ -2693,8 +2751,15 @@ function drawCard() {
   const r = viewRange(tcard.d.c.length, tcard.minFrom, tcard.view, tcard.defSpan);
   tcard.opts.from = r.from; tcard.opts.to = r.to; tcard.opts.top = chartTop();
   tcard.geo = renderChart($('#tcv'), tcard.d, tcard.opts);
+  zmT?.sync();   // a new trade opens at its default view: "к последней свече" from the previous one's scrolling must go
 }
-function closeModal() { $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null; }
+let modalBack = null;
+function closeModal() {
+  if ($('#modal').classList.contains('hidden')) return;
+  $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null;
+  if (modalBack?.isConnected) modalBack.focus({preventScroll:true});
+  modalBack = null;
+}
 
 // ---------- backtest ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -2791,7 +2856,7 @@ function btEstimate() {
 }
 async function runBacktest() {
   if (btBusy) return;
-  btBusy = true; $('#btRun').disabled = true;
+  btBusy = true; $('#btRun').disabled = true; $('#btStatus').classList.add('busy');   // a turning mark while it loads and counts
   const s = btSettings(), days = +$('#btDays').value, tfms = TFMS[s.tf];
   const st = $('#btStatus');
   try {
@@ -2847,7 +2912,7 @@ async function runBacktest() {
   } catch (e) {
     st.textContent = 'Ошибка: ' + (e.message || e);
   }
-  btBusy = false; $('#btRun').disabled = false;
+  btBusy = false; $('#btRun').disabled = false; $('#btStatus').classList.remove('busy');
 }
 function groupRow(name, list) {
   const g = M.journalStats(10000, list);
@@ -2917,14 +2982,19 @@ function renderBacktest() {
     + ['тейк', 'стоп', 'тайм-стоп', 'конец теста'].filter(z => tr.some(x => x.reason === z)).map(z => groupRow('выход: ' + z, by(x => x.reason, z))).join('')
     + (s.regimeSrc === 'majors' ? [['flat', 'Рынок в боковике'], ['up', 'Рынок растёт'], ['down', 'Рынок падает']] : [['flat', 'BTC во флэте'], ['up', 'BTC в росте'], ['down', 'BTC в падении']]).filter(([k]) => tr.some(x => x.snap?.regime === k)).map(([k, nm]) => groupRow(nm, by(x => x.snap?.regime, k))).join('')
     + groupRow('1-я половина периода', h1) + groupRow('2-я половина периода', h2) + '</tbody>';
-  const list = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
-  $('#btTrades').innerHTML = list.map(x => `<tr tabindex="0" class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
-    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
-    <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
-    <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td><td class="hm">${x.snap?.score ?? '—'}</td></tr>`).join('')
+  btList = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
+  // the newest BT_ROWS first, the rest on request: a long 15m run drew thousands of rows at once and froze a phone for a moment
+  $('#btTrades').innerHTML = btRowsHtml(btList.slice(0, BT_ROWS))
+    + (btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
     || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
   drawEquity();
 }
+const BT_ROWS = 300;
+let btList = [];
+const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
+    <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
+    <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
+    <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td><td class="hm">${x.snap?.score ?? '—'}</td></tr>`).join('');
 function drawEquity() { // legacy canvas curve — the results now use the SVG balance chart in the hero
   const cv = $('#btEq'); if (!cv) return;
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
@@ -2950,6 +3020,15 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.42', date:'21 октября 2026', title:'Быстрее под рукой и удобнее на телефоне', items:[
+    'График больше не подтормаживает при движении мыши, прокрутке, масштабе и ползунках канала: он перерисовывается раз в кадр, а не на каждое событие.',
+    'На iPhone страница больше не увеличивается при нажатии на поле ввода. Кнопки в «Бете» и в настройках стали крупнее для пальца, а точка «вышла новая версия» видна и на телефоне.',
+    'Сайт показывается сразу, даже если шрифт Google грузится медленно или недоступен.',
+    'Серый второстепенный текст стал читаемее в обеих темах.',
+    'Если не удалось обновить данные бота, сайт так и пишет и показывает, на какое время цифры. Раньше он молча показывал старое состояние или писал «бот не отвечает».',
+    'Бэктест: пока идёт расчёт, крутится значок; длинный список сделок показывает последние 300, остальные по кнопке. Числа во всех таблицах итога выровнены вправо.',
+    'Работа с клавиатуры: таблицы сортируются по Enter, карточка сделки держит фокус внутри и возвращает его при закрытии, форма профиля закрывается по Esc. Фокус больше не сбрасывается, когда журнал обновляется.',
+  ]},
   {v:'2.41', date:'21 октября 2026', title:'Telegram «Рынок» больше не теряет сигналы', items:[
     'Фильтр «Рынок» в Telegram пропускал большинство подтверждённых разворотов. Порог силы сравнивался с силой ещё не закрытой свечи, а у неё нет 20 баллов за подтверждение. Сигнал силой 75 выглядел как 55 и не уходил. Например, 20–21 октября на топ-100 1h было три таких сигнала, а пришёл один. Теперь сила берётся с закрытой свечи, как у «Моих сигналов».',
     'Держать сайт открытым для сигналов в Telegram не нужно: их присылает сервер.',
@@ -3303,9 +3382,9 @@ $('#more').onclick = () => setMore(!$('#mtable').classList.contains('more'));
 setMore(load('sr_more', false));
 let scanTimer;
 const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); syncServerBot(); };   // the server bot sends this market's signals to Telegram
-$('#N').oninput = e => { S.N = +e.target.value; $('#Nv').textContent = S.N; computeChart(); };
-$('#k').oninput = e => { S.k = +e.target.value; $('#kv').textContent = S.k; computeChart(); };
-$('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').textContent = S.candles; chartView = null; drawChart(); };
+$('#N').oninput = e => { S.N = +e.target.value; $('#Nv').textContent = S.N; computeChartSoon(); };
+$('#k').oninput = e => { S.k = +e.target.value; $('#kv').textContent = S.k; computeChartSoon(); };
+$('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').textContent = S.candles; chartView = null; drawChartSoon(); };
 $('#N').onchange = () => { loadChart(); rescanSoon(); };
 $('#k').onchange = rescanSoon;
 $('#cn').onchange = () => { save('sr_settings', S); loadChart(); };
@@ -3345,9 +3424,9 @@ $('#fchips').onclick = e => {
 };
 $('#tb').onclick = e => {
   if (e.target.closest('[data-fclear]')) { clearFilters(); return; }
-  if (e.target.closest('[data-retry]')) { $('#tb').innerHTML = ('<tr class="sk">' + '<td></td>'.repeat(9) + '</tr>').repeat(6); scan(); return; }
+  if (e.target.closest('[data-retry]')) { $('#tb').innerHTML = ('<tr class="sk">' + '<td></td>'.repeat(9) + '</tr>').repeat(10); scan(); return; }
   const f = e.target.closest('[data-fav]');
-  if (f) { const s = f.dataset.fav; favs.has(s) ? favs.delete(s) : favs.add(s); save('sr_favs', [...favs]); renderTable(); if (s === chartSym) computeChart(); return; }
+  if (f) { const s = f.dataset.fav; favs.has(s) ? favs.delete(s) : favs.add(s); save('sr_favs', [...favs]); keepFocus(renderTable); if (s === chartSym) computeChart(); return; }
   const tr = e.target.closest('tr.row'); if (tr) openCoin(tr.dataset.sym);
 };
 // close my bot's positions by hand (one, or all with id = null), at market with the usual fee and slippage.
@@ -3388,6 +3467,15 @@ $('#jdesc').onclick = e => {
 $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+// Tab stays inside the open card instead of walking the page behind it
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Tab' || $('#modal').classList.contains('hidden')) return;
+  const f = [...$('#modal').querySelectorAll('button, [href], input, select, textarea, canvas, [tabindex]:not([tabindex="-1"])')].filter(x => x.offsetParent);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1], inside = $('#modal').contains(document.activeElement);
+  if (e.shiftKey && (document.activeElement === first || !inside)) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && (document.activeElement === last || !inside)) { e.preventDefault(); first.focus(); }
+});
 // table rows open with Enter / Space, like a click
 document.addEventListener('keydown', e => {
   const tr = e.target.closest?.('tr.row'); if (!tr || e.target !== tr) return;
@@ -3400,6 +3488,8 @@ document.addEventListener('keydown', e => {
 });
 document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; sortDir = sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1); sortKey = k; renderTable(); });
 document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : (k === 'sym' || k === 'reason' ? 1 : -1); jSort = k; renderJournal(); });
+// sortable headers work from the keyboard too: Tab to a header, Enter or Space sorts by it
+document.querySelectorAll('#mhead th[data-s], #jhead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
 // ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes ----------
 const PAGES = ['market', 'journal', 'backtest', 'beta', 'help', 'changes'];
@@ -3618,6 +3708,8 @@ $('#pfCancel').onclick = async () => {
   formBase = null; syncSavebar(); $('#bform').classList.add('hidden');
 };
 $('#pfSave').onclick = saveForm;
+// Escape in the form is 'Cancel' (with the same question when something was changed)
+$('#bform').addEventListener('keydown', e => { if (e.key === 'Escape' && $('#dlg').classList.contains('hidden')) { e.preventDefault(); e.stopPropagation(); $('#pfCancel').click(); } });
 $('#pfCoins').onchange = () => $('#pfListL').classList.toggle('hidden', $('#pfCoins').value !== 'list');
 $('#blist').onclick = async e => {
   const ed = e.target.closest('[data-pe]'), del = e.target.closest('[data-pd]'), role = e.target.closest('[data-role]'), sh = e.target.closest('[data-ps]');
@@ -3663,11 +3755,11 @@ $('#jreset').onclick = async () => {
   J = {balance:10000, start:10000, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
 };
 const cv = $('#cv');
-cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); hoverY = e.clientY - cv.getBoundingClientRect().top; drawChart(); };
-cv.onmouseleave = () => { hoverI = null; hoverY = null; drawChart(); };
+cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); hoverY = e.clientY - cv.getBoundingClientRect().top; drawChartSoon(); };
+cv.onmouseleave = () => { hoverI = null; hoverY = null; drawChartSoon(); };
 const tcv = $('#tcv');
-tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); tcard.opts.hoverY = e.clientY - tcv.getBoundingClientRect().top; drawCard(); };
-tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCard(); };
+tcv.onmousemove = e => { if (!tcard) return; tcard.opts.hoverI = hoverIndex(tcard.geo, tcv, e); tcard.opts.hoverY = e.clientY - tcv.getBoundingClientRect().top; drawCardSoon(); };
+tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCardSoon(); };
 // numeric columns (prices, %, $, R) are right-aligned; dates and text stay left
 const isNum = s => /^[+−-]?[$×]?\d/.test(s) && !/^\d\d\.\d\d/.test(s) && !/^\d\d:\d\d/.test(s);
 function alignNums(tb) {
@@ -3682,10 +3774,15 @@ function alignNums(tb) {
 }
 let alignQ = new Set();
 new MutationObserver(ms => {
-  for (const m of ms) { const tb = m.target.closest?.('tbody'); if (tb) alignQ.add(tb); }
+  for (const m of ms) {
+    const tb = m.target.closest?.('tbody'); if (tb) { alignQ.add(tb); continue; }
+    // a whole table (or a block with tables) rebuilt through innerHTML: its bodies are among the added nodes, not around the
+    // target — the backtest's «По силе сигнала» and «По стороне…» tables stayed left-aligned
+    for (const n of m.addedNodes) if (n.nodeType === 1) (n.tagName === 'TBODY' ? [n] : n.querySelectorAll('tbody')).forEach(b => alignQ.add(b));
+  }
   if (alignQ.size) requestAnimationFrame(() => { alignQ.forEach(alignNums); alignQ.clear(); });
 }).observe(document.body, {childList: true, subtree: true});
-window.onresize = () => { drawChart(); drawCard(); };
+window.onresize = () => { drawChartSoon(); drawCardSoon(); if (tf2On) drawChart2Soon(); };
 // theme: dark by default, light on request; charts read the new tokens and redraw
 function applyTheme(t) {
   document.documentElement.dataset.theme = t;
@@ -3710,7 +3807,7 @@ const setWide = on => {
   requestAnimationFrame(drawChart);
 };
 zm = attachZoom(cv, {wheelGate:true, state:() => chart && {n:chart.c.length, minFrom:chart.N - 1, defSpan:chartDefSpan(), view:chartView, geo:chartGeo},
-  set:v => { chartView = v; drawChart(); }, expand:() => setWide(!document.body.classList.contains('wide')),
+  set:v => { chartView = v; drawChartSoon(); }, expand:() => setWide(!document.body.classList.contains('wide')),
   tools:`<button data-z="level" class="ct-txt" title="Провести свой уровень (L): нажмите на график на нужной цене" aria-label="Свой уровень">— уровень</button>`
     + `<button data-z="tf2" class="ct-txt" title="Второй таймфрейм рядом (T)" aria-label="Второй таймфрейм">2 ТФ</button>`,
   onTool:z => { if (z === 'level') setLevelMode(!levelMode); if (z === 'tf2') setTf2(!tf2On); },
@@ -3801,12 +3898,12 @@ function setTf2(on) {
 }
 document.querySelectorAll('#tf2seg .tab').forEach(b => b.onclick = () => { tf2Pref = b.dataset.tf2; save('sr_tf2tf', tf2Pref); chart2View = null; loadTf2(); });
 const cv2 = $('#cv2');
-cv2.onmousemove = e => { hover2 = hoverIndex(chart2Geo, cv2, e); hover2Y = e.clientY - cv2.getBoundingClientRect().top; drawChart2(); };
-cv2.onmouseleave = () => { hover2 = null; hover2Y = null; drawChart2(); };
+cv2.onmousemove = e => { hover2 = hoverIndex(chart2Geo, cv2, e); hover2Y = e.clientY - cv2.getBoundingClientRect().top; drawChart2Soon(); };
+cv2.onmouseleave = () => { hover2 = null; hover2Y = null; drawChart2Soon(); };
 zm2 = attachZoom(cv2, {wheelGate:true, state:() => chart2 && {n:chart2.c.length, minFrom:chart2.N - 1, defSpan:chart2DefSpan(), view:chart2View, geo:chart2Geo},
-  set:v => { chart2View = v; drawChart2(); }, pick:e => pickLevel(e, chart2Geo, cv2)});
+  set:v => { chart2View = v; drawChart2Soon(); }, pick:e => pickLevel(e, chart2Geo, cv2)});
 if (tf2On) setTf2(true);
-attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCard(); }});
+zmT = attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCardSoon(); }});
 
 $('#btRun').onclick = runBacktest;
 // "Проверить честно" under an inflated (today's top) result
@@ -3842,6 +3939,7 @@ hlOpts('#btHL', $('#btTf').value);
 $('#btCustom').oninput = btEstimate;
 $('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });
 $('#btTrades').onclick = e => {
+  if (e.target.closest('[data-btmore]')) { e.target.closest('tr').outerHTML = btRowsHtml(btList.slice(BT_ROWS)); return; }
   const tr = e.target.closest('tr.row'); if (!tr || !btRes) return;
   const x = btRes.trades.find(t => String(t.id) === tr.dataset.id);
   if (x) showTrade(x, {isOpen:false, who:'бэктест', set:btRes.settings});
