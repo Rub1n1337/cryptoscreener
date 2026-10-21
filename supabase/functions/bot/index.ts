@@ -595,8 +595,12 @@ async function runUserBots(now: number, reqStart: number) {
     await pool(lst.filter((s) => !RM.has(rkey(s, SM))), PAR, async (s) => { KM[s] = await getK(s, SM.tf, true); });
     const told = new Map<string, number[]>();
     if (SM.tf === S.tf) for (const k of Object.keys(sent)) if (k.startsWith("s:") && isTold(sent[k])) { const [, s, t] = k.split(":"); told.set(s, [...(told.get(s) || []), +t]); }
-    // confirmed the way the bots confirm: on the closed candle (M.tradeRow)
-    const rowsM = lst.map((s) => analyzeK(s, KM[s], SM)).filter((r: any) => r && M.tradeRow(r)?.rev && !(told.get(r.sym) || []).some((t) => Math.abs(t - r.touchTime) <= win));
+    // confirmed the way the bots confirm: on the closed candle (M.tradeRow), with that candle's strength, as the bot's own signals
+    // do. Before 2.41 the threshold was checked on the forming candle's strength: its own reversal check rarely holds yet, so it
+    // lacked the 20 points of a confirmed reversal and most confirmed signals fell below the threshold (21.10, top-100 1h: 2 of 3
+    // lost, e.g. a closed-candle 75 read as 55)
+    const rowsM = lst.map((s) => { const r = analyzeK(s, KM[s], SM), c = r && M.tradeRow(r); return c?.rev ? { ...r, rev: true, score: c.score } : null; })
+      .filter((r: any) => r && !(told.get(r.sym) || []).some((t) => Math.abs(t - r.touchTime) <= win));
     // tries of the signals whose list Telegram did not take before (freshSignals overwrites them)
     const tries: Record<string, number> = {};
     for (const [k, v] of Object.entries(sent)) if (k.startsWith("m:") && !isTold(v)) tries[k] = (v as any).retry;
