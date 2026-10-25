@@ -590,7 +590,15 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .hchg{font-size:13px}.hchg .chip{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:600;margin-right:6px;font-variant-numeric:tabular-nums}
 .hchg .chip.pos{background:rgba(34,197,94,.12)}.hchg .chip.neg{background:rgba(240,82,95,.12)}.hchg .chip.flat{background:var(--s3)}
 .hside{display:flex;gap:28px;font-size:12px;color:var(--mute)}.hside div{display:flex;flex-direction:column;gap:3px}.hside b{font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
-.hchart{position:relative;height:150px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
+.hchart{position:relative;height:150px;touch-action:pan-y;cursor:crosshair;border-radius:4px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
+.hchart:focus{outline:none}.hchart:focus-visible{outline:2px solid var(--focus);outline-offset:6px}
+/* the balance chart's pointer: a line, a dot on the balance, a note (see eqShow); the drawdown band's size */
+.hx{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:var(--c-cross);pointer-events:none}
+.hdot{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;box-shadow:0 0 0 4px var(--ring);pointer-events:none}
+.htip{position:absolute;top:0;z-index:2;padding:7px 10px;background:var(--c-tip);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--shadow);font-size:12px;line-height:1.5;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
+.htip b{font-size:14px}
+.hdd{position:absolute;font-size:11px;white-space:nowrap;pointer-events:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .hlab{position:absolute;left:0;transform:translateY(-130%);font-size:11px;color:var(--faint);pointer-events:none}
 .hend{position:absolute;right:0;width:9px;height:9px;margin:-4.5px -4.5px 0 0;border-radius:50%;box-shadow:0 0 0 4px var(--ring)}
 .haxis{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:8px}
@@ -2556,29 +2564,117 @@ function countUp(el, from, to, fmt, ms = 650) {
   requestAnimationFrame(step);
 }
 const peakOf = D => { let b = D.start, pk = b; for (const x of [...D.closed].sort((a, b2) => a.tclose - b2.tclose)) { b += x.pnl; pk = Math.max(pk, b); } return pk; };
-// balance over time: a step line — the balance only changes when a trade closes
-function equityChart(D, tEnd) {
+// balance over time: a step line — the balance only changes when a trade closes.
+// key: 'j' the journal's chart, 'bt' the backtest's — both can be on the page at once (one hidden), so ids carry it.
+// EQ keeps each chart's points for the pointer and the keyboard (eqShow); EQH — the point shown, to show it again after a redraw
+const EQ = new Map(), EQH = {key:null, t:null, sticky:false};
+function equityChart(D, tEnd, key = 'j') {
   const cl2 = [...D.closed].sort((a, b) => a.tclose - b.tclose);
-  if (!cl2.length) return `<div class="hempty">Закрытых сделок пока нет — здесь появится график баланса и итоги: winrate, средний результат, комиссии, просадка.</div>`;
+  if (!cl2.length) { EQ.delete(key); return `<div class="hempty">Закрытых сделок пока нет — здесь появится график баланса и итоги: winrate, средний результат, комиссии, просадка.</div>`; }
   const t0 = Math.min(...cl2.map(x => x.time)), t1 = tEnd ?? Date.now();
-  const pts = [[t0, D.start]]; let b = D.start;
-  for (const x of cl2) { b += x.pnl; pts.push([x.tclose, b]); }
-  pts.push([t1, b]);
-  let mn = Math.min(...pts.map(p => p[1])), mx = Math.max(...pts.map(p => p[1]));
+  const pts = [{t:t0, b:D.start, dd:0}]; let b = D.start;
+  for (const x of cl2) { b += x.pnl; pts.push({t:x.tclose, b, x}); }
+  // the deepest fall from a peak, measured as M.journalStats measures «Макс. просадка» (same order, same sums, so the band
+  // and the number agree): «8.5%» is from the highest balance before it, not from the start — on a chart from 10k to 40k
+  // it looked like a small step that never went below the start
+  let peak = D.start, pkI = 0, dd = 0, ddPk = 0, ddTr = 0;
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i].b > peak) { peak = pts[i].b; pkI = i; }
+    pts[i].dd = (peak - pts[i].b) / peak;
+    if (pts[i].dd > dd) { dd = pts[i].dd; ddPk = pkI; ddTr = i; }
+  }
+  pts.push({t:t1, b, dd:pts[pts.length - 1].dd, end:true});
+  let mn = Math.min(...pts.map(p => p.b)), mx = Math.max(...pts.map(p => p.b));
   const pad = (mx - mn) * 0.18 || Math.max(1, mx * 0.002); mn -= pad; mx += pad;
-  const W = 1000, H = 150, X = t => ((t - t0) / Math.max(1, t1 - t0) * W).toFixed(1), Y = v => ((mx - v) / (mx - mn) * H).toFixed(1);
-  let d = `M${X(pts[0][0])},${Y(pts[0][1])}`;
-  for (let i = 1; i < pts.length; i++) d += ` H${X(pts[i][0])} V${Y(pts[i][1])}`;
+  const W = 1000, H = 150, X = t => (t - t0) / Math.max(1, t1 - t0) * W, Y = v => (mx - v) / (mx - mn) * H, f = v => v.toFixed(1);
+  let d = `M${f(X(pts[0].t))},${f(Y(pts[0].b))}`;
+  for (let i = 1; i < pts.length; i++) d += ` H${f(X(pts[i].t))} V${f(Y(pts[i].b))}`;
   const col = b >= D.start ? PC.lo : PC.up, ys = Y(D.start) / H * 100, ye = Y(b) / H * 100;
-  return `<div class="hchart"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <defs><linearGradient id="eqg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".25"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
-      <line x1="0" x2="${W}" y1="${Y(D.start)}" y2="${Y(D.start)}" stroke="${PC.base}" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"/>
-      <path d="${d} V${H} H0 Z" fill="url(#eqg)"/>
+  EQ.set(key, {pts, t0, t1, mn, mx, col, start:D.start, live:!tEnd});
+  // the band of the deepest drawdown, and its size on it: from the left edge of the band when it is in the left half, else
+  // from the right edge, so the words never run off the chart; at the bottom when the «старт» label is in the upper half
+  const bx0 = X(pts[ddPk].t), bx1 = X(pts[ddTr].t), ddPct = (dd * 100).toFixed(1);
+  const band = dd >= 0.0005 ? `<rect x="${f(bx0)}" y="0" width="${f(Math.max(3, bx1 - bx0))}" height="${H}" fill="${PC.up}" fill-opacity=".1"/>` : '';
+  const ddLab = dd >= 0.0005 ? `<span class="hdd neg" style="${(bx0 + bx1) / 2 < W / 2 ? `left:${f(bx0 / 10)}%` : `right:${f(100 - bx1 / 10)}%`};${ys < 50 ? 'bottom' : 'top'}:3px">макс. просадка −${ddPct}%</span>` : '';
+  return `<div class="hchart" data-eq="${key}" tabindex="0" role="group" aria-label="График баланса по закрытым сделкам: старт $${money(D.start)}, ${tEnd ? 'в конце' : 'сейчас'} $${money(b)}${dd >= 0.0005 ? `, макс. просадка ${ddPct}%` : ''}. Стрелки влево и вправо — по сделкам">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="eqg-${key}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".25"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+      ${band}<line x1="0" x2="${W}" y1="${f(Y(D.start))}" y2="${f(Y(D.start))}" stroke="${PC.base}" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"/>
+      <path d="${d} V${H} H0 Z" fill="url(#eqg-${key})"/>
       <path d="${d}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
-      <span class="hlab" style="top:${ys}%">старт $${money(D.start)}</span>
-      <span class="hend" style="top:${ye}%;background:${col}"></span></div>
+      <span class="hlab" style="top:${ys}%">старт $${money(D.start)}</span>${ddLab}
+      <span class="hend" style="top:${ye}%;background:${col}"></span>
+      <span class="hx" hidden></span><span class="hdot" hidden></span><div class="htip" hidden></div><span class="sr" aria-live="polite"></span></div>
     <div class="haxis"><span>${dt(t0)}</span><span>${dt((t0 + t1) / 2)}</span><span>${tEnd ? dt(t1) : 'сейчас'}</span></div>`;
 }
+// the point under the pointer: the trade close nearest in time (a binary search — a long backtest has thousands)
+function eqAt(el, cx) {
+  const E = EQ.get(el.dataset.eq), r = el.getBoundingClientRect(), t = E.t0 + (cx - r.left) / Math.max(1, r.width) * (E.t1 - E.t0), P = E.pts;
+  let lo = 0, hi = P.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m].t <= t) lo = m; else hi = m; }
+  return t - P[lo].t <= P[hi].t - t ? lo : hi;
+}
+// a vertical line, a dot on the balance and a note: date, balance, change from the start, drawdown from the peak, the trade
+// closed at that moment. say: also read it out (keyboard) — on every mouse move a screen reader would never stop talking
+function eqShow(el, i, say = false) {
+  const E = EQ.get(el.dataset.eq); if (!E) return;
+  i = clamp(i, 0, E.pts.length - 1);
+  const p = E.pts[i], W = el.clientWidth, x = (p.t - E.t0) / Math.max(1, E.t1 - E.t0) * W, y = (E.mx - p.b) / (E.mx - E.mn) * el.clientHeight;
+  const ln = el.querySelector('.hx'), dot = el.querySelector('.hdot'), tip = el.querySelector('.htip');
+  Object.assign(EQH, {key:el.dataset.eq, t:p.t});
+  ln.hidden = dot.hidden = tip.hidden = false;
+  ln.style.left = dot.style.left = x + 'px'; dot.style.top = y + 'px'; dot.style.background = E.col;
+  const chg = p.b / E.start - 1, tr = p.x;
+  tip.innerHTML = `<div class="faint">${i === 0 ? 'старт · ' : ''}${p.end ? (E.live ? 'сейчас' : 'конец периода') : dt(p.t)}</div>`
+    + `<div><b>$${money(p.b)}</b> <span class="${cl(chg)}">${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(1)}%</span> <span class="faint">от старта</span></div>`
+    + (i ? `<div>${p.dd >= 0.0005 ? `<span class="neg">−${(p.dd * 100).toFixed(1)}%</span> <span class="faint">от пика</span>` : '<span class="faint">на пике</span>'}</div>` : '')
+    + (tr ? `<div>${pair(tr.sym)} ${tr.side} · ${tr.reason || '—'} · <span class="${cl(tr.pnl)}">${usd(tr.pnl)}</span></div>` : '');
+  const tw = tip.offsetWidth;
+  tip.style.left = (x + 12 + tw <= W ? x + 12 : Math.max(0, x - 12 - tw)) + 'px';
+  if (say) el.querySelector('.sr').textContent = tip.textContent;
+}
+function eqHide(el) {
+  for (const s of ['.hx', '.hdot', '.htip']) { const n = el?.querySelector(s); if (n) n.hidden = true; }
+  if (!el || EQH.key === el.dataset.eq) Object.assign(EQH, {key:null, t:null, sticky:false});
+}
+// the journal is redrawn every 30-60 s: a note still shown (the mouse hasn't left, the finger hasn't tapped elsewhere, the
+// keyboard is on it) comes back on the same moment
+const eqIdx = (E, t) => { const i = E.pts.findIndex(p => p.t >= t); return i < 0 ? E.pts.length - 1 : i; };
+function eqRestore(key) {
+  if (EQH.key !== key || EQH.t == null) return;
+  const el = document.querySelector(`.hchart[data-eq="${key}"]`), E = EQ.get(key);
+  if (el && E) eqShow(el, eqIdx(E, EQH.t)); else Object.assign(EQH, {key:null, t:null, sticky:false});
+}
+// mouse: the note follows the pointer and goes when it leaves. A finger: a tap or a sideways drag shows the point and it stays
+// until a tap elsewhere; a scroll that starts on the chart shows nothing (touch-action: pan-y leaves up-down to the page,
+// and the browser cancels the pointer when it scrolls)
+let eqMove = null, eqTap = null;
+const eqMoveSoon = perFrame(() => { if (eqMove?.el.isConnected) eqShow(eqMove.el, eqAt(eqMove.el, eqMove.x)); });
+const eqOf = e => { const el = e.target.closest?.('.hchart[data-eq]'); return el && EQ.has(el.dataset.eq) ? el : null; };
+document.addEventListener('pointermove', e => {
+  const el = eqOf(e); if (!el || (e.pointerType !== 'mouse' && !eqTap)) return;
+  if (e.pointerType !== 'mouse') EQH.sticky = true;
+  eqMove = {el, x:e.clientX}; eqMoveSoon();
+});
+document.addEventListener('pointerdown', e => {
+  const el = eqOf(e);
+  if (!el) { if (EQH.sticky) document.querySelectorAll('.hchart[data-eq]').forEach(eqHide); return; }
+  if (e.pointerType === 'mouse') { eqMove = {el, x:e.clientX}; eqMoveSoon(); } else eqTap = {el};
+});
+document.addEventListener('pointerup', e => { if (eqTap && e.pointerType !== 'mouse') { eqMove = {el:eqTap.el, x:e.clientX}; EQH.sticky = true; eqMoveSoon(); } eqTap = null; });
+document.addEventListener('pointercancel', () => { eqTap = null; });
+document.addEventListener('pointerout', e => { const el = eqOf(e); if (!el || el.contains(e.relatedTarget) || e.pointerType !== 'mouse') return; eqMove = null; eqHide(el); });
+document.addEventListener('keydown', e => {
+  const el = e.target; if (!el.matches?.('.hchart[data-eq]')) return;
+  const E = EQ.get(el.dataset.eq); if (!E) return;
+  if (e.key === 'Escape') { eqHide(el); return; }
+  const n = E.pts.length, shown = EQH.key === el.dataset.eq && EQH.t != null, cur = shown ? eqIdx(E, EQH.t) : n - 1;
+  const i = !shown && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') ? n - 1
+    : e.key === 'ArrowLeft' ? cur - 1 : e.key === 'ArrowRight' ? cur + 1 : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : null;
+  if (i == null) return;
+  e.preventDefault(); eqShow(el, i, true);
+});
+document.addEventListener('focusout', e => { if (e.target.matches?.('.hchart[data-eq]') && !EQH.sticky) eqHide(e.target); });
 function equitySvg(D, W = 150, H = 26) {
   const pts = [D.start]; [...D.closed].sort((a, b) => a.tclose - b.tclose).forEach(x => pts.push(pts[pts.length-1] + x.pnl));
   if (pts.length < 2) return '';
@@ -2620,7 +2716,7 @@ function journalInsight(D, st) {
   }
   return txt ? `<div class="insight"><svg class="i"><use href="#i-info"/></svg><span>${txt}</span></div>` : '';
 }
-function renderJournal() { return keepFocus(renderJournalNow); }
+function renderJournal() { const r = keepFocus(renderJournalNow); eqRestore('j'); return r; }
 function renderJournalNow() {
   document.querySelectorAll('.jm').forEach(b => b.classList.toggle('on', b.dataset.m === jMode));
   $('#jmine').classList.toggle('hidden', jMode !== 'mine');
@@ -2983,7 +3079,7 @@ function renderBacktest() {
            <div>Сделок<b>${st.n}</b></div>
          </div>
        </div>
-       ${equityChart(D, r.to + TFMS[s.tf])}
+       ${equityChart(D, r.to + TFMS[s.tf], 'bt')}
      </div>
      ${st.n ? `<div class="statrow">
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`)}
@@ -3008,7 +3104,7 @@ function renderBacktest() {
   $('#btTrades').innerHTML = btRowsHtml(btList.slice(0, BT_ROWS))
     + (btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
     || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
-  drawEquity();
+  drawEquity(); eqRestore('bt');
 }
 const BT_ROWS = 300;
 let btList = [];
@@ -3041,6 +3137,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.44', date:'26 октября 2026', title:'График баланса отвечает на мышь и палец', items:[
+    'Наведите мышь на график баланса в бэктесте или журнале — увидите дату, баланс, изменение от старта, просадку от пика и сделку, которая закрылась в этот момент. На телефоне — коснитесь графика или ведите по нему пальцем вбок, прокрутка страницы не мешает. С клавиатуры: стрелки ходят по сделкам.',
+    'Самая большая просадка подсвечена на графике. «Макс. просадка» считается от самого высокого баланса перед падением, а не от старта: при балансе около $30 000 просадка 8.5% — это ~$2 500, и раньше на графике она выглядела ступенькой, хотя баланс не опускался ниже стартового.',
+  ]},
   {v:'2.43', date:'26 октября 2026', title:'Сайт помнит, как вы его настроили', items:[
     'Сортировка таблицы монет и журнала сохраняется после перезагрузки. Над таблицей монет появляется метка «Сортировка: …» — крестик на ней возвращает обычный порядок: избранное и сигналы сверху.',
     'Разделы «Дополнительно» в «Моём боте» и в бэктесте остаются открытыми или закрытыми, как вы их оставили.',
