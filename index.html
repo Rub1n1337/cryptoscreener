@@ -1008,9 +1008,11 @@ details.dis>.dbody{padding:0 16px 16px}
     <div class="fields" style="align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
       <span class="faint" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;align-self:center;margin-right:4px">Риск-менеджмент</span>
       <label title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">RR (тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
-      <label title="RM: какую долю баланса теряем, если сработал стоп">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
+      <label title="RM: какую долю баланса теряем, если сработал стоп (без сложного процента — долю стартового баланса)">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
       <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на все позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
       <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
+      <label title="С какой суммы начинается проверка: от $100 до $10 000 000">Старт, $ <input type="number" id="btStart" min="100" max="10000000" step="100" value="10000" inputmode="numeric" style="width:120px"></label>
+      <label class="inline" title="Включено: риск считается от текущего баланса — после прибыли стоп больше, после убытков меньше. Выключено: риск всегда от стартового баланса — при 1% и $10 000 каждый стоп $100"><input type="checkbox" id="btComp" checked> сложный процент</label>
     </div></div>
     <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, режим рынка, фильтры T½ и ширины, канал</span></summary><div class="dbody">
       <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
@@ -2920,21 +2922,25 @@ const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/)
 const poolOf = n => Math.min(400, Math.max(150, n * 2));
 // coins delisted from Binance during the test period: without them "the top at each moment" is built from survivors only.
 // In Oct 2026 about 40 USDT pairs delisted within a year had days of $10M+ turnover (TON up to $295M, OM $28M).
-// Pairs that no longer trade (stale ticker) get one daily-candle request each; their best day's turnover is cached for the day.
-// A delisted coin joins the pool when its best day beats today's 24 h turnover of the weakest coin already in it.
+// Pairs that no longer trade (stale ticker) get one daily-candle request each; their daily turnover is cached for the day, from
+// the earliest start asked for, and a shorter period counts only its own days. Before 2.45 a year's cache served a 60-day run
+// as it was: coins delisted long before its window joined the pool (19 «сняты» instead of 2) — they never traded in it, but
+// they inflated the count and the pool, and their history was downloaded for nothing.
+// A delisted coin joins the pool when its best day in the period beats today's 24 h turnover of the weakest coin already in it.
 async function delistedFor(tk, from, minQV, say) {
   const now = Date.now(), day = Math.floor(now / 864e5);
   let c = load('sr_delisted', null);
-  if (!c || c.day !== day || c.from > from) {
+  if (!c || c.day !== day || c.from > from || !c.d) {
     const gone = tk.filter(x => x.symbol.endsWith('USDT') && !M.STABLE.has(x.symbol.slice(0, -4)) && !(x.closeTime > now - 864e5)).map(x => x.symbol);
-    const qv = {}; let n = 0;
+    const d = {}; let n = 0;
     await pool(gone, 6, async s => {
-      try { const K = await api(`/api/v3/klines?symbol=${s}&interval=1d&startTime=${from}&limit=1000`); if (K.length) qv[s] = Math.max(...K.map(k => +k[7])); } catch {}
+      try { const K = await api(`/api/v3/klines?symbol=${s}&interval=1d&startTime=${from}&limit=1000`); if (K.length) d[s] = [K[0][0], K.map(k => Math.round(+k[7]))]; } catch {}
       say(`Ищу монеты, снятые с биржи за период: ${++n}/${gone.length}…`);
     });
-    c = {day, from, qv}; save('sr_delisted', c);
+    c = {day, from, d}; save('sr_delisted', c);
   }
-  return Object.entries(c.qv).filter(([, q]) => q >= minQV).map(([s]) => s);
+  // [first day's open time, turnover of each day]: the days of this period are those opening at `from` or later
+  return Object.entries(c.d).filter(([, [t0, q]]) => { const i = Math.max(0, Math.ceil((from - t0) / 864e5)); return q.length > i && Math.max(...q.slice(i)) >= minQV; }).map(([s]) => s);
 }
 const coinsLabel = r =>r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} монет)` : `${r.pairs} монет`;
 function btSettings() {
@@ -2944,7 +2950,9 @@ function btSettings() {
           top:custom ? custom.length : +$('#btTop').value, custom, pit:!custom && $('#btPit').value === 'pit',
           strategy:$('#btStrat').value, longOnly:$('#btLong').checked,
           rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1,
-          erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value, maxOpen:+$('#btSlots').value || 3};
+          erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value, maxOpen:+$('#btSlots').value || 3,
+          // the starting balance, and the stake of the risk: the balance (compounding, as the bots trade) or the start (fixedRisk)
+          start:clamp(Math.round(+$('#btStart').value) || 10000, 100, 1e7), ...($('#btComp').checked ? {} : {fixedRisk:true})};
 }
 function btFill(s) {
   $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0); hlOpts('#btHL', $('#btTf').value);
@@ -2953,6 +2961,7 @@ function btFill(s) {
   $('#btER').value = String(s.erMax ?? 0.15); $('#btReg').value = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
   $('#btSrc').value = s.regimeSrc || 'majors';   // the bot always reads the regime from BTC+ETH+SOL
   $('#btTS').value = String(s.timeStop ?? 48); $('#btSlots').value = String(M.slotsOf(s)); $('#btCoinER').value = String(s.coinErMax || 0);
+  $('#btComp').checked = !s.fixedRisk;   // the starting balance stays as the user set it
   btEstimate();
 }
 function btEstimate() {
@@ -3016,12 +3025,12 @@ async function runBacktest() {
     st.textContent = 'Считаю…'; await sleep(30);
     const t0 = performance.now();
     btHist = {hist, from};
-    btRes = M.backtest(hist, s, {start:10000, from, only:traded, top:s.pit ? s.top : 0});
+    btRes = M.backtest(hist, s, {start:s.start, from, only:traded, top:s.pit ? s.top : 0});
     btRes.settings = s; btRes.days = days;
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
     const goneN = gone.filter(x => hist[x]?.length).length;
     st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
-      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
+      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · старт $${money(s.start)} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ` от старта ($${money(s.start * s.risk)} со сделки)` : ' от баланса (сложный процент)'} · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '')
       + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} монет (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '');
     btRes.status = st.textContent; renderBacktest();
@@ -3137,6 +3146,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.45', date:'26 октября 2026', title:'Бэктест: свой стартовый баланс и риск без сложного процента', items:[
+    'В бэктесте можно задать стартовый баланс — от $100 до $10 000 000.',
+    'Переключатель «сложный процент». Включён (как раньше) — риск считается от текущего баланса: после прибыли стоп больше, после убытков меньше. Выключен — риск всегда от стартового баланса: при 1% и $10 000 каждый стоп $100, при 2% — $200. Так видно, сколько правила зарабатывают без разгона от прибыли. Входы и выходы те же, меняется только размер позиций.',
+    'Бэктест после проверки длинного периода больше не завышает число монет, снятых с биржи, для короткого: в 60 днях писалось «19 сняты» вместо 2. На сделки это не влияло.',
+  ]},
   {v:'2.44', date:'26 октября 2026', title:'График баланса отвечает на мышь и палец', items:[
     'Наведите мышь на график баланса в бэктесте или журнале — увидите дату, баланс, изменение от старта, просадку от пика и сделку, которая закрылась в этот момент. На телефоне — коснитесь графика или ведите по нему пальцем вбок, прокрутка страницы не мешает. С клавиатуры: стрелки ходят по сделкам.',
     'Самая большая просадка подсвечена на графике. «Макс. просадка» считается от самого высокого баланса перед падением, а не от старта: при балансе около $30 000 просадка 8.5% — это ~$2 500, и раньше на графике она выглядела ступенькой, хотя баланс не опускался ниже стартового.',
@@ -4076,7 +4090,8 @@ function profToBacktest(p, who) {
   toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
 }
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp'].forEach(s => $(s).onchange = btEstimate);
+$('#btStart').addEventListener('change', () => { $('#btStart').value = btSettings().start; });   // shows the amount the test will use: 50 → 100
 $('#btTf').addEventListener('change', () => hlOpts('#btHL', $('#btTf').value));
 $('#pfTf').addEventListener('change', () => hlOpts('#pfHL', $('#pfTf').value));
 hlOpts('#btHL', $('#btTf').value);

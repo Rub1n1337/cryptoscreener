@@ -350,7 +350,8 @@ export function snapshot(r, S) {
            slope: r.slope, brk: r.brk, er: r.er, mkt: r.mkt ?? null, regime: regimeOf(r.mkt, S),
            settings: { method: S.method, N: S.N, k: S.k, tf: S.tf, minScore: S.minScore, strategy: S.strategy || 'revert', longOnly: !!S.longOnly, maxHL: S.maxHL || 0,
                        rr: S.rr || 0, risk: S.risk ?? RISK, lev: S.lev ?? 1, minWidth: S.minWidth || 0, erMax: S.erMax ?? 0.15,
-                       regimeOnly: S.regimeOnly || (S.flatOnly ? 'flat' : 'any'), regimeSrc: S.regimeSrc || 'btc', coinErMax: S.coinErMax || 0, timeStop: S.timeStop ?? TIME_STOP, maxOpen: slotsOf(S) } };
+                       regimeOnly: S.regimeOnly || (S.flatOnly ? 'flat' : 'any'), regimeSrc: S.regimeSrc || 'btc', coinErMax: S.coinErMax || 0, timeStop: S.timeStop ?? TIME_STOP, maxOpen: slotsOf(S),
+                       ...(S.fixedRisk ? { fixedRisk: true } : {}) } };
 }
 
 // ---------- trading rules ----------
@@ -370,16 +371,19 @@ export function levels(r, S, side = r.side === 'low' ? 'LONG' : 'SHORT') {
   if (!(S.rr > 0) && tpD < 0.8 * slD) return null;
   return { side, sg, brk, e, slD, tpD, sl: e * (1 - sg * slD), tp: e * (1 + sg * tpD) };
 }
-export function planEntry(r, balance, S, now) {
+export function planEntry(r, balance, S, now, start = balance) {
   const side = wants(r, S);
   if (!side) return null;
   const L = levels(r, S, side);
   if (!L) return null;
   const { sg, brk, e, slD, tpD } = L;
-  // size: lose S.risk of the balance at the stop, but never exceed the leverage cap
-  // (S.lev × balance shared by the profile's slots; default 1× and 3 slots → each position ≤ ⅓ of the balance)
-  const risk = S.risk ?? RISK, lev = S.lev ?? 1;
-  const qty = Math.min(balance * risk / (e * slD), balance * lev / slotsOf(S) / e);
+  // size: lose S.risk of the money at stake at the stop, but never exceed the leverage cap
+  // (S.lev × balance shared by the profile's slots; default 1× and 3 slots → each position ≤ ⅓ of the balance).
+  // The money at stake is the balance (compounding: the stop grows and shrinks with it) or, with S.fixedRisk, the starting
+  // balance: at 1% of $10 000 every stop is $100 however the balance has moved. The cap stays on the balance: no more can go
+  // into a position than there is
+  const risk = S.risk ?? RISK, lev = S.lev ?? 1, stake = S.fixedRisk && start > 0 ? start : balance;
+  const qty = Math.min(stake * risk / (e * slD), balance * lev / slotsOf(S) / e);
   if (!(qty > 0)) return null;
   const sl = L.sl;
   return { id: now + r.sym, sym: r.sym, side, entry: e, last: e, tp: e * (1 + sg * tpD), sl, qty, time: now, tfms: TFMS[S.tf], ts: S.timeStop ?? TIME_STOP,
@@ -432,7 +436,8 @@ export function closeTrade(p, exit, reason, now) {
            reason, fee, fin, gross, pnl, r: risk ? pnl / risk : null, note: p.note, snap: p.snap ?? null };
 }
 // one bot step: manage exits, then open new positions. Pure — the caller persists the result.
-export function botTick({ rows, klines, open, recentSyms, balance, S, now, allowEntries = true, market }) {
+// start: the starting balance, the stake of S.fixedRisk (without it the stake is the balance, see planEntry)
+export function botTick({ rows, klines, open, recentSyms, balance, S, now, allowEntries = true, market, start }) {
   const closed = [], stillOpen = [];
   for (const p of open) {
     const K = klines[p.sym];
@@ -452,7 +457,7 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
     const cands = rows.map(tradeRow).filter(r => r && wants(r, S) && !stillOpen.some(p => p.sym === r.sym) && !cool.has(r.sym)).sort((a, b) => b.score - a.score);
     for (const r of cands) {
       if (stillOpen.length + opened.length >= slotsOf(S)) break;
-      const p = planEntry(r, balance, S, now);
+      const p = planEntry(r, balance, S, now, start);
       if (p) opened.push(p);
     }
   }
@@ -551,7 +556,7 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
       cands.sort((a, b) => b.score - a.score);
       for (const r of cands) {
         if (open.length >= slots) break;
-        const p = planEntry(r, balance, S, T + tfms - 1);
+        const p = planEntry(r, balance, S, T + tfms - 1, start);
         if (p) { p.ei = r.i; p.id = `${T}${r.sym}`; open.push(p); }
       }
     }

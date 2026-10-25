@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Проверка math.js</title>
+<style>
+  :root{color-scheme:dark;--bg:#0a0d14;--text:#e6e9ef;--mute:#8b95a5;--ok:#22c55e;--bad:#f0525f}
+  body{margin:0;padding:20px;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif}
+  h1{font-size:18px;margin:0 0 4px}p{color:var(--mute);margin:0 0 16px}
+  #sum{font-weight:700;margin:0 0 12px}.ok{color:var(--ok)}.bad{color:var(--bad)}
+  li{margin:2px 0}code{color:var(--mute)}
+</style>
+</head>
+<body>
+<h1>Проверка math.js</h1>
+<p>Синтетические свечи с фиксированным зерном, без сети. <code>?ref=_ref/math.js</code> — сравнить с прежней версией (сохраняется перед правкой: <code>git show HEAD:supabase/functions/_shared/math.js &gt; tests/_ref/math.js</code>).</p>
+<div id="sum">Считаю…</div>
+<ol id="out"></ol>
+<script type="module">
+// Checks for the shared strategy math (supabase/functions/_shared/math.js): position sizing with and without compounding,
+// the drawdown, and — given ?ref=<an older copy> — that a change left the rest of the behaviour exactly as it was.
+// Run it in the preview after every change to math.js; window.__TEST holds the counts for scripted runs.
+import * as M from '../supabase/functions/_shared/math.js';
+const out = document.getElementById('out'), res = {pass:0, fail:0, failed:[]};
+const check = (name, ok, info = '') => {
+  ok ? res.pass++ : (res.fail++, res.failed.push(name));
+  const li = document.createElement('li'); li.className = ok ? 'ok' : 'bad';
+  li.textContent = `${ok ? 'PASS' : 'FAIL'} — ${name}${info ? ' · ' + info : ''}`; out.append(li);
+};
+
+// ---------- candles: a seeded random walk with a sharp move now and then, so the bands get touched and reversals happen ----------
+const rng = seed => () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+const TF = '1h', TFMS = M.TFMS[TF], T0 = Date.UTC(2025, 0, 1), BARS = 1400, WARM = 400;
+function series(seed) {
+  const R = rng(seed), K = []; let p = 50 + 100 * R();
+  for (let i = 0; i < BARS; i++) {
+    const o = p; let ch = (R() - 0.5) * 0.02;
+    if (R() < 0.025) ch += (R() < 0.5 ? -1 : 1) * (0.04 + R() * 0.05);
+    p = Math.max(0.01, p * (1 + ch));
+    K.push([T0 + i * TFMS, o, Math.max(o, p) * (1 + R() * 0.006), Math.min(o, p) * (1 - R() * 0.006), p, 1000 * (1 + R()) * (Math.abs(ch) > 0.03 ? 3 : 1), T0 + (i + 1) * TFMS - 1]);
+  }
+  return K;
+}
+const hist = {};
+['AAAUSDT', 'BBBUSDT', 'CCCUSDT', 'DDDUSDT', 'EEEUSDT', 'FFFUSDT', 'GGGUSDT', 'HHHUSDT', ...M.MAJORS].forEach((s, i) => { hist[s] = series(1000 + i * 7); });
+const from = T0 + WARM * TFMS;
+
+const BASE = {method:'log', N:100, k:2, tf:TF, minScore:0, strategy:'revert', rr:0, risk:0.01, lev:10, maxOpen:3, timeStop:48, regimeSrc:'majors', erMax:0.25};
+const VARIANTS = {
+  'отскок к центру, риск 1%': BASE,
+  'RR 1:2, плечо 3×': {...BASE, rr:2, lev:3},
+  'переключатель, robust, риск 2%': {...BASE, strategy:'switch', method:'robust', k:2.5, risk:0.02},
+};
+const bt = (Mod, S, start) => Mod.backtest(hist, S, {start, from});
+const riskOf = x => Math.abs(x.entry - x.sl) * x.qty;
+const timing = x => [x.sym, x.side, x.time, x.tclose, x.reason, x.entry, x.exit].join('|');
+const near = (a, b, rel = 1e-9) => Math.abs(a - b) <= rel * Math.max(1, Math.abs(a), Math.abs(b));
+
+// ---------- 1. sizing: compounding and a fixed stake ----------
+for (const [name, S] of Object.entries(VARIANTS)) {
+  for (const start of [10000, 2500]) {
+    const c = bt(M, S, start), f = bt(M, {...S, fixedRisk:true}, start);
+    check(`${name}, старт ${start}: есть сделки`, c.trades.length >= 5, `${c.trades.length} сделок`);
+    // sizing never decides whether or when to trade: the same entries and exits, only the amounts differ
+    check(`${name}, старт ${start}: без сложного процента те же входы и выходы`, c.trades.map(timing).join() === f.trades.map(timing).join());
+    // a fixed stake: no stop above start × risk; most at exactly that (a few can be lower, held back by the leverage cap)
+    const cap = start * S.risk, fr = f.trades.map(riskOf);
+    check(`${name}, старт ${start}: фиксированный риск ≤ ${cap}`, fr.every(r => r <= cap * (1 + 1e-9)), `макс. ${Math.max(...fr).toFixed(4)}`);
+    check(`${name}, старт ${start}: фиксированный риск ровно ${cap} у большинства`, fr.filter(r => near(r, cap)).length >= fr.length / 2, `${fr.filter(r => near(r, cap)).length} из ${fr.length}`);
+    // compounding: the first stop is start × risk (the balance is still the start), later ones follow the balance
+    const cr = c.trades.map(riskOf);
+    check(`${name}, старт ${start}: со сложным процентом первый стоп = ${cap}`, near(cr[0], cap) || cr[0] < cap, cr[0].toFixed(4));
+    check(`${name}, старт ${start}: со сложным процентом стоп меняется с балансом`, cr.some(r => !near(r, cap)));
+    // the drawdown: journalStats against a plain recount
+    let eq = start, pk = start, dd = 0;
+    for (const x of [...c.trades].sort((a, b) => a.tclose - b.tclose)) { eq += x.pnl; pk = Math.max(pk, eq); dd = Math.max(dd, (pk - eq) / pk); }
+    check(`${name}, старт ${start}: просадка journalStats совпадает с пересчётом`, M.journalStats(start, c.trades).maxDD === dd * 100, `${(dd * 100).toFixed(2)}%`);
+    if (start === 10000) check(`${name}: снимок сделки помнит фиксированный риск`, f.trades.every(x => x.snap?.settings?.fixedRisk === true) && c.trades.every(x => !('fixedRisk' in (x.snap?.settings || {}))));
+  }
+}
+
+// ---------- 2. planEntry directly, on the row of a real backtest entry ----------
+{
+  const S = VARIANTS['отскок к центру, риск 1%'], first = bt(M, S, 10000).trades[0];
+  const T = first.time - TFMS + 1, Q = M.prepare(hist[first.sym], S), i = Q.t.indexOf(T), r = M.signalAt(Q, i, first.sym, T + TFMS, true);
+  r.mkt = null;
+  const p = (bal, s, start) => M.planEntry(r, bal, s, T + TFMS - 1, start);
+  check('planEntry: строка входа восстановлена', !!p(10000, S, 10000), first.sym);
+  if (p(10000, S, 10000)) {
+    check('planEntry: сложный процент — риск от баланса', near(p(20000, S, 10000).risk, 200));
+    check('planEntry: фиксированный — риск от старта', near(p(20000, {...S, fixedRisk:true}, 10000).risk, 100));
+    check('planEntry: фиксированный при балансе ниже старта — всё равно от старта', near(p(6000, {...S, fixedRisk:true}, 10000).risk, 100));
+    check('planEntry: без старта фиксированный риск = от баланса (безопасно для старых вызовов)', near(p(20000, {...S, fixedRisk:true}).risk, 200));
+    check('planEntry: ограничение по плечу — от баланса, не от старта', p(1000, {...S, fixedRisk:true, lev:1}, 10000).entry * p(1000, {...S, fixedRisk:true, lev:1}, 10000).qty <= 1000 / 3 * (1 + 1e-9));
+  }
+}
+
+// ---------- 3. against the previous copy: nothing else changed ----------
+const refPath = new URLSearchParams(location.search).get('ref');
+if (refPath) {
+  try {
+    const R = await import(new URL(refPath, location.href).href);
+    check('отпечаток анализа не изменился (коллектор и бот договорятся)', M.fingerprint() === R.fingerprint());
+    for (const [name, S] of Object.entries(VARIANTS)) for (const start of [10000, 2500]) {
+      const a = bt(M, S, start), b = bt(R, S, start);
+      check(`прежняя версия, ${name}, старт ${start}: сделки совпадают байт в байт`, JSON.stringify(a.trades) === JSON.stringify(b.trades) && a.balance === b.balance, `$${a.balance.toFixed(2)}`);
+    }
+  } catch (e) { check('прежняя версия загружена', false, String(e)); }
+}
+
+const sum = document.getElementById('sum');
+sum.className = res.fail ? 'bad' : 'ok';
+sum.textContent = res.fail ? `Провалено ${res.fail} из ${res.pass + res.fail}` : `Все ${res.pass} проверок пройдены`;
+window.__TEST = res;
+</script>
+</body>
+</html>
