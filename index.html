@@ -449,11 +449,21 @@ tr.row.newsig td{animation:rowflash 2.4s ease-out}
   :is(#jclosed,#btTrades) tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry exit reason"}
   :is(#jclosed,#btTrades) td:nth-child(2){grid-area:coin}:is(#jclosed,#btTrades) td:nth-child(3){grid-area:side;font-size:12px;font-weight:600}
   :is(#jclosed,#btTrades) td:nth-child(11){grid-area:pnl;text-align:right}:is(#jclosed,#btTrades) td:nth-child(12){grid-area:r;text-align:right;font-size:12.5px}
+  /* backtest trades also show the signal strength (13), at the right end of the coin line: the «По силе сигнала» table
+     groups them by it. A column of its own would squeeze the exit price at 320 px */
+  #btTrades tr.row td:nth-child(13){display:block;grid-area:coin;justify-self:end;font-size:12px;color:var(--mute)}#btTrades tr.row td:nth-child(13)::before{content:'сила '}
+  #btTrades tr.row td:nth-child(2){padding-right:60px}
   :is(#jclosed,#btTrades) td:nth-child(1){grid-area:date;font-size:12px;color:var(--mute)}:is(#jclosed,#btTrades) td:nth-child(7){grid-area:reason;justify-self:end}:is(#jopen,#jclosed,#btTrades) td{min-width:0;overflow:hidden;text-overflow:ellipsis}
   :is(#jclosed,#btTrades) td:nth-child(4){grid-area:entry}:is(#jclosed,#btTrades) td:nth-child(5){grid-area:exit}
   :is(#jclosed,#btTrades) td:is(:nth-child(4),:nth-child(5)),#jopen td:is(:nth-child(4),:nth-child(5)){font-size:12px;color:var(--mute)}
   :is(#jclosed,#btTrades) td:nth-child(4)::before,#jopen td:nth-child(4)::before{content:"вход "}
   :is(#jclosed,#btTrades) td:nth-child(5)::before{content:"выход "}#jopen td:nth-child(5)::before{content:"сейчас "}
+  /* 320 px: «выход $0.00096…» was cut to «выход …». The prices read «$0.005517 → $0.005658»; the first column fits the
+     date (~73 px), the arrow and exit price (~85 px) get the rest */
+  @media(max-width:360px){
+    :is(#jclosed,#btTrades) tr.row{grid-template-columns:76px minmax(0,1fr) auto;column-gap:8px}
+    :is(#jclosed,#btTrades) td:nth-child(4)::before{content:none}:is(#jclosed,#btTrades) td:nth-child(5)::before{content:"→ "}
+  }
   /* open positions: 1 opened · 2 coin · 3 side · 4 entry · 5 now · 9 PnL · 10 R */
   #jopen tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10)){display:block}
   #jopen tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry now x"}#jopen tr.row td.jx{display:block;grid-area:x}
@@ -806,7 +816,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <div class="card" data-cf="lo" role="button" tabindex="0" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх. Нажмите, чтобы показать их."><div class="t" data-s="Дешевле">Дешевле обычного</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
       <div class="card" data-cf="hi" role="button" tabindex="0" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз. Нажмите, чтобы показать их."><div class="t" data-s="Дороже">Дороже обычного</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
       <div class="card" data-cf="sig" role="button" tabindex="0" title="Подтверждённые развороты: цена вышла за границу, вернулась, и это подтвердил объём. Нажмите, чтобы показать их."><div class="t">Сигналы</div><div class="v" style="color:var(--acc)" id="c4">—</div><div class="s" id="c4s"></div></div>
-      <div class="card" data-cf="sq" role="button" tabindex="0" title="Монеты, которые сейчас вдвое спокойнее обычного. Часто это затишье перед сильным движением. Нажмите, чтобы показать их."><div class="t">Затишье</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s">монет без движения</div></div>
+      <div class="card" data-cf="sq" role="button" tabindex="0" title="Монеты, которые сейчас вдвое спокойнее обычного. Часто это затишье перед сильным движением. Нажмите, чтобы показать их."><div class="t">Затишье</div><div class="v" style="color:var(--acc)" id="c5">—</div><div class="s" id="c5s">монет без движения</div></div>
     </div>
     <div class="botnow hidden" id="botNow" role="button" tabindex="0" title="Открыть журнал общего бота"></div>
 
@@ -1320,7 +1330,14 @@ async function pool(items, n, fn) {
 }
 
 // ---------- scanner ----------
-let rows = [], cache = {}, scanning = false, scanQueued = false, lastScan = 0, footBase = '', sortKey = 'ext', sortDir = -1, prevScanDone = false;
+// a table's order is remembered if its column still exists; the market's default 'ext' (favourites, then signals) has no
+// header — the «Сортировка» chip above the table brings it back
+function savedSort(k, head, def) {
+  const m = load(k, null);
+  return Array.isArray(m) && [...document.querySelectorAll(head + ' th')].some(th => th.dataset.s === m[0]) ? [m[0], m[1] > 0 ? 1 : -1] : def;
+}
+let rows = [], cache = {}, scanning = false, scanQueued = false, lastScan = 0, footBase = '', prevScanDone = false;
+let [sortKey, sortDir] = savedSort('sr_msort', '#mhead', ['ext', -1]);
 async function scan() {
   if (scanning) { scanQueued = true; return; }
   scanning = true; scanQueued = false;
@@ -1354,7 +1371,8 @@ async function scan() {
       for (const r of rows) if (ULV[r.sym]) checkLevels(r.sym, prevPx.get(r.sym), r.price);
       prevScanDone = true; scanErr = null;
       runBot();
-      renderCards(); renderTable(); renderJournal(); renderDetail();
+      renderCards(); renderTable(); renderDetail();
+      if (!$('#journal').classList.contains('hidden')) renderJournal();   // a hidden journal is redrawn when it is opened (go)
       $('#symlist').innerHTML = rows.map(r => `<option value="${base(r.sym)}">`).join('');
       footBase = `${rows.length} пар${fails ? ` (${fails} не загрузились)` : ''} · биржа Binance · ТФ ${tf} · обновлено ${new Date().toLocaleTimeString('ru')}`;
       $('#mlive').innerHTML = liveTag(lastScan, 3 * SCAN_MS); tickLive();
@@ -1398,7 +1416,7 @@ function renderCards() {
   const plur = (n, f) => f[n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2];
   $('#c4').textContent = sigN; $('#c4s').textContent = (sigN ? `с силой от ${S.minScore} — порог бота` : 'сильных сейчас нет — это нормально') + (weakN ? ` · ещё ${weakN} ${plur(weakN, ['слабый', 'слабых', 'слабых'])}` : '');
   const sqN = rows.filter(r => r.squeeze).length;
-  $('#c5').textContent = sqN; $('#c5').nextElementSibling.textContent = `${plur(sqN, ['монета', 'монеты', 'монет'])} без движения`;
+  $('#c5').textContent = sqN; $('#c5s').textContent =`${plur(sqN, ['монета', 'монеты', 'монет'])} без движения`;
 }
 function gauge(pB) {
   // track spans %B from -20% to 120%; the channel itself is the shaded 0..100% part
@@ -1446,11 +1464,13 @@ function baseFilter() {
 function renderChips(shown) {
   const sel = s => $(s).options[$(s).selectedIndex].textContent, q = $('#fs').value.trim();
   const chips = [...['#fz', '#fmin', '#fhl', '#fside'].filter(s => $(s).selectedIndex > 0).map(s => [s, sel(s)]), ...(q ? [['#fs', `«${q}»`]] : [])];
-  const on = chips.length || $('#fl').value;
+  const sortTh = sortKey !== 'ext' && [...document.querySelectorAll('#mhead th')].find(th => th.dataset.s === sortKey);
+  const on = chips.length || $('#fl').value || sortTh;
   $('#fchips').classList.toggle('hidden', !on);
   if (!on) return;
   $('#fchips').innerHTML = `<span class="mute">Показано <b>${shown}</b> из ${rows.length}</span>`
     + chips.map(([s, t]) => `<button class="chip" data-unset="${s}" aria-label="Убрать фильтр: ${esc(t)}">${esc(t)}<span aria-hidden="true">×</span></button>`).join('')
+    + (sortTh ? `<button class="chip" data-unset="sort" aria-label="Вернуть обычный порядок: избранное и сигналы сверху">Сортировка: ${esc(sortTh.textContent.trim())} ${sortDir > 0 ? '↑' : '↓'}<span aria-hidden="true">×</span></button>` : '')
     + (chips.length ? '<button class="chip clear" data-fclear>Сбросить</button>' : '');
 }
 // why the table is empty: a searched coin hidden by the filters is named, so it never looks missing from the market
@@ -1462,7 +1482,8 @@ function emptyRow() {
   return `<tr><td colspan="9" class="mute">${msg}</td></tr>`;
 }
 let scanErr = null, flashSyms = new Set();
-function renderTable() {
+function renderTable() { return keepFocus(renderTableNow); }   // the star or row in focus stays focused after a rescan
+function renderTableNow() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
   if (!rows.length) { if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
   save('sr_tfilt', Object.fromEntries(TF_FILTERS.map(s => [s, $(s).value])));
@@ -2572,7 +2593,7 @@ function equitySvg(D, W = 150, H = 26) {
 }
 const reasonTag = r => `<span class="tag ${r === 'тейк' ? 'tp' : r === 'стоп' ? 'sl' : 'ts'}">${r || '—'}</span>`;
 const scoreOf = p => p.snap?.score ?? (String(p.note || '').match(/(?:оценка|сила) (\d+)/)?.[1] ?? '—');
-let jSort = 'tclose', jDir = -1;
+let [jSort, jDir] = savedSort('sr_jsort', '#jhead', ['tclose', -1]);
 const journalData = () => jMode === 'shared' ? SJ : (BP.where === 'server' ? SB_MINE : J);
 const plural = (n, f) => f[n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2];
 // ▲/▼ chip for a change: sign and arrow carry the meaning, colour only reinforces it
@@ -3020,6 +3041,14 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.43', date:'26 октября 2026', title:'Сайт помнит, как вы его настроили', items:[
+    'Сортировка таблицы монет и журнала сохраняется после перезагрузки. Над таблицей монет появляется метка «Сортировка: …» — крестик на ней возвращает обычный порядок: избранное и сигналы сверху.',
+    'Разделы «Дополнительно» в «Моём боте» и в бэктесте остаются открытыми или закрытыми, как вы их оставили.',
+    'Поиск монеты не перерисовывает таблицу на каждую букву, а ждёт короткую паузу в наборе — на телефоне печатать легче.',
+    'На телефоне в сделках бэктеста видна сила сигнала, а на узком экране (320 px) цена выхода больше не обрезается до «выход …».',
+    'Звук нового сигнала больше не пропадает, если браузер заглушил его до первого нажатия на странице.',
+    'Работа с клавиатуры: таблица монет — одна остановка Tab, по строкам ходят стрелки. Фокус на звёздочке или строке не теряется, когда таблица обновляется.',
+  ]},
   {v:'2.42', date:'21 октября 2026', title:'Быстрее под рукой и удобнее на телефоне', items:[
     'График больше не подтормаживает при движении мыши, прокрутке, масштабе и ползунках канала: он перерисовывается раз в кадр, а не на каждое событие.',
     'На iPhone страница больше не увеличивается при нажатии на поле ввода. Кнопки в «Бете» и в настройках стали крупнее для пальца, а точка «вышла новая версия» видна и на телефоне.',
@@ -3358,9 +3387,11 @@ function renderChangelog() {
 // ---------- sound ----------
 let actx = null;
 function beep() {
-  try { actx = actx || new AudioContext(); const o = actx.createOscillator(), gn = actx.createGain(); o.frequency.value = 880; gn.gain.value = 0.08;
+  try { actx = actx || new AudioContext(); if (actx.state === 'suspended') actx.resume(); const o = actx.createOscillator(), gn = actx.createGain(); o.frequency.value = 880; gn.gain.value = 0.08;
     o.connect(gn); gn.connect(actx.destination); o.start(); o.stop(actx.currentTime + 0.25); } catch {}
 }
+// browsers keep sound started by a timer muted until the page is clicked or a key is pressed; the next touch unmutes it
+for (const ev of ['pointerup', 'keydown']) addEventListener(ev, () => { if (actx?.state === 'suspended') actx.resume(); }, {passive:true});
 
 // ---------- UI wiring ----------
 function syncInputs() {
@@ -3412,14 +3443,16 @@ $('#ctitle').onclick = e => { if (!e.target.closest('[data-cfav]')) return; favs
 { const f = load('sr_tfilt', {}); for (const s of TF_FILTERS) if (f[s] != null && [...$(s).options].some(o => o.value === f[s])) $(s).value = f[s];
   document.querySelectorAll('#flseg .tab').forEach(x => x.classList.toggle('on', x.dataset.fl === $('#fl').value)); }
 TF_FILTERS.forEach(s => $(s).onchange = renderTable);
-$('#fs').oninput = renderTable;
-$('#fs').onkeydown = e => { if (e.key === 'Escape' && e.target.value) { e.preventDefault(); e.target.value = ''; renderTable(); } };
+// the search redraws the table once typing pauses, not on every letter (each redraw rebuilds every row)
+let fsT = 0;
+$('#fs').oninput = () => { clearTimeout(fsT); fsT = setTimeout(renderTable, 120); };
+$('#fs').onkeydown = e => { if (e.key === 'Escape' && e.target.value) { e.preventDefault(); clearTimeout(fsT); e.target.value = ''; renderTable(); } };
 const setFl = v => { $('#fl').value = v; document.querySelectorAll('#flseg .tab').forEach(x => x.classList.toggle('on', x.dataset.fl === v)); };
 function clearFilters() { for (const s of TF_FILTERS) $(s).selectedIndex = 0; $('#fs').value = ''; setFl(''); renderTable(); }
 // the row of active filters above the table: each chip removes its filter, «Сбросить» removes all
 $('#fchips').onclick = e => {
   const c = e.target.closest('[data-unset]');
-  if (c) { const s = c.dataset.unset; if (s === '#fs') $('#fs').value = ''; else if (s === '#fl') setFl(''); else $(s).selectedIndex = 0; renderTable(); }
+  if (c) { const s = c.dataset.unset; if (s === 'sort') { setSort('ext', -1); return; } if (s === '#fs') $('#fs').value = ''; else if (s === '#fl') setFl(''); else $(s).selectedIndex = 0; renderTable(); }
   else if (e.target.closest('[data-fclear]')) clearFilters();
 };
 $('#tb').onclick = e => {
@@ -3486,8 +3519,9 @@ document.addEventListener('keydown', e => {
     if (nx?.matches('tr.row')) { e.preventDefault(); nx.focus(); if (tr.closest('#tb') && !isPhone()) loadChart(nx.dataset.sym); }
   }
 });
-document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; sortDir = sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1); sortKey = k; renderTable(); });
-document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : (k === 'sym' || k === 'reason' ? 1 : -1); jSort = k; renderJournal(); });
+function setSort(k, d) { sortKey = k; sortDir = d; save('sr_msort', [k, d]); renderTable(); }
+document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; setSort(k, sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1)); });
+document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : (k === 'sym' || k === 'reason' ? 1 : -1); jSort = k; save('sr_jsort', [jSort, jDir]); renderJournal(); });
 // sortable headers work from the keyboard too: Tab to a header, Enter or Space sorts by it
 document.querySelectorAll('#mhead th[data-s], #jhead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
@@ -3701,6 +3735,8 @@ document.querySelectorAll('#bmode .tab').forEach(b => b.onclick = () => { BP.mod
 $('#bER').onchange = e => { BP.erMax = +e.target.value; saveBP(); renderBotPanel(); syncServerBot(); runBot(); };
 // only the user's own toggles are remembered, not the initial open/close done by renderBotPanel
 $('#bprof').addEventListener('toggle', () => { if (bprofInit && Date.now() - bprofInit > 300) save('sr_bprof', $('#bprof').open); });
+// «Дополнительно» in «Мой бот» and in the backtest form stay open or closed as the user left them
+for (const [sel, k] of [['.bmore', 'sr_bmore'], ['#btAdv', 'sr_btadv']]) { const d = $(sel); d.open = load(k, false) === true; d.addEventListener('toggle', () => save(k, d.open)); }
 $('#bnew').onclick = () => openForm(null);
 $('#bimport').onclick = importByLink;
 $('#pfCancel').onclick = async () => {
@@ -3780,8 +3816,16 @@ new MutationObserver(ms => {
     // target — the backtest's «По силе сигнала» and «По стороне…» tables stayed left-aligned
     for (const n of m.addedNodes) if (n.nodeType === 1) (n.tagName === 'TBODY' ? [n] : n.querySelectorAll('tbody')).forEach(b => alignQ.add(b));
   }
-  if (alignQ.size) requestAnimationFrame(() => { alignQ.forEach(alignNums); alignQ.clear(); });
+  if (alignQ.size) requestAnimationFrame(() => { alignQ.forEach(tb => { alignNums(tb); rove(tb); }); alignQ.clear(); });
 }).observe(document.body, {childList: true, subtree: true});
+// a table's rows are one Tab stop (the focused, selected or first row): arrows walk the rows, Tab leaves the table
+// instead of stepping through 150 coins
+function rove(tb) {
+  const rs = [...tb.querySelectorAll(':scope > tr.row[tabindex]')]; if (!rs.length) return;
+  const cur = rs.find(r => r === document.activeElement) || rs.find(r => r.classList.contains('sel')) || rs[0];
+  rs.forEach(r => r.tabIndex = r === cur ? 0 : -1);
+}
+document.addEventListener('focusin', e => { if (e.target.matches?.('tr.row[tabindex]')) rove(e.target.parentElement); });
 window.onresize = () => { drawChartSoon(); drawCardSoon(); if (tf2On) drawChart2Soon(); };
 // theme: dark by default, light on request; charts read the new tokens and redraw
 function applyTheme(t) {
@@ -4173,9 +4217,6 @@ $('#bAccOut').onclick = e => {
   const b = e.target.closest('[data-copy]'); if (!b) return;
   navigator.clipboard.writeText(b.dataset.copy).then(() => toast('Скопировано', '', 'ok'), () => toast('Не удалось скопировать', 'Выделите код вручную.', 'bad'));
 };
-// order book snapshots from all charts go out at least 1.2 s apart (they are the heaviest request we make)
-let gateAt = 0;
-const snapGate = () => { const now = Date.now(), at = Math.max(now, gateAt); gateAt = at + 1200; return new Promise(r => setTimeout(r, at - now)); };
 
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
 let sharedIn = null;
