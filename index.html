@@ -533,7 +533,13 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 @media (prefers-reduced-motion:reduce){.live i{animation:none}}
 /* why the bot is idle */
 .bh-why{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--accbg);border:1px solid var(--warn-line);font-size:13px;line-height:1.5}
-.bh-why b{color:var(--text)}.bh-why .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.bh-why button{height:34px;font-size:13px}
+.bh-why b{color:var(--text)}
+.erscale{display:grid;gap:5px;max-width:380px;margin-top:10px;font-size:12px}
+.er-row{display:grid;grid-template-columns:36px minmax(0,1fr) 34px;gap:8px;align-items:center}.er-row>span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.er-bar{position:relative;height:6px;border-radius:3px;background:var(--s3)}
+.er-bar i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--faint)}.er-bar i.over{background:var(--acc)}
+.er-bar b{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:1px;background:var(--text)}
+.er-note{color:var(--mute);font-size:11.5px}.bh-why .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.bh-why button{height:34px;font-size:13px}
 /* shared profile banner */
 .pimp{display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap;padding:14px 16px;margin-bottom:12px;border-radius:var(--r);border:1px solid var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .pimp>div{flex:1 1 320px;min-width:0}.pimp p{margin:3px 0 0;font-size:13px;color:var(--mute)}
@@ -591,6 +597,8 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .hchg{font-size:13px}.hchg .chip{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:600;margin-right:6px;font-variant-numeric:tabular-nums}
 .hchg .chip.pos{background:rgba(34,197,94,.12)}.hchg .chip.neg{background:rgba(240,82,95,.12)}.hchg .chip.flat{background:var(--s3)}
 .hside{display:flex;gap:28px;font-size:12px;color:var(--mute)}.hside div{display:flex;flex-direction:column;gap:3px}.hside b{font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
+/* touch screens: a number's name that opens an explanation on a tap is underlined with dots (taptip shows the title) */
+@media(hover:none){.statrow .card[title] .t,.hside div[title] .tl{text-decoration:underline dotted var(--faint);text-underline-offset:3px}}
 .hchart{position:relative;height:150px;touch-action:pan-y;cursor:crosshair;border-radius:4px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
 .hchart:focus{outline:none}.hchart:focus-visible{outline:2px solid var(--focus);outline-offset:6px}
 /* the balance chart's pointer: a line, a dot on the balance, a note (see eqShow); the drawdown band's size */
@@ -2262,6 +2270,17 @@ function sharedReg(redraw) {
   return m ? M.regimeOf(m, s) : null;
 }
 // the same "why isn't it trading" for the shared bot: its rules often wait for a flat market, and silence looks like a breakdown
+// «Бот ждёт» with the measure itself: ER of BTC, ETH and SOL over 7 days against the border of the rules. The market is a flat
+// when all three are below it (BTC alone for rules tested on BTC); the bars show how far it is from turning, so a bot waiting
+// for days reads as waiting, not as broken. by: {BTCUSDT: {er, ch}, …} of the timeframe the rules trade on
+function erScale(by, s) {
+  const thr = s.erMax ?? 0.15, syms = s.regimeSrc === 'btc' ? ['BTCUSDT'] : M.MAJORS;
+  if (!syms.every(x => isFinite(by?.[x]?.er))) return '';
+  const max = Math.max(0.5, thr * 2, ...syms.map(x => by[x].er)), pc = v => (v / max * 100).toFixed(1) + '%';
+  return `<div class="erscale" title="ER — насколько прямо шла цена за 7 дней: около 0 — ходит туда-сюда (боковик), около 1 — идёт в одну сторону (импульс). Черта — граница правил: ${thr}">`
+    + syms.map(x => `<div class="er-row"><span>${base(x)}</span><span class="er-bar"><i class="${by[x].er >= thr ? 'over' : ''}" style="width:${pc(by[x].er)}"></i><b style="left:${pc(thr)}"></b></span><span>${by[x].er.toFixed(2)}</span></div>`).join('')
+    + `<div class="er-note">Боковик — когда ${syms.length > 1 ? 'у всех трёх' : 'у BTC'} ER ниже черты (${thr}).</div></div>`;
+}
 function sharedIdle() {
   if (!SJ?.checked) return '';
   const s = {...SJ.settings, regimeSrc:SJ.settings.regimeSrc || 'majors'};
@@ -2269,7 +2288,7 @@ function sharedIdle() {
   if (open.length >= slots) return `<div class="bh-why"><b>Заняты все места: ${open.length} из ${slots}.</b> Новую сделку бот откроет, когда закроется одна из текущих.</div>`;
   const only = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
   if (reg && ((only === 'flat' && reg !== 'flat') || (only === 'impulse' && reg === 'flat') || (s.strategy === 'switch' && reg === 'down')))
-    return `<div class="bh-why"><b>Бот ждёт:</b> ${only === 'flat' ? `он торгует только в боковике, а сейчас ${regPlain(reg)}` : only === 'impulse' ? 'он торгует только в импульсе, а сейчас боковик' : 'в падающем рынке он в сделки не входит'}. Новых сделок не будет, пока рынок не сменится — так правила и задуманы.</div>`;
+    return `<div class="bh-why"><b>Бот ждёт:</b> ${only === 'flat' ? `он торгует только в боковике, а сейчас ${regPlain(reg)}` : only === 'impulse' ? 'он торгует только в импульсе, а сейчас боковик' : 'в падающем рынке он в сделки не входит'}. Новых сделок не будет, пока рынок не сменится — так правила и задуманы.${SJ.regime?.tf === s.tf ? erScale(SJ.regime.by, s) : ''}</div>`;
   const last = (SJ.closed || []).reduce((m, x) => Math.max(m, x.tclose || 0), 0);
   if (!open.length && (!last || Date.now() - last > 6 * 36e5))
     return `<div class="bh-why"><b>Подходящих сигналов пока нет.</b> Бот смотрит на ${TF_PLAIN[s.tf] || s.tf} и входит только по подтверждённым разворотам с силой от ${s.minScore}.</div>`;
@@ -2297,7 +2316,7 @@ function idleReason(act, reg, srv) {
       if (s.regimeOnly === 'flat') acts += `<button data-act="auto:${act.id}:${alt.id}">Авто: «${act.name}» в боковике, «${alt.name}» в импульсе</button>`;
       if (s.regimeOnly === 'impulse') acts += `<button data-act="auto:${alt.id}:${act.id}">Авто: «${alt.name}» в боковике, «${act.name}» в импульсе</button>`;
     }
-    return `<div class="bh-why"><b>Бот ждёт:</b> ${text}. Новых сделок не будет, пока рынок не сменится — так профиль и задуман.${acts ? `<div class="acts">${acts}</div>` : ''}</div>`;
+    return `<div class="bh-why"><b>Бот ждёт:</b> ${text}. Новых сделок не будет, пока рынок не сменится — так профиль и задуман.${erScale(regNow(s.tf, renderBotPanel)?.by, s)}${acts ? `<div class="acts">${acts}</div>` : ''}</div>`;
   }
   const last = closed.reduce((m, x) => Math.max(m, x.tclose || 0), 0);
   if (!open.length && (!last || Date.now() - last > 6 * 36e5))
@@ -2778,12 +2797,12 @@ function renderJournalNow() {
        ${journalInsight(D, st)}
      </div>
      ${st.n ? `<div class="statrow">
-       ${card('Сделок', st.n, `открыто ${D.open.length} из ${slots}`)}
+       ${card('Сделок', st.n, `открыто ${D.open.length} из ${slots}`, '', 'Сколько сделок закрыто за всё время и сколько позиций открыто сейчас из возможных')}
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок')}
        ${card('Ср. результат', rr(st.expR) + trend, other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR),'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), 'прибыли / убытки', st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе')}
        ${card('Комиссии и заём', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа: комиссия и проценты за заём под шорты и плечо. Если это больше прибыли до них — стратегия работает на биржу')}
-       ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от пика')}
+       ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от предыдущего пика, а не от старта. На графике баланса оно подсвечено')}
      </div>` : ''}`;
   // the balance counts to its new value instead of jumping (only when it actually changed)
   countUp($('#jcards .hv'), lastBal[jMode], D.balance, v => '$' + money(v)); lastBal[jMode] = D.balance;
@@ -3115,20 +3134,20 @@ function renderBacktest() {
            <div class="hv">$${money(r.balance)}</div>
            <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">после комиссий</span></div></div>
          <div class="hside">
-           <div>Средний результат<b class="${cl(st.expR)}">${rr(st.expR)}</b></div>
-           <div>Макс. просадка<b>${st.maxDD.toFixed(1)}%</b></div>
+           <div title="Средний итог сделки в рисках (R) после комиссий: +1R — заработали столько, сколько рисковали. Больше 0 — у правил есть преимущество"><span class="tl">Средний результат</span><b class="${cl(st.expR)}">${rr(st.expR)}</b></div>
+           <div title="Самое большое падение баланса от предыдущего пика, а не от старта. На графике ниже оно подсвечено"><span class="tl">Макс. просадка</span><b>${st.maxDD.toFixed(1)}%</b></div>
            <div>Сделок<b>${st.n}</b></div>
          </div>
        </div>
        ${equityChart(D, r.to + TFMS[s.tf], 'bt')}
      </div>
      ${st.n ? `<div class="statrow">
-       ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`)}
+       ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок. Сама по себе мало что говорит: при тейке вдвое дальше стопа хватает и 35%')}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), `ср. +${usd(st.avgWin, false)} / ${usd(st.avgLoss)}`, st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей / сумма убытков')}
        ${card('Комиссии и заём', usd(-st.fees), `до них ${usd(st.gross)}`, 'neg', 'Комиссия биржи и проценты за заём под шорты и плечо, за все сделки')}
        ${card('Комиссия в R', st.feeR == null ? '—' : '−' + st.feeR.toFixed(2) + 'R', 'на каждую сделку', st.feeR > 0.1 ? 'neg' : '', 'Какую долю риска сделки съедает комиссия. Чем меньше стоп и чем больше плечо, тем больше эта доля')}
        ${card('Плечо', st.lev == null ? '—' : st.lev.toFixed(2) + '×', `средний размер позиции к балансу · до ${s.lev}×`, '', 'Размер позиции, делённый на баланс. Комиссия считается от размера позиции')}
-       ${card('Сделок в день', (st.n / r.days).toFixed(1), `в сделке в среднем ${dur(st.avgHold)}`)}
+       ${card('Сделок в день', (st.n / r.days).toFixed(1), `в сделке в среднем ${dur(st.avgHold)}`, '', 'Как часто за период находились сигналы, на которых бот вошёл бы, и сколько в среднем длилась сделка')}
      </div>` : ''}`;
   // by score bucket
   const buckets = {};
@@ -3178,6 +3197,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.49', date:'26 октября 2026', title:'Видно, почему бот ждёт, и что значат цифры', items:[
+    'Когда бот ждёт смены рынка, под объяснением теперь шкала: насколько прямо шли BTC, ETH и SOL за неделю (ER) и где граница правил. Видно, далеко ли рынку до смены и бот не сломан, а ждёт.',
+    'На телефоне названия цифр в итогах (winrate, средний результат, просадка и другие) подчёркнуты пунктиром: коснитесь — откроется объяснение. Добавлены объяснения там, где их не было.',
+    '«Макс. просадка» в подсказке объяснена прямо: это падение от предыдущего пика, а не от старта.',
+  ]},
   {v:'2.48', date:'26 октября 2026', title:'Честно о правилах общего бота и быстрый старт бэктеста', items:[
     'В журнале общего бота крупно написано: у его правил не найдено преимущества. На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет. Общий бот показывает, как работает бот, а не стратегию для денег.',
     'Пустой бэктест предлагает начать с готового: «Проверить правила общего бота» или «Проверить мой профиль» — форма заполнится и проверка запустится сразу.',
