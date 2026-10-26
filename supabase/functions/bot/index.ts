@@ -280,7 +280,7 @@ async function run() {
   const { data: recent } = await db.from("trades").select("sym").gt("tclose", now - M.COOLDOWN * M.TFMS[S.tf]);
   // the regime it trades by, measured as the backtest does on its timeframe (undefined: botTick takes it from the rows)
   const mkt = await regimeOn(S.tf, now) ?? undefined;
-  const res = M.botTick({ rows, klines, open: open!, recentSyms: (recent ?? []).map((x: any) => x.sym), balance: st.balance, S, now, market: mkt });
+  const res = M.botTick({ rows, klines, open: open!, recentSyms: (recent ?? []).map((x: any) => x.sym), balance: st.balance, start: st.start_balance, S, now, market: mkt });
 
   // trades, positions and balance in one transaction (bot_commit): a failure half-way can't lose a trade's P&L any more.
   // The regime is kept too: the site and Telegram explain what the bot waits for by it, not by a regime of their own
@@ -306,7 +306,7 @@ function cleanSet(s: any = {}) {
     tf: oneOf(s.tf, ["5m", "15m", "1h", "4h", "1d"], D.tf), minScore: num(s.minScore, 0, 100, D.minScore),
     strategy: oneOf(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr: num(s.rr, 0, 10, 0), risk: num(s.risk, 0.001, 0.05, D.risk),
     lev: num(s.lev, 1, 10, 1), minWidth: num(s.minWidth, 0, 30, 0), maxHL: num(s.maxHL, 0, 500, 0), longOnly: s.longOnly === true,
-    coinErMax: num(s.coinErMax, 0, 1, 0), regimeOnly: oneOf(s.regimeOnly, ["any", "flat", "impulse"], "any"),
+    coinErMax: num(s.coinErMax, 0, 1, 0), regimeOnly: oneOf(s.regimeOnly, ["any", "flat", "impulse"], "any"), fixedRisk: s.fixedRisk === true,
     timeStop: oneOf(s.timeStop === undefined ? 48 : Number(s.timeStop), [0, 24, 48, 96], 48),
     maxOpen: oneOf(s.maxOpen === undefined ? M.MAX_OPEN : Number(s.maxOpen), M.SLOTS, M.MAX_OPEN) };
 }
@@ -354,7 +354,8 @@ async function runUserBots(now: number, reqStart: number) {
   // Bots holding positions go first every minute: an exit at the stop must not wait for the queue to come round. They too are
   // taken least recently checked first (they used to come in table order, so past 40 the same ones went first every minute and
   // the rest never ran), and KEEP places stay for bots without positions, or those would never get one
-  const RUN = 40, KEEP = 10, FIELDS = "id, config, balance, tg_chat, alerts, sig_sent", seen = new Date(now - 30 * 864e5).toISOString();
+  // reset_n: how many times the journal was reset — ub_commit refuses the step's write if it changed meanwhile
+  const RUN = 40, KEEP = 10, FIELDS = "id, config, balance, start_balance, reset_n, tg_chat, alerts, sig_sent", seen = new Date(now - 30 * 864e5).toISOString();
   const oldest = { ascending: true, nullsFirst: true };
   const { data: held } = await db.from("user_bots").select(`${FIELDS}, user_positions!inner(bot_id)`).eq("enabled", true).order("checked_at", oldest).limit(RUN);
   const heldIds = new Set((held ?? []).map((b: any) => b.id));
@@ -439,14 +440,17 @@ async function runUserBots(now: number, reqStart: number) {
       for (const p of open) exitK[p.sym] = await getK(p.sym, tfOf(p.tfms) || S.tf);
       const { data: rec } = await db.from("user_trades").select("data").eq("bot_id", b.id).gt("tclose", now - M.COOLDOWN * (M.TFMS as any)[S.tf]);
       const mkt = REGT[S.tf] ?? undefined;   // undefined: botTick takes it from the BTC/ETH/SOL rows
-      const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, S, now, market: mkt });
+      const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, start: b.start_balance, S, now, market: mkt });
       for (const p of res.opened) { p.note = `«${pname}» · ${p.note}`; p.snap.profile = pname; }
       // trades, positions and balance in one transaction (ub_commit); a manual close sent meanwhile survives it.
-      // regime: "the market now" (1h) for the site's line, and `trade` — what the profile trades by on its timeframe
-      const { error: ec } = await db.rpc("ub_commit", { p_bot: b.id, p_closed: res.closed, p_keep: [...res.stillOpen, ...res.opened], p_balance: res.balance,
+      // regime: "the market now" (1h) for the site's line, and `trade` — what the profile trades by on its timeframe.
+      // p_gen: the reset number this step read; if the owner reset the journal since, nothing is written (false) and nothing
+      // is announced — before 2.46 such a step put the positions and the balance from before the reset back
+      const { data: wrote, error: ec } = await db.rpc("ub_commit", { p_bot: b.id, p_closed: res.closed, p_keep: [...res.stillOpen, ...res.opened], p_balance: res.balance,
         p_profile: pname, p_regime: reg ? { state: regName, by: reg.by, trade: mkt ? { tf: S.tf, erMax: S.erMax, state: M.regimeOf(mkt, S), by: mkt.by } : null } : null,
-        p_checked: new Date(now).toISOString() });
+        p_checked: new Date(now).toISOString(), p_gen: b.reset_n ?? null });
       if (ec) throw ec;
+      if (wrote === false) { done++; continue; }
       if (b.tg_chat) {
         if (quietNow(alertsOf(b).quiet)) QUIET.add(String(b.tg_chat));
         await sendTo([b.tg_chat], [
