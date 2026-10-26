@@ -919,7 +919,7 @@ details.dis>.dbody{padding:0 16px 16px}
     <div class="phead"><div><h2>Журнал сделок</h2><p>Результаты бумажной торговли по сигналам сканера. Клик по сделке — её карточка: свечи, вход и выход, и почему бот вошёл.</p></div></div>
     <div class="seg">
       <button class="tab jm" data-m="shared" title="Один бот на сервере для всех посетителей. Работает круглосуточно, даже когда сайт никто не открывал">Общий бот 24/7</button>
-      <button class="tab jm" data-m="mine" title="Ваш личный бот: торгует по вашим профилям на виртуальные $10 000">Мой бот</button>
+      <button class="tab jm" data-m="mine" title="Ваш личный бот: торгует по вашим профилям на виртуальные деньги">Мой бот</button>
     </div>
     <div class="sub" id="jdesc"></div>
     <div id="srv"></div>
@@ -942,7 +942,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <div class="seg mini" id="bwhere"><button class="tab" data-w="server">На сервере 24/7</button><button class="tab" data-w="browser">В браузере</button></div></div>
         <div class="bopt"><div><b>Когда рынок считается боковиком</b><p>Бот смотрит на BTC, ETH и SOL за 7 дней: насколько цена прошла по прямой относительно всего пути (ER). Если у всех трёх ER ниже порога — боковик, иначе импульс. Здесь — граница для выбора профиля в авто-режиме (по часовым свечам) и для профилей без своей границы; сделки профиль решает по свечам своего таймфрейма, как в бэктесте.</p></div>
           <select id="bER" aria-label="Граница боковика для выбора профиля и для профилей без своей границы"><option value="0.1">ER &lt; 0.10 · строже</option><option value="0.15">ER &lt; 0.15 · обычно</option><option value="0.25">ER &lt; 0.25 · мягче</option></select></div>
-        <div class="bopt"><div><b>Начать заново</b><p>Удалит все сделки вашего бота и вернёт баланс к $10 000. Профили останутся.</p></div>
+        <div class="bopt"><div><b>Начать заново</b><p>Удалит все сделки вашего бота и начнёт журнал с суммы, которую вы укажете. Профили останутся.</p></div>
           <button id="jreset">Сбросить журнал</button></div>
       </div></details>
       <div id="bform" class="hidden">
@@ -969,6 +969,7 @@ details.dis>.dbody{padding:0 16px 16px}
           <label class="fl" title="Флэт — когда BTC, ETH и SOL все в боковике (порог ER выше, в настройках бота)">Входить <select id="pfReg"><option value="any">в любом рынке</option><option value="flat">только во флэте</option><option value="impulse">только в импульсе</option></select></label>
           <label class="fl" title="Закрыть сделку по рынку, если за это число свечей не сработали ни тейк, ни стоп">Тайм-стоп <select id="pfTS"><option value="0">выкл — ждать тейк или стоп</option><option value="24">24 свечи</option><option value="48">48 свечей</option><option value="96">96 свечей</option></select></label>
           <label class="fl inl"><input type="checkbox" id="pfLong"> только LONG</label>
+          <label class="fl inl" title="Включено: риск считается от текущего баланса — после прибыли стоп больше, после убытков меньше. Выключено: риск всегда от стартового баланса — при 1% и $10 000 каждый стоп $100"><input type="checkbox" id="pfComp"> сложный процент</label>
         </div>
         <div class="row pfbar" id="pfBar" style="margin-top:12px"><span class="pfbt" id="pfBarT"></span><button id="pfSave" class="primary">Сохранить профиль</button><button id="pfCancel">Отмена</button></div>
       </div>
@@ -2013,7 +2014,7 @@ const profById = id => BP.profiles.find(p => p.id === id) || BP.profiles[0];
 // The regime is read from BTC, ETH and SOL, or from BTC alone when the profile was backtested that way (regimeSrc, since 2.35)
 const profSet = p => ({...PROFILE_DEF, ...p.set, regimeSrc:p.set?.regimeSrc === 'btc' ? 'btc' : 'majors', erMax:p.set?.erMax ?? BP.erMax});
 const profSummary = p => { const s = profSet(p);
-  return `${s.tf} · ${METHOD_NAME[s.method]} ${s.N}/${s.k} · ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · сила ≥ ${s.minScore} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}% · плечо до ${s.lev}×`
+  return `${s.tf} · ${METHOD_NAME[s.method]} ${s.N}/${s.k} · ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · сила ≥ ${s.minScore} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ' от старта' : ''} · плечо до ${s.lev}×`
     + (s.minWidth ? ` · ширина ≥ ${s.minWidth}%` : '') + (s.maxHL ? ` · T½ ≤ ${s.maxHL}` : '') + (s.coinErMax ? ` · без трендовых монет` : '')
     + (s.regimeOnly === 'flat' ? ` · только когда ${s.regimeSrc === 'btc' ? 'BTC' : 'BTC, ETH, SOL'} во флэте` : s.regimeOnly === 'impulse' ? ' · только в импульсе' : '')
     + (s.regimeSrc === 'btc' && (s.strategy === 'switch' || s.regimeOnly === 'impulse') ? ' · режим рынка по BTC' : '')
@@ -2087,7 +2088,10 @@ async function setWhere(w) {
   if (w === 'server' && !UB) {
     try { UB = await rpc('ub_create', {p_config:serverConfig()}); save('sr_ubot', UB); }
     catch (e) { toast('Не удалось создать серверного бота', String(e.message || e), 'bad'); return; }
-    toast('Ваш бот теперь работает на сервере 24/7', 'торгует по выбранному профилю, даже когда сайт закрыт. Журнал — отдельный, начинается с $10 000', 'ok');
+    // a new server bot starts at $10 000; with another start in the browser it begins from the same amount
+    const start = J.start >= 100 && J.start <= 1e7 ? Math.round(J.start) : 10000;
+    if (start !== 10000) await rpc('ub_reset', {p_id:UB.id, p_secret:UB.secret, p_start:start}).catch(() => {});
+    toast('Ваш бот теперь работает на сервере 24/7', `торгует по выбранному профилю, даже когда сайт закрыт. Журнал — отдельный, начинается с $${start.toLocaleString('ru')}`, 'ok');
   }
   BP.where = w; saveBP();
   if (w === 'server') { syncServerBot(); fetchServerBot(); } else SB_MINE = null;
@@ -2122,7 +2126,7 @@ async function runBot() {
     // (the position came back and its P&L was lost). The pause after a trade counts that close too
     const market = (await regimeOn(set.tf)) ?? undefined;
     const recent = J.closed.filter(x => now - x.tclose < M.COOLDOWN * TFMS[set.tf]).map(x => x.sym);
-    const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, S:set, now, allowEntries:J.on, market});
+    const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, start:J.start, S:set, now, allowEntries:J.on, market});
     for (const p of res.opened) { p.note = `«${P.name}» · ${p.note}`; p.snap.profile = P.name; }
     J.open = [...res.stillOpen, ...res.opened];
     J.closed = [...res.closed, ...J.closed];
@@ -2148,6 +2152,7 @@ function cleanProfile(p) {
     strategy:pick(s.strategy, Object.keys(M.STRATEGIES), D.strategy), rr:near(s.rr, [0, 1.5, 2, 3], 0), risk:near(s.risk, [0.005, 0.01, 0.02, 0.03, 0.04, 0.05], D.risk),
     lev:near(s.lev, [1, 2, 3, 5, 10], 1), minWidth:near(s.minWidth, [0, 3, 5, 8], 0), maxHL:near(s.maxHL, [0, 20, 40], 0), coinErMax:near(s.coinErMax, [0, 0.2, 0.3], 0),
     longOnly:s.longOnly === true, regimeOnly:pick(s.regimeOnly, ['any', 'flat', 'impulse'], 'any'), timeStop:near(s.timeStop ?? 48, [0, 24, 48, 96], 48), maxOpen:near(s.maxOpen ?? 3, M.SLOTS, 3),
+    ...(s.fixedRisk === true ? {fixedRisk:true} : {}),   // risk from the starting balance, without compounding
     // the profile's own flat / impulse border travels with it; a profile without one uses the receiver's common setting
     ...(s.erMax != null && isFinite(+s.erMax) ? {erMax:near(s.erMax, [0.1, 0.15, 0.25], 0.15)} : {}),   // the values the selects offer
     ...(s.regimeSrc === 'btc' ? {regimeSrc:'btc'} : {})};   // the regime from BTC alone, as it was backtested
@@ -2208,7 +2213,7 @@ const profPlain = p => { const s = profSet(p);
   const when = s.regimeOnly === 'flat' ? ' Торгует только в спокойном рынке.' : s.regimeOnly === 'impulse' ? ' Торгует только в сильном движении.' : '';
   const hold = s.timeStop ? '' : ' Держит сделку до тейка или стопа.';
   const tfp = TF_PLAIN[s.tf] || s.tf;
-  return `${idea}.${when}${hold} ${tfp[0].toUpperCase() + tfp.slice(1)}, ${p.coins.mode === 'list' ? 'монеты: ' + p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}, риск ${(s.risk * 100).toFixed(s.risk < 0.01 ? 1 : 0)}% на сделку.`; };
+  return `${idea}.${when}${hold} ${tfp[0].toUpperCase() + tfp.slice(1)}, ${p.coins.mode === 'list' ? 'монеты: ' + p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}, риск ${(s.risk * 100).toFixed(s.risk < 0.01 ? 1 : 0)}% ${s.fixedRisk ? 'от стартового баланса' : 'на сделку'}.`; };
 const regPlain = r => r === 'flat' ? 'боковик' : r === 'up' ? 'импульс вверх' : r === 'down' ? 'импульс вниз' : '—';
 // why the bot isn't opening trades right now — in words, with the one action that changes it
 const allowsReg = (p, r) => { const x = profSet(p);
@@ -2449,7 +2454,7 @@ function openForm(p) {
   hlOpts('#pfHL', s.tf);
   $('#pfTf').value = s.tf; $('#pfMethod').value = s.method; $('#pfN').value = s.N; $('#pfK').value = s.k; $('#pfStrat').value = s.strategy; $('#pfMin').value = s.minScore;
   $('#pfRR').value = String(s.rr); $('#pfRisk').value = String(Math.round(s.risk * 1000) / 10); $('#pfLev').value = String(s.lev);
-  $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfReg').value = s.regimeOnly || 'any'; $('#pfTS').value = String(s.timeStop ?? 48); $('#pfSlots').value = String(M.slotsOf(s));
+  $('#pfW').value = String(s.minWidth); $('#pfHL').value = String(s.maxHL); $('#pfCoinER').value = String(s.coinErMax); $('#pfLong').checked = !!s.longOnly; $('#pfComp').checked = !s.fixedRisk; $('#pfReg').value = s.regimeOnly || 'any'; $('#pfTS').value = String(s.timeStop ?? 48); $('#pfSlots').value = String(M.slotsOf(s));
   $('#bform').classList.remove('hidden'); $('#bform').scrollIntoView({block:'nearest', behavior:'smooth'});
   formBase = formState(); syncSavebar();
   if (!isPhone()) setTimeout(() => { $('#pfName').focus({preventScroll:true}); $('#pfName').select(); }, 0);   // on a phone the keyboard would cover the form
@@ -2462,7 +2467,7 @@ function saveForm() {
     set:{method:$('#pfMethod').value, N:clamp(+$('#pfN').value || 210, 20, 300), k:clamp(+$('#pfK').value || 3, 1, 5), tf:$('#pfTf').value,
          minScore:clamp(+$('#pfMin').value || 0, 0, 100), strategy:$('#pfStrat').value, rr:+$('#pfRR').value || 0, risk:(+$('#pfRisk').value || 2) / 100,
          lev:+$('#pfLev').value || 1, minWidth:+$('#pfW').value || 0, maxHL:+$('#pfHL').value || 0, coinErMax:+$('#pfCoinER').value || 0, longOnly:$('#pfLong').checked,
-         regimeOnly:$('#pfReg').value, timeStop:+$('#pfTS').value, maxOpen:+$('#pfSlots').value || 3}};
+         regimeOnly:$('#pfReg').value, timeStop:+$('#pfTS').value, maxOpen:+$('#pfSlots').value || 3, ...($('#pfComp').checked ? {} : {fixedRisk:true})}};
   const i = BP.profiles.findIndex(x => x.id === p.id);
   // the profile's own flat / impulse border and regime source (from a preset, a link or a saved backtest) are not in the form:
   // they stay as they were
@@ -2731,7 +2736,7 @@ function renderJournalNow() {
     ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
       <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
         <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Входы и выходы общего бота — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>${sharedIdle()}`
-    : `Ваш личный бот на виртуальные $10 000: торгует по вашим профилям, журнал видите только вы.`;
+    : `Ваш личный бот на виртуальные $${Math.round(D.start || 10000).toLocaleString('ru')}: торгует по вашим профилям, журнал видите только вы.`;
   tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
   const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
@@ -3146,6 +3151,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.46', date:'26 октября 2026', title:'«Мой бот»: свой стартовый баланс и риск без сложного процента', items:[
+    'В профиле бота появился переключатель «сложный процент». Выключите его — и бот будет рисковать от стартового баланса: при 1% и $10 000 каждый стоп $100, как бы ни менялся баланс. Работает в браузере и на сервере, переносится в бэктест и передаётся по ссылке на профиль.',
+    '«Начать заново» в «Моём боте» спрашивает, с какой суммы начать: от $100 до $10 000 000. Стартовая сумма меняется только вместе со сбросом журнала, иначе проценты и просадка прошлых сделок считались бы от другой суммы.',
+    'Сброс журнала серверного бота больше не может «откатиться»: раньше, если он совпадал с проверкой рынка, бот мог вернуть позиции и баланс из прошлого журнала.',
+  ]},
   {v:'2.45', date:'26 октября 2026', title:'Бэктест: свой стартовый баланс и риск без сложного процента', items:[
     'В бэктесте можно задать стартовый баланс — от $100 до $10 000 000.',
     'Переключатель «сложный процент». Включён (как раньше) — риск считается от текущего баланса: после прибыли стоп больше, после убытков меньше. Выключен — риск всегда от стартового баланса: при 1% и $10 000 каждый стоп $100, при 2% — $200. Так видно, сколько правила зарабатывают без разгона от прибыли. Входы и выходы те же, меняется только размер позиций.',
@@ -3727,7 +3737,7 @@ function ask({title, text = '', ok = 'Готово', danger = false, input = nul
     const back = document.activeElement, inp = $('#dlgIn'), withInput = input != null;
     $('#dlgT').textContent = title; $('#dlgD').textContent = text; $('#dlgD').classList.toggle('hidden', !text);
     $('#dlgOk').textContent = ok; $('#dlgOk').className = danger ? 'danger' : 'primary';
-    inp.classList.toggle('hidden', !withInput); inp.value = input?.value ?? ''; inp.placeholder = input?.placeholder ?? '';
+    inp.classList.toggle('hidden', !withInput); inp.value = input?.value ?? ''; inp.placeholder = input?.placeholder ?? ''; inp.inputMode = input?.inputmode ?? '';
     $('#dlg').classList.remove('hidden');
     if (withInput) { inp.focus(); inp.select(); } else (danger ? $('#dlgNo') : $('#dlgOk')).focus();
     const done = v => {
@@ -3894,15 +3904,25 @@ $('#btSave').onclick = async () => {
   const {method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop, maxOpen, erMax} = s;
   BP.profiles.push({id:'p' + Date.now(), name:cleanName(name), coins:s.custom ? {mode:'list', list:s.custom} : {mode:'top', top:s.top},
     set:{method, N, k, tf, minScore, strategy, rr, risk, lev, minWidth, maxHL, longOnly, coinErMax, regimeOnly, timeStop, maxOpen,
-      ...(usesReg ? {erMax, ...(s.regimeSrc === 'btc' ? {regimeSrc:'btc'} : {})} : {})}});
+      ...(s.fixedRisk ? {fixedRisk:true} : {}), ...(usesReg ? {erMax, ...(s.regimeSrc === 'btc' ? {regimeSrc:'btc'} : {})} : {})}});
   saveBP(); renderBotPanel(); syncServerBot();
   toast(`Профиль «${cleanName(name)}» добавлен`, 'Журнал → Мой бот: нажмите на него, чтобы бот торговал по этим правилам', 'ok', () => { jMode = 'mine'; go('journal'); });
 };
+// starting over, from any amount: the journal and its percentages begin anew, so the start changes only with a reset
 $('#jreset').onclick = async () => {
-  if (!(await ask({title:'Сбросить журнал?', ok:'Сбросить', danger:true,
-    text:`Все сделки ${BP.where === 'server' ? 'серверного' : 'вашего'} бота удалятся, баланс вернётся к $10 000. Профили останутся. Отменить это нельзя.`}))) return;
-  if (BP.where === 'server' && UB) { await rpc('ub_reset', {p_id:UB.id, p_secret:UB.secret}).catch(e => toast('Не удалось сбросить', String(e.message || e), 'bad')); fetchServerBot(); return; }
-  J = {balance:10000, start:10000, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
+  const srv = BP.where === 'server' && UB, cur = (srv ? SB_MINE?.start : J.start) || 10000;
+  const v = await ask({title:'Начать заново', ok:'Сбросить', danger:true, input:{value:String(Math.round(cur)), inputmode:'numeric'},
+    text:`Все сделки ${srv ? 'серверного' : 'вашего'} бота удалятся, профили останутся. Отменить это нельзя. С какой суммы начать, $ (от 100 до 10 000 000):`});
+  if (v == null) return;
+  const start = Math.round(+String(v).replace(/[\s,]/g, ''));   // «25 000» and «25,000» are 25000
+  if (!(start >= 100 && start <= 1e7)) { toast('Сумма — от $100 до $10 000 000', `введено: «${String(v).slice(0, 20)}»`, 'warn'); return; }
+  if (srv) {
+    try { await rpc('ub_reset', {p_id:UB.id, p_secret:UB.secret, p_start:start}); toast(`Журнал начат заново с $${start.toLocaleString('ru')}`, '', 'ok'); }
+    catch (e) { toast('Не удалось сбросить', String(e.message || e), 'bad'); }
+    fetchServerBot(); return;
+  }
+  J = {balance:start, start, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
+  toast(`Журнал начат заново с $${start.toLocaleString('ru')}`, '', 'ok');
 };
 const cv = $('#cv');
 cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); hoverY = e.clientY - cv.getBoundingClientRect().top; drawChartSoon(); };
