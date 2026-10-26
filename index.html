@@ -189,6 +189,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 #more.dot{position:relative}#more.dot::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--acc)}   /* table filters are on */
 .filters select.on{border-color:var(--acc);color:var(--text)}   /* a table filter that is set */
 .fchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-2px 0 10px;font-size:12.5px}
+.fhint{flex-basis:100%;color:var(--mute);font-size:12px;line-height:1.45}
 .chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--acc);background:var(--accbg);color:var(--text);font-size:12.5px;cursor:pointer}
 .chip span{color:var(--mute);font-size:14px;line-height:1}.chip:hover span{color:var(--text)}.chip.clear{border-color:var(--line2);color:var(--mute)}
 @media (pointer:coarse){.chip{height:36px}}
@@ -675,6 +676,8 @@ details.dis>.dbody{padding:0 16px 16px}
   .cards>.card:first-child .v{font-size:15px}
   .cards .card .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .cards .card .t[data-s]{font-size:0}.cards .card .t[data-s]::after{content:attr(data-s);font-size:10px}
+  /* 320 px: in capitals with spacing the short titles were cut to «ДЕШЕВЛ», «СИГНА…»; in plain letters they fit in one row */
+  @media(max-width:360px){.cards>.card{padding:8px 7px}.cards .card .t,.cards .card .t[data-s]::after{text-transform:none;letter-spacing:0;font-size:10.5px}}
   .cact .search{flex:1 1 100%}.cact .seg{flex:1}.cact .seg .tab{flex:1}
   body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}   /* the tab bar grows by the home-indicator inset */
   /* no scroll inside the page scroll on phones */
@@ -1476,13 +1479,16 @@ function renderChips(shown) {
   const sel = s => $(s).options[$(s).selectedIndex].textContent, q = $('#fs').value.trim();
   const chips = [...['#fz', '#fmin', '#fhl', '#fside'].filter(s => $(s).selectedIndex > 0).map(s => [s, sel(s)]), ...(q ? [['#fs', `«${q}»`]] : [])];
   const sortTh = sortKey !== 'ext' && [...document.querySelectorAll('#mhead th')].find(th => th.dataset.s === sortKey);
+  // a filter a summary card stands for is said in words: on a phone the card's tooltip needs a long press nobody knows of
+  const hint = [$('#fz').value, $('#fl').value].map(v => v && document.querySelector(`.card[data-cf="${v}"]`)?.title.replace(/\s*Нажмите.*$/, '')).filter(Boolean).join(' ');
   const on = chips.length || $('#fl').value || sortTh;
   $('#fchips').classList.toggle('hidden', !on);
   if (!on) return;
   $('#fchips').innerHTML = `<span class="mute">Показано <b>${shown}</b> из ${rows.length}</span>`
     + chips.map(([s, t]) => `<button class="chip" data-unset="${s}" aria-label="Убрать фильтр: ${esc(t)}">${esc(t)}<span aria-hidden="true">×</span></button>`).join('')
     + (sortTh ? `<button class="chip" data-unset="sort" aria-label="Вернуть обычный порядок: избранное и сигналы сверху">Сортировка: ${esc(sortTh.textContent.trim())} ${sortDir > 0 ? '↑' : '↓'}<span aria-hidden="true">×</span></button>` : '')
-    + (chips.length ? '<button class="chip clear" data-fclear>Сбросить</button>' : '');
+    + (chips.length ? '<button class="chip clear" data-fclear>Сбросить</button>' : '')
+    + (hint ? `<span class="fhint">${esc(hint)}</span>` : '');
 }
 // why the table is empty: a searched coin hidden by the filters is named, so it never looks missing from the market
 function emptyRow() {
@@ -2894,11 +2900,13 @@ async function throttled(path) { // backtest downloads stay well under Binance's
   if (wait) await sleep(wait);
   return api(path);
 }
-async function fetchHistory(sym, tf, startT, endT) {
+// stop: throws to end the download between requests (see runBacktest); a coin cut off half-way is not cached
+async function fetchHistory(sym, tf, startT, endT, stop) {
   const key = `${sym}|${tf}|${startT}|${endT}`;
   if (histCache.has(key)) return histCache.get(key);
   const tfms = TFMS[tf], out = [];
   for (let t = startT; t < endT;) {
+    stop?.();
     const K = await throttled(`/api/v3/klines?symbol=${sym}&interval=${tf}&startTime=${t}&endTime=${endT - 1}&limit=1000`);
     if (!K.length) break;
     // only numbers are kept (open time, o, h, l, c, volume, close time): Binance's 12-field rows of strings took ~4× the memory
@@ -2985,9 +2993,16 @@ function btEstimate() {
   $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.pit ? poolOf(s.top) : s.top} монет. Повторные — мгновенно.`
     + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '');
 }
+// while the history loads, «Запустить» is «Прервать»: a year on a wide pool takes minutes. Each run has its own stop flag,
+// so the downloads of a stopped run end with their current request even if a new run has started; what was fully loaded stays
+// in histCache, and the next run goes on from there. The calculation itself (seconds) is not interrupted
+const STOPPED = new Error('остановлено');
+let btCtl = null;
+const btButton = busy => { $('#btRun').classList.toggle('primary', !busy); $('#btRun').innerHTML = `<svg class="i"><use href="#i-${busy ? 'x' : 'play'}"/></svg>${busy ? 'Прервать' : 'Запустить'}`; };
 async function runBacktest() {
-  if (btBusy) return;
-  btBusy = true; $('#btRun').disabled = true; $('#btStatus').classList.add('busy');   // a turning mark while it loads and counts
+  if (btBusy) { if (btCtl) { btCtl.stop = true; $('#btRun').disabled = true; $('#btStatus').textContent = 'Останавливаю…'; } return; }
+  const ctl = btCtl = {stop:false}, stop = () => { if (ctl.stop) throw STOPPED; };
+  btBusy = true; btButton(true); $('#btStatus').classList.add('busy');   // a turning mark while it loads and counts
   const s = btSettings(), days = +$('#btDays').value, tfms = TFMS[s.tf];
   const st = $('#btStatus');
   try {
@@ -3005,7 +3020,7 @@ async function runBacktest() {
     let traded = s.custom || live, gone = [];
     if (s.pit) {   // plus the coins delisted meanwhile (see delistedFor)
       const weakest = +(tk.find(x => x.symbol === traded[traded.length - 1])?.quoteVolume || 0);
-      gone = (await delistedFor(tk, from, weakest, t => { st.textContent = t; })).filter(x => !traded.includes(x));
+      gone = (await delistedFor(tk, from, weakest, t => { stop(); st.textContent = t; })).filter(x => !traded.includes(x));
       traded = [...traded, ...gone];
     }
     const syms = [...new Set([...traded, ...M.MAJORS])];   // BTC/ETH/SOL are always loaded: they define the market regime
@@ -3016,18 +3031,21 @@ async function runBacktest() {
     trimHistory(key => key.endsWith(`|${s.tf}|${startT}|${endT}`) && syms.includes(key.split('|')[0]));
     const hist = {}; let done = 0;
     await pool(syms, 4, async sym => {
-      try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {}
-      st.textContent = `Загружаю историю: ${++done}/${syms.length} пар…`;
+      stop();
+      try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT, stop)).filter(k => k[6] < now); } catch {}
+      if (!ctl.stop) st.textContent = `Загружаю историю: ${++done}/${syms.length} пар…`;
     });
+    stop();
     // a coin whose download failed (a phone on a weak network, Binance asking to slow down) used to drop out silently and
     // change the result; it gets two more tries, and whatever still fails is named next to the result
     let failed = syms.filter(x => !hist[x]);
     for (let round = 1; round <= 2 && failed.length; round++) {
       st.textContent = `Догружаю ${failed.length} пар (попытка ${round + 1})…`; await sleep(1500 * round);
-      for (const sym of failed) { try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT)).filter(k => k[6] < now); } catch {} }
+      for (const sym of failed) { stop(); try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT, stop)).filter(k => k[6] < now); } catch {} }
+      stop();
       failed = failed.filter(x => !hist[x]);
     }
-    st.textContent = 'Считаю…'; await sleep(30);
+    st.textContent = 'Считаю…'; $('#btRun').disabled = true; await sleep(30);   // the calculation can't be stopped: no «Прервать» during it
     const t0 = performance.now();
     btHist = {hist, from};
     btRes = M.backtest(hist, s, {start:s.start, from, only:traded, top:s.pit ? s.top : 0});
@@ -3041,9 +3059,9 @@ async function runBacktest() {
     btRes.status = st.textContent; renderBacktest();
     if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
-    st.textContent = 'Ошибка: ' + (e.message || e);
+    st.textContent = e === STOPPED ? 'Остановлено. Загруженная история сохранилась — следующий запуск продолжит с неё.' : 'Ошибка: ' + (e.message || e);
   }
-  btBusy = false; $('#btRun').disabled = false; $('#btStatus').classList.remove('busy');
+  btBusy = false; btCtl = null; btButton(false); $('#btRun').disabled = false; $('#btStatus').classList.remove('busy');
 }
 function groupRow(name, list) {
   const g = M.journalStats(10000, list);
@@ -3151,6 +3169,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.47', date:'26 октября 2026', title:'Бэктест можно прервать, карточки понятнее на телефоне', items:[
+    'Пока бэктест загружает историю, кнопка «Запустить» становится «Прервать». Загруженное сохраняется: следующий запуск продолжит с того же места, а не начнёт заново.',
+    'Когда включён фильтр одной из карточек («Дешевле обычного», «Сигналы» и другие), над таблицей написано, что он показывает. На телефоне раньше это было видно только по долгому нажатию на карточку.',
+    'На узком экране (320 px) названия карточек больше не обрезаются до «ДЕШЕВЛ» и «СИГНА…».',
+  ]},
   {v:'2.46', date:'26 октября 2026', title:'«Мой бот»: свой стартовый баланс и риск без сложного процента', items:[
     'В профиле бота появился переключатель «сложный процент». Выключите его — и бот будет рисковать от стартового баланса: при 1% и $10 000 каждый стоп $100, как бы ни менялся баланс. Работает в браузере и на сервере, переносится в бэктест и передаётся по ссылке на профиль.',
     '«Начать заново» в «Моём боте» спрашивает, с какой суммы начать: от $100 до $10 000 000. Стартовая сумма меняется только вместе со сбросом журнала, иначе проценты и просадка прошлых сделок считались бы от другой суммы.',
