@@ -224,7 +224,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .banner.warn{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}.banner.warn svg{color:var(--acc)}
 .banner.bad{border-color:var(--bad-line);background:linear-gradient(0deg,rgba(240,82,95,.08),rgba(240,82,95,.08)),var(--s1)}.banner.bad svg{color:var(--up)}
 .banner.info svg{color:var(--blue)}
-.banner b{color:var(--text)}
+.banner b{color:var(--text)}.banner .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .intro{display:flex;gap:16px;align-items:flex-start;background:var(--intro);border:1px solid var(--intro-line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;font-size:13.5px}
 .intro ol{margin:6px 0 0;padding-left:18px;line-height:1.7}.intro .h{font-weight:700;font-size:15px}.intro button{margin-left:auto;flex:0 0 auto}
 /* touch screens: a tooltip shown by a tap (or a long press on a button), see "tooltips on touch screens" */
@@ -1038,7 +1038,8 @@ details.dis>.dbody{padding:0 16px 16px}
       </div>
     </div></details>
     <div class="mute" id="btStatus" style="margin-bottom:14px;font-size:13px"></div>
-    <div class="banner info" id="btEmpty"><svg class="i"><use href="#i-info"/></svg><div><b>Выберите идею входа и нажмите «Запустить».</b><br>
+    <div class="banner info" id="btEmpty"><svg class="i"><use href="#i-info"/></svg><div><b>Выберите идею входа и нажмите «Запустить» — или начните с готового:</b>
+      <div class="acts"><button class="primary" data-qs="shared">Проверить правила общего бота</button><button data-qs="mine">Проверить мой профиль</button></div>
       <span class="mute">Если результат в плюсе только на одном периоде — это случайность, а не преимущество. Проверьте на 30 и на 60 днях.</span></div></div>
     <div id="btOut" class="hidden">
       <div class="banner" id="btVerdict"></div>
@@ -1998,6 +1999,11 @@ const PRESETS = [
   {id:'p-flat', name:'Боковик · 15m', coins:{mode:'top', top:150}, set:{...PROFILE_DEF}},
   {id:'p-imp', name:'Импульс · 4h', coins:{mode:'top', top:150}, set:{...PROFILE_DEF, tf:'4h', k:3.5, strategy:'breakout', rr:3, longOnly:true}},
 ];
+// the shared bot's rules as checked on the honest top over three years (docs/RESEARCH-2026-10.md, 19.10): while it trades by
+// exactly these, its journal says in large type that they lost every year. Rules changed since → the numbers no longer apply,
+// and the notice goes
+const SHARED_TESTED = {N:210, k:3.5, rr:2, tf:'4h', lev:3, top:50, risk:0.01, erMax:0.25, maxHL:20, method:'log', minScore:60, strategy:'switch', timeStop:48, regimeSrc:'majors', regimeOnly:'any'};
+const sharedNoEdge = () => !!SJ?.settings && Object.entries(SHARED_TESTED).every(([k, v]) => SJ.settings[k] === v);
 // no preset has held up on an honest check (the top of each moment, delisted coins included, several years), so each says so;
 // the shared bot's one with its numbers
 const presetTag = p => !PRESETS.some(x => x.id === p.id) ? '' : ` <span class="tag" title="${p.id === 'p-sw4h'
@@ -2739,7 +2745,10 @@ function renderJournalNow() {
   if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
-    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
+    ? (sharedNoEdge() ? `<div class="banner warn noedge"><svg class="i"><use href="#i-warn"/></svg><div><b>У правил общего бота не найдено преимущества.</b>
+        На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет: −0.42R, −0.40R и −0.30R на сделку.
+        Общий бот показывает, как работает бот, а не стратегию, по которой стоит торговать. Проверить самому — кнопка «Проверить в бэктесте» ниже.</div></div>` : '')
+    + `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
       <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
         <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Входы и выходы общего бота — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>${sharedIdle()}`
     : `Ваш личный бот на виртуальные $${Math.round(D.start || 10000).toLocaleString('ru')}: торгует по вашим профилям, журнал видите только вы.`;
@@ -3169,6 +3178,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.48', date:'26 октября 2026', title:'Честно о правилах общего бота и быстрый старт бэктеста', items:[
+    'В журнале общего бота крупно написано: у его правил не найдено преимущества. На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет. Общий бот показывает, как работает бот, а не стратегию для денег.',
+    'Пустой бэктест предлагает начать с готового: «Проверить правила общего бота» или «Проверить мой профиль» — форма заполнится и проверка запустится сразу.',
+  ]},
   {v:'2.47', date:'26 октября 2026', title:'Бэктест можно прервать, карточки понятнее на телефоне', items:[
     'Пока бэктест загружает историю, кнопка «Запустить» становится «Прервать». Загруженное сохраняется: следующий запуск продолжит с того же места, а не начнёт заново.',
     'Когда включён фильтр одной из карточек («Дешевле обычного», «Сигналы» и другие), над таблицей написано, что он показывает. На телефоне раньше это было видно только по долгому нажатию на карточку.',
@@ -4132,6 +4145,14 @@ function profToBacktest(p, who) {
   const tfNote = $('#btTf').value !== p.set.tf ? ` Таймфрейм ${p.set.tf} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
   toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
 }
+// an empty backtest offers a start: the shared bot's rules or the profile «Мой бот» trades by, checked at once on the period
+// in the form (60 days by default — under a minute)
+$('#btEmpty').onclick = e => {
+  const b = e.target.closest('[data-qs]'); if (!b || btBusy) return;
+  if (b.dataset.qs === 'shared' && !SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; }
+  btFromProf(b.dataset.qs === 'shared' ? sharedProf() : activeProfile());
+  runBacktest();
+};
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
 ['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp'].forEach(s => $(s).onchange = btEstimate);
 $('#btStart').addEventListener('change', () => { $('#btStart').value = btSettings().start; });   // shows the amount the test will use: 50 → 100
