@@ -6,4 +6,11 @@
 - Local preview: `serve.ps1` (http://localhost:8765). Pushing to `main` auto-deploys to Vercel and reloads open tabs.
 - After changing `math.js`: open `tests/math.html?ref=_ref/math.js` in the preview (the previous copy saved to `tests/_ref/math.js` first); every check must pass.
 - Changelog (`CHANGELOG` in index.html) is for users: what changed for them, no implementation details.
-- Problems hit and how they were fixed: `docs/LESSONS.md`. Read it before big changes; add a row with every non-trivial fix.
+- Problems hit and how they were fixed: `docs/LESSONS.md`. Before work read its short checklist at the top, then grep the section of the area you touch (the whole file is ~36 KB); add a row with every non-trivial fix.
+
+## Working economically
+- `index.html` is ~4.5k lines: find places with grep, read only ranges (sed -n / Read offset+limit). Never read or cat it whole; same for `beta.js`, `math.js`, `bot/index.ts` unless the whole file is the task.
+- Text with Cyrillic or other non-ASCII: change it with Edit only, never perl/sed substitutions.
+- Checks in the preview: assertions in one `javascript_tool` call first; screenshots only for visual changes, at scale ≤ 0.6. A hidden preview pane stops `requestAnimationFrame` — wait with setTimeout in scripts.
+- One session per plan wave (`docs/PLAN-*.md` keeps the status and is the hand-off); a long session gets compacted and loses detail.
+- After changing `math.js`: `tests/math.html?ref=_ref/math.js`. After a push: check the served version (Vercel can miss a push).
