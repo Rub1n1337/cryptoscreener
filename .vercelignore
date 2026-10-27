@@ -10,3 +10,4 @@ supabase/functions/_shared/tg.ts
 tests
 .github
 supabase/config.toml
+scripts

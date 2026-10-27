@@ -68,6 +68,7 @@ svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-
 .top{position:sticky;top:0;z-index:40;background:var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .topin{max-width:1500px;margin:0 auto;padding:0 16px;height:58px;display:flex;align-items:center;gap:18px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:16px;white-space:nowrap}
+@media (pointer:coarse){.brand{min-width:36px;min-height:36px}}   /* the logo alone on a phone was a 28 px target */
 .brand small{font-weight:600;font-size:12px;color:var(--acc);background:var(--accbg);padding:2px 8px;border-radius:999px}
 .tabs{display:flex;gap:2px;align-items:center}
 .top .tabs{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
