@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.39 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.40 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.40', date:'21 октября 2026', title:'Серверный бот и доступ к «Бете»', items:[
+    'Исправлен перевод бота на сервер.',
+    'Исправлена проверка кодов доступа к «Бете».',
+    'Ошибка сервера при входе в «Бету» отображается с описанием.',
+  ]},
   {v:'2.39', date:'20 октября 2026', title:'Ручное закрытие и стабильность бэктеста', items:[
     'Исправлен двойной учёт сделки при ручном закрытии позиции в браузерном боте.',
     'Бэктест предупреждает, если прогон слишком велик для памяти устройства.',

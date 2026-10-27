@@ -4,17 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- the page may talk only to these hosts: even an injected script could not send the bot's key anywhere else -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Sigma Radar</title>
 <!-- the logo: Σ drawn as the channel — top band red, bottom band green, the price (gold) out to the band and back to the centre -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23161b26'/><path d='M47 15H17' stroke='%23f0525f' stroke-width='7' stroke-linecap='round'/><path d='M17 49H47' stroke='%2322c55e' stroke-width='7' stroke-linecap='round'/><path d='M17 15L34 32L17 49' stroke='%23f5b70a' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<!-- the font must not hold up the first paint: Google Fonts is slow or blocked for some visitors (Russia, VPNs), and a
-     render-blocking stylesheet kept the page blank meanwhile. It loads in the background; the system font shows until then -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
+<!-- Inter is served from this site, not Google Fonts: a visitor's address goes to no one else, and the font loads where Google
+     is slow or blocked. Variable files, weights 400–700, only the subsets the text uses (fonts/LICENSE.txt: SIL OFL 1.1) -->
+<link rel="preload" href="/fonts/inter-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+@font-face{font-family:Inter;font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-cyrillic.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:Inter;font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-greek.woff2) format('woff2');unicode-range:U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF}
+@font-face{font-family:Inter;font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 /* ---------- design tokens ---------- */
 :root{
   --bg:#0a0d14;--s1:#10141d;--s2:#161b26;--s3:#1d2331;--line:#222a39;--line2:#2c3547;
@@ -271,6 +273,8 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .kv span{color:var(--mute)}.kv b{font-weight:600;text-align:right}
 .aside h4{margin:14px 0 8px;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
 .foot{text-align:center;color:var(--faint);font-size:12px;margin-top:18px}
+.sfoot{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0 16px;color:var(--faint);font-size:12px;margin-top:22px}.sfoot a{color:var(--mute);text-underline-offset:2px}
+@media(pointer:coarse){.sfoot a{display:inline-flex;align-items:center;min-height:36px}.doc a{padding:10px 0}}   /* a link inside text: the padding widens the tap area, not the line */
 
 /* ---------- progressive disclosure ---------- */
 #hdr{display:none}
@@ -963,6 +967,8 @@ details.dis>.dbody{padding:0 16px 16px}
           <select id="bER" aria-label="Граница боковика для выбора профиля и для профилей без своей границы"><option value="0.1">ER &lt; 0.10 · строже</option><option value="0.15">ER &lt; 0.15 · обычно</option><option value="0.25">ER &lt; 0.25 · мягче</option></select></div>
         <div class="bopt"><div><b>Начать заново</b><p>Удалит все сделки вашего бота и начнёт журнал с суммы, которую вы укажете. Профили останутся.</p></div>
           <button id="jreset">Сбросить журнал</button></div>
+        <div class="bopt hidden" id="bdelOpt"><div><b>Удалить с сервера</b><p>Удалит серверного бота: его сделки, позиции и связь с Telegram. Профили останутся, бот продолжит работать в этой вкладке.</p></div>
+          <button id="ubdel">Удалить с сервера</button></div>
       </div></details>
       <div id="bform" class="hidden">
         <div class="ptitle" id="bformTitle" style="margin-bottom:10px">Профиль</div>
@@ -1231,8 +1237,56 @@ details.dis>.dbody{padding:0 16px 16px}
     </div></details>
   </section>
 
+  <!-- LEGAL: terms, what is stored where and how to delete it. Keep it true to the code: storage keys, ub_delete, cleanup_abandoned_bots -->
+  <section id="legal" class="hidden">
+    <div class="phead"><div><h2>Правовая информация</h2><p>Условия использования и обращение с данными. Редакция от 27 октября 2026.</p></div></div>
+    <div class="panel doc">
+      <h3>О сервисе</h3>
+      <p>Sigma Radar — бесплатный учебный сервис: сканер рынка, боты на виртуальных деньгах и проверка правил на истории. Платных функций и рекламы нет. Связь с владельцем — в Telegram: <a href="https://t.me/sigmascreener" target="_blank" rel="noopener">t.me/sigmascreener</a>.</p>
+      <h3>Условия использования</h3>
+      <ul>
+        <li>Боты торгуют виртуальными деньгами, ордера на биржу не отправляются.</li>
+        <li>Сигналы, бэктесты и журналы — не инвестиционная рекомендация и не предложение купить или продать актив. Результат на истории не гарантирует результата в будущем.</li>
+        <li>Решения о реальных сделках вы принимаете сами и на свой риск. Торговля криптовалютой, особенно с плечом, может привести к потере всех вложенных средств.</li>
+        <li>Сервис предоставляется «как есть». Данные бирж могут приходить с задержкой или ошибками, сайт и боты могут работать с перерывами. В пределах, допустимых законом, владелец не отвечает за убытки от использования сервиса.</li>
+        <li>Сервис предназначен для лиц старше 18 лет.</li>
+        <li>Условия могут меняться; действующая редакция всегда на этой странице.</li>
+      </ul>
+      <h3>Какие данные хранятся</h3>
+      <p>Регистрации нет: сервис не запрашивает имя, почту, телефон и пароль. Cookie, аналитика, реклама и счётчики посещений не используются.</p>
+      <ul>
+        <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере», профили, избранное, свои уровни, настройки и тема, а также ключ доступа к вашему серверному боту.</li>
+        <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Бот анонимный, доступ к нему есть только у браузера, где хранится ключ.</li>
+        <li><b>На сервере, если вы подключили Telegram</b>: номер чата, имя из профиля Telegram, выбранные уведомления и состояние доставки последнего сообщения.</li>
+        <li><b>IP-адрес</b> — только для ограничения частоты запросов: создание серверных ботов и попытки входа в «Бету». Удаляется автоматически в течение двух суток.</li>
+      </ul>
+      <h3>Кому передаются данные</h3>
+      <ul>
+        <li><b>Binance</b> — браузер сам загружает цены, свечи и стаканы с открытого API биржи; биржа видит ваш IP-адрес, как любой сайт, который вы открываете.</li>
+        <li><b>Vercel</b> — хостинг сайта, <b>Supabase</b> — база данных и серверные боты, <b>Railway</b> — сервер сбора рыночных данных. Как любой хостинг, они ведут технические журналы запросов.</li>
+        <li><b>Telegram</b> — доставляет сообщения бота, если вы его подключили.</li>
+      </ul>
+      <p>Данные не продаются и не передаются для рекламы. Шрифт загружается с этого же сайта.</p>
+      <h3>Сроки хранения</h3>
+      <ul>
+        <li>Серверный бот засыпает через 30 дней без заходов на сайт и удаляется через 90 дней, если к нему не подключён Telegram. Бот с Telegram хранится, пока вы его не удалите.</li>
+        <li>Подписка в Telegram хранится, пока вы не отпишетесь.</li>
+        <li>Данные в браузере хранятся, пока вы их не очистите.</li>
+      </ul>
+      <h3>Как удалить свои данные</h3>
+      <ul>
+        <li><b>Серверный бот:</b> «Журнал» → «Мой бот» → «Дополнительно» → «Удалить с сервера». Удаляются сделки, позиции и связь с Telegram.</li>
+        <li><b>Telegram:</b> команда /stop в боте удаляет подписку и отвязывает бота с сайта.</li>
+        <li><b>Браузер:</b> очистите данные этого сайта в настройках браузера. Журнал и профили удалятся без возможности восстановления.</li>
+        <li>По другим вопросам о данных напишите владельцу в Telegram.</li>
+      </ul>
+      <h3>Лицензии</h3>
+      <p>Шрифт Inter распространяется по лицензии <a href="/fonts/LICENSE.txt" target="_blank" rel="noopener">SIL Open Font License 1.1</a>. Рыночные данные предоставляет Binance.</p>
+    </div>
+  </section>
 
   <div class="foot" id="foot">—</div>
+  <footer class="sfoot"><span>Учебный сервис · не финансовый совет</span><a href="#legal">Правовая информация</a><a href="https://t.me/sigmascreener" target="_blank" rel="noopener">Telegram</a></footer>
 </div>
 
 <!-- TRADE CARD -->
@@ -2442,6 +2496,7 @@ function renderBotPanelNow() {
   $('#bER').value = String(BP.erMax);
   document.querySelectorAll('#bmode .tab').forEach(b => b.classList.toggle('on', b.dataset.m === BP.mode));
   document.querySelectorAll('#bwhere .tab').forEach(b => b.classList.toggle('on', b.dataset.w === BP.where));
+  $('#bdelOpt').classList.toggle('hidden', !UB);
   const srv = BP.where === 'server', act = srv && SB_MINE?.profile ? (BP.profiles.find(p => p.name === SB_MINE.profile) || activeProfile()) : activeProfile();
   const on = srv && SB_MINE ? SB_MINE.on : J.on;
   if (srv && SB_MINE?.regime?.by) botRegime = {...M.marketOf(s => SB_MINE.regime.by[s] || null), by:SB_MINE.regime.by};
@@ -3221,6 +3276,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.52', date:'27 октября 2026', title:'Правовая информация и данные', items:[
+    'Добавлена страница «Правовая информация»: условия использования, какие данные хранятся и как их удалить.',
+    'Добавлена кнопка «Удалить с сервера» для серверного бота.',
+    'Шрифт загружается с самого сайта, без сторонних сервисов.',
+  ]},
   {v:'2.51', date:'27 октября 2026', title:'Улучшения мобильной версии', items:[
     'Кнопка монеты в сообщениях Telegram открывает её график.',
     'Панель RSI на графике стала выше на небольших экранах.',
@@ -3278,11 +3338,6 @@ const CHANGELOG = [
   {v:'2.41', date:'21 октября 2026', title:'Сигналы «Рынок» в Telegram', items:[
     'Исправлен пропуск подтверждённых разворотов в фильтре «Рынок».',
     'Сигналы в Telegram приходят и при закрытом сайте.',
-  ]},
-  {v:'2.40', date:'21 октября 2026', title:'Серверный бот и доступ к «Бете»', items:[
-    'Исправлен перевод бота на сервер.',
-    'Исправлена проверка кодов доступа к «Бете».',
-    'Ошибка сервера при входе в «Бету» отображается с описанием.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -3445,7 +3500,7 @@ document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const 
 document.querySelectorAll('#mhead th[data-s], #jhead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
 // ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes ----------
-const PAGES = ['market', 'journal', 'backtest', 'beta', 'help', 'changes'];
+const PAGES = ['market', 'journal', 'backtest', 'beta', 'help', 'changes', 'legal'];   // legal has no tab: the footer links to it
 let page = 'market';
 function go(t, push = true) {
   if (!PAGES.includes(t)) t = 'market';
@@ -3725,6 +3780,20 @@ $('#jreset').onclick = async () => {
   J = {balance:start, start, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
   toast(`Журнал начат заново с $${start.toLocaleString('ru')}`, '', 'ok');
 };
+// the server copy goes entirely (ub_delete): trades, positions, the Telegram link. The profiles live here, so the bot carries on in
+// this tab; «На сервере 24/7» later creates a new one
+$('#ubdel').onclick = async () => {
+  if (!UB) return;
+  if (!(await ask({title:'Удалить бота с сервера?', ok:'Удалить', danger:true,
+    text:'Сделки и позиции серверного бота и его связь с Telegram удалятся. Отменить это нельзя. Профили останутся, бот продолжит работать в этой вкладке.'}))) return;
+  clearTimeout(syncTimer);
+  try { await rpc('ub_delete', {p_id:UB.id, p_secret:UB.secret}); }
+  catch (e) { if (!/forbidden/.test(e.message)) { toast('Не удалось удалить', String(e.message || e), 'bad'); return; } }   // forbidden: it is gone already
+  UB = null; save('sr_ubot', null); SB_MINE = null;
+  if (BP.where === 'server') { BP.where = 'browser'; saveBP(); }
+  renderBotPanel(); renderJournal(); renderGuard();
+  toast('Бот удалён с сервера', 'Профили остались, бот работает в этой вкладке', 'ok');
+};
 const cv = $('#cv');
 cv.onmousemove = e => { hoverI = hoverIndex(chartGeo, cv, e); hoverY = e.clientY - cv.getBoundingClientRect().top; drawChartSoon(); };
 cv.onmouseleave = () => { hoverI = null; hoverY = null; drawChartSoon(); };
@@ -3962,6 +4031,7 @@ const CMD_PAGES = [
   {label:'Бэктест', hint:'проверка на истории', kw:['бэктест', 'backtest', 'история', 'тест'], run:() => go('backtest')},
   {label:'Как это работает', hint:'справка и словарь', kw:['справка', 'help', 'словарь', 'термин', 'помощь'], run:() => go('help')},
   {label:'Что нового', hint:'обновления сайта', kw:['новое', 'обновлен', 'changelog', 'версия'], run:() => go('changes')},
+  {label:'Правовая информация', hint:'условия, данные, контакты', kw:['правов', 'условия', 'конфиденц', 'privacy', 'terms', 'данные', 'cookie', 'контакт', 'владел'], run:() => go('legal')},
 ];
 const CMD_SETTINGS = [
   {label:'Плечо', kw:['плечо', 'leverage', 'lev'], run:() => editActive('#pfLev')},
@@ -3973,6 +4043,7 @@ const CMD_SETTINGS = [
   {label:'Граница боковика (ER)', kw:['er', 'граница', 'порог', 'боковик', 'флэт'], run:() => openMore('#bER')},
   {label:'Где работает бот: сервер или браузер', kw:['сервер', 'server', 'браузер', 'browser', '24/7', 'вкладк'], run:() => openMore('#bwhere')},
   {label:'Сбросить журнал моего бота', kw:['сброс', 'reset', 'заново', 'очистить'], run:() => openMore('#jreset')},
+  {label:'Удалить моего бота с сервера', kw:['удалить', 'delete', 'сервер', 'данные'], run:() => UB ? openMore('#ubdel') : go('legal')},
   {label:'Новый профиль', kw:['новый', 'создать', 'new', 'профиль', 'profile'], run:() => { openMine(); openForm(null); focusEl('#pfName'); }},
   {label:'Добавить профиль по ссылке', kw:['импорт', 'import', 'ссылк', 'добавить', 'поделить', 'share'], run:() => { openMine(); importByLink(); }},
   {label:'Настройки канала: модель, N, k', kw:['модель', 'канал', 'боллинджер', 'bollinger', 'сигма', 'sigma', 'ширина'], run:() => { go('market'); $('#cset').click(); focusEl('#method'); }},
