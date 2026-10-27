@@ -121,7 +121,7 @@ const FOOT = `\n\n<i>бумажная торговля · не финансов�
 const keyboard = (syms: string[]) => {
   const coins = [...new Set(syms.map((s) => s.replace(/USDT$/, "")))].slice(0, 3);
   return { inline_keyboard: [
-    ...(coins.length ? [coins.map((c) => ({ text: `📈 ${c}`, url: `${SITE}/#market/${encodeURIComponent(c)}` }))] : []),
+    ...(coins.length ? [coins.map((c) => ({ text: `📈 ${c}`, url: `${SITE}/#coin/${encodeURIComponent(c)}` }))] : []),   // #coin: on a phone the chart opens at once
     [{ text: "🔔 Уведомления", callback_data: "+n" }, { text: "🤖 Мой бот", callback_data: "+m" }],
   ] };
 };
