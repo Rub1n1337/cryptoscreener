@@ -8,3 +8,5 @@ supabase/functions/bot
 supabase/functions/tg
 supabase/functions/_shared/tg.ts
 tests
+.github
+supabase/config.toml

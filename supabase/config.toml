@@ -1,0 +1,9 @@
+# Read by the Supabase CLI (.github/workflows/deploy-functions.yml). Both functions are called without a user JWT:
+# bot by pg_cron with its own token header, tg by Telegram's webhook with its secret header.
+project_id = "aumldylzccbmddavtrqe"
+
+[functions.bot]
+verify_jwt = false
+
+[functions.tg]
+verify_jwt = false
