@@ -6,7 +6,7 @@
 - Colours only through CSS tokens (`:root` = dark, `:root[data-theme=light]`); canvas code reads them via `pal()` into `PC`.
 - Local preview: `serve.ps1` (http://localhost:8765). Pushing to `main` auto-deploys to Vercel and reloads open tabs.
 - After changing `math.js`: open `tests/math.html?ref=_ref/math.js` in the preview (the previous copy saved to `tests/_ref/math.js` first); every check must pass.
-- Changelog (`CHANGELOG` in index.html) is for users: what changed for them, no implementation details. Entries before 2.40 live in `changelog.js` (loaded when «Что нового» opens); when `CHANGELOG` grows past ~12, move its oldest there.
+- Changelog (`CHANGELOG` in index.html) is for users, in an official, concise style: a 2–5-word title; 1–5 items of one short sentence each («Добавлено…», «Исправлено…», «… стало …»). No mentions of AI, reviews or the development process; no causes, internals, px, «раньше…» stories or numbers that may later change. Entries before 2.40 live in `changelog.js` (loaded when «Что нового» opens); when `CHANGELOG` grows past ~12, move its oldest there.
 - `docs/AUDIT-STATE.md` is what other AIs get instead of past rounds: update its version and lists with every release. Their replies are triaged against it first (stale snapshot → one line).
 - Problems hit and how they were fixed: `docs/LESSONS.md`. Before work read its short checklist at the top, then grep the section of the area you touch (the whole file is ~36 KB); add a row with every non-trivial fix.
 
