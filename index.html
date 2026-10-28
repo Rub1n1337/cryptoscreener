@@ -451,7 +451,8 @@ tr.row.newsig td{animation:rowflash 2.4s ease-out}
   .tablewrap:has(:is(#jopen,#jclosed,#btTrades)) :is(table,tbody){display:block;width:100%}.tablewrap:has(:is(#jopen,#jclosed,#btTrades)){overflow-x:hidden}
   .sorthint{display:none}
   #jclosed tr.jday,#jclosed tr.jday td{display:block}#jclosed tr.jday td{padding:14px 12px 6px}
-  #jopen tr.row,#jclosed tr.row,#btTrades tr.row{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--row-line)}
+  #jopen,#jclosed,#btTrades{container:trades/inline-size}
+  #jopen tr.row,#jclosed tr.row,#btTrades tr.row{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--row-line)}
   #jopen tr.row td,#jclosed tr.row td,#btTrades tr.row td{display:none;padding:0;border:0;text-align:left}
   /* closed trades (journal and backtest): 1 date · 2 coin · 3 side · 4 entry · 5 exit · 7 reason · 11 PnL · 12 R */
   :is(#jclosed,#btTrades) tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(7),:nth-child(11),:nth-child(12)){display:block}
@@ -467,12 +468,15 @@ tr.row.newsig td{animation:rowflash 2.4s ease-out}
   :is(#jclosed,#btTrades) td:is(:nth-child(4),:nth-child(5)),#jopen td:is(:nth-child(4),:nth-child(5)){font-size:12px;color:var(--mute)}
   :is(#jclosed,#btTrades) td:nth-child(4)::before,#jopen td:nth-child(4)::before{content:"вход "}
   :is(#jclosed,#btTrades) td:nth-child(5)::before{content:"выход "}#jopen td:nth-child(5)::before{content:"сейчас "}
-  /* 320 px: «выход $0.00096…» was cut to «выход …». The prices read «$0.005517 → $0.005658»; the first column fits the
-     date (~73 px), the arrow and exit price (~85 px) get the rest */
-  @media(max-width:360px){
-    :is(#jclosed,#btTrades) tr.row{grid-template-columns:76px minmax(0,1fr) auto;column-gap:8px}
-    :is(#jclosed,#btTrades) td:nth-child(4)::before{content:none}:is(#jclosed,#btTrades) td:nth-child(5)::before{content:"→ "}
+  /* «вход $0.00001234» (~111 px) and «выход $0.00001234» (~120 px) beside «тайм-стоп» need ~360 px of the table itself
+     (a screen of ~414 px; gutters and scrollbars differ, so it's a container query). Narrower, the prices read
+     «$0.005517 → $0.005658»: the first column fits a date with a year (~94 px), and under 300 px of table only one
+     without (~75 px), so the arrow and exit price (~86 px) still fit at a 320 px screen */
+  @container trades (max-width:359.98px){
+    :is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:96px minmax(0,1fr) auto;column-gap:8px}
+    :is(#jopen,#jclosed,#btTrades) td:nth-child(4)::before{content:none}:is(#jopen,#jclosed,#btTrades) td:nth-child(5)::before{content:"→ "}
   }
+  @container trades (max-width:299.98px){:is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:76px minmax(0,1fr) auto}}
   /* open positions: 1 opened · 2 coin · 3 side · 4 entry · 5 now · 9 PnL · 10 R */
   #jopen tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10)){display:block}
   #jopen tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry now x"}#jopen tr.row td.jx{display:block;grid-area:x}
@@ -3276,6 +3280,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.53', date:'28 октября 2026', title:'Цены сделок на телефоне', items:[
+    'Исправлено обрезание цен в списках сделок журнала и бэктеста на телефоне.',
+    'На узких экранах цены входа и выхода показаны через стрелку.',
+  ]},
   {v:'2.52', date:'27 октября 2026', title:'Правовая информация и данные', items:[
     'Добавлена страница «Правовая информация»: условия использования, какие данные хранятся и как их удалить.',
     'Добавлена кнопка «Удалить с сервера» для серверного бота.',
@@ -3334,10 +3342,6 @@ const CHANGELOG = [
     'Ошибка обновления данных бота отображается отдельно от его состояния.',
     'Бэктест показывает ход расчёта и выводит последние 300 сделок с возможностью показать все.',
     'Улучшена работа с клавиатуры.',
-  ]},
-  {v:'2.41', date:'21 октября 2026', title:'Сигналы «Рынок» в Telegram', items:[
-    'Исправлен пропуск подтверждённых разворотов в фильтре «Рынок».',
-    'Сигналы в Telegram приходят и при закрытом сайте.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
