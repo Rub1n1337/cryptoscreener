@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.42 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.43 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.43', date:'26 октября 2026', title:'Сохранение настроек интерфейса', items:[
+    'Сортировка таблиц и состояние разделов «Дополнительно» сохраняются после перезагрузки.',
+    'Поиск монеты работает плавнее при наборе.',
+    'В сделках бэктеста на телефоне отображается сила сигнала.',
+    'Звуковое уведомление о сигнале срабатывает надёжнее.',
+    'Улучшена навигация по таблицам с клавиатуры.',
+  ]},
   {v:'2.42', date:'21 октября 2026', title:'Быстродействие и мобильная версия', items:[
     'Графики работают плавнее при наведении, прокрутке и масштабировании.',
     'На iPhone страница не масштабируется при вводе; кнопки увеличены для касания.',

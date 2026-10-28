@@ -19,6 +19,12 @@ async function fapi(path) { const r = await fetch('https://fapi.binance.com' + p
 const rest = (p, path) => p.mkt === 'fut' ? fapi(path.replace('/api/v3/', '/fapi/v1/')) : K.api(path);
 // on phones the chart buttons sit above the canvas, so the plot needs no room for them at the top
 const PHONE = matchMedia('(max-width:700px)');
+// stream watchdog: after QUIET_SHOW ms without a message the chart says "no data", after QUIET_MS it reconnects
+const QUIET_SHOW = 5000, QUIET_MS = 10000;
+// the stream state (Pane.state) in words: the status line, the note under the charts, the chart's own labels
+const STATE_LINE = {offline:'нет интернета — подключусь, когда сеть вернётся', off:'нет связи с Binance — переподключаюсь', quiet:'нет данных от Binance — переподключаюсь', sync:'загружаю стакан…'};
+const STATE_NOTE = {offline:'Нет интернета: стакан и сделки остановлены до возвращения сети', off:'Нет связи с Binance: стакан и сделки остановлены, переподключаюсь', quiet:'Binance не присылает данные: стакан и сделки остановлены, переподключаюсь', sync:'Стакан загружается…'};
+const STATE_SHORT = {offline:'нет интернета', off:'нет связи с Binance', quiet:'нет данных', sync:'стакан загружается…'};
 const DEF_SYMS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 
 // ---------- indicator catalogue (the picker mirrors the "Индикаторы" window of order-flow terminals) ----------
@@ -154,7 +160,7 @@ async function srvHas(sym, mkt = 'spot') {
   return (await srvSyms)[mkt].has(sym);
 }
 // ---------- panes ----------
-let panes = [], active = 0, layout = 1, link = true, hoverT = null, tool = null, ruler = null, loopOn = false;
+let panes = [], active = 0, layout = 1, link = true, hoverT = null, tool = null, ruler = null, loopOn = false, under = null;   // under: the chart under the mouse
 const act = () => panes[active];
 const redrawAll = () => panes.forEach(p => p.dirty = true);
 
@@ -169,12 +175,12 @@ class Pane {
     el.addEventListener('focusin', () => setActive(panes.indexOf(this)));   // Tab to a chart makes it the active one too
     const cv = this.cv;
     cv.addEventListener('mousemove', e => {
-      this.hoverI = K.hoverIndex(this.geo, cv, e); this.hoverY = e.clientY - cv.getBoundingClientRect().top; this.dirty = true;
+      this.hoverI = K.hoverIndex(this.geo, cv, e); this.hoverY = e.clientY - cv.getBoundingClientRect().top; this.dirty = true; under = this;
       if (!e.buttons) cv.style.cursor = !tool && this.hitAt(e) ? 'pointer' : '';
       if (link && this.d && this.hoverI != null) { hoverT = {src:this, t:this.d.t[clamp(this.hoverI, 0, this.d.t.length - 1)]}; panes.forEach(q => { if (q !== this) q.dirty = true; }); }
       if (ruler?.live && ruler.pane === this) { const pt = this.pointAt(e); if (pt) ruler.b = pt; }
     });
-    cv.addEventListener('mouseleave', () => { this.hoverI = this.hoverY = null; hoverT = null; redrawAll(); });
+    cv.addEventListener('mouseleave', () => { this.hoverI = this.hoverY = null; hoverT = null; under = null; redrawAll(); });
     cv.addEventListener('touchmove', e => { if (this.yDrag?.scale && e.touches.length === 1) { e.preventDefault(); const f = Math.exp((e.touches[0].clientY - this.yDrag.y0) / 160), c = (this.yDrag.mn + this.yDrag.mx) / 2, h = (this.yDrag.mx - this.yDrag.mn) / 2 * f; this.setY({mn:c - h, mx:c + h}); return; }
       if (ruler?.live && ruler.pane === this) { e.preventDefault(); const pt = this.pointAt(e.touches[0]); if (pt) { ruler.b = pt; this.dirty = true; } } }, {passive:false});
     this.zs = K.attachZoom(cv, {
@@ -289,13 +295,49 @@ class Pane {
     }
     if (!rows.length) throw new Error('нет свечей');
     const d = M.parse(rows); d.qv = rows.map(x => +x[7]); d.tbq = rows.map(x => +x[10]); d.nt = rows.map(x => +x[8]);   // quote volume, taker-buy quote volume, number of trades
-    this.d = d; calc(d); this.dirty = true; return true;
+    this.d = d; this.kFin = false; calc(d); this.dirty = true; return true;
   }
   onKline(k) {   // live candle from the stream: update the forming bar or start a new one
     const d = this.d; if (!d) return;
+    if (this.kPend) { this.kPend.set(k.t, k); return; }   // missing candles are being fetched: these follow them
     const T = k.t, i = d.t.length - 1, v = [+k.o, +k.h, +k.l, +k.c, +k.v, +k.q, +k.Q, +k.n];
-    if (T === d.t[i]) { [d.o[i], d.h[i], d.l[i], d.c[i], d.v[i], d.qv[i], d.tbq[i], d.nt[i]] = v; }
-    else if (T > d.t[i]) { d.t.push(T); d.o.push(v[0]); d.h.push(v[1]); d.l.push(v[2]); d.c.push(v[3]); d.v.push(v[4]); d.qv.push(v[5]); d.tbq.push(v[6]); d.nt.push(v[7]); }
+    if (T === d.t[i]) { [d.o[i], d.h[i], d.l[i], d.c[i], d.v[i], d.qv[i], d.tbq[i], d.nt[i]] = v; this.kFin = k.x; }
+    else if (T > d.t[i]) {
+      // the last candle never got its final update, or candles are missing (a break, the tab away, a pause in the background):
+      // fetch them from the last known one, which is rewritten too
+      if ((!this.kFin || T > d.t[i] + TFMS[this.tf]) && !this.cuTimer) { this.kPend = new Map([[T, k]]); this.catchUp(d.t[i]); return; }
+      d.t.push(T); d.o.push(v[0]); d.h.push(v[1]); d.l.push(v[2]); d.c.push(v[3]); d.v.push(v[4]); d.qv.push(v[5]); d.tbq.push(v[6]); d.nt.push(v[7]); this.kFin = k.x;
+    }
+    calc(d); this.dirty = true;
+  }
+  // candles from `from` (a known open time) up to now over REST; they replace what the chart had from there on
+  async catchUp(from) {
+    const d = this.d, req = this.req, tf = TFMS[this.tf]; if (!d) return;
+    clearTimeout(this.cuTimer); this.cuTimer = null; this.kPend ||= new Map();
+    if ((Date.now() - from) / tf > MAXBARS) { this.kPend = null; return this.restart(); }   // away for days: load the chart afresh
+    let rows = [];
+    try {
+      for (let s = from; ;) {   // Binance gives at most 1000 candles per request: page forwards
+        const k = await rest(this, `/api/v3/klines?symbol=${this.sym}&interval=${this.tf}&startTime=${s}&limit=1000`);
+        if (req !== this.req || d !== this.d) return;
+        rows = rows.concat(k); if (k.length < 1000) break; s = k[k.length - 1][0] + tf;
+      }
+      this.cuFails = 0;
+    } catch {
+      if (req !== this.req || d !== this.d) return;
+      // no answer: the stream's candles go on as they come, and the same range is asked for again a bit later
+      this.cuFails = (this.cuFails || 0) + 1; rows = []; this.cuFrom = from;
+      this.cuTimer = setTimeout(() => this.catchUp(from), Math.min(60e3, 5000 * 2 ** (this.cuFails - 1)));
+    }
+    const cut = d.t.indexOf(from);
+    if (rows.length && rows[0][0] === from && cut >= 0) {
+      const keep = [...d.t.keys()].filter(j => d.t[j] > rows[rows.length - 1][0]);   // bars after the answer (none, normally)
+      const cols = ['t', 'o', 'h', 'l', 'c', 'v', 'qv', 'tbq', 'nt'], at = [0, 1, 2, 3, 4, 5, 7, 10, 8];   // the series and their Binance kline fields
+      cols.forEach((f, n) => { const tail = keep.map(j => d[f][j]); d[f].length = cut; for (const x of rows) d[f].push(+x[at[n]]); d[f].push(...tail); });
+      this.kFin = false;   // the last fetched candle is the forming one
+    }
+    const pend = this.kPend; this.kPend = null;
+    for (const T of [...pend.keys()].sort((a, b) => a - b)) this.onKline(pend.get(T));
     calc(d); this.dirty = true;
   }
 
@@ -320,7 +362,8 @@ class Pane {
   sampleHeat() {
     // the big-trade threshold (top N% of recent trades) is refreshed here once a second, not sorted on every trade
     if (this.tradeUsd.length >= 50) { const s = [...this.tradeUsd].sort((a, b) => a - b); this.thr = s[Math.floor(s.length * (1 - C('bubPct') / 100))]; }
-    if (!this.book?.ok || !this.d) return;
+    // a stopped or silent book stream leaves a frozen book: it must not go into the map as if it were live
+    if (!this.book?.ok || !this.d || this.ws?.readyState !== 1 || Date.now() - this.msgAt > QUIET_SHOW) return;
     this.heatMs += 1000;
     const bk = this.buckets(0.04, this.fine); if (!bk) return;
     const tf = TFMS[this.tf], bar = Math.floor(Date.now() / tf) * tf;
@@ -408,7 +451,9 @@ class Pane {
     // liquidations on /market, so they get a second connection (it follows the first one's life)
     const fut = this.mkt === 'fut', rest4 = [`${s}@aggTrade`, `${s}@kline_${this.tf}`, ...(fut ? [`${s}@forceOrder`, `${s}@markPrice@1s`] : [])];
     const ws = this.ws = new WebSocket(fut ? WSF_PUB + `${s}@depth@100ms` : WS + [`${s}@depth@100ms`, ...rest4].join('/'));
-    if (fut) { const w2 = this.ws2 = new WebSocket(WSF_MKT + rest4.join('/')); w2.onmessage = e => ws.onmessage(e); w2.onclose = () => { if (this.ws === ws && loopOn && !this.dead) ws.close(); }; }
+    // the watchdog (watch) counts the silence of each connection from here: the book's, and on futures the trades'
+    this.msgAt = this.msg2At = Date.now(); this.nMsg = 0; this.waitRe = false;
+    if (fut) { const w2 = this.ws2 = new WebSocket(WSF_MKT + rest4.join('/')); w2.onmessage = e => { this.msg2At = Date.now(); onMsg(e); }; w2.onclose = () => { if (this.ws === ws && loopOn && !this.dead) ws.close(); }; }
     this.book = null; let syncing = false;
     // Binance's procedure: buffer the diff stream, take a snapshot, then apply the buffered events newer than it.
     // One sync at a time per chart, snapshots spaced out across charts, growing pauses after failures —
@@ -430,8 +475,9 @@ class Pane {
         clearTimeout(this.syncTimer); this.syncTimer = setTimeout(resync, Math.min(60e3, 1500 * 2 ** this.fails));
       }
     };
-    ws.onmessage = e => {
-      this.wsFails = 0;
+    ws.onmessage = e => { this.msgAt = Date.now(); onMsg(e); };
+    const onMsg = e => {
+      this.wsFails = 0; if (++this.nMsg === 50) this.quietN = 0;   // a steady flow again: the next silence counts from the shortest wait
       const {stream, data} = JSON.parse(e.data);
       if (stream.endsWith('@aggTrade')) return this.onTrade(data);
       if (stream.endsWith('@forceOrder')) return this.onLiq(data.o);
@@ -443,7 +489,7 @@ class Pane {
     ws.onopen = resync; this.resyncNow = resync;
     ws.onclose = () => {   // reconnect while the tab is open, waiting longer after each failed attempt
       if (!loopOn || this.dead) return;
-      this.wsFails = (this.wsFails || 0) + 1;
+      this.wsFails = (this.wsFails || 0) + 1; this.waitRe = true;
       clearTimeout(this.wsTimer); this.wsTimer = setTimeout(() => this.connect(), Math.min(60e3, 3000 * 2 ** (this.wsFails - 1)));
     };
   }
@@ -452,9 +498,29 @@ class Pane {
     if (this.ws2) { this.ws2.onclose = null; this.ws2.close(); this.ws2 = null; }
     if (this.ws) { this.ws.onclose = null; this.ws.close(); this.ws = null; }
   }
-  live() { return this.ws?.readyState === 1 && this.book?.ok; }
+  // the longest silence of the open connections, ms (futures: the book's and the trades', whichever is quieter)
+  silence() { return Date.now() - Math.min(this.msgAt || 0, this.ws2 ? this.msg2At || 0 : Infinity); }
+  // what the streams are doing, for the status line and the note under the charts
+  state() {
+    if (!navigator.onLine) return 'offline';
+    if (this.ws?.readyState !== 1 || this.ws2 && this.ws2.readyState !== 1) return 'off';
+    if (this.silence() > QUIET_SHOW) return 'quiet';
+    return this.book?.ok ? 'live' : 'sync';
+  }
+  live() { return this.state() === 'live'; }
+  // the watchdog (once a second): a connection can stay open while nothing comes through it. After a silence, reconnect;
+  // a market that is really that quiet gets longer waits each time (10 → 20 → 40 → 80 s), so it isn't reconnected all the time
+  // slept: the page itself stood still (a hidden or frozen tab), so the messages that came meanwhile are still queued
+  // behind this timer — the silence counts afresh from now
+  watch(slept) {
+    if (!this.ws || this.waitRe || this.dead) return;   // not connected, or a reconnect is already on its way
+    if (slept) { this.msgAt = this.msg2At = Date.now(); return; }
+    if (this.silence() < QUIET_MS * 2 ** Math.min(this.quietN || 0, 3)) return;
+    this.quietN = (this.quietN || 0) + 1; this.connect();
+  }
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
+    clearTimeout(this.cuTimer); this.cuTimer = null; this.kPend = null; this.cuFails = 0;
     this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.fpLive = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
     if (ruler?.pane === this) ruler = null;
     const key = this.mkt + this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
@@ -622,14 +688,16 @@ class Pane {
   // history and the far book from our server, when it follows this coin
   async fromServer() {
     if (!(await srvHas(this.sym, this.mkt)) || !this.d) return;
-    const key = this.key(), tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}${this.sq()}&since=${this.d.t[0]}`);
+    // the server folds its minutes into this timeframe's bars and sends values in units of r.u dollars (an older server:
+    // minutes and dollars — folded here the same way)
+    const key = this.key(), tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}${this.sq()}&tf=${this.tf}&since=${this.d.t[0]}`);
     if (!r?.cols?.length || key !== this.key()) return;
-    this.fine = r.base; const heat = new Map();   // server bins become our fine bins, so live samples line up with the history
+    this.fine = r.base; const heat = new Map(), u = r.u || 1;   // server bins become our fine bins, so live samples line up with the history
     for (const [t, k0, v] of r.cols) {
       const bar = Math.floor(t / tf) * tf; let col = heat.get(bar); if (!col) heat.set(bar, col = new Map());
-      v.forEach((x, i) => { if (x > (col.get(k0 + i) || 0)) col.set(k0 + i, x); });
+      v.forEach((x, i) => { if (x && x * u > (col.get(k0 + i) || 0)) col.set(k0 + i, x * u); });
     }
-    this.heat = heat; this.heatMs = Math.max(this.heatMs, r.cols.length * 6e4); this.hc = null; this.srv = true; this.dirty = true;
+    this.heat = heat; this.heatMs = Math.max(this.heatMs, (r.mins ?? r.cols.length) * 6e4); this.hc = null; this.srv = true; this.dirty = true;
   }
   async farBook() {
     if (!this.srv || this.farBusy) return;   // a slow server must not stack a new request every 3 s
@@ -692,7 +760,7 @@ class Pane {
         this.drawNotes(g, G);
         if (ruler?.pane === this) this.drawRuler(g, G);
         if (labels && on('heat') && this.heatMs < 15 * 6e4) {   // the heatmap only has what was collected while the tab was open: say so
-          const m = Math.floor(this.heatMs / 6e4), t = this.book?.ok ? `карта копится · ${m} мин` : 'стакан загружается…';
+          const m = Math.floor(this.heatMs / 6e4), st = this.state(), t = st === 'live' ? `карта копится · ${m} мин` : STATE_SHORT[st];
           g.font = '11px system-ui'; g.textBaseline = 'middle'; g.fillStyle = PC.mute; g.fillText(t, Math.max(G.padL + 4, G.X(G.e) - G.bw - 8 - g.measureText(t).width), G.T0 + 8);
         }
       }});
@@ -975,7 +1043,7 @@ class Pane {
     // the column, left to right: book dynamics, the book, the imbalance strip (with dynamics on, the book starts after its strip)
     const PC = K.PC, xA = G.W - G.padR, aw = on('act') && on('dom') ? 24 : 0, x0 = xA + aw, cw = this.rc - aw, ph = G.pH - G.T0, m = this.mid();
     g.fillStyle = PC.grid; g.globalAlpha = 0.16; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;   // the book's lane
-    if (!this.book?.ok || !m) { g.save(); g.translate(x0 + cw / 2, G.T0 + ph / 2); g.rotate(-Math.PI / 2); g.font = '11px system-ui'; g.textAlign = 'center'; g.fillStyle = PC.mute; g.fillText('стакан загружается…', 0, 0); g.restore(); return; }
+    if (!this.book?.ok || !m) { const st = this.state(); g.save(); g.translate(x0 + cw / 2, G.T0 + ph / 2); g.rotate(-Math.PI / 2); g.font = '11px system-ui'; g.textAlign = 'center'; g.fillStyle = PC.mute; g.fillText(STATE_SHORT[st === 'live' ? 'sync' : st], 0, 0); g.restore(); return; }
     const im = on('imb') ? this.imbalance() : null, sw = im ? 4 : 0, right = x0 + cw - sw - (im ? 2 : 0), bw = right - x0;
     if (on('dom') && bw > 8) {
       const step = this.bookStep(G); this.lastBookStep = step;
@@ -1087,6 +1155,8 @@ class Pane {
   note(W) {
     const d = this.d, m = this.mid(); if (!d || !m) { $('#bNote').innerHTML = ''; return; }
     const parts = layout > 1 ? [`<b>${K.base(this.sym)} · ${TFL[this.tf]}</b>`] : [], i = d.c.length - 1, up = d.B.up[i], lo = d.B.lo[i];
+    // without a live stream the walls and the balance below would describe a frozen book: say what is going on instead
+    const st = this.state(); if (st !== 'live') { $('#bNote').innerHTML = [...parts, STATE_NOTE[st]].map(p => `<span>${p}</span>`).join(''); return; }
     const near = side => W.filter(w => w.side === side).sort((a, b) => Math.abs(a.price - m) - Math.abs(b.price - m))[0];
     const a = near('ask'), b = near('bid');
     if (a) parts.push(`стена продаж <b>${K.fp(a.price)}</b> (+${((a.price / m - 1) * 100).toFixed(2)}%, ${fmtUsd(a.usd)})${isFinite(up) && Math.abs(a.price - up) < (up - lo) * 0.1 ? ' — <b>у верхней границы канала</b>' : ''}`);
@@ -1478,17 +1548,38 @@ function wire() {
     if (k === 'y' || k === 'н') { e.preventDefault(); redo(); }
   });
   window.addEventListener('resize', redrawAll);
+  // the network is back: reconnect now instead of waiting out the pause between attempts (up to a minute)
+  window.addEventListener('online', () => {
+    if (!loopOn) return;
+    for (const p of panes) {
+      const st = p.state();
+      if (st === 'off' || st === 'quiet') { p.wsFails = 0; p.connect(); }
+      else if (st === 'sync') { clearTimeout(p.syncTimer); p.resyncNow?.(); }
+      if (p.cuTimer) p.catchUp(p.cuFrom);
+    }
+    setLive(); redrawAll();
+  });
+  window.addEventListener('offline', () => { if (loopOn) { setLive(); redrawAll(); } });
   wirePop();
 }
 function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.prevSym = p.sym; p.sym = sym; savePanes(); p.restart(); renderList(); }
 function setLive() {
   const p = act(); if (!p) return;
-  const ok = p.live(), mins = Math.floor(p.heatMs / 6e4), all = panes.filter(q => q.live()).length;
-  $('#bLive').innerHTML = `<span class="live${ok ? '' : ' stale'}"><i></i><span>${ok ? `стакан и сделки вживую${layout > 1 ? ` · ${all} из ${layout} графиков` : ''} · ${p.srv ? `сервер: полный стакан ${K.base(p.sym)}${p.mkt === 'fut' ? ' (фьючерсы)' : ''} и карта за ${durTxt(p.heatMs)}` : `карта ${K.base(p.sym)} копится ${mins ? mins + ' мин' : 'с этой минуты'}`}` : 'нет связи с Binance — переподключаюсь'}</span></span>`;
+  const st = p.state(), ok = st === 'live', mins = Math.floor(p.heatMs / 6e4), all = panes.filter(q => q.live()).length;
+  $('#bLive').innerHTML = `<span class="live${ok ? '' : ' stale'}"><i></i><span>${!ok ? STATE_LINE[st] : `стакан и сделки вживую${layout > 1 ? ` · ${all} из ${layout} графиков` : ''} · ${p.srv ? `сервер: полный стакан ${K.base(p.sym)}${p.mkt === 'fut' ? ' (фьючерсы)' : ''} и карта за ${durTxt(p.heatMs)}` : `карта ${K.base(p.sym)} копится ${mins ? mins + ' мин' : 'с этой минуты'}`}`}</span></span>`;
 }
+// one frame draws the chart under the mouse (or the active one), then the others while it has time left, the longest
+// waiting first; past that, one chart that has waited 3 frames. So four charts marked at once (the sampler does it every
+// second) spread over four short frames instead of one long one, and a frame never draws more than two of them over its time
 function loop() {
   if (!loopOn) return;
-  for (const p of panes) if (p.dirty) { p.dirty = false; p.draw(); }
+  const t0 = performance.now(), a = under && panes.includes(under) ? under : act(), draw = p => { p.dirty = false; p.waited = 0; p.draw(); };
+  if (a?.dirty) draw(a);
+  let late = false;
+  for (const p of panes.filter(q => q.dirty).sort((x, y) => (y.waited || 0) - (x.waited || 0))) {
+    if (performance.now() - t0 > 8) { if (late || (p.waited || 0) < 3) { p.waited = (p.waited || 0) + 1; continue; } late = true; }
+    draw(p);
+  }
   requestAnimationFrame(loop);
 }
 
@@ -1509,8 +1600,8 @@ export function open(kit) {
   }
   if (loopOn) return;
   loopOn = true; renderList();
-  let tick = 0;
-  sampler = setInterval(() => { tick++; panes.forEach(p => { p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); p.loadFp(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
+  let tick = 0, tickAt = Date.now();
+  sampler = setInterval(() => { tick++; const slept = Date.now() - tickAt > 3000; tickAt = Date.now(); panes.forEach(p => { p.watch(slept); if (!slept) p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); p.loadFp(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }

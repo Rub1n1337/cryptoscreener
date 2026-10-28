@@ -271,6 +271,48 @@ setInterval(() => { const now = Date.now(); for (const [ip, h] of HITS) if (now 
 // every open chart asks for the same far book every 3 s: answer from a 2-second cache instead of re-binning the whole book
 const CACHE = new Map(), CACHE_MS = {'/book':2000, '/symbols':10000, '/health':5000};
 setInterval(() => { const now = Date.now(); for (const [k, v] of CACHE) if (now - v.t > 30e3) CACHE.delete(k); }, 30e3);
+// heatmap history is the biggest answer we give (a day of BTC by the minute was ~4 MB of JSON, built anew for every chart
+// opened). With ?tf= the minutes are folded into that timeframe's bars (max per bin, as the Beta tab does) and values go in
+// units of `u` dollars, about three significant digits for a typical bin. One answer per coin, timeframe and starting bar,
+// built and gzipped once per new minute of history: all charts of one timeframe opened within that minute share it
+const TFMS = {'1m':6e4, '5m':3e5, '15m':9e5, '30m':18e5, '1h':36e5, '4h':144e5, '1d':864e5};
+const HEAT_CACHE = new Map();
+setInterval(() => { const now = Date.now(); for (const [k, v] of HEAT_CACHE) if (now - v.t > 120e3) HEAT_CACHE.delete(k); }, 60e3);
+function heatAnswer(c, q) {
+  const fold = q.has('tf'), tf = TFMS[q.get('tf')] || 6e4, first = c.heat[0]?.t || 0, last = c.heat[c.heat.length - 1]?.t || 0;
+  const since = Math.floor(Math.max(+q.get('since') || 0, first) / tf) * tf, key = `${c.id}|${fold ? tf : 'm'}|${since}`, ver = `${c.heat.length}|${last}`;
+  const hit = HEAT_CACHE.get(key); if (hit?.ver === ver) return hit;
+  const groups = [];   // the minutes of each bar
+  for (const h of c.heat) {
+    if (h.t < since) continue;
+    const bar = fold ? Math.floor(h.t / tf) * tf : h.t, g = groups[groups.length - 1];
+    if (g?.t === bar) g.list.push(h); else groups.push({t:bar, list:[h]});
+  }
+  const cols = groups.map(({t, list}) => {
+    if (list.length === 1) return {t, k0:list[0].k0, v:list[0].v};
+    let lo = Infinity, hi = -Infinity; for (const h of list) { lo = Math.min(lo, h.k0); hi = Math.max(hi, h.k0 + h.v.length - 1); }
+    const v = new Float32Array(hi - lo + 1);
+    for (const h of list) for (let i = 0, o = h.k0 - lo; i < h.v.length; i++) if (h.v[i] > v[o + i]) v[o + i] = h.v[i];
+    return {t, k0:lo, v};
+  });
+  // the unit: a power of ten about 1/100 of the median bin (from a sample); an older Beta tab (no ?tf) gets plain dollars
+  let u = 1;
+  if (fold) {
+    const smp = []; let n = 0;
+    for (const cl of cols) for (let i = 0; i < cl.v.length; i++) if (cl.v[i] > 0 && n++ % 37 === 0) smp.push(cl.v[i]);
+    smp.sort((a, b) => a - b); const med = smp[smp.length >> 1] || 0;
+    if (med >= 1000) u = 10 ** (Math.floor(Math.log10(med)) - 2);
+  }
+  const body = JSON.stringify({base:c.base, u, mins:groups.reduce((s, g) => s + g.list.length, 0), cols:cols.map(cl => [cl.t, cl.k0, Array.from(cl.v, x => Math.round(x / u))])});
+  const e = {t:Date.now(), ver, body, gz:new Promise((ok, no) => zlib.gzip(body, (err, z) => err ? no(err) : ok(z)))};
+  e.gz.catch(() => {}); HEAT_CACHE.set(key, e); return e;
+}
+function sendAnswer(req, res, e) {   // a cached answer, gzipped already when the caller takes gzip
+  const head = {'content-type':'application/json; charset=utf-8', 'access-control-allow-origin':'*', 'cache-control':'no-store'};
+  const plain = () => { res.writeHead(200, head); res.end(e.body); };
+  if (!/gzip/.test(req.headers['accept-encoding'] || '')) return plain();
+  e.gz.then(z => { res.writeHead(200, {...head, 'content-encoding':'gzip'}); res.end(z); }, plain);
+}
 const routes = {
   '/health': () => ({ok:true, uptime:Math.round(process.uptime()), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, mkt:c.mkt, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length, liqMin:c.liq.length}))}),
   '/symbols': () => { const of = m => [...coins.values()].filter(c => c.mkt === m).map(c => c.sym); return {symbols:of('spot'), futures:of('fut')}; },
@@ -281,8 +323,9 @@ const routes = {
     let minB = Infinity, maxA = 0; for (const p of c.book.bids.keys()) if (p < minB) minB = p; for (const p of c.book.asks.keys()) if (p > maxA) maxA = p;
     return {t:Date.now(), base:c.base, mid, minB, maxA, bids:bins('bids'), asks:bins('asks')};
   },
-  // heatmap history since ?since=ms: [[t, k0, [$…]], …] per minute
-  '/heat': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, cols:c.heat.filter(h => h.t >= since).map(h => [h.t, h.k0, Array.from(h.v, round)])}; },
+  // heatmap history since ?since=ms: {base, u, mins, cols:[[t, k0, [value / u …]], …]} per bar of ?tf= (per minute without it);
+  // answered from HEAT_CACHE by the server below
+  '/heat': (q, c) => heatAnswer(c, q),
   // clusters since ?since=ms: [[t, k0, [buy $…], [sell $…]], …] per minute
   // liquidations since ?since=ms: [[t, k0, [shorts $…], [longs $…]], …] per minute
   '/liq': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, bars:c.liq.filter(b => b.t >= since).map(b => [b.t, b.k0, Array.from(b.buy, round), Array.from(b.sell, round)])}; },
@@ -320,6 +363,7 @@ http.createServer((req, res) => {
   const needCoin = !['/health', '/symbols'].includes(u.pathname), c = coins.get(cid(sym, fut ? 'fut' : 'spot'));
   if (needCoin && !c) return send(req, res, 404, {error:'symbol not followed', ...routes['/symbols']()});
   try {
+    if (u.pathname === '/heat') return sendAnswer(req, res, fn(u.searchParams, c));
     const body = JSON.stringify(fn(u.searchParams, c));
     if (ck) CACHE.set(ck, {t:Date.now(), body});
     send(req, res, 200, body);
