@@ -1,6 +1,15 @@
-// Older «Что нового» entries (2.41 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.42 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.42', date:'21 октября 2026', title:'Быстродействие и мобильная версия', items:[
+    'Графики работают плавнее при наведении, прокрутке и масштабировании.',
+    'На iPhone страница не масштабируется при вводе; кнопки увеличены для касания.',
+    'Страница отображается сразу, не дожидаясь загрузки шрифта.',
+    'Повышена контрастность второстепенного текста.',
+    'Ошибка обновления данных бота отображается отдельно от его состояния.',
+    'Бэктест показывает ход расчёта и выводит последние 300 сделок с возможностью показать все.',
+    'Улучшена работа с клавиатуры.',
+  ]},
   {v:'2.41', date:'21 октября 2026', title:'Сигналы «Рынок» в Telegram', items:[
     'Исправлен пропуск подтверждённых разворотов в фильтре «Рынок».',
     'Сигналы в Telegram приходят и при закрытом сайте.',
