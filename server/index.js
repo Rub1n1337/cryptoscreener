@@ -329,20 +329,43 @@ const countOut = (req, res) => {
   const end = res.end, k = req.url.split('?')[0];
   res.end = function (chunk, ...a) { if (chunk?.length) { const r = k === '/scan' || routes[k] ? k : 'other'; OUT[r] = (OUT[r] || 0) + chunk.length; } return end.call(this, chunk, ...a); };
 };
-// loop = share of the time the main thread was busy; msMin = ms per minute spent on each part (see RES); outKbMin = egress per route
-let cpuPrev = process.cpuUsage(), cpuAt = Date.now(), elu = performance.eventLoopUtilization(), usage = {cpu:0, msgPerS:0, kbPerS:0};
+// what Railway itself counts: the container's network card (egress is billed there, TCP acknowledgements of the incoming
+// streams included) and the cgroup's memory (the page cache of the volume files may count too). Linux only, else null
+function readNet() {
+  try {
+    const n = {rx:0, rxp:0, tx:0, txp:0};
+    for (const l of fs.readFileSync('/proc/net/dev', 'utf8').split('\n').slice(2)) {
+      const [name, rest] = l.split(':'); if (!rest || name.trim() === 'lo') continue;
+      const f = rest.trim().split(/\s+/).map(Number); n.rx += f[0]; n.rxp += f[1]; n.tx += f[8]; n.txp += f[9];
+    }
+    return n;
+  } catch { return null; }
+}
+function cgroupMem() {
+  for (const [cur, stat] of [['/sys/fs/cgroup/memory.current', '/sys/fs/cgroup/memory.stat'], ['/sys/fs/cgroup/memory/memory.usage_in_bytes', '/sys/fs/cgroup/memory/memory.stat']]) {
+    try {
+      const st = Object.fromEntries(fs.readFileSync(stat, 'utf8').trim().split('\n').map(l => l.split(' ')).map(([k, v]) => [k, +v]));
+      return {mb:mb(+fs.readFileSync(cur, 'utf8')), anonMb:mb(st.anon ?? st.total_rss ?? 0), fileMb:mb(st.file ?? st.total_cache ?? 0)};
+    } catch {}
+  }
+  return null;
+}
+// loop = share of the time the main thread was busy; msMin = ms per minute spent on each part (see RES); outKbMin = egress per route;
+// net = the network card per minute: KB and packets sent (tx) and received (rx)
+let cpuPrev = process.cpuUsage(), cpuAt = Date.now(), elu = performance.eventLoopUtilization(), netPrev = readNet(), usage = {cpu:0, msgPerS:0, kbPerS:0};
 setInterval(() => {
-  const d = process.cpuUsage(cpuPrev), s = (Date.now() - cpuAt) / 1000, perMin = x => Math.round(x / s * 60);
+  const d = process.cpuUsage(cpuPrev), s = (Date.now() - cpuAt) / 1000, perMin = x => Math.round(x / s * 60), net = readNet();
   usage = {cpu:+((d.user + d.system) / 1e6 / s).toFixed(3), loop:+performance.eventLoopUtilization(elu).utilization.toFixed(3),
     msgPerS:Math.round(RES.msgs / s), kbPerS:Math.round(RES.bytes / s / 1024),
     msMin:{msgs:perMin(RES.msgMs), heat:perMin(RES.heatMs), prune:perMin(RES.pruneMs), gc:perMin(RES.gcMs)},
-    outKbMin:Object.fromEntries(Object.entries(OUT).map(([k, v]) => [k, perMin(v / 1024)]))};
-  cpuPrev = process.cpuUsage(); cpuAt = Date.now(); elu = performance.eventLoopUtilization();
+    outKbMin:Object.fromEntries(Object.entries(OUT).map(([k, v]) => [k, perMin(v / 1024)])),
+    net:net && netPrev ? {txKbMin:perMin((net.tx - netPrev.tx) / 1024), txPktMin:perMin(net.txp - netPrev.txp), rxKbMin:perMin((net.rx - netPrev.rx) / 1024), rxPktMin:perMin(net.rxp - netPrev.rxp)} : null};
+  cpuPrev = process.cpuUsage(); cpuAt = Date.now(); elu = performance.eventLoopUtilization(); netPrev = net;
   for (const k in RES) RES[k] = 0;
   for (const k in OUT) delete OUT[k];
 }, 60e3);
 const mb = x => Math.round(x / 1048576);
-const resources = () => { const m = process.memoryUsage(); return {...usage, rssMb:mb(m.rss), heapMb:mb(m.heapUsed), heapTotalMb:mb(m.heapTotal), buffersMb:mb(m.arrayBuffers), scan:scanStats()}; };
+const resources = () => { const m = process.memoryUsage(); return {...usage, rssMb:mb(m.rss), heapMb:mb(m.heapUsed), heapTotalMb:mb(m.heapTotal), buffersMb:mb(m.arrayBuffers), cgroup:cgroupMem(), scan:scanStats()}; };
 const routes = {
   '/health': () => ({ok:true, uptime:Math.round(process.uptime()), res:resources(), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, mkt:c.mkt, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length, liqMin:c.liq.length}))}),
   '/symbols': () => { const of = m => [...coins.values()].filter(c => c.mkt === m).map(c => c.sym); return {symbols:of('spot'), futures:of('fut')}; },
