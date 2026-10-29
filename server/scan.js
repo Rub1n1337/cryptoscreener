@@ -38,6 +38,7 @@ async function api(path) {
   for (const b of BASES) {
     if (Date.now() < (PAUSE[b] || 0)) { err = new Error('paused ' + b); continue; }
     try {
+      ST.fetches++;
       const r = await fetch(b + path, {signal:AbortSignal.timeout(8e3)});
       if (r.ok) return await r.json();
       if (r.status === 429 || r.status === 418) PAUSE[b] = Date.now() + Math.min(600, Math.max(30, +r.headers.get('retry-after') || 60)) * 1e3;
@@ -105,13 +106,19 @@ export async function scan(body) {
       if (!s?.K.length) { out[sym] = null; continue; }
       // the same candles and settings within a minute give the same answer (volume is projected by `now`): reuse it
       if (s.anMin !== minute) { s.an = new Map(); s.anMin = minute; }
-      if (!s.an.has(ck)) s.an.set(ck, m.analyze(sym, s.K, {...S, N:t.tf === '1d' ? Math.max(20, Math.min(S.N, s.K.length - 20)) : S.N}, now, true));
+      if (!s.an.has(ck)) { s.an.set(ck, m.analyze(sym, s.K, {...S, N:t.tf === '1d' ? Math.max(20, Math.min(S.N, s.K.length - 20)) : S.N}, now, true)); ST.analyses++; }
+      else ST.reused++;
       out[sym] = s.an.get(ck);
     }
     return out;
   });
+  ST.calls++; ST.calcMs += Date.now() - t1;
   return {fp:FP, rows, refreshed:todo.length, series:SER.size, ms:{fetch:t1 - t0, calc:Date.now() - t1}};
 }
-export const scanSeries = () => SER.size;   // candle series kept for the bot, for /health
+// for /health: candle series kept, and per minute — /scan calls, analyses computed and reused, the analysis time and Binance requests
+const ST = {calls:0, analyses:0, reused:0, calcMs:0, fetches:0};
+let stLast = {...ST}, stAt = Date.now();
+setInterval(() => { const s = (Date.now() - stAt) / 60e3; stLast = Object.fromEntries(Object.entries(ST).map(([k, v]) => [k, Math.round(v / s)])); for (const k in ST) ST[k] = 0; stAt = Date.now(); }, 60e3);
+export const scanStats = () => ({series:SER.size, perMin:stLast});
 // non-finite numbers (T½ = ∞) don't survive JSON: they travel as "__Infinity" / "__NaN" and the bot turns them back
 export const encode = obj => JSON.stringify(obj, (k, v) => typeof v === 'number' && !Number.isFinite(v) ? '__' + v : v);

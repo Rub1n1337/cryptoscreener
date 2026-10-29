@@ -11,7 +11,7 @@ import zlib from 'node:zlib';
 import WebSocket from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scan, encode, scanSeries } from './scan.js';
+import { scan, encode, scanStats } from './scan.js';
 
 const PORT = +process.env.PORT || 8080;
 const TOP = +process.env.TOP || 20;                       // how many of the most traded USDT pairs to follow
@@ -326,7 +326,7 @@ setInterval(() => {
   cpuPrev = process.cpuUsage(); cpuAt = Date.now(); RES.msgs = RES.bytes = 0;
 }, 60e3);
 const mb = x => Math.round(x / 1048576);
-const resources = () => { const m = process.memoryUsage(); return {...usage, rssMb:mb(m.rss), heapMb:mb(m.heapUsed), heapTotalMb:mb(m.heapTotal), buffersMb:mb(m.arrayBuffers), series:scanSeries()}; };
+const resources = () => { const m = process.memoryUsage(); return {...usage, rssMb:mb(m.rss), heapMb:mb(m.heapUsed), heapTotalMb:mb(m.heapTotal), buffersMb:mb(m.arrayBuffers), scan:scanStats()}; };
 const routes = {
   '/health': () => ({ok:true, uptime:Math.round(process.uptime()), res:resources(), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, mkt:c.mkt, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length, liqMin:c.liq.length}))}),
   '/symbols': () => { const of = m => [...coins.values()].filter(c => c.mkt === m).map(c => c.sym); return {symbols:of('spot'), futures:of('fut')}; },
