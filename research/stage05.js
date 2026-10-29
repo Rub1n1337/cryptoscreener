@@ -14,7 +14,7 @@ import * as M from '../supabase/functions/_shared/math.js';
 
 const API = 'https://data-api.binance.vision/api/v3', DAY = 864e5;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function get(path) {
+export async function get(path) {
   for (let a = 0; a < 5; a++) {
     try {
       const r = await fetch(API + path, { signal: AbortSignal.timeout(20000) });
@@ -27,7 +27,7 @@ async function get(path) {
   throw new Error('fetch failed ' + path);
 }
 // rows [openTime, o, h, l, c, volume, quoteVolume]
-async function klines(sym, tf, start, end) {
+export async function klines(sym, tf, start, end) {
   const out = [];
   for (let t = start; t < end;) {
     const K = await get(`/klines?symbol=${sym}&interval=${tf}&startTime=${t}&endTime=${end - 1}&limit=1000`);
@@ -38,37 +38,43 @@ async function klines(sym, tf, start, end) {
   }
   return out;
 }
-async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) await fn(items[i++]); })); }
+export async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) await fn(items[i++]); })); }
 
 export const S = { phase: 'idle', done: 0, total: 0, note: '', err: null, t0: 0 };
 export const out = {};   // tf -> {set, years, events}
 let QV = null;   // daily turnover of every pair (sym -> Map(day -> quote volume)), kept between runs
+
+// three years back from today's midnight (UTC), oldest first
+export const yearsBack = (end = Math.floor(Date.now() / DAY) * DAY) => [0, 1, 2].map(y => [end - (3 - y) * 365 * DAY, end - (2 - y) * 365 * DAY]);
+// daily turnover of every pair over the three years, delisted ones included (the ticker still lists them):
+// the pool of each year is what was ever in its daily top-75, plus the majors
+export async function pools(years) {
+  if (!QV) {
+    const tk = await get('/ticker/24hr');
+    const syms = tk.map(x => x.symbol).filter(s => s.endsWith('USDT') && !M.STABLE.has(s.slice(0, -4)));
+    S.phase = 'daily'; S.total = syms.length; S.done = 0;
+    const qv = {};
+    await pool(syms, 6, async s => { try { const K = await klines(s, '1d', years[0][0] - 2 * DAY, years[2][1]); if (K.length) qv[s] = new Map(K.map(k => [k[0], k[6]])); } catch {} S.done++; });
+    QV = qv;
+  }
+  return years.map(([y0, y1]) => {
+    const inPool = new Set();
+    for (let d = y0; d < y1; d += DAY) {
+      const day = Object.keys(QV).map(s => [s, QV[s].get(d) || 0]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 75);
+      for (const [s] of day) inPool.add(s);
+    }
+    for (const s of M.MAJORS) inPool.add(s);
+    return [...inPool];
+  });
+}
 
 export async function start(opt = {}) {
   const tf = opt.tf ?? '1h', set = { method: 'log', N: 210, k: opt.k ?? 3.5, tf, minScore: 0 };
   Object.assign(S, { phase: 'ticker', done: 0, total: 0, note: '', err: null, t0: Date.now() });
   const run = out[tf] = { set, years: [], events: [] };
   try {
-    const end = Math.floor(Date.now() / DAY) * DAY, years = [0, 1, 2].map(y => [end - (3 - y) * 365 * DAY, end - (2 - y) * 365 * DAY]);
-    // daily turnover of every pair over the three years, delisted ones included (the ticker still lists them):
-    // the pool of each year is what was ever in its daily top-75
-    if (!QV) {
-      const tk = await get('/ticker/24hr');
-      const syms = tk.map(x => x.symbol).filter(s => s.endsWith('USDT') && !M.STABLE.has(s.slice(0, -4)));
-      S.phase = 'daily'; S.total = syms.length; S.done = 0;
-      const qv = {};
-      await pool(syms, 6, async s => { try { const K = await klines(s, '1d', years[0][0] - 2 * DAY, end); if (K.length) qv[s] = new Map(K.map(k => [k[0], k[6]])); } catch {} S.done++; });
-      QV = qv;
-    }
-    for (const [y0, y1] of years) {
-      const inPool = new Set();
-      for (let d = y0; d < y1; d += DAY) {
-        const day = Object.keys(QV).map(s => [s, QV[s].get(d) || 0]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 75);
-        for (const [s] of day) inPool.add(s);
-      }
-      for (const s of M.MAJORS) inPool.add(s);
-      await yearEvents([...inPool], y0, y1, set, run);
-    }
+    const years = yearsBack(), pl = await pools(years);
+    for (const [n, [y0, y1]] of years.entries()) await yearEvents(pl[n], y0, y1, set, run);
     S.phase = 'done';
   } catch (e) { S.err = String(e.message || e); S.phase = 'error'; }
 }
