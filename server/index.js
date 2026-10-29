@@ -323,15 +323,23 @@ function sendAnswer(req, res, e) {   // a cached answer, gzipped already when th
   e.gz.then(z => { res.writeHead(200, {...head, 'content-encoding':'gzip'}); res.end(z); }, plain);
 }
 // what the service costs: Railway bills memory and CPU by the minute. cpu = share of one vCPU over the last minute
-// loop = share of the time the main thread was busy; msMin = ms per minute spent on each part (see RES)
+// egress — Railway bills what the service sends: bytes of answer bodies per route (counted at res.end)
+const OUT = {};
+const countOut = (req, res) => {
+  const end = res.end, k = req.url.split('?')[0];
+  res.end = function (chunk, ...a) { if (chunk?.length) { const r = k === '/scan' || routes[k] ? k : 'other'; OUT[r] = (OUT[r] || 0) + chunk.length; } return end.call(this, chunk, ...a); };
+};
+// loop = share of the time the main thread was busy; msMin = ms per minute spent on each part (see RES); outKbMin = egress per route
 let cpuPrev = process.cpuUsage(), cpuAt = Date.now(), elu = performance.eventLoopUtilization(), usage = {cpu:0, msgPerS:0, kbPerS:0};
 setInterval(() => {
   const d = process.cpuUsage(cpuPrev), s = (Date.now() - cpuAt) / 1000, perMin = x => Math.round(x / s * 60);
   usage = {cpu:+((d.user + d.system) / 1e6 / s).toFixed(3), loop:+performance.eventLoopUtilization(elu).utilization.toFixed(3),
     msgPerS:Math.round(RES.msgs / s), kbPerS:Math.round(RES.bytes / s / 1024),
-    msMin:{msgs:perMin(RES.msgMs), heat:perMin(RES.heatMs), prune:perMin(RES.pruneMs), gc:perMin(RES.gcMs)}};
+    msMin:{msgs:perMin(RES.msgMs), heat:perMin(RES.heatMs), prune:perMin(RES.pruneMs), gc:perMin(RES.gcMs)},
+    outKbMin:Object.fromEntries(Object.entries(OUT).map(([k, v]) => [k, perMin(v / 1024)]))};
   cpuPrev = process.cpuUsage(); cpuAt = Date.now(); elu = performance.eventLoopUtilization();
   for (const k in RES) RES[k] = 0;
+  for (const k in OUT) delete OUT[k];
 }, 60e3);
 const mb = x => Math.round(x / 1048576);
 const resources = () => { const m = process.memoryUsage(); return {...usage, rssMb:mb(m.rss), heapMb:mb(m.heapUsed), heapTotalMb:mb(m.heapTotal), buffersMb:mb(m.arrayBuffers), scan:scanStats()}; };
@@ -354,6 +362,7 @@ const routes = {
   '/fp': (q, c) => { const since = +q.get('since') || 0; return {base:c.base, bars:c.fp.filter(b => b.t >= since).map(b => [b.t, b.k0, Array.from(b.buy, round), Array.from(b.sell, round)])}; },
 };
 http.createServer((req, res) => {
+  countOut(req, res);
   if (req.method === 'OPTIONS') { res.writeHead(204, {'access-control-allow-origin':'*', 'access-control-allow-methods':'GET, POST', 'access-control-allow-headers':'content-type'}); return res.end(); }
   // the Supabase bot's candles and analyses (scan.js): a JSON body, answered gzipped
   if (req.method === 'POST' && req.url === '/scan') {
