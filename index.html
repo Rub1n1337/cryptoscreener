@@ -24,6 +24,9 @@
   --acc:#f5b70a;--accbg:rgba(245,183,10,.12);--up:#f0525f;--lo:#22c55e;--blue:#5b8cff;--violet:#a78bfa;--mid:#64748b;
   --panel:var(--s1);--panel2:var(--s2);
   --r:12px;--r-s:8px;--h:34px;
+  /* motion (DESIGN-RULES §13): one curve — quick start, soft stop; three durations: small things, menus / sheets / pages,
+     large blocks. Highlights (a new signal, a price change) hold longer and fade along the same curve */
+  --ease:cubic-bezier(.2,.8,.2,1);--dur-1:160ms;--dur-2:240ms;--dur-3:500ms;
   --shadow:0 10px 30px rgba(0,0,0,.35);
   --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#16a34a;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags, server cells, focus ring */
   --topbg:rgba(10,13,20,.82);--navbg:rgba(10,13,20,.96);--backdrop:rgba(3,6,12,.7);--ring:rgba(255,255,255,.05);
@@ -104,7 +107,7 @@ body.wide #market .grid{grid-template-columns:minmax(0,1fr)}body.wide #cv{height
 /* ---------- controls ---------- */
 button,select,input{font:inherit;color:var(--text)}
 button,select,input:not([type=checkbox]):not([type=range]){height:var(--h);background:var(--s2);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 12px}
-button{cursor:pointer;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:background .15s,border-color .15s,color .15s}
+button{cursor:pointer;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
 button:hover{background:var(--s3);border-color:var(--hover)}
 button:disabled{opacity:.5;cursor:wait}
 button.primary{background:var(--acc);border-color:var(--acc);color:#1a1300;font-weight:650}
@@ -152,7 +155,7 @@ canvas{width:100%;display:block;background:var(--canvas);border-radius:10px;bord
 #cv{height:clamp(440px,60vh,700px);cursor:crosshair}
 .cvwrap{position:relative}canvas:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 /* chart toolbar: zoom, back to the latest candle, reset, wide mode */
-.ctools{position:absolute;top:8px;left:8px;display:flex;gap:4px;z-index:2;opacity:.85;transition:opacity .15s}.cvwrap:hover .ctools,.ctools:focus-within{opacity:1}
+.ctools{position:absolute;top:8px;left:8px;display:flex;gap:4px;z-index:2;opacity:.85;transition:opacity var(--dur-1) var(--ease)}.cvwrap:hover .ctools,.ctools:focus-within{opacity:1}
 .ctools button{width:34px;height:30px;padding:0;font-size:15px;line-height:1;background:var(--s1);border-color:var(--line2);color:var(--mute)}.ctools button:hover{color:var(--text)}
 @media(max-width:1200px){.ctools [data-z=expand]{display:none}}
 .ctools button.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}.ctools .ct-txt{width:auto;padding:0 9px;font-size:12.5px;font-weight:600}
@@ -177,7 +180,7 @@ th{position:sticky;top:0;z-index:3;background:var(--s1);color:var(--mute);font-s
 th:hover{color:var(--text)}th.sorted{color:var(--acc)}th[data-dir=desc]::after{content:" ↓"}th[data-dir=asc]::after{content:" ↑"}
 td{padding:9px 8px;border-bottom:1px solid var(--row-line);white-space:nowrap}
 tr:last-child td{border-bottom:0}
-tr.row{cursor:pointer;transition:background .1s}tr.row:hover{background:var(--s2)}
+tr.row{cursor:pointer;transition:background var(--dur-1) var(--ease)}tr.row:hover{background:var(--s2)}
 tr.row:focus{outline:none}tr.row:focus-visible{background:var(--s2)}tr.row:focus-visible>td:first-child{box-shadow:inset 3px 0 0 var(--focus)}   /* the row the arrows are on: an outline on a tr is cut or missing */
 tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .coin{display:inline-flex;align-items:center;gap:8px}
@@ -197,7 +200,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--acc);background:var(--accbg);color:var(--text);font-size:12.5px;cursor:pointer}
 .chip span{color:var(--mute);font-size:14px;line-height:1}.chip:hover span{color:var(--text)}.chip.clear{border-color:var(--line2);color:var(--mute)}
 @media (pointer:coarse){.chip{height:36px}}
-.whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity .2s;z-index:3;white-space:nowrap}.whint.show{opacity:1}
+.whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity var(--dur-2) var(--ease);z-index:3;white-space:nowrap}.whint.show{opacity:1}
 .botnow{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--s1);cursor:pointer;font-size:13.5px}.botnow:hover{border-color:var(--line2)}.botnow:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12.5px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
 @media(max-width:560px){.botnow{display:block}.bn-dot{display:inline-block;margin-right:8px;vertical-align:1px}.bn-main{display:inline}.bn-last,.bn-go{display:block;margin-top:6px}}
@@ -236,10 +239,10 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .taptip{position:fixed;z-index:95;max-width:320px;background:var(--s2);color:var(--text);border:1px solid var(--line2);border-radius:10px;padding:8px 11px;font-size:13px;line-height:1.45;box-shadow:var(--shadow);pointer-events:none}
 .taptip[hidden]{display:none}
 #toasts{position:fixed;right:16px;bottom:16px;z-index:70;display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100vw - 32px))}
-.toast{display:flex;gap:10px;align-items:flex-start;background:var(--s2);border:1px solid var(--line2);border-left:3px solid var(--blue);border-radius:10px;padding:11px 14px;box-shadow:var(--shadow);font-size:13px;animation:tin .25s ease-out;cursor:pointer}
+.toast{display:flex;gap:10px;align-items:flex-start;background:var(--s2);border:1px solid var(--line2);border-left:3px solid var(--blue);border-radius:10px;padding:11px 14px;box-shadow:var(--shadow);font-size:13px;animation:tin var(--dur-2) var(--ease);cursor:pointer}
 .toast.ok{border-left-color:var(--lo)}.toast.bad{border-left-color:var(--up)}.toast.warn{border-left-color:var(--acc)}
 .toast b{display:block;margin-bottom:2px}.toast .mute{font-size:12px}
-.toast.out{animation:tout .2s ease-in forwards}
+.toast.out{animation:tout var(--dur-2) var(--ease) forwards}
 @keyframes tin{from{transform:translateY(10px);opacity:0}}@keyframes tout{to{transform:translateX(20px);opacity:0}}
 
 /* ---------- guard popover ---------- */
@@ -295,7 +298,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .bsym{flex:0 1 160px}.bsym input{width:100%}
 .ind-btn{gap:8px;font-weight:600}.ind-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:11.5px;font-weight:700}
-#btOut{transition:opacity .2s}#btOut.stale{opacity:.45}
+#btOut{transition:opacity var(--dur-2) var(--ease)}#btOut.stale{opacity:.45}
 .bchart{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .bpanes{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);min-width:0}.bpanes[data-lay="2"],.bpanes[data-lay="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
 .bpane{position:relative;min-width:0;border-radius:10px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .15s}
@@ -404,24 +407,34 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 @keyframes fadein{from{opacity:0}}
 @keyframes sheetin{from{transform:translateY(24px);opacity:0}}
 @keyframes rowflash{0%,30%{background:var(--accbg)}100%{background:transparent}}
-section:not(.hidden){animation:pagein .22s ease-out}
-.modal:not(.hidden),.cmdk:not(.hidden){animation:fadein .16s ease-out}
-.modal:not(.hidden) .mbox,.cmdk:not(.hidden) .cmdbox,.cmdk:not(.hidden) .dlgbox{animation:popin .18s ease-out}
-.evp.open,.guard.open{animation:popin .16s ease-out}
-details.dis[open]>.dbody{animation:pagein .2s ease-out}
-.card,.prof,.btn,button{transition:background .15s,border-color .15s,color .15s,transform .15s,box-shadow .15s}
+section:not(.hidden){animation:pagein var(--dur-2) var(--ease)}
+.modal:not(.hidden),.cmdk:not(.hidden){animation:fadein var(--dur-1) var(--ease)}
+.modal:not(.hidden) .mbox,.cmdk:not(.hidden) .cmdbox,.cmdk:not(.hidden) .dlgbox{animation:popin var(--dur-2) var(--ease)}
+.evp.open,.guard.open{animation:popin var(--dur-2) var(--ease)}
+details.dis[open]>.dbody{animation:pagein var(--dur-2) var(--ease)}
+.card,.prof,.btn,button{transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
 @media (hover:hover){.card[data-cf]:hover{transform:translateY(-2px)}.prof.pick:hover{transform:translateY(-1px)}}
-tr.row.newsig td{animation:rowflash 2.4s ease-out}
-@media(max-width:700px){body.sheet #cpanel{animation:sheetin .22s ease-out}}
+tr.row.newsig td{animation:rowflash 2.4s var(--ease)}
+/* a price that moved since the last update glows green / red for a moment (the arrow-less colour is a hint only: the number itself changed) */
+@keyframes tickup{0%,35%{color:var(--lo-t);background:var(--c-lo2)}}
+@keyframes tickdn{0%,35%{color:var(--up-t);background:var(--c-hi)}}
+.tick-up{animation:tickup 1s var(--ease)}.tick-dn{animation:tickdn 1s var(--ease)}
+/* shown for the first time (data-first, see firstShow): the balance line draws itself from the left, the ER bars fill up */
+@keyframes eqdraw{from{clip-path:inset(0 100% 0 0)}}
+@keyframes erfill{from{transform:scaleX(0)}}
+.hchart[data-first] svg{animation:eqdraw var(--dur-3) var(--ease)}
+.hchart[data-first] .hend{animation:fadein var(--dur-2) var(--ease) var(--dur-3) backwards}
+[data-first] .er-bar i{transform-origin:left;animation:erfill var(--dur-3) var(--ease)}
+@media(max-width:700px){body.sheet #cpanel{animation:sheetin var(--dur-2) var(--ease)}}
 /* theme switch: the new theme spreads as a circle from the button (View Transitions; browsers without it just swap) */
 ::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
-::view-transition-new(root){animation:themereveal .45s cubic-bezier(.4,0,.2,1)}
+::view-transition-new(root){animation:themereveal var(--dur-3) var(--ease)}
 @keyframes themereveal{from{clip-path:circle(0 at var(--vt-x,100%) var(--vt-y,0))}to{clip-path:circle(160vmax at var(--vt-x,100%) var(--vt-y,0))}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after,::view-transition-new(root){animation:none!important;transition:none!important}html{scroll-behavior:auto}}
 /* "what's new" tab: a dot until the latest version has been seen */
 #ver.fresh{color:var(--acc);font-weight:700}#ver.fresh::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);margin-left:4px;vertical-align:2px}
 /* summary cards double as filter shortcuts */
-.card[data-cf]{cursor:pointer;transition:border-color .15s}.card[data-cf]:hover{border-color:var(--hover)}.card[data-cf].on{border-color:var(--acc)}
+.card[data-cf]{cursor:pointer;transition:border-color var(--dur-1) var(--ease)}.card[data-cf]:hover{border-color:var(--hover)}.card[data-cf].on{border-color:var(--acc)}
 .sheetbar{display:none}
 /* ---------- phone: the market is a list first; a coin's chart opens full screen ---------- */
 @media(max-width:700px){
@@ -578,7 +591,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .cmdf{display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
 .cmdbtn{gap:8px;color:var(--mute)}.cmdbtn kbd{margin-left:4px}
 @media(max-width:700px){.cmdk{padding:10px}.cmdbox{max-height:80vh}.cmdf{display:none}}
-.flash{animation:flash 1.6s ease-out}
+.flash{animation:flash 1.6s var(--ease)}
 @keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 3px transparent}}
 /* my bot: status, profile picker, extra options */
 .bhero{display:flex;gap:14px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--s2)}
@@ -670,7 +683,7 @@ details.dis{background:var(--s1);border:1px solid var(--line);border-radius:var(
 details.dis>summary{list-style:none;cursor:pointer;padding:14px 44px 14px 16px;display:block;position:relative;font-weight:600;line-height:1.45}
 details.dis>summary::-webkit-details-marker{display:none}
 details.dis>summary .sdot{margin-right:8px;vertical-align:1px}
-details.dis>summary::after{content:"";position:absolute;right:18px;top:19px;width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform .2s}
+details.dis>summary::after{content:"";position:absolute;right:18px;top:19px;width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform var(--dur-2) var(--ease)}
 details.dis[open]>summary::after{transform:rotate(-135deg)}
 details.dis>summary .mute{font-weight:400;font-size:13px}
 details.dis>.dbody{padding:0 16px 16px}
@@ -1325,7 +1338,12 @@ const { TFMS, clamp, median, bands, rsi, halfLife, parse } = M;
 
 // ---------- utils ----------
 const $ = s => document.querySelector(s);
-const DEF = {method:'log', N:210, k:3, tf:'4h', candles:540, top:150, minScore:60, v:4};   // 4h — the same timeframe the shared bot trades, so the market shows what it acts on
+// a block's entrance animation plays once: firstShow(key) marks it with data-first until the animation has ended (it only runs
+// while the block is on screen, so one rendered in a closed tab plays when the tab opens); later re-renders come without it
+const seenFirst = new Set();
+const firstShow = key => seenFirst.has(key) ? '' : ` data-first="${key}"`;
+document.addEventListener('animationend', e => { const k = e.target.closest?.('[data-first]')?.dataset.first; if (k) seenFirst.add(k); });
+const DEF ={method:'log', N:210, k:3, tf:'4h', candles:540, top:150, minScore:60, v:4};   // 4h — the same timeframe the shared bot trades, so the market shows what it acts on
 const SCAN_MS = 60000;
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 // a full browser storage used to fail silently (a long journal would simply stop being saved): say it once
@@ -1585,6 +1603,10 @@ function emptyRow() {
   return `<tr><td colspan="9" class="mute">${msg}</td></tr>`;
 }
 let scanErr = null, flashSyms = new Set();
+// a price that changed since it was last shown glows green / red once (.tick-up / .tick-dn); sorting and filtering redraw the
+// same price and don't glow. key: the coin in the table, 'c:' + coin in the chart header
+const shownPx = new Map();
+const tickCls = (key, p) => { const was = shownPx.get(key); shownPx.set(key, p); return was == null || !isFinite(p) || fp(was) === fp(p) ? '' : p > was ? 'tick-up' : 'tick-dn'; };
 function renderTable() { return keepFocus(renderTableNow); }   // the star or row in focus stays focused after a rescan
 function renderTableNow() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
@@ -1618,7 +1640,7 @@ function renderTableNow() {
     const vc = r.volZ >= 1 ? 'var(--acc)' : r.volZ <= -1 ? 'var(--faint)' : 'inherit';
     return `<tr tabindex="0" class="row${r.sym === chartSym ? ' sel' : ''}${flashSyms.has(r.sym) ? ' newsig' : ''}" data-sym="${r.sym}">
       <td><button class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}" aria-pressed="${favs.has(r.sym)}" aria-label="${favs.has(r.sym) ? 'Убрать из избранного' : 'В избранное'}: ${pair(r.sym)}">${favs.has(r.sym) ? '★' : '☆'}</button></td>
-      <td>${coin(r.sym)}</td><td>${fp(r.price)}</td><td>${gauge(r.pB)}</td>
+      <td>${coin(r.sym)}</td><td class="${tickCls(r.sym, r.price)}">${fp(r.price)}</td><td>${gauge(r.pB)}</td>
       <td class="hm hx ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
       <td>${r.label ? `<span class="tag ${r.wasRev && !r.rev && r.kind === 'touch' ? (r.side === 'low' ? 'loc' : 'upc') + ' weak' : r.cls + (weak ? ' weak' : '')}"${r.touchTime && (r.rev || r.wasRev) ? ` title="${tip}${sigTip(r)}"` : weak ? ` title="${tip}"` : ''}>${labelOf(r)}</span>` : '<span class="faint">—</span>'}</td>
       <td>${sc}</td>
@@ -2015,7 +2037,7 @@ function computeChart() {
   const pB = (d.c[i] - B.lo[i]) / (B.up[i] - B.lo[i]), hl = halfLife(d.c, B.mid);
   const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
   const fav = favs.has(chartSym);
-  $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button> <span class="cprice">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
+  $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button> <span class="cprice ${tickCls('c:' + chartSym, d.c[i])}">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
   $('#cstats').innerHTML = `${(pB*100).toFixed(0)}% диапазона · границы ${fp(B.lo[i])} — ${fp(B.up[i])} · RSI ${chart.R[i].toFixed(0)} · <span class="${hlCls(hl)}" title="${hlTip(hl)}">T½ ${isFinite(hl) && hl * TFMS[S.tf] < 30 * 864e5 ? dur(hl * TFMS[S.tf]) : 'тренд'}</span>`
     + `<span class="faint"> · ${METHOD_NAME[S.method]} ${S.N}/${S.k}</span>`;
   drawChart(); renderDetail();
@@ -2400,7 +2422,7 @@ function erScale(by, s) {
   const thr = s.erMax ?? 0.15, syms = s.regimeSrc === 'btc' ? ['BTCUSDT'] : M.MAJORS;
   if (!syms.every(x => isFinite(by?.[x]?.er))) return '';
   const max = Math.max(0.5, thr * 2, ...syms.map(x => by[x].er)), pc = v => (v / max * 100).toFixed(1) + '%';
-  return `<div class="erscale" title="ER — насколько прямо шла цена за 7 дней: около 0 — ходит туда-сюда (боковик), около 1 — идёт в одну сторону (импульс). Черта — граница правил: ${thr}">`
+  return `<div class="erscale"${firstShow(`er-${syms.length}-${thr}`)} title="ER — насколько прямо шла цена за 7 дней: около 0 — ходит туда-сюда (боковик), около 1 — идёт в одну сторону (импульс). Черта — граница правил: ${thr}">`
     + syms.map(x => `<div class="er-row"><span>${base(x)}</span><span class="er-bar"><i class="${by[x].er >= thr ? 'over' : ''}" style="width:${pc(by[x].er)}"></i><b style="left:${pc(thr)}"></b></span><span>${by[x].er.toFixed(2)}</span></div>`).join('')
     + `<div class="er-note">Боковик — когда ${syms.length > 1 ? 'у всех трёх' : 'у BTC'} ER ниже черты (${thr}).</div></div>`;
 }
@@ -2758,7 +2780,7 @@ function equityChart(D, tEnd, key = 'j') {
   const bx0 = X(pts[ddPk].t), bx1 = X(pts[ddTr].t), ddPct = (dd * 100).toFixed(1);
   const band = dd >= 0.0005 ? `<rect x="${f(bx0)}" y="0" width="${f(Math.max(3, bx1 - bx0))}" height="${H}" fill="${PC.up}" fill-opacity=".1"/>` : '';
   const ddLab = dd >= 0.0005 ? `<span class="hdd neg" style="${(bx0 + bx1) / 2 < W / 2 ? `left:${f(bx0 / 10)}%` : `right:${f(100 - bx1 / 10)}%`};${ys < 50 ? 'bottom' : 'top'}:3px">макс. просадка −${ddPct}%</span>` : '';
-  return `<div class="hchart" data-eq="${key}" tabindex="0" role="group" aria-label="График баланса по закрытым сделкам: старт $${money(D.start)}, ${tEnd ? 'в конце' : 'сейчас'} $${money(b)}${dd >= 0.0005 ? `, макс. просадка ${ddPct}%` : ''}. Стрелки влево и вправо — по сделкам">
+  return `<div class="hchart" data-eq="${key}"${firstShow(key === 'bt' ? `eq-bt-${tEnd}-${cl2.length}` : 'eq-' + key)} tabindex="0" role="group" aria-label="График баланса по закрытым сделкам: старт $${money(D.start)}, ${tEnd ? 'в конце' : 'сейчас'} $${money(b)}${dd >= 0.0005 ? `, макс. просадка ${ddPct}%` : ''}. Стрелки влево и вправо — по сделкам">
       <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
       <defs><linearGradient id="eqg-${key}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".25"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
       ${band}<line x1="0" x2="${W}" y1="${f(Y(D.start))}" y2="${f(Y(D.start))}" stroke="${PC.base}" stroke-dasharray="5 5" vector-effect="non-scaling-stroke"/>
