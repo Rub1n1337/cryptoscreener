@@ -16,7 +16,8 @@ liquidity-heatmap history and trade clusters, and serves them over HTTP. No keys
 6. Keep history across restarts: attach a **Volume** to the service (any mount path, e.g. `/data`). Railway passes its
    path in `RAILWAY_VOLUME_MOUNT_PATH`; the logs then show `restored: …` after each restart. Without a volume the
    history lives in memory only.
-7. **Settings → Build → Watch Paths**: `/server/**`, so site-only commits do not restart the collector.
+7. Redeploys: `build.watchPatterns` in `railway.json` limits them to the code files, so site and README commits do not
+   restart the collector.
 
 Then put the domain into `SERVER` at the top of the server section in `beta.js` (or open the site once with
 `?srv=https://<domain>`).
@@ -49,14 +50,21 @@ by the minute; incoming traffic is free. `/health` → `res` shows what the serv
 | `rssMb`, `heapMb`, `heapTotalMb`, `buffersMb` | memory: the whole process, the JS heap, typed arrays (history) |
 | `scan` | the bot's candle series, and per minute `/scan` calls, analyses, their time, Binance requests |
 
-Measured 29.10.2026 (20 spot + 20 futures coins, a day of history, ~590 candle series for the bot):
+Measured 29.10.2026 (20 spot + 20 futures coins, a day of history, ~590 candle series for the bot); a busier market means
+more messages, so more CPU and egress:
 
 | | use | a month |
 |---|---|---|
-| CPU | ~0.11 vCPU (about 40% stream messages, the rest `/scan`, heatmap, GC, HTTP) | ~$2.2 |
-| RAM | ~310 MB (heap ~110, history ~62 in typed arrays, the rest Node and buffers) | ~$3.1 |
-| egress | `/scan` ~100–260 KB a minute gzipped; an open Beta chart ~90 KB a minute | ~$0.3–0.6 |
+| CPU | ~0.11–0.13 vCPU (about 40% stream messages, the rest `/scan`, heatmap, GC, HTTP) | ~$2.2–2.6 |
+| RAM | ~320–335 MB in the container (`cgroup`: heap ~120, history ~60 in typed arrays, the rest Node, buffers, file cache) | ~$3.3 |
+| egress | ~1–1.2 MB a minute on the network card (`net.txKbMin`), 44–53 GB a month: three quarters are TCP acks, one per packet Binance sends (`txPktMin` ≈ `rxPktMin`); `/scan` ~250 KB a minute | ~$2.2–2.7 |
 | volume | ~160 MB | ~$0.02 |
+| total | | ~$7.7–8.5 |
 
-Each coin pair (spot + futures) is about 1/20 of the CPU and of the history memory. The book streams come once a second
-(spot) and every 500 ms (futures): at 100 ms they cost several times the CPU for nothing the heatmap or `/book` could show.
+The acks follow the number of messages, not their size. Trade streams are about three quarters of them, so the trade
+history (`/fp`) and the number of coins are what egress and CPU scale with. Each coin pair (spot + futures) is about 1/20
+of the CPU and of the history memory. The book streams come once a second (spot) and every 500 ms (futures): at 100 ms
+they cost several times the CPU for nothing the heatmap or `/book` could show.
+
+A deploy runs the old and the new copy side by side for a while (memory doubles), so `build.watchPatterns` in
+`railway.json` redeploys on code changes only: editing this README does not restart the service.
