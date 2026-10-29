@@ -11,7 +11,7 @@ import zlib from 'node:zlib';
 import WebSocket from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
-import { scan, encode } from './scan.js';
+import { scan, encode, scanSeries } from './scan.js';
 
 const PORT = +process.env.PORT || 8080;
 const TOP = +process.env.TOP || 20;                       // how many of the most traded USDT pairs to follow
@@ -227,8 +227,12 @@ function closeHeat(c) {
 
 // ---------- streams: one connection per 10 coins, reconnect with growing pauses ----------
 // spot: book and trades on one connection; futures: the book on /public and trades on /market (what = 'depth' | 'trade' | 'both')
+// The book comes once a second (spot) and twice a second (futures), not every 100 ms: the heatmap is sampled every 10 s and
+// /book is cached for 2 s, so faster updates only cost CPU (6× the messages); an open Beta chart has its own 100 ms stream
+const DEPTH = {spot:'@depth', fut:'@depth@500ms'};
+const RES = {msgs:0, bytes:0};   // messages and bytes taken from Binance, for /health
 function stream(group, mkt = 'spot', what = 'both', attempt = 0) {
-  const names = group.flatMap(s => [...(what !== 'trade' ? [`${s.toLowerCase()}@depth@100ms`] : []), ...(what !== 'depth' ? [`${s.toLowerCase()}@aggTrade`] : [])]);
+  const names = group.flatMap(s => [...(what !== 'trade' ? [`${s.toLowerCase()}${DEPTH[mkt]}`] : []), ...(what !== 'depth' ? [`${s.toLowerCase()}@aggTrade`] : [])]);
   const ws = new WebSocket((mkt === 'fut' ? (what === 'depth' ? WSF_PUB : WSF_MKT) : WS_URL) + names.join('/'));
   let opened = false;
   ws.on('open', () => {
@@ -236,6 +240,7 @@ function stream(group, mkt = 'spot', what = 'both', attempt = 0) {
     if (what !== 'trade') for (const s of group) { const c = coins.get(cid(s, mkt)); c.buffer.length = 0; if (c.book) c.book.live = false; resync(c); }
   });
   ws.on('message', buf => {
+    RES.msgs++; RES.bytes += buf.length;
     let m; try { m = JSON.parse(buf); } catch { return; }
     const c = coins.get(cid(m.data?.s, mkt)); if (!c) return;
     if (m.stream.endsWith('@aggTrade')) onTrade(c, m.data); else onDepth(c, m.data);
@@ -313,8 +318,17 @@ function sendAnswer(req, res, e) {   // a cached answer, gzipped already when th
   if (!/gzip/.test(req.headers['accept-encoding'] || '')) return plain();
   e.gz.then(z => { res.writeHead(200, {...head, 'content-encoding':'gzip'}); res.end(z); }, plain);
 }
+// what the service costs: Railway bills memory and CPU by the minute. cpu = share of one vCPU over the last minute
+let cpuPrev = process.cpuUsage(), cpuAt = Date.now(), usage = {cpu:0, msgPerS:0, kbPerS:0};
+setInterval(() => {
+  const d = process.cpuUsage(cpuPrev), s = (Date.now() - cpuAt) / 1000;
+  usage = {cpu:+((d.user + d.system) / 1e6 / s).toFixed(3), msgPerS:Math.round(RES.msgs / s), kbPerS:Math.round(RES.bytes / s / 1024)};
+  cpuPrev = process.cpuUsage(); cpuAt = Date.now(); RES.msgs = RES.bytes = 0;
+}, 60e3);
+const mb = x => Math.round(x / 1048576);
+const resources = () => { const m = process.memoryUsage(); return {...usage, rssMb:mb(m.rss), heapMb:mb(m.heapUsed), heapTotalMb:mb(m.heapTotal), buffersMb:mb(m.arrayBuffers), series:scanSeries()}; };
 const routes = {
-  '/health': () => ({ok:true, uptime:Math.round(process.uptime()), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, mkt:c.mkt, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length, liqMin:c.liq.length}))}),
+  '/health': () => ({ok:true, uptime:Math.round(process.uptime()), res:resources(), disk:diskInfo(), coins:[...coins.values()].map(c => ({sym:c.sym, mkt:c.mkt, book:!!c.book?.ok, levels:c.book ? c.book.bids.size + c.book.asks.size : 0, heatMin:c.heat.length, fpMin:c.fp.length, liqMin:c.liq.length}))}),
   '/symbols': () => { const of = m => [...coins.values()].filter(c => c.mkt === m).map(c => c.sym); return {symbols:of('spot'), futures:of('fut')}; },
   // the whole book we know, binned by the coin's base step: [[bin, $], …] for bids and asks
   '/book': (q, c) => {

@@ -112,5 +112,6 @@ export async function scan(body) {
   });
   return {fp:FP, rows, refreshed:todo.length, series:SER.size, ms:{fetch:t1 - t0, calc:Date.now() - t1}};
 }
+export const scanSeries = () => SER.size;   // candle series kept for the bot, for /health
 // non-finite numbers (T½ = ∞) don't survive JSON: they travel as "__Infinity" / "__NaN" and the bot turns them back
 export const encode = obj => JSON.stringify(obj, (k, v) => typeof v === 'number' && !Number.isFinite(v) ? '__' + v : v);
