@@ -34,4 +34,29 @@ Then put the domain into `SERVER` at the top of the server section in `beta.js` 
 
 Add `&mkt=fut` to `/book`, `/heat` and `/fp` for the futures book and history (`/liq` is always futures).
 
-Memory: about 30–60 MB for 20 coins with a day of history; the volume holds about the same on disk.
+## What it costs (Railway Hobby: $5 a month includes $5 of usage)
+
+Railway bills RAM ($10 per GB a month), CPU ($20 per vCPU a month), egress ($0.05 per GB) and the volume ($0.15 per GB a month)
+by the minute; incoming traffic is free. `/health` → `res` shows what the service uses right now:
+
+| field | what |
+|---|---|
+| `cpu` | share of one vCPU over the last minute |
+| `loop` | share of that minute the main thread was busy |
+| `msgPerS`, `kbPerS` | messages and KB per second taken from Binance |
+| `msMin` | ms per minute spent on stream messages, heatmap samples, pruning, GC |
+| `outKbMin` | egress per route, KB per minute |
+| `rssMb`, `heapMb`, `heapTotalMb`, `buffersMb` | memory: the whole process, the JS heap, typed arrays (history) |
+| `scan` | the bot's candle series, and per minute `/scan` calls, analyses, their time, Binance requests |
+
+Measured 29.10.2026 (20 spot + 20 futures coins, a day of history, ~590 candle series for the bot):
+
+| | use | a month |
+|---|---|---|
+| CPU | ~0.11 vCPU (about 40% stream messages, the rest `/scan`, heatmap, GC, HTTP) | ~$2.2 |
+| RAM | ~310 MB (heap ~110, history ~62 in typed arrays, the rest Node and buffers) | ~$3.1 |
+| egress | `/scan` ~100–260 KB a minute gzipped; an open Beta chart ~90 KB a minute | ~$0.3–0.6 |
+| volume | ~160 MB | ~$0.02 |
+
+Each coin pair (spot + futures) is about 1/20 of the CPU and of the history memory. The book streams come once a second
+(spot) and every 500 ms (futures): at 100 ms they cost several times the CPU for nothing the heatmap or `/book` could show.
