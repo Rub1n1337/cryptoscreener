@@ -1634,9 +1634,11 @@ function renderChart(cv, d, o = {}) {
   if (!W || !d) return null;
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  // the view may extend past the last candle (eView > n-1): that is empty space on the right
-  const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, s = clamp(o.from ?? 0, 0, n - 1);
-  const eView = Math.max(s + 1, o.to ?? n - 1), e = Math.min(eView, n - 1);
+  // the view may extend past the last candle (eView > n-1): that is empty space on the right. from / to may be fractional
+  // (a view moved by a part of a candle): f is where the view starts; s…e are the bars at least partly in view,
+  // s0…e0 one more on each side, so lines run to the edges (the plot is clipped)
+  const {t, h, l, c, v, B, R} = d, op = d.o, n = c.length, f = clamp(o.from ?? 0, 0, n - 1);
+  const eView = Math.max(f + 1, o.to ?? n - 1), s = Math.floor(f + 1e-6), e = Math.min(Math.ceil(eView - 1e-6), n - 1), s0 = Math.max(0, s - 1), e0 = Math.min(n - 1, e + 1);
   // the right gutter is as wide as the longest price tag, so tags are never cut and no space is wasted
   g.font = '11px system-ui';
   const tagW = Math.max(...[...(o.levels || []).filter(L => !L.noTag).map(L => `${L.tag || ''} ${fp(L.v)}`), ...(o.tags || []).map(T => T.text), ...(o.ulevels || []).map(v => `ур. ${fp(v)}`), fp(B.up[e]), fp(B.lo[e]), fp(c[n - 1]) + (o.priceSub ? ' · ' + o.priceSub : '')].map(x => g.measureText(x).width));
@@ -1649,9 +1651,24 @@ function renderChart(cv, d, o = {}) {
   // its 30 / 70 lines ran into the value. The price pane gives the difference
   if (showR) { const r0 = H - (showV ? pH + 24 + Math.round(H * 0.08) + 22 : pH + 30) - 6; if (r0 < 56) pH -= 56 - r0; }
   const vTop = pH + 24, vH = showV ? Math.round(H * (showR ? 0.08 : 0.16) - (showR ? 0 : 30)) : 0, rTop = showV ? vTop + vH + 22 : pH + 30, rH = H - rTop - 6;
-  const cnt = eView - s + 1, bw = (W - padL - padR) / cnt, candles = bw >= (o.thin ? 1 : 3);   // o.thin: keep candles even when they are 1-2 px wide
-  const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i <= e ? t[i] : t[e] + (i - e) * step;
-  const X = i => padL + (i - s + 0.5) * bw;
+  const pw = W - padL - padR, cnt = eView - f + 1, bw = pw / cnt, candles = bw >= (o.thin ? 1 : 3);   // o.thin: keep candles even when they are 1-2 px wide
+  const step = n > 1 ? t[n - 1] - t[n - 2] : 0, tAt = i => i < n ? t[i] : t[n - 1] + (i - n + 1) * step;
+  const X = i => padL + (i - f + 0.5) * bw;
+  // drawing inside the plot only: bars cut by the edges don't spill into the margin or under the price tags
+  const clip = () => { g.save(); g.beginPath(); g.rect(padL, 0, pw, H); g.clip(); };
+  // time labels at round times (hours, days…): they ride with the candles while the chart is dragged, instead of
+  // hopping to other candles. The step is the shortest that keeps labels ~115 px apart; a label goes on the first bar of
+  // each period, shown only when it fits whole and doesn't touch the previous one
+  const tz = -new Date(t[n - 1]).getTimezoneOffset() * 6e4, need = 115 / bw * step;
+  const D = [6e4, 12e4, 3e5, 6e5, 9e5, 18e5, 36e5, 72e5, 108e5, 144e5, 216e5, 432e5, 864e5, 1728e5, 2592e5, 6048e5, 12096e5, 2592e6, 7776e6, 15552e6, 31536e6].find(x => x >= need && x >= step) || need;
+  const per = i => Math.floor((tAt(i) + tz - (D % 6048e5 ? 0 : 3456e5)) / D);   // weeks start on Monday (1970-01-01 was a Thursday)
+  const tLabels = []; g.font = '11px system-ui';
+  for (let i = Math.max(1, s), last = -Infinity; i <= Math.floor(eView + 0.5) && step; i++) {
+    if (per(i) === per(i - 1)) continue;
+    const txt = dt(tAt(i)), w = g.measureText(txt).width, x0 = X(i) - w / 2;
+    if (x0 < padL || x0 + w > W - padR || x0 < last + 12) continue;
+    tLabels.push({x:X(i), x0, txt}); last = x0 + w;
+  }
   let mn = Infinity, mx = -Infinity;
   const acc = x => { if (isFinite(x)) { mn = Math.min(mn, x); mx = Math.max(mx, x); } };
   for (let i = s; i <= e; i++) { if (!o.fitPrice) { acc(B.up[i]); acc(B.lo[i]); } if (candles) { acc(h[i]); acc(l[i]); } else acc(c[i]); }
@@ -1666,21 +1683,22 @@ function renderChart(cv, d, o = {}) {
   const gridV = []; if (stepP) for (let v = Math.ceil(mn / stepP) * stepP; v <= mx && gridV.length < 12; v += stepP) gridV.push(v);
   g.strokeStyle = PC.grid; g.lineWidth = 1; g.globalAlpha = 0.5; g.setLineDash([2, 4]);
   for (const v of gridV) { g.beginPath(); g.moveTo(padL, Y(v)); g.lineTo(W - padR, Y(v)); g.stroke(); }
-  if (o.vgrid) { const nT = clamp(Math.floor((W - padL - padR) / 115), 2, 5); for (let q = 1; q < nT - 1; q++) { const x = X(Math.round(s + q * (eView - s) / (nT - 1))); g.beginPath(); g.moveTo(x, T0); g.lineTo(x, pH); g.stroke(); } }   // o.vgrid: vertical lines at the time labels
+  if (o.vgrid) for (const L of tLabels) { g.beginPath(); g.moveTo(L.x, T0); g.lineTo(L.x, pH); g.stroke(); }   // o.vgrid: vertical lines at the time labels
   g.setLineDash([]); g.globalAlpha = 1;
   g.font = '11px system-ui'; g.textBaseline = 'middle';
+  clip();
   // o.fitPrice: the scale follows the candles only; the channel may run off the plot, so the price pane is clipped
   if (o.fitPrice) { g.save(); g.beginPath(); g.rect(0, T0 - 4, W - padR, pH - T0 + 4); g.clip(); }
   // channel
-  let f0 = s; while (f0 <= e && !isFinite(B.mid[f0])) f0++;
-  if (f0 <= e && !o.fitPrice) {   // with the scale fitted to the candles the band usually overflows the plot: lines only
+  let f0 = s0; while (f0 <= e0 && !isFinite(B.mid[f0])) f0++;
+  if (f0 <= e0 && !o.fitPrice) {   // with the scale fitted to the candles the band usually overflows the plot: lines only
     g.beginPath();
-    for (let i = f0; i <= e; i++) g[i === f0 ? 'moveTo' : 'lineTo'](X(i), Y(B.up[i]));
-    for (let i = e; i >= f0; i--) g.lineTo(X(i), Y(B.lo[i]));
+    for (let i = f0; i <= e0; i++) g[i === f0 ? 'moveTo' : 'lineTo'](X(i), Y(B.up[i]));
+    for (let i = e0; i >= f0; i--) g.lineTo(X(i), Y(B.lo[i]));
     g.fillStyle = PC.band; g.fill();
   }
   const line = (arr, col, w = 1.3, dash = []) => { g.beginPath(); g.setLineDash(dash); let st = false;
-    for (let i = s; i <= e; i++) { if (!isFinite(arr[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), Y(arr[i])); st = true; }
+    for (let i = s0; i <= e0; i++) { if (!isFinite(arr[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), Y(arr[i])); st = true; }
     g.strokeStyle = col; g.lineWidth = w; g.stroke(); g.setLineDash([]); };
   // position zones: green from entry to take profit, red from entry to stop
   for (const z of o.zones || []) {
@@ -1741,6 +1759,7 @@ function renderChart(cv, d, o = {}) {
   const cur = o.live ? c[n - 1] : c[e];
   const curCol = o.priceCol || PC.acc;   // o.priceCol: e.g. green / red by the last candle
   if (o.live && cur >= mn && cur <= mx) { g.setLineDash([3, 3]); g.strokeStyle = curCol + '88'; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, Y(cur)); g.lineTo(W - padR, Y(cur)); g.stroke(); g.setLineDash([]); }
+  g.restore();   // the plot clip: price tags go to the right margin
   // a border off the plot (the scale fits the candles) is pinned to the edge with an arrow, so it never disappears
   if (isFinite(B.up[e])) tags.push(!o.fitPrice || B.up[e] <= mx ? {y:Y(B.up[e]), text:fp(B.up[e]), col:PC.up} : {y:T0, text:'↑ ' + fp(B.up[e]), col:PC.up});
   if (isFinite(B.lo[e])) tags.push(!o.fitPrice || B.lo[e] >= mn ? {y:Y(B.lo[e]), text:fp(B.lo[e]), col:PC.lo} : {y:pH - 6, text:'↓ ' + fp(B.lo[e]), col:PC.lo});
@@ -1762,20 +1781,18 @@ function renderChart(cv, d, o = {}) {
   }
   // time axis
   g.font = '11px system-ui'; g.fillStyle = PC.axis;
-  const nT = clamp(Math.floor((W - padL - padR) / 115), 2, 5);   // as many time labels as fit without touching
-  for (let q = 0; q < nT; q++) {
-    const i = Math.round(s + q * (eView - s) / (nT - 1)), txt = dt(tAt(i)), w = g.measureText(txt).width;
-    g.fillText(txt, clamp(X(i) - w / 2, padL, W - padR - w), pH + 6);
-  }
+  for (const L of tLabels) g.fillText(L.txt, L.x0, pH + 6);
   // volume
   if (showV) {
   let vmax = 0; for (let i = s; i <= e; i++) vmax = Math.max(vmax, v[i]);
   g.fillStyle = PC.label; g.fillText('Объём', padL + 2, vTop + 6);
+  clip();
   for (let i = s; i <= e; i++) {
     const hh = vmax ? v[i] / vmax * vH : 0;
     g.fillStyle = c[i] >= op[i] ? PC.volup : PC.voldn;
     g.fillRect(X(i) - Math.max(0.5, bw * 0.35), vTop + vH - hh, Math.max(1, bw * 0.7), hh);
   }
+  g.restore();
   }
   if (!showR) {}
   else if (o.sub) {
@@ -1785,13 +1802,15 @@ function renderChart(cv, d, o = {}) {
     if (o.sub.kind === 'bars') { a = Math.min(a, 0); b = Math.max(b, 0); }
     const SY = x => rTop + (b - x) / ((b - a) || 1) * rH;
     g.fillStyle = PC.label; g.fillText(o.sub.label, padL + 2, rTop + 7);
+    clip();
     if (o.sub.kind === 'bars') {
       for (let i = s; i <= e; i++) { if (!isFinite(sv[i])) continue; g.fillStyle = sv[i] >= 0 ? PC.volup : PC.voldn; const y0 = SY(0), y1 = SY(sv[i]); g.fillRect(X(i) - Math.max(0.5, bw * 0.35), Math.min(y0, y1), Math.max(1, bw * 0.7), Math.abs(y1 - y0) || 1); }
     } else {
       g.beginPath(); let st = false;
-      for (let i = s; i <= e; i++) { if (!isFinite(sv[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), SY(sv[i])); st = true; }
+      for (let i = s0; i <= e0; i++) { if (!isFinite(sv[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), SY(sv[i])); st = true; }
       g.strokeStyle = PC.rsi; g.lineWidth = 1.3; g.stroke();
     }
+    g.restore();
     if (isFinite(sv[e])) { g.fillStyle = PC.rsi; g.fillText(o.sub.fmt ? o.sub.fmt(sv[e]) : sv[e].toFixed(0), W - padR + RC + 6, SY(sv[e])); }
   } else {
   // RSI
@@ -1801,9 +1820,9 @@ function renderChart(cv, d, o = {}) {
   g.fillStyle = PC.lo2; g.fillRect(padL, RY(30), W - padL - padR, RY(0) - RY(30));
   g.strokeStyle = PC.grid; g.lineWidth = 1; g.setLineDash([3, 3]);
   for (const x of [30, 70]) { g.beginPath(); g.moveTo(padL, RY(x)); g.lineTo(W - padR, RY(x)); g.stroke(); }
-  g.setLineDash([]); g.beginPath(); let st = false;
-  for (let i = s; i <= e; i++) { if (!isFinite(R[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), RY(R[i])); st = true; }
-  g.strokeStyle = PC.rsi; g.stroke();
+  g.setLineDash([]); clip(); g.beginPath(); let st = false;
+  for (let i = s0; i <= e0; i++) { if (!isFinite(R[i])) continue; g[st ? 'lineTo' : 'moveTo'](X(i), RY(R[i])); st = true; }
+  g.strokeStyle = PC.rsi; g.stroke(); g.restore();
   if (isFinite(R[e])) { g.fillStyle = PC.rsi; g.fillText(R[e].toFixed(0), W - padR + RC + 6, RY(R[e])); }
   }
   // extra layers drawn by the caller on top of everything (Beta: trade bubbles, walls)
@@ -1811,7 +1830,7 @@ function renderChart(cv, d, o = {}) {
   // hover
   const hi = o.hoverI;
   if (hi != null && hi >= s && hi <= e) {
-    const x = X(hi);
+    const x = clamp(X(hi), padL, W - padR);   // a bar cut by the edge: the line stays on the plot
     g.strokeStyle = PC.cross; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
     const pb = (c[hi] - B.lo[hi]) / (B.up[hi] - B.lo[hi]);
     const txt = [dt(t[hi]), candles ? `O ${fp(op[hi])}  H ${fp(h[hi])}` : '', candles ? `L ${fp(l[hi])}  C ${fp(c[hi])}` : 'цена ' + fp(c[hi]),
@@ -1835,23 +1854,35 @@ function renderChart(cv, d, o = {}) {
     const tl = new Date(t[hi]).toLocaleDateString('ru', {weekday:'short'}) + ' ' + dt(t[hi]), tw = g.measureText(tl).width + 10, tx = clamp(x - tw / 2, padL, W - padR - tw);
     g.fillStyle = PC.cross; g.fillRect(tx, pH - 2, tw, 17); g.fillStyle = PC.canvas; g.fillText(tl, tx + 5, pH + 6);
   }
-  return {s, e, padL, padR, bw, mn, mx, pH, W, T0, ph};   // enough to turn a pointer position back into a bar and a price
+  return {s, e, f, padL, padR, pw, bw, mn, mx, pH, W, T0, ph};   // enough to turn a pointer position back into a bar and a price
 }
-const hoverIndex = (geo, cv, ev) => geo ? geo.s + Math.floor((ev.clientX - cv.getBoundingClientRect().left - geo.padL) / geo.bw) : null;
+const hoverIndex = (geo, cv, ev) => geo ? Math.floor((ev.clientX - cv.getBoundingClientRect().left - geo.padL) / geo.bw + geo.f) : null;
 // the price under a pointer, or null outside the price pane
 const priceAt = (geo, cv, ev) => { if (!geo) return null; const y = ev.clientY - cv.getBoundingClientRect().top; return y >= geo.T0 && y <= geo.pH - 8 ? geo.mx - (y - geo.T0) / geo.ph * (geo.mx - geo.mn) : null; };
 
 // ---------- zoom & pan: view = {span, endOff} — bars visible, bars hidden on the right; null = default ----------
+// both may be fractional: the view moves with the finger / wheel by a part of a candle, not in candle steps.
+// from / to are fractional too; s…e are the whole bars at least partly in view (for loops over the data)
 const MIN_SPAN = 8;
 function viewRange(n, minFrom, view, defSpan) {
   const room = Math.max(20, n - minFrom);
   // (MIN_SPAN: the closest zoom — 8 candles, enough room for footprint numbers inside a candle)
-  const span = clamp(Math.round(view?.span ?? defSpan), Math.min(MIN_SPAN, room), room);
+  const span = clamp(view?.span ?? Math.round(defSpan), Math.min(MIN_SPAN, room), room);
   // negative endOff = empty bars to the right of the last candle (up to 8% of the view); default leaves a small margin
-  const endOff = clamp(Math.round(view?.endOff ?? -Math.max(2, span * 0.03)), -Math.round(Math.max(3, span * 0.08)), room - span);   // a small margin; at most 8% empty space on the right
-  const to = n - 1 - endOff;
-  return {from: to - span + 1, to, span, endOff};
+  const endOff = clamp(view?.endOff ?? -Math.round(Math.max(2, span * 0.03)), -Math.max(3, span * 0.08), room - span);   // a small margin; at most 8% empty space on the right
+  const to = n - 1 - endOff, from = to - span + 1;
+  return {from, to, span, endOff, s:Math.max(0, Math.floor(from + 1e-6)), e:Math.min(n - 1, Math.ceil(to - 1e-6))};
 }
+// a wheel event's travel in px (some mice and Firefox count in lines or pages); Shift turns the wheel sideways
+function wheelPx(e, el) {
+  const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
+  let dx = e.deltaX * k, dy = e.deltaY * k;
+  if (e.shiftKey && !dx) { dx = dy; dy = 0; }
+  return {dx, dy};
+}
+// zoom in proportion to the travel, so a touchpad's dozens of small steps zoom as smoothly as a mouse notch (~100 px ≈ ×1.2);
+// a touchpad pinch arrives as Ctrl + small steps and gets a stronger rate
+const wheelZoom = (dy, e, rate = 0.0018) => Math.exp(clamp(dy, -300, 300) * (e.ctrlKey && Math.abs(dy) < 40 ? rate * 5 : rate));
 // one redraw per frame, however many mouse, wheel, touch, slider or resize events arrive: a 120 Hz mouse used to redraw the
 // whole chart 120 times a second, and dragging N from 20 to 300 recomputed the channel 280 times
 const perFrame = f => { let id = 0; return () => { if (!id) id = requestAnimationFrame(() => { id = 0; f(); }); }; };
@@ -1874,32 +1905,44 @@ function attachZoom(cv, api) {
     h.classList.add('show'); setTimeout(() => h.classList.remove('show'), 1800);
   };
   const range = st => viewRange(st.n, st.minFrom, st.view, st.defSpan);
+  // positions in bars: bar i spans i − ½ … i + ½, the view's left edge is from − ½. Several events can arrive before the
+  // next redraw, so the bar width comes from the current view and the plot width (geo.bw may be a step behind)
+  const posAt = (st, r, x) => r.from - 0.5 + (x - cv.getBoundingClientRect().left - st.geo.padL) / st.geo.pw * r.span;
+  const maxSpan = st => Math.max(20, st.n - st.minFrom);
+  const setLeft = (st, left, span) => api.set({span, endOff:st.n - 0.5 - left - span});
+  // zoom by m keeping the point at pos (in bars) where it is
+  const zoomAt = (st, r, m, pos) => { const span = clamp(r.span * m, MIN_SPAN, maxSpan(st)); setLeft(st, pos - (pos - (r.from - 0.5)) * span / r.span, span); };
   cv.addEventListener('wheel', e => {
-    if (api.wheelGate && !armed && !e.ctrlKey && !e.metaKey) { wheelHint(); return; }   // let the page scroll
-    const st = api.state(); if (!st?.geo) return;
+    // vertical: zoom; sideways (touchpad swipe, Shift + wheel): through history. The sideways swipe needs no click on a
+    // page chart: the page doesn't scroll sideways anyway
+    const {dx, dy} = wheelPx(e, cv), free = !api.wheelGate || armed || e.ctrlKey || e.metaKey;
+    const side = Math.abs(dx) > Math.abs(dy) * (free ? 1 : 2);
+    if (!free && !side) { if (dy) wheelHint(); return; }   // let the page scroll
+    const st = api.state(); if (!st?.geo || !(dx || dy)) return;
     e.preventDefault();
-    const r = range(st), span = Math.round(clamp(r.span * (e.deltaY > 0 ? 1.2 : 1 / 1.2), MIN_SPAN, st.n - st.minFrom));
-    const cur = clamp(hoverIndex(st.geo, cv, e), r.from, r.to), frac = (cur - r.from) / Math.max(1, r.span - 1);
-    const to = Math.round(cur - frac * (span - 1)) + span - 1;   // keep the bar under the cursor in place
-    api.set({span, endOff: st.n - 1 - to});
+    const r = range(st);
+    if (side) api.set({span:r.span, endOff:r.endOff - dx / st.geo.pw * r.span});
+    else zoomAt(st, r, wheelZoom(dy, e), clamp(posAt(st, r, e.clientX), r.from - 0.5, r.to + 0.5));   // the bar under the cursor stays
   }, {passive:false});
-  const down = x => { const st = api.state(); if (!st?.geo) return; const r = range(st); drag = {x, endOff:r.endOff, span:r.span, bw:st.geo.bw}; };
-  const move = x => { if (!drag) return false; api.set({span:drag.span, endOff:drag.endOff + Math.round((x - drag.x) / drag.bw)}); return true; };
+  const down = x => { const st = api.state(); if (!st?.geo) return; const r = range(st); drag = {x, endOff:r.endOff, span:r.span, bw:st.geo.pw / r.span}; };
+  const move = x => { if (!drag) return false; api.set({span:drag.span, endOff:drag.endOff + (x - drag.x) / drag.bw}); return true; };
   // api.pick(e) gets the first say on a press (e.g. placing a level); when it takes it, there is no drag
   cv.addEventListener('mousedown', e => { if (e.button !== 0 || api.pick?.(e)) return; down(e.clientX); cv.style.cursor = 'grabbing'; });
   window.addEventListener('mousemove', e => { if (move(e.clientX)) e.preventDefault(); });
   window.addEventListener('mouseup', () => { drag = null; cv.style.cursor = ''; });
   // touch: one finger pans, two fingers pinch-zoom (the canvas allows only vertical page scroll, so the browser doesn't zoom the page)
+  // around the point between the fingers: the bar under it at the start stays under it, also when both fingers move
   let pinch = null;
-  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY), mid = t => (t[0].clientX + t[1].clientX) / 2;
   cv.addEventListener('touchstart', e => {
     if (e.touches.length === 1 && !api.pick?.(e.touches[0])) down(e.touches[0].clientX);
-    if (e.touches.length === 2) { const st = api.state(); if (!st?.geo) return; const r = range(st); pinch = {d:dist(e.touches), span:r.span, endOff:r.endOff}; drag = null; }
+    if (e.touches.length === 2) { const st = api.state(); if (!st?.geo) return; const r = range(st); pinch = {d:dist(e.touches), span:r.span, pos:posAt(st, r, mid(e.touches)), pw:st.geo.pw, padL:st.geo.padL}; drag = null; }
   }, {passive:true});
   cv.addEventListener('touchmove', e => {
     if (pinch && e.touches.length === 2) {
-      e.preventDefault(); const st = api.state();
-      api.set({span:Math.round(clamp(pinch.span * pinch.d / Math.max(1, dist(e.touches)), MIN_SPAN, st.n - st.minFrom)), endOff:pinch.endOff}); return;
+      e.preventDefault(); const st = api.state(); if (!st) return;
+      const span = clamp(pinch.span * pinch.d / Math.max(1, dist(e.touches)), MIN_SPAN, maxSpan(st));
+      setLeft(st, pinch.pos - (mid(e.touches) - cv.getBoundingClientRect().left - pinch.padL) / pinch.pw * span, span); return;
     }
     if (e.touches.length === 1 && move(e.touches[0].clientX)) e.preventDefault();
   }, {passive:false});
@@ -1907,8 +1950,8 @@ function attachZoom(cv, api) {
   cv.addEventListener('dblclick', () => api.set(null));
   // the same actions as buttons (for people who don't know about the wheel) and keys
   const ctl = {
-    zoom: f => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:Math.round(clamp(r.span * f, MIN_SPAN, st.n - st.minFrom)), endOff:r.endOff}); },
-    pan: k => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:r.span, endOff:r.endOff + Math.round(r.span * k)}); },
+    zoom: f => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:clamp(r.span * f, MIN_SPAN, maxSpan(st)), endOff:r.endOff}); },
+    pan: k => { const st = api.state(); if (!st?.geo) return; const r = range(st); api.set({span:r.span, endOff:r.endOff + r.span * k}); },
     latest: () => { const st = api.state(); if (!st?.geo) return; api.set({span:range(st).span}); },   // keep the zoom, default right margin
     reset: () => api.set(null),
   };
@@ -1988,7 +2031,7 @@ const chartDefSpan = () => Math.min(S.candles, Math.max(80, Math.round($('#cv').
 // in that case the candles fill the plot and the channel borders are labelled at the edge
 function fitCandles(d, r) {
   let lo = Infinity, hi = -Infinity, bl = Infinity, bh = -Infinity;
-  for (let i = Math.max(0, r.from); i <= Math.min(d.c.length - 1, r.to); i++) {
+  for (let i = r.s; i <= r.e; i++) {
     lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]);
     if (isFinite(d.B.up[i])) { bh = Math.max(bh, d.B.up[i]); bl = Math.min(bl, d.B.lo[i]); }
   }
@@ -4351,7 +4394,7 @@ setInterval(checkUpdate, 3 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 window.__sr = {get rows() { return rows; }, get J() { return J; }, get SJ() { return SJ; }, get btHist() { return btHist; }, openTrade, M};
 // the toolkit the Beta module (beta.js) builds on — the same chart, zoom, data and helpers as the rest of the site
-window.__sr.kit = {renderChart, attachZoom, viewRange, hoverIndex, priceAt, barAt, api, fp, usd, money, dt, hm, base, pair, toast, load, save, isPhone, openCoin,
+window.__sr.kit = {renderChart, attachZoom, viewRange, wheelPx, wheelZoom, hoverIndex, priceAt, barAt, api, fp, usd, money, dt, hm, base, pair, toast, load, save, isPhone, openCoin,
   PC, get rows() { return rows; }, get favs() { return favs; }, get cache() { return cache; }};
 </script>
 </body>

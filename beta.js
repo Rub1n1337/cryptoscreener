@@ -201,7 +201,7 @@ class Pane {
     cv.addEventListener('wheel', e => {
       if (!this.inScale(e) || !this.geo) return;
       e.preventDefault(); e.stopImmediatePropagation();
-      this.zoomY(e.deltaY > 0 ? 1.12 : 1 / 1.12, e);
+      this.zoomY(K.wheelZoom(K.wheelPx(e, cv).dy, e, 0.0011), e);   // in proportion to the travel: a mouse notch ≈ ×1.12
     }, {passive:false, capture:true});
     window.addEventListener('mousemove', e => {
       const y = this.yDrag; if (!y || !this.geo) return;
@@ -246,9 +246,13 @@ class Pane {
       if (q === this || !q.d) continue;
       if (!v) { q.view = null; } else {
         // the same right edge in time, measured by candle closes (opens differ between timeframes: a 1h candle opened up to
-        // an hour ago), and never more empty space on the right than a sliver
-        const qtf = TFMS[q.tf], qn = q.d.c.length, right = this.d.t[n - 1] + tf - v.endOff * tf, span = Math.max(8, Math.round(v.span * tf / qtf));
-        q.view = {span, endOff:Math.max(-Math.round(span * 0.12), Math.round((q.d.t[qn - 1] + qtf - right) / qtf))};
+        // an hour ago), and never more empty space on the right than a sliver; fractional, so the others move as smoothly.
+        // «к последней свече» sets no endOff: the others go to their latest candle too
+        const qtf = TFMS[q.tf], qn = q.d.c.length, span = Math.max(8, v.span * tf / qtf);
+        if (v.endOff == null) { q.view = {span}; } else {
+          const right = this.d.t[n - 1] + tf - v.endOff * tf;
+          q.view = {span, endOff:Math.max(-span * 0.12, (q.d.t[qn - 1] + qtf - right) / qtf)};
+        }
       }
       q.dirty = true; q.zs.sync();
     }
@@ -714,11 +718,11 @@ class Pane {
     const d = this.d; if (!d) return;
     const n = d.c.length, r = K.viewRange(n, d.N - 1, this.view, this.defSpan()), PC = K.PC;
     let lo = Infinity, hi = -Infinity;
-    for (let i = Math.max(0, r.from); i <= Math.min(n - 1, r.to); i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
+    for (let i = r.s; i <= r.e; i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }   // r.from / r.to may be fractional: r.s…r.e are whole bars
     if (this.yr) { lo = this.yr.mn; hi = this.yr.mx; }   // a manual price scale decides what is visible
     const sl = this.yr ? 0 : 0.002, W = this.lastWalls = (this.wc || this.walls()).filter(w => w.price >= lo * (1 - sl) && w.price <= hi * (1 + sl));   // only walls inside the visible range, so they don't squash the candles
     const cw0 = this.cv.clientWidth, narrow = cw0 < 520;   // phones: walls stay as lines and in the book column, without tags on the scale   // on narrow charts a wall tag is just its size (the colour tells the side)
-    const wi0 = Math.max(r.from, n - 1 - Math.round((r.to - r.from) * 0.3));   // wall lines only over the recent third: the book column shows them in full
+    const wi0 = Math.max(r.s, n - 1 - Math.round((r.to - r.from) * 0.3));   // wall lines only over the recent third: the book column shows them in full
     const levels = on('walls') ? W.map(w => ({v:w.price, i0:wi0, noTag:cw0 < 420 && on('dom'), col:w.side === 'ask' ? PC.up : PC.lo, tag:!labels ? '' : narrow ? fmtUsd(w.usd) : `стена ${fmtUsd(w.usd)}`})) : [];
     const noBand = Array(n).fill(NaN), B = on('bb') ? d.B : {up:noBand, lo:noBand, mid:noBand, z:noBand};
     // the lower pane holds one of delta / CVD / RSI (they replace each other in the picker); empty says how to fill it
@@ -731,7 +735,7 @@ class Pane {
     if (ruler?.pane === this) hI = null;   // the candle tooltip would cover the ruler's label
     else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; mirror = true; }
     // VWAP lines get their value as a tag on the price scale (a text label next to the line collided with the price tags)
-    const e = Math.min(n - 1, r.to), vv = on('vwapv') ? avwap(d, d.t[clamp(r.from, 0, n - 1)]) : null, av = drw(this.sym).filter(x => x.type === 'avwap' && x.t >= d.t[0]).map(x => ({x, arr:avwap(d, x.t)}));
+    const e = r.e, vv = on('vwapv') ? avwap(d, d.t[r.s]) : null, av = drw(this.sym).filter(x => x.type === 'avwap' && x.t >= d.t[0]).map(x => ({x, arr:avwap(d, x.t)}));
     const tags = [...(on('vwap') && isFinite(d.vwap[e]) ? [{v:d.vwap[e], text:(labels ? 'VWAP ' : '') + K.fp(d.vwap[e]), col:PC.acc, pin:true}] : []),
       ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
       ...(vv && isFinite(vv[e]) ? [{v:vv[e], text:(labels ? 'VWAP экр. ' : '') + K.fp(vv[e]), col:PC.mid, pin:true}] : []),
