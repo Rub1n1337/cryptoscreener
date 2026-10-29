@@ -1,6 +1,10 @@
-// Older «Что нового» entries (2.43 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.44 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.44', date:'26 октября 2026', title:'Интерактивный график баланса', items:[
+    'График баланса показывает дату, баланс, просадку и сделку по наведению или касанию.',
+    'На графике выделен участок максимальной просадки.',
+  ]},
   {v:'2.43', date:'26 октября 2026', title:'Сохранение настроек интерфейса', items:[
     'Сортировка таблиц и состояние разделов «Дополнительно» сохраняются после перезагрузки.',
     'Поиск монеты работает плавнее при наборе.',
