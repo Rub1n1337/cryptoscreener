@@ -11,6 +11,7 @@ import zlib from 'node:zlib';
 import WebSocket from 'ws';
 import fs from 'node:fs';
 import path from 'node:path';
+import { PerformanceObserver, performance } from 'node:perf_hooks';
 import { scan, encode, scanStats } from './scan.js';
 
 const PORT = +process.env.PORT || 8080;
@@ -19,7 +20,7 @@ const TOP_FUT = +(process.env.TOP_FUT ?? TOP);            // and how many USDT p
 const ONLY = (process.env.SYMBOLS || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
 const KEEP_MIN = +process.env.KEEP_MIN || 1440;           // minutes of heatmap / cluster history per coin
 const HEAT_RANGE = 0.12;                                  // heatmap: ±12% around the price (far walls show up too)
-const BOOK_RANGE = 0.25;                                  // book served up to ±25% (far levels beyond are dropped)
+const BOOK_RANGE = 0.15;                                  // book kept up to ±15%, the widest wall search in the Beta (far levels beyond cost memory and CPU only)
 const REST = {spot:['https://data-api.binance.vision', 'https://api.binance.com'], fut:['https://fapi.binance.com']};
 const WS_URL = 'wss://stream.binance.com:9443/stream?streams=';
 // futures split their streams: the order book on /public, trades on /market
@@ -230,7 +231,9 @@ function closeHeat(c) {
 // The book comes once a second (spot) and twice a second (futures), not every 100 ms: the heatmap is sampled every 10 s and
 // /book is cached for 2 s, so faster updates only cost CPU (6× the messages); an open Beta chart has its own 100 ms stream
 const DEPTH = {spot:'@depth', fut:'@depth@500ms'};
-const RES = {msgs:0, bytes:0};   // messages and bytes taken from Binance, for /health
+// for /health: messages and bytes taken from Binance, and where the CPU goes (ms): handling them, the heatmap samples, pruning, GC
+const RES = {msgs:0, bytes:0, msgMs:0, heatMs:0, pruneMs:0, gcMs:0};
+new PerformanceObserver(l => { for (const e of l.getEntries()) RES.gcMs += e.duration; }).observe({entryTypes:['gc']});
 function stream(group, mkt = 'spot', what = 'both', attempt = 0) {
   const names = group.flatMap(s => [...(what !== 'trade' ? [`${s.toLowerCase()}${DEPTH[mkt]}`] : []), ...(what !== 'depth' ? [`${s.toLowerCase()}@aggTrade`] : [])]);
   const ws = new WebSocket((mkt === 'fut' ? (what === 'depth' ? WSF_PUB : WSF_MKT) : WS_URL) + names.join('/'));
@@ -240,10 +243,11 @@ function stream(group, mkt = 'spot', what = 'both', attempt = 0) {
     if (what !== 'trade') for (const s of group) { const c = coins.get(cid(s, mkt)); c.buffer.length = 0; if (c.book) c.book.live = false; resync(c); }
   });
   ws.on('message', buf => {
-    RES.msgs++; RES.bytes += buf.length;
+    const t0 = performance.now(); RES.msgs++; RES.bytes += buf.length;
     let m; try { m = JSON.parse(buf); } catch { return; }
     const c = coins.get(cid(m.data?.s, mkt)); if (!c) return;
     if (m.stream.endsWith('@aggTrade')) onTrade(c, m.data); else onDepth(c, m.data);
+    RES.msgMs += performance.now() - t0;
   });
   ws.on('error', e => log('stream error', e.message));
   ws.on('close', () => { const wait = Math.min(60e3, 2000 * 2 ** (opened ? 0 : attempt)); log('stream closed, reconnecting in', wait / 1000, 's'); setTimeout(() => stream(group, mkt, what, opened ? 0 : attempt + 1), wait); });
@@ -319,11 +323,15 @@ function sendAnswer(req, res, e) {   // a cached answer, gzipped already when th
   e.gz.then(z => { res.writeHead(200, {...head, 'content-encoding':'gzip'}); res.end(z); }, plain);
 }
 // what the service costs: Railway bills memory and CPU by the minute. cpu = share of one vCPU over the last minute
-let cpuPrev = process.cpuUsage(), cpuAt = Date.now(), usage = {cpu:0, msgPerS:0, kbPerS:0};
+// loop = share of the time the main thread was busy; msMin = ms per minute spent on each part (see RES)
+let cpuPrev = process.cpuUsage(), cpuAt = Date.now(), elu = performance.eventLoopUtilization(), usage = {cpu:0, msgPerS:0, kbPerS:0};
 setInterval(() => {
-  const d = process.cpuUsage(cpuPrev), s = (Date.now() - cpuAt) / 1000;
-  usage = {cpu:+((d.user + d.system) / 1e6 / s).toFixed(3), msgPerS:Math.round(RES.msgs / s), kbPerS:Math.round(RES.bytes / s / 1024)};
-  cpuPrev = process.cpuUsage(); cpuAt = Date.now(); RES.msgs = RES.bytes = 0;
+  const d = process.cpuUsage(cpuPrev), s = (Date.now() - cpuAt) / 1000, perMin = x => Math.round(x / s * 60);
+  usage = {cpu:+((d.user + d.system) / 1e6 / s).toFixed(3), loop:+performance.eventLoopUtilization(elu).utilization.toFixed(3),
+    msgPerS:Math.round(RES.msgs / s), kbPerS:Math.round(RES.bytes / s / 1024),
+    msMin:{msgs:perMin(RES.msgMs), heat:perMin(RES.heatMs), prune:perMin(RES.pruneMs), gc:perMin(RES.gcMs)}};
+  cpuPrev = process.cpuUsage(); cpuAt = Date.now(); elu = performance.eventLoopUtilization();
+  for (const k in RES) RES[k] = 0;
 }, 60e3);
 const mb = x => Math.round(x / 1048576);
 const resources = () => { const m = process.memoryUsage(); return {...usage, rssMb:mb(m.rss), heapMb:mb(m.heapUsed), heapTotalMb:mb(m.heapTotal), buffersMb:mb(m.arrayBuffers), scan:scanStats()}; };
@@ -400,6 +408,6 @@ http.createServer((req, res) => {
   for (let i = 0; i < syms.length; i += 10) stream(syms.slice(i, i + 10));
   for (let i = 0; i < futs.length; i += 10) { stream(futs.slice(i, i + 10), 'fut', 'depth'); stream(futs.slice(i, i + 10), 'fut', 'trade'); }
   liqStream();
-  setInterval(() => { for (const c of coins.values()) sampleHeat(c); }, 10e3);
-  setInterval(() => { const t = Math.floor(Date.now() / 6e4) * 6e4; for (const c of coins.values()) { if (c.fpT && c.fpT < t) { closeFp(c); c.fpT = 0; c.fpCur = null; } if (c.liqT && c.liqT < t) { closeLiq(c); c.liqT = 0; } if (c.book?.ok) prune(c); } }, 15e3);
+  setInterval(() => { const t0 = performance.now(); for (const c of coins.values()) sampleHeat(c); RES.heatMs += performance.now() - t0; }, 10e3);
+  setInterval(() => { const t = Math.floor(Date.now() / 6e4) * 6e4, t0 = performance.now(); for (const c of coins.values()) { if (c.fpT && c.fpT < t) { closeFp(c); c.fpT = 0; c.fpCur = null; } if (c.liqT && c.liqT < t) { closeLiq(c); c.liqT = 0; } if (c.book?.ok) prune(c); } RES.pruneMs += performance.now() - t0; }, 15e3);
 })();
