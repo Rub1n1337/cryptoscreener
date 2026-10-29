@@ -301,12 +301,14 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 #btOut{transition:opacity var(--dur-2) var(--ease)}#btOut.stale{opacity:.45}
 .bchart{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .bpanes{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);min-width:0}.bpanes[data-lay="2"],.bpanes[data-lay="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
-.bpane{position:relative;min-width:0;border-radius:10px;outline:1px solid transparent;outline-offset:2px;transition:outline-color .15s}
+.bpane{position:relative;min-width:0;border-radius:10px;outline:1px solid transparent;outline-offset:2px;transition:outline-color var(--dur-1) var(--ease);container:bpane/inline-size}
 .bpanes:not([data-lay="1"]) .bpane.on{outline-color:var(--blue)}
-.bph{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--mute);padding:0 2px 4px;min-width:0}.bph .lg{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--text)}.bph .lg i{font-style:normal;color:var(--faint);margin:0 2px 0 6px}.bph .lg i:first-child{margin-left:0}.bph b{color:var(--text)}.bpane.on .bph b{color:var(--blue)}
+.bph{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--mute);padding:0 2px 4px;min-width:0}.bph .lg{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;font-variant-numeric:tabular-nums;color:var(--text)}.bph .lg>span{margin-right:3px}.bph .lg i{font-style:normal;color:var(--faint);margin-right:2px}.bph b{color:var(--text)}.bpane.on .bph b{color:var(--blue)}
+/* a narrow chart (phone, 2 or 4 charts): the candle legend gets its own lines under the coin, wrapped between values, never cut */
+@container bpane (max-width:560px){.bph{flex-wrap:wrap;row-gap:2px}.bph .lg{order:5;flex:1 1 100%;white-space:normal;overflow:visible;line-height:1.45}.bph .lg>span{white-space:nowrap}}
 .bcv{display:block;width:100%;height:clamp(440px,64vh,760px);cursor:crosshair;touch-action:pan-y}
 .bpanes[data-lay="2"] .bcv{height:clamp(400px,60vh,720px)}.bpanes[data-lay="4"] .bcv{height:clamp(240px,33vh,400px)}
-.bpane.tool .bcv{cursor:copy}
+.bpane.tool .bcv{cursor:copy;touch-action:none}   /* with a drawing tool a finger draws, it doesn't scroll the page */
 .bbar-r{margin-left:auto;display:flex;gap:8px;align-items:center}
 .pick-btn{gap:6px;font-weight:600}.pick-btn .i{width:15px;height:15px}.pick-btn[aria-pressed=true]{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 .btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12.5px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre button{flex:1}}
@@ -315,7 +317,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bpop.help{width:min(380px,calc(100vw - 32px))}.hks{display:grid;gap:7px}.hk{display:grid;grid-template-columns:128px 1fr;gap:10px;font-size:12.5px;line-height:1.35}.hk b{font-weight:650}.hk span{color:var(--mute)}
 .ind-lbl{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--mute);margin:-2px 0 10px;cursor:pointer}.ind-lbl input{accent-color:var(--blue)}
 .ind-chip{display:inline-flex;gap:6px;align-items:center}.ind-chip .i{width:14px;height:14px}.btools .tab .i,.ctools .i{width:17px;height:17px}.ctools .ct-yauto.show{width:auto;padding:0 9px;gap:5px;font-size:12px;font-weight:600}#bLay .tab .i{width:17px;height:17px}.sel-it button .i{width:15px;height:15px}
-@media(max-width:700px){.bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.bchips::-webkit-scrollbar{display:none}.bchip,.bchip-t{flex:0 0 auto}.bchip .s{max-width:96px}}
+@media(max-width:700px){.bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.bchips::-webkit-scrollbar{display:none}.bchip,.bchip-t{flex:0 0 auto}.bchips .bchip{max-width:none}.bchip .s{max-width:96px}}
 #bMktBtn.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 .bpop.fpp{width:min(380px,calc(100vw - 32px))}.fps{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px;font-size:12px;color:var(--mute)}.fps span{display:grid;gap:1px}.fps b{font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}.fpr{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:6px;font-size:12px;padding:4px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}.fpr span:not(:first-child){text-align:right}.fph{color:var(--faint);font-size:11px;border-top:0}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
@@ -335,15 +337,20 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bchip{padding:0 2px 0 8px;max-width:100%}.bchip b{font-weight:650;white-space:nowrap}.bchip .s{color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;font-variant-numeric:tabular-nums}
 .bchip button{width:22px;height:22px;padding:0;border:0;background:transparent;color:var(--faint);display:inline-grid;place-items:center}.bchip button:hover{color:var(--text);background:var(--s2)}.bchip button .i{width:13px;height:13px}
 .bchip.off{opacity:.5}.bchip.off b{text-decoration:line-through}
+/* 2 and 4 charts: the chips stay one line that scrolls sideways (the wheel scrolls it too), so they don't eat the chart's height */
+.bpanes:not([data-lay="1"]) .bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.bpanes:not([data-lay="1"]) .bchip,.bpanes:not([data-lay="1"]) .bchip-t{flex:0 0 auto;max-width:none}.bpanes[data-lay="4"] .bchip .s{display:none}
 .sel-cfg .pf{display:grid;gap:7px;font-size:12px;color:var(--mute)}.sel-cfg .pf>span{display:flex;justify-content:space-between;gap:8px}.sel-cfg .pf b{color:var(--blue);font-weight:650}
 .pseg{display:flex;gap:4px;flex-wrap:wrap}.pseg button{height:30px;padding:0 10px;font-size:12.5px;font-weight:600}.pseg button.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .btools .tab{min-width:34px;padding:0 9px;font-weight:700}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue);color:#fff}
-.bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin .16s ease-out}
+.bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin var(--dur-2) var(--ease)}
 .bhint button{height:28px;padding:0 10px;font-size:12.5px}
 .bph .bpx{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text)}.bph .live{font-size:11.5px}
 @media(max-width:1250px){#bIndBtn .ib-t{display:none}}
-@media(max-width:700px){#bLay [data-lay="4"]{display:none}.bhint{position:static;transform:none;grid-column:1/-1;justify-self:center;white-space:normal;margin-bottom:2px}@media(max-width:420px){#bTools [data-act=redo],#bTools [data-act=clear]{display:none}}}
-.bpop{position:absolute;z-index:30;background:var(--s1);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow);padding:14px;width:min(340px,calc(100vw - 32px));animation:popin .16s ease-out}
+/* phone: the tool hint covers the chart's header (legend, chips), not the plot, and doesn't push the chart down — a chart that
+   moved under the finger between choosing a tool and drawing, and jumped back after it */
+@media(max-width:700px){#bLay [data-lay="4"]{display:none}.bhint{top:0;bottom:auto;left:0;right:0;transform:none;justify-content:space-between;white-space:normal;border-radius:12px;line-height:1.35}}
+@media(pointer:coarse) and (max-height:500px){#bLay [data-lay="4"]{display:none}}   /* a phone on its side: still two charts at most (SMALL in beta.js) */
+.bpop{position:absolute;z-index:30;background:var(--s1);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow);padding:14px;width:min(340px,calc(100vw - 32px));animation:popin var(--dur-2) var(--ease)}
 .bpop h4{margin:0 0 10px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;gap:8px}.bpop h4 button{width:30px;height:30px;padding:0}
 .bpop .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.bpop .pgrid button{height:36px;padding:0;font-weight:600}.bpop .pgrid button.on{background:var(--blue);border-color:var(--blue);color:#fff}
 .bpop .phint{font-size:12px;color:var(--faint);margin:10px 0 0;line-height:1.4}
@@ -392,7 +399,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
   #bMktBtn,#bTfBtn,#bRangeBtn{justify-content:center;min-width:0;font-size:13px}
   .bbar .bbar-r{grid-column:4;grid-row:2;margin:0}
   .bbar #bTools{grid-column:1/-1;display:flex;overflow-x:auto;scrollbar-width:none}.bbar #bTools::-webkit-scrollbar{display:none}
-  .bbar #bTools .tab{flex:1 0 auto}
+  .bbar #bTools .tab{flex:1 1 0;min-width:0;padding:0}   /* all nine fit, «повторить» and «убрать всё» too: no hidden end of the row */
   .bpane{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:6px}
   .bpane>.bph{grid-column:1/-1}
   .bpane>.cvwrap{display:contents}
@@ -742,6 +749,7 @@ details.dis>.dbody{padding:0 16px 16px}
 /* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){.cmdbtn kbd{display:none}:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}
   .pseg button,.bhint button,.ind-chip,.bh-why button{min-height:36px}.chipb{height:36px!important}.ind-it button{width:36px;height:36px}
   .sel-it button,.bpop .pcols button{width:36px;height:36px}.bchip button{width:36px;height:36px;margin:-7px}   /* a bigger target, the chip keeps its size */
+  .bchip-t,.bchip{height:36px}.bpop h4 button{width:36px;height:36px}#bIndClear{min-height:36px}.ind-lbl{min-height:36px}
   /* iOS zooms the page into any text field under 16px and leaves it zoomed */
   input:not([type=checkbox]):not([type=range]),select,textarea{font-size:16px!important}}
 </style>
@@ -3353,6 +3361,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.57', date:'29 октября 2026', title:'Аккуратная вёрстка «Беты»', items:[
+    'Лента сделок перенесена в отдельную полосу у стакана и не закрывает свечи.',
+    'Исправлено наложение подписей в стакане, в шапке графика и у построений.',
+    'Тепловая карта ликвидаций стала заметнее, футпринт текущей свечи обновляется вживую.',
+    'На телефоне добавлены «Повторить» и «Убрать всё» для построений, кнопки стали крупнее.',
+    'Раскладка графиков подстраивается при повороте телефона, окно настроек не уходит за экран.',
+  ]},
   {v:'2.56', date:'29 октября 2026', title:'Плавный график', items:[
     'Масштаб колёсиком и тачпадом стал плавным и следует за силой прокрутки.',
     'Перетаскивание графика стало плавным, подписи времени двигаются вместе со свечами.',
@@ -3407,11 +3422,6 @@ const CHANGELOG = [
     'В профиле бота добавлен переключатель «Сложный процент».',
     'При сбросе журнала можно задать стартовый баланс от $100 до $10 000 000.',
     'Исправлен возможный откат сброса журнала серверного бота.',
-  ]},
-  {v:'2.45', date:'26 октября 2026', title:'Стартовый баланс и сложный процент в бэктесте', items:[
-    'В бэктесте можно задать стартовый баланс.',
-    'Добавлен переключатель «Сложный процент»: без него риск считается от стартового баланса.',
-    'Исправлен подсчёт монет, снятых с биржи, для коротких периодов.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

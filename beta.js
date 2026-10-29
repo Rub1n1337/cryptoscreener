@@ -19,6 +19,8 @@ async function fapi(path) { const r = await fetch('https://fapi.binance.com' + p
 const rest = (p, path) => p.mkt === 'fut' ? fapi(path.replace('/api/v3/', '/fapi/v1/')) : K.api(path);
 // on phones the chart buttons sit above the canvas, so the plot needs no room for them at the top
 const PHONE = matchMedia('(max-width:700px)');
+// four charts don't fit a phone, upright or on its side (the "4" button is hidden by the same rule in index.html)
+const SMALL = matchMedia('(max-width:700px), (pointer:coarse) and (max-height:500px)');
 // stream watchdog: after QUIET_SHOW ms without a message the chart says "no data", after QUIET_MS it reconnects
 const QUIET_SHOW = 5000, QUIET_MS = 10000;
 // the stream state (Pane.state) in words: the status line, the note under the charts, the chart's own labels
@@ -33,12 +35,11 @@ const CATS = [
     {id:'dom', name:'Биржевой стакан', hint:'заявки по уровням — колонкой у шкалы цены'},
     {id:'imb', name:'Дисбаланс стакана', hint:'полоса у шкалы: доля покупателей и продавцов у цены'},
     {id:'act', name:'Динамика стакана', hint:'полоса у стакана: где за последние секунды заявки ставили (зелёный) и снимали (красный)'},
-    {id:'tape', name:'Лента сделок', hint:'последние сделки кружками на своей цене у шкалы, новые — справа (как лента для скальпинга)'},
-    {id:'obsum', name:'Σ стакана', hint:'внизу стакана: все известные заявки на продажу против покупки, в $'},
+    {id:'tape', name:'Лента сделок', hint:'последние сделки кружками на своей цене, в полосе у стакана; новые — справа (как лента для скальпинга)'},
+    {id:'obsum', name:'Σ стакана', hint:'внизу стакана: все известные заявки на продажу (сверху) и покупку (снизу), в $'},
     {id:'heat', name:'Тепловая карта ликвидности', hint:'плотность лимитных заявок во времени'},
     {id:'walls', name:'Стены в стакане', hint:'уровни, где заявок намного больше обычного (порог — в настройках)'},
     {id:'bubbles', name:'Пузыри крупных сделок', hint:'крупные рыночные покупки и продажи'},
-    {id:'flow', name:'Поток ликвидности', hint:'как быстро ставят и снимают заявки', soon:true},
   ]},
   {name:'Поток сделок', items:[
     {id:'vol', name:'Объём', hint:'панель объёма под графиком; выключите — цене достанется больше места'},
@@ -49,7 +50,7 @@ const CATS = [
   ]},
   {name:'Фьючерсы', items:[
     {id:'liq', name:'Ликвидации', hint:'принудительные закрытия: красный ромб — ликвидирован лонг, зелёный — шорт (только фьючерсы)'},
-    {id:'liqheat', name:'Тепловая карта ликвидаций', hint:'где принудительно закрывали позиции: красный — лонги, зелёный — шорты; история с нашего сервера (топ-20 монет)'},
+    {id:'liqheat', name:'Тепловая карта ликвидаций', hint:'где принудительно закрывали позиции: полоса от свечи вправо, ярче — больше; красный — лонги, зелёный — шорты; история с нашего сервера (топ-20 монет)'},
     {id:'oi', name:'Открытый интерес', hint:'нижняя панель: сумма открытых позиций в $ (только фьючерсы, история до 30 дней)'},
   ]},
   {name:'Кластерный анализ', items:[
@@ -181,6 +182,8 @@ class Pane {
       if (ruler?.live && ruler.pane === this) { const pt = this.pointAt(e); if (pt) ruler.b = pt; }
     });
     cv.addEventListener('mouseleave', () => { this.hoverI = this.hoverY = null; hoverT = null; under = null; redrawAll(); });
+    // a second finger while drawing: drop the unfinished drawing (the tool stays chosen), the pinch zooms
+    cv.addEventListener('touchstart', e => { if (e.touches.length > 1 && ruler?.live && ruler.pane === this) { ruler = null; this.dirty = true; } }, {passive:true});
     cv.addEventListener('touchmove', e => { if (this.yDrag?.scale && e.touches.length === 1) { e.preventDefault(); const f = Math.exp((e.touches[0].clientY - this.yDrag.y0) / 160), c = (this.yDrag.mn + this.yDrag.mx) / 2, h = (this.yDrag.mx - this.yDrag.mn) / 2 * f; this.setY({mn:c - h, mx:c + h}); return; }
       if (ruler?.live && ruler.pane === this) { e.preventDefault(); const pt = this.pointAt(e.touches[0]); if (pt) { ruler.b = pt; this.dirty = true; } } }, {passive:false});
     this.zs = K.attachZoom(cv, {
@@ -221,7 +224,7 @@ class Pane {
     });
     this.label();
   }
-  inBook(e) { const g = this.geo; if (!g || !this.rc) return false; const x = e.clientX - this.cv.getBoundingClientRect().left; return x >= g.W - g.padR && x <= g.W - g.padR + this.rc; }
+  inBook(e) { const g = this.geo; if (!g || this.rc <= this.tw) return false; const x = e.clientX - this.cv.getBoundingClientRect().left; return x >= g.W - g.padR + this.tw && x <= g.W - g.padR + this.rc; }
   inScale(e) { const g = this.geo; if (!g) return false; const x = e.clientX - this.cv.getBoundingClientRect().left; return x > g.W - g.padR + this.rc && x < g.W; }
   setY(r) {
     if (r && !(r.mx > r.mn)) return;
@@ -441,6 +444,10 @@ class Pane {
       this.fpLive ||= new Map(); let col = this.fpLive.get(bar);
       if (!col) { this.fpLive.set(bar, col = new Map()); if (this.fpLive.size > 600) this.fpLive.delete(this.fpLive.keys().next().value); }
       const r = col.get(k) || [0, 0]; r[x.m ? 1 : 0] += usd; col.set(k, r);   // m = the buyer was the maker: a market sell
+      // the same by minute (half an hour kept): the forming candle takes the server's minutes and the live ones after them
+      const mn = Math.floor(x.T / 6e4) * 6e4; this.fpMin ||= new Map(); let mc = this.fpMin.get(mn);
+      if (!mc) { this.fpMin.set(mn, mc = new Map()); for (const t of this.fpMin.keys()) { if (t < mn - 18e5) this.fpMin.delete(t); else break; } }
+      const q = mc.get(k) || [0, 0]; q[x.m ? 1 : 0] += usd; mc.set(k, q);
     }
     this.tape ||= []; this.tape.push({p:+x.p, usd, sell:x.m}); if (this.tape.length > 120) this.tape.splice(0, 40);   // the trade tape
     this.tradeUsd.push(usd); if (this.tradeUsd.length > 2000) this.tradeUsd.shift();
@@ -525,7 +532,7 @@ class Pane {
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
     clearTimeout(this.cuTimer); this.cuTimer = null; this.kPend = null; this.cuFails = 0;
-    this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.fpLive = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
+    this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.fpLive = this.fpMin = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
     if (ruler?.pane === this) ruler = null;
     const key = this.mkt + this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
     if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }
@@ -602,8 +609,11 @@ class Pane {
   // one candle's clusters at a given row step: Map row -> [buy $, sell $]; server history first, live trades for the rest
   fpBar(bar, step) {
     const out = new Map(), addCol = (col, base) => { for (const [k, [b, s]] of col) { const kk = Math.floor(k * base / step), a = out.get(kk) || [0, 0]; a[0] += b; a[1] += s; out.set(kk, a); } };
-    const H = this.fpHist, h = H?.cols.get(bar), live = this.fpLive?.get(bar);
-    if (h) addCol(h, H.base);
+    const H = this.fpHist, h = H?.cols.get(bar), live = this.fpLive?.get(bar), tf = TFMS[this.tf];
+    if (h) {   // the server sends its minutes once a minute: the live trades after its last minute keep the forming candle current
+      addCol(h, H.base);
+      if (bar + tf > H.upTo && this.fpMin) for (const [t, col] of this.fpMin) if (t >= H.upTo && t >= bar && t < bar + tf) addCol(col, this.base);
+    }
     else if (live) addCol(live, this.base);   // candles the server has not got yet (or no server): trades seen since the tab opened
     return out;
   }
@@ -658,7 +668,8 @@ class Pane {
   drawFootprint(g, G) {
     const d = this.d, PC = K.PC, step = this.fpStepFor(G);
     const rowPx = Math.abs(G.Y(0) - G.Y(step)), wide = G.bw >= 56 && rowPx >= 11; this.fpStepNow = step;
-    if (G.bw < 6) return;
+    const hint = t => { if (!labels) return; g.font = '10.5px system-ui'; g.fillStyle = PC.mute; g.textBaseline = 'middle'; g.fillText(t, G.padL + 6, G.pH - 10); };
+    if (G.bw < 6) { hint('футпринт: приблизьте график — свечи слишком узкие'); return; }
     g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     g.font = '600 10px system-ui'; g.textBaseline = 'middle';
     for (let i = G.s; i <= G.e; i++) {
@@ -687,7 +698,7 @@ class Pane {
       if (wide) { g.strokeStyle = (d.c[i] >= d.o[i] ? PC.lo : PC.up) + 'aa'; g.lineWidth = 2; g.beginPath(); g.moveTo(x0 + 1, G.Y(d.h[i])); g.lineTo(x0 + 1, G.Y(d.l[i])); g.stroke(); }   // the candle as a bar at the table's edge
     }
     g.textAlign = 'left'; g.restore();
-    if (!wide && labels) { g.font = '10.5px system-ui'; g.fillStyle = PC.mute; g.textBaseline = 'middle'; g.fillText('футпринт: приблизьте график, чтобы увидеть цифры', G.padL + 6, G.pH - 10); }
+    if (!wide) hint('футпринт: приблизьте график, чтобы увидеть цифры');
   }
   // history and the far book from our server, when it follows this coin
   async fromServer() {
@@ -730,7 +741,7 @@ class Pane {
       : on('oi') && this.mkt === 'fut' && d.oi ? {label:'Открытый интерес, $', values:d.oi, kind:'line', fmt:fmtUsd}
       : null;   // RSI, or nothing at all (the price then takes the room)
     // the crosshair of the chart under the mouse is mirrored on the others at the same time (just the line and the time)
-    this.hits = [];   // clickable drawings (notes, VWAP anchors), filled while drawing
+    this.hits = []; this.lbls = [];   // clickable drawings (notes, VWAP anchors) and the labels placed so far, filled while drawing
     let hI = this.hoverI, hY = this.hoverY, mirror = false;
     if (ruler?.pane === this) hI = null;   // the candle tooltip would cover the ruler's label
     else if (hoverT && hoverT.src !== this && link) { hI = hoverT.t >= d.t[0] && hoverT.t < d.t[n - 1] + TFMS[this.tf] ? K.barAt(d.t, hoverT.t) : null; hY = null; mirror = true; }
@@ -740,7 +751,10 @@ class Pane {
       ...av.filter(a => isFinite(a.arr[e])).map(a => ({v:a.arr[e], text:(labels ? 'VWAP⚓ ' : '') + K.fp(a.arr[e]), col:PC.trade, pin:true})),
       ...(vv && isFinite(vv[e]) ? [{v:vv[e], text:(labels ? 'VWAP экр. ' : '') + K.fp(vv[e]), col:PC.mid, pin:true}] : []),
       ...(on('dpoc') && isFinite(d.dpoc[e]) ? [{v:d.dpoc[e], text:(labels ? 'dPOC ' : '') + K.fp(d.dpoc[e]), col:PC.rsi, pin:true}] : [])];
-    const cw = this.cv.clientWidth; this.rc = (on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0) + (on('act') && on('dom') ? 24 : 0);   // the order book column at the price scale
+    // the column at the price scale, left to right: the tape's lane, the book dynamics strip, the book (or just the imbalance strip)
+    const cw = this.cv.clientWidth;
+    this.tw = on('tape') ? (cw < 400 ? 32 : cw < 520 ? 44 : 72) : 0; this.aw = on('act') && on('dom') ? (cw < 400 ? 16 : 24) : 0;
+    this.rc = this.tw + this.aw + (on('dom') ? (cw < 400 ? 40 : cw < 520 ? 52 : 68) : on('imb') ? 34 : 0);
     this.geo = K.renderChart(this.cv, {...d, B}, {from:r.from, to:r.to, levels, tags, live:true, hoverI:hI, hoverY:hY, hoverLine:mirror, top:PHONE.matches ? 10 : 44, sub, vol:on('vol'), lower:!!sub || on('rsi'), noTip:true, vgrid:true, noMarks:true,
       priceCol:d.c[n - 1] >= d.o[n - 1] ? PC.lo : PC.up, priceSub:this.countdown(), fitPrice:true, thin:true,
       rightCol:this.rc, yRange:this.yr, crossPct:true,
@@ -753,12 +767,15 @@ class Pane {
         if (vv) drawLine(g, G, vv, PC.mid, [2, 3]);
         for (const a of av) this.drawAvwap(g, G, a);
         if (on('dpoc')) drawStep(g, G, d.dpoc, PC.rsi);
-        for (const x of drw(this.sym)) { if (x.type === 'frvp') this.drawFrvp(g, G, x); if (x.type === 'fib') this.drawFib(g, G, x); if (x.type === 'raff') this.drawRaff(g, G, x); }
-        if (this.rc) this.drawBook(g, G);
+        // Fibonacci's level labels stay at their lines; the profile and channel labels are placed after them, around what is taken
+        const dr = drw(this.sym); for (const x of dr) if (x.type === 'fib') this.drawFib(g, G, x);
+        for (const x of dr) if (x.type === 'frvp') this.drawFrvp(g, G, x);
+        for (const x of dr) if (x.type === 'raff') this.drawRaff(g, G, x);
+        if (this.rc > this.tw) this.drawBook(g, G);
+        if (on('tape')) this.drawTape(g, G);
         if (on('heat') && !mirror) this.drawHeatHover(g, G, hI, hY);
         if (on('fp')) this.drawFootprint(g, G);
         if (on('mk')) this.drawMarkers(g, G);
-        if (on('tape')) this.drawTape(g, G);
         if (on('bubbles')) this.drawBubbles(g, G);
         if (on('liq') && this.mkt === 'fut') this.drawLiqs(g, G);
         this.drawNotes(g, G);
@@ -770,11 +787,12 @@ class Pane {
       }});
     this.el.querySelector('.bpx').textContent = K.fp(d.c[n - 1]);
     // the header doubles as the legend: the candle under the cursor (or the last one), instead of a box over the candles
-    const li = hI != null && hI >= 0 && hI < n ? hI : n - 1, chg = (d.c[li] / d.o[li] - 1) * 100, np = x => K.fp(x).replace('$', '');
-    const lg = `<i>O</i>${np(d.o[li])} <i>H</i>${np(d.h[li])} <i>L</i>${np(d.l[li])} <i>C</i>${np(d.c[li])} <span class="${chg >= 0 ? 'pos' : 'neg'}">${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(2)}%</span>`
-      + ` <i>об.</i>$${fmtUsd(d.qv[li])} <i>Δ</i><span class="${d.delta[li] >= 0 ? 'pos' : 'neg'}">${d.delta[li] >= 0 ? '+' : ''}${fmtUsd(d.delta[li])}</span>`;
+    // each value is one unbreakable item: a narrow chart wraps the legend between items instead of cutting it
+    const li = hI != null && hI >= 0 && hI < n ? hI : n - 1, chg = (d.c[li] / d.o[li] - 1) * 100, np = x => K.fp(x).replace('$', ''), it = (k, v) => `<span>${k ? `<i>${k}</i>` : ''}${v}</span>`;
+    const lg = it('O', np(d.o[li])) + ' ' + it('H', np(d.h[li])) + ' ' + it('L', np(d.l[li])) + ' ' + it('C', np(d.c[li])) + ' ' + it('', `<span class="${chg >= 0 ? 'pos' : 'neg'}">${chg >= 0 ? '+' : '−'}${Math.abs(chg).toFixed(2)}%</span>`)
+      + ' ' + it('об.', '$' + fmtUsd(d.qv[li])) + ' ' + it('Δ', `<span class="${d.delta[li] >= 0 ? 'pos' : 'neg'}">${d.delta[li] >= 0 ? '+' : ''}${fmtUsd(d.delta[li])}</span>`);
     const fu = this.mkt === 'fut' && this.fund, left = fu ? Math.max(0, this.fund.next - Date.now()) : 0;   // futures: funding rate and time to the next payment
-    const lgAll = lg + (fu ? ` <i>фанд.</i><span class="${this.fund.rate >= 0 ? 'pos' : 'neg'}">${this.fund.rate >= 0 ? '+' : '−'}${Math.abs(this.fund.rate * 100).toFixed(4)}%</span> <i>через</i>${Math.floor(left / 36e5)}:${String(Math.floor(left % 36e5 / 6e4)).padStart(2, '0')}` : '');
+    const lgAll = lg + (fu ? ' ' + it('фанд.', `<span class="${this.fund.rate >= 0 ? 'pos' : 'neg'}">${this.fund.rate >= 0 ? '+' : '−'}${Math.abs(this.fund.rate * 100).toFixed(4)}%</span>`) + ' ' + it('через', `${Math.floor(left / 36e5)}:${String(Math.floor(left % 36e5 / 6e4)).padStart(2, '0')}`) : '');
     if (lgAll !== this.lgHtml) { this.lgHtml = lgAll; this.el.querySelector('.lg').innerHTML = lgAll; }
     if (this === act()) this.note(W);
   }
@@ -848,13 +866,19 @@ class Pane {
       cols.push([i, agg]);
     }
     const vals = cols.flatMap(([, a]) => [...a.values()].map(([s, l]) => s + l)).sort((a, b) => a - b); if (!vals.length) return;
-    const top = vals[Math.floor(vals.length * 0.95)] || vals[vals.length - 1], h = Math.max(2, Math.abs(G.Y(0) - G.Y(step)));
+    const top = vals[Math.floor(vals.length * 0.95)] || vals[vals.length - 1], h = Math.max(3, Math.abs(G.Y(0) - G.Y(step)));
+    // liquidations happen inside the candle's range, so a cell under its own candle is hidden by it: each cell is a band
+    // that starts at its candle and fades out to the right over a few candles (at least ~30 px), where the chart is free
+    const len = Math.max(G.bw * 2, 30, Math.min(160, G.bw * 8)), parts = [1, 0.55, 0.3, 0.12];
+    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     for (const [i, agg] of cols) for (const [k, [s, l]] of agg) {
-      const y = G.Y(k * step); if (y < G.T0 || y > G.pH) continue;
-      const f = Math.min(1, Math.sqrt((s + l) / top)); g.globalAlpha = 0.15 + 0.6 * f;
-      g.fillStyle = l >= s ? PC.up : PC.lo; g.fillRect(G.X(i) - G.bw / 2, y - h / 2, G.bw + 0.5, h);
+      const y = G.Y(k * step); if (y < G.T0 - h || y > G.pH + h) continue;
+      const f = Math.min(1, Math.sqrt((s + l) / top)); if (f < 0.12) continue;   // single small liquidations would only be noise
+      const x0 = G.X(i) - G.bw / 2, a = 0.3 + 0.6 * f;
+      g.fillStyle = l >= s ? PC.up : PC.lo;
+      parts.forEach((m, j) => { g.globalAlpha = a * m; g.fillRect(j ? x0 + G.bw + (j - 1) * (len - G.bw) / 3 : x0, y - h / 2, j ? (len - G.bw) / 3 + 0.5 : G.bw + 0.5, h); });
     }
-    g.globalAlpha = 1;
+    g.globalAlpha = 1; g.restore();
   }
   // book dynamics: net $ put up (+) or pulled (−) per fine price bin, in one-second buckets (two minutes kept)
   recordAct(p, d, side) {
@@ -871,15 +895,18 @@ class Pane {
     for (const [s, m] of this.act) if (s > from) for (const [k, d] of m) { const r = keyOf((k + 0.5) * this.fine); out.set(r, (out.get(r) || 0) + d); }
     return out;
   }
-  // the tape: the latest trades as circles at their price next to the book, newest on the right (like a scalping tape)
+  // the tape: the latest trades as circles at their price, newest on the right (like a scalping tape), in its own lane
+  // left of the book, so it never covers the latest candles
   drawTape(g, G) {
-    const T = this.tape; if (!T?.length) return;
-    const PC = K.PC, x1 = G.W - G.padR - 8, n = Math.min(T.length, 40), gap = Math.max(4, Math.min(10, (G.W - G.padL - G.padR) * 0.12 / n));   // a narrow strip next to the book
+    const PC = K.PC, xL = G.W - G.padR, tw = this.tw, T = this.tape;
+    g.fillStyle = PC.grid; g.globalAlpha = 0.1; g.fillRect(xL, G.T0, tw - 1, G.pH - G.T0); g.globalAlpha = 1;
+    if (!T?.length) return;
+    const rMax = Math.min(7.8, tw * 0.11), n = Math.min(T.length, tw < 50 ? 12 : 24), gap = n > 1 ? (tw - 2 * rMax - 2) / (n - 1) : 0, x1 = xL + tw - rMax - 2;
     let max = 0; for (let j = T.length - n; j < T.length; j++) max = Math.max(max, T[j].usd);
-    g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
-    for (let j = 0; j < n; j++) {
+    g.save(); g.beginPath(); g.rect(xL, G.T0, tw, G.pH - G.T0); g.clip();
+    for (let j = n - 1; j >= 0; j--) {   // the oldest first, so the newest circles stay on top
       const t = T[T.length - 1 - j], y = G.Y(t.p); if (y < G.T0 || y > G.pH) continue;
-      const r = 1.8 + 6 * Math.log1p(t.usd) / Math.log1p(max || 1), col = t.sell ? PC.up : PC.lo;
+      const r = Math.max(1.5, rMax * (0.25 + 0.75 * Math.log1p(t.usd) / Math.log1p(max || 1))), col = t.sell ? PC.up : PC.lo;
       g.globalAlpha = Math.max(0.25, 1 - j / n); g.beginPath(); g.arc(x1 - j * gap, y, r, 0, 7); g.fillStyle = col + '99'; g.fill(); g.strokeStyle = col; g.lineWidth = 1; g.stroke();
     }
     g.globalAlpha = 1; g.restore();
@@ -890,7 +917,8 @@ class Pane {
     const col = hc.cols.find(c => c[0] === i); if (!col) return;
     const p = G.mx - (y - G.T0) / (G.pH - G.T0) * (G.mx - G.mn), v = col[1].get(Math.round(p / step)); if (!v) return;
     const t = `карта: $${fmtUsd(v)} у ${K.fp(Math.round(p / step) * step)}`, x = G.X(i);
-    g.font = '600 11px system-ui'; g.textBaseline = 'middle'; const w = g.measureText(t).width + 12, bx = x + 14 + w > G.W - G.padR ? x - 14 - w : x + 14, by = clamp(y - 24, G.T0 + 2, G.pH - 20);
+    g.font = '600 11px system-ui'; g.textBaseline = 'middle'; const w = g.measureText(t).width + 12, by = clamp(y - 24, G.T0 + 2, G.pH - 20);
+    const bx = clamp(x + 14 + w > G.W - G.padR ? x - 14 - w : x + 14, 2, G.W - w - 2);   // a narrow chart: no room on either side, keep it on the canvas
     g.fillStyle = K.PC.tip; g.fillRect(bx, by, w, 18); g.strokeStyle = K.PC.grid; g.strokeRect(bx + 0.5, by + 0.5, w - 1, 17); g.fillStyle = K.PC.price; g.fillText(t, bx + 6, by + 9);
   }
   // volume profile of the visible candles, from the left edge (as on order-flow terminals): thin rows, the value area
@@ -961,10 +989,12 @@ class Pane {
     for (let k = 0; k < rows; k++) { const y0 = G.Y(lo + (k + 1) * sz), y1 = G.Y(lo + k * sz); g.fillStyle = k === poc ? PC.acc + '99' : PC.rsi + '44'; g.fillRect(xa, y0, vp[k] / max * wMax, Math.max(1, y1 - y0 - 1)); }
     const yp = G.Y(lo + (poc + 0.5) * sz); g.strokeStyle = PC.acc; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(xa, yp); g.lineTo(xb, yp); g.stroke(); g.setLineDash([]);
     g.restore();
-    const lbl = `Профиль · ${i1 - i0 + 1} св. · POC ${K.fp(lo + (poc + 0.5) * sz)} · $${fmtUsd(vol)}`; g.font = '600 11px system-ui'; g.textBaseline = 'middle';
-    const lw = g.measureText(lbl).width + 10, ly = Math.max(G.T0 + 9, G.Y(hi) - 10);
-    g.fillStyle = PC.tip; g.fillRect(xa, ly - 9, lw, 18); g.fillStyle = PC.rsi; g.fillText(lbl, xa + 5, ly); g.font = '11px system-ui';
-    this.hits.push({x0:xa, x1:xa + lw, y0:ly - 9, y1:ly + 9, obj:x});
+    // the label: as long as the plot allows (not under the book column), clear of the other drawings' labels
+    const pp = K.fp(lo + (poc + 0.5) * sz), room = G.W - G.padR - G.padL; g.font = '600 11px system-ui'; g.textBaseline = 'middle';
+    const lbl = [`Профиль · ${i1 - i0 + 1} св. · POC ${pp} · $${fmtUsd(vol)}`, `Профиль · POC ${pp}`, `POC ${pp}`].find(t => g.measureText(t).width + 10 <= room) || `POC ${pp}`;
+    const lw = g.measureText(lbl).width + 10, lx = Math.max(G.padL, Math.min(xa, G.W - G.padR - lw)), ly = this.place(G, lx, Math.max(G.T0 + 9, G.Y(hi) - 10), lw);
+    g.fillStyle = PC.tip; g.fillRect(lx, ly - 9, lw, 18); g.fillStyle = PC.rsi; g.fillText(lbl, lx + 5, ly); g.font = '11px system-ui';
+    this.hits.push({x0:lx, x1:lx + lw, y0:ly - 9, y1:ly + 9, obj:x});
   }
   // Fibonacci retracement: from the first point (0) to the second (1), levels drawn from the left point to the right edge
   drawFib(g, G, x, preview) {
@@ -977,7 +1007,7 @@ class Pane {
     for (const r of L) {
       const y = G.Y(P(r)), key = r === 0.5 || r === 0.618;
       g.strokeStyle = key ? PC.acc : PC.trade + (r === 0 || r === 1 ? 'ff' : '99'); g.lineWidth = key ? 1.3 : 1; g.beginPath(); g.moveTo(xa, y); g.lineTo(xb, y); g.stroke();
-      if (labels || preview) { g.font = '10.5px system-ui'; g.textBaseline = 'bottom'; g.fillStyle = key ? PC.acc : PC.trade; g.fillText(`${r} · ${K.fp(P(r))}`, xa + 4, y - 2); }
+      if (labels || preview) { const t = `${r} · ${K.fp(P(r))}`; g.font = '10.5px system-ui'; g.textBaseline = 'bottom'; g.fillStyle = key ? PC.acc : PC.trade; g.fillText(t, xa + 4, y - 2); if (!preview) this.lbls.push({x:xa + 4, y:y - 8, w:g.measureText(t).width, h:12}); }
     }
     g.restore();
     if (!preview) { const y = G.Y(P(0)); this.hits.push({x0:xa, x1:xa + 110, y0:y - 14, y1:y + 4, obj:x}); }
@@ -995,9 +1025,19 @@ class Pane {
     g.strokeStyle = PC.rsi; g.lineWidth = 1.3; seg(i0, i1, dev, []); seg(i0, i1, -dev, []); g.lineWidth = 1; seg(i0, i1, 0, [4, 3]);
     if (iEnd > i1) { g.globalAlpha = 0.55; seg(i1, iEnd, dev, [3, 4]); seg(i1, iEnd, -dev, [3, 4]); seg(i1, iEnd, 0, [2, 4]); g.globalAlpha = 1; }
     g.setLineDash([]); g.restore();
-    const pct = slope / fit(i1) * 100, lbl = `Канал Раффа · ${n} св. · ${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(3)}% за свечу`;
-    if (labels || preview) { g.font = '600 10.5px system-ui'; g.textBaseline = 'middle'; const w = g.measureText(lbl).width + 10, lx = Math.max(G.padL, G.X(i0)), ly = clamp(G.Y(fit(i0) + dev) - 11, G.T0 + 9, G.pH - 9);
+    // the label: as long as the plot allows (it must not slide under the book column), clear of the other drawings' labels
+    const pct = slope / fit(i1) * 100, sg = `${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(3)}%`, room = G.W - G.padR - G.padL;
+    if (labels || preview) { g.font = '600 10.5px system-ui'; g.textBaseline = 'middle';
+      const lbl = [`Канал Раффа · ${n} св. · ${sg} за свечу`, `Рафф · ${n} св. · ${sg}/св.`, `Рафф ${sg}/св.`].find(t => g.measureText(t).width + 10 <= room) || `Рафф ${sg}/св.`;
+      const w = g.measureText(lbl).width + 10, lx = Math.max(G.padL, Math.min(G.X(i0), G.W - G.padR - w)), y0 = clamp(G.Y(fit(i0) + dev) - 11, G.T0 + 9, G.pH - 9), ly = preview ? y0 : this.place(G, lx, y0, w);
       g.fillStyle = PC.tip; g.fillRect(lx, ly - 9, w, 18); g.fillStyle = PC.rsi; g.fillText(lbl, lx + 5, ly); if (!preview) this.hits.push({x0:lx, x1:lx + w, y0:ly - 9, y1:ly + 9, obj:x}); }
+  }
+  // labels of drawings must not cover each other: a new one moves down, then up, by its height until it is free
+  place(G, x, y, w, h = 18) {
+    const free = yy => !this.lbls.some(b => x < b.x + b.w && b.x < x + w && yy - h / 2 < b.y + b.h / 2 && b.y - b.h / 2 < yy + h / 2);
+    let yy = y;
+    for (let k = 1; k < 12 && !free(yy); k++) yy = clamp(y + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (h + 2), G.T0 + h / 2, G.pH - h / 2);
+    this.lbls.push({x, y:yy, w, h}); return yy;
   }
   drawNotes(g, G) {
     const d = this.d, PC = K.PC;
@@ -1044,8 +1084,8 @@ class Pane {
   // the order book at the price scale, like order-flow terminals: one row per price step over the whole height,
   // rows touch each other (no gaps), each row shows its size; the strip at the right edge is the imbalance near the price
   drawBook(g, G) {
-    // the column, left to right: book dynamics, the book, the imbalance strip (with dynamics on, the book starts after its strip)
-    const PC = K.PC, xA = G.W - G.padR, aw = on('act') && on('dom') ? 24 : 0, x0 = xA + aw, cw = this.rc - aw, ph = G.pH - G.T0, m = this.mid();
+    // the column, left to right (after the tape's lane): book dynamics, the book, the imbalance strip
+    const PC = K.PC, xA = G.W - G.padR + this.tw, aw = this.aw, x0 = xA + aw, cw = this.rc - this.tw - aw, ph = G.pH - G.T0, m = this.mid();
     g.fillStyle = PC.grid; g.globalAlpha = 0.16; g.fillRect(x0, G.T0, cw, ph); g.globalAlpha = 1;   // the book's lane
     if (!this.book?.ok || !m) { const st = this.state(); g.save(); g.translate(x0 + cw / 2, G.T0 + ph / 2); g.rotate(-Math.PI / 2); g.font = '11px system-ui'; g.textAlign = 'center'; g.fillStyle = PC.mute; g.fillText(STATE_SHORT[st === 'live' ? 'sync' : st], 0, 0); g.restore(); return; }
     const im = on('imb') ? this.imbalance() : null, sw = im ? 4 : 0, right = x0 + cw - sw - (im ? 2 : 0), bw = right - x0;
@@ -1067,6 +1107,8 @@ class Pane {
       let kLo = bLo, kHi = aHi; for (const p of this.book.bids.keys()) if (p < kLo) kLo = p; for (const p of this.book.asks.keys()) if (p > kHi) kHi = p;
       const farLo = Math.min(kLo, this.far ? this.farLo ?? kLo : kLo), farHi = Math.max(kHi, this.far ? this.farHi ?? kHi : kHi);
       const k0 = keyOf(G.mn) - 1, k1 = keyOf(G.mx) + 1;
+      // the rows stay between the step label on top and the Σ strip at the bottom, so neither covers a row
+      const sumH = on('obsum') && totA + totB > 0 ? 36 : 0, rT = G.T0 + 17, rB = G.pH - sumH;
       // bar length: by side within a row (the price row holds both), scaled by the 97th percentile so one wall doesn't flatten the rest
       const vals = [...byK.values()].flatMap(r => [r.a, r.b]).filter(Boolean).sort((a, b) => a - b), ref = vals[Math.floor(vals.length * 0.97)] || vals[vals.length - 1] || 1;
       const yP = Math.round(G.Y(m)), rowPx = Math.abs(G.Y(0) - G.Y(step)), gap = rowPx >= 7 ? 1 : 0;   // 1 px between rows once they are tall enough
@@ -1076,7 +1118,7 @@ class Pane {
         g.fillStyle = (side === 'a' ? PC.up : PC.lo) + (partial ? '40' : f > 0.75 ? 'cc' : f > 0.4 ? '8c' : '4d'); g.fillRect(right - w, y0, w, y1 - y0);
         return f;
       };
-      g.save(); g.beginPath(); g.rect(xA, G.T0, cw + aw, ph); g.clip();
+      g.save(); g.beginPath(); g.rect(xA, rT, cw + aw, rB - rT); g.clip();
       g.font = '10px system-ui'; g.textBaseline = 'middle'; g.lineJoin = 'round';
       for (let k = k0; k <= k1; k++) {
         const lo = A + k * step, hi = lo + step, yT = Math.round(G.Y(hi)), yB = Math.round(G.Y(lo)), h = yB - yT, yc = (yT + yB) / 2, p = (lo + hi) / 2;
@@ -1089,8 +1131,9 @@ class Pane {
         if (lo <= m && m < hi && r.a && r.b) {   // the row with the price in it: asks above the price line, bids below (like ZeroSynapse)
           f = Math.max(bar(r.a, 'a', yT, Math.max(yT, yP - 1), partial), bar(r.b, 'b', Math.min(yB - gap, yP + 1), yB - gap, partial));
         } else f = bar(r.a >= r.b ? r.a : r.b, r.a >= r.b ? 'a' : 'b', yT, yB - gap, partial);
+        // sizes only where the book is complete (the partly known zone gets its own label) and not cut by the column's edges
         const v = r.a + r.b;
-        if (h >= 10.5 && (labels || f > 0.75)) { const t = C('domUnit') ? fmtQty(v / p) : fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
+        if (h >= 10.5 && (labels || f > 0.75) && !partial && yc - 5 >= rT && yc + 5 <= rB) { const t = C('domUnit') ? fmtQty(v / p) : fmtUsd(v); g.lineWidth = 3; g.strokeStyle = PC.canvas; g.strokeText(t, x0 + 3, yc); g.fillStyle = f > 0.4 ? PC.price : PC.mute; g.fillText(t, x0 + 3, yc); }
       }
       g.fillStyle = PC.acc; g.fillRect(x0, yP, cw - sw, 1);   // the last price line through the column
       // book dynamics strip (left of the book): per row, net $ put up (green, to the right) or pulled (red, to the left) in the last N seconds
@@ -1105,28 +1148,30 @@ class Pane {
         g.fillStyle = PC.grid; g.fillRect(Math.round(cxA), G.T0, 1, ph);
       }
       // say why the far rows are empty: Binance gives the nearest 5000 levels (1000 on the other charts), not the whole book
-      g.font = '10px system-ui'; g.fillStyle = PC.mute; g.textAlign = 'center';
-      const yA = G.Y(farHi), yBd = G.Y(farLo), cx = x0 + (cw - sw) / 2;
-      if (isFinite(farHi) && yA - G.T0 > 48) g.fillText('глубже', cx, (G.T0 + yA) / 2 - 6), g.fillText('нет данных', cx, (G.T0 + yA) / 2 + 6);
-      if (farLo > 0 && G.pH - yBd > 48) g.fillText('глубже', cx, (yBd + G.pH) / 2 - 6), g.fillText('нет данных', cx, (yBd + G.pH) / 2 + 6);
-      {   // the partly known zone: levels learned from the stream / the server beyond the dense snapshot
-        const yP2 = G.Y(aHi), yTp = Math.max(G.T0, G.Y(farHi)), yQ = G.Y(bLo), yBt = Math.min(G.pH, G.Y(farLo));
-        if (yP2 - yTp > 60) g.fillText('неполные', cx, (yTp + yP2) / 2 - 6), g.fillText('данные', cx, (yTp + yP2) / 2 + 6);
-        if (yBt - yQ > 60) g.fillText('неполные', cx, (yQ + yBt) / 2 - 6), g.fillText('данные', cx, (yQ + yBt) / 2 + 6);
-      }
+      g.font = '10px system-ui'; g.textAlign = 'center'; g.lineWidth = 3; g.strokeStyle = PC.canvas;
+      const cx = x0 + (cw - sw) / 2, zone = (a, b, y0, y1, min) => {   // two lines in the middle of the visible part of a zone
+        const lo = Math.max(rT, y0), hi = Math.min(rB, y1); if (hi - lo <= min) return;
+        for (const [t, dy] of [[a, -6], [b, 6]]) { g.strokeText(t, cx, (lo + hi) / 2 + dy); g.fillStyle = PC.mute; g.fillText(t, cx, (lo + hi) / 2 + dy); }
+      };
+      if (isFinite(farHi)) zone('глубже', 'нет данных', G.T0, G.Y(farHi), 48);
+      if (farLo > 0) zone('глубже', 'нет данных', G.Y(farLo), G.pH, 48);
+      // the partly known zone: levels learned from the stream / the server beyond the dense snapshot
+      zone('неполные', 'данные', G.Y(farHi), G.Y(aHi), 60); zone('неполные', 'данные', G.Y(bLo), G.Y(farLo), 60);
       g.textAlign = 'left';
       g.restore();
-      // Σ: everything we know of the book, sellers against buyers, as two bars at the bottom of the column
-      if (on('obsum') && totA + totB > 0) {
-        const sh = 26, sy = G.pH - sh, half = Math.round((cw - sw - 4) * totA / (totA + totB));
-        g.fillStyle = PC.tip; g.fillRect(x0 + 1, sy, cw - sw - 2, sh - 1);
-        g.fillStyle = PC.up + 'cc'; g.fillRect(x0 + 2, sy + 3, half, 6); g.fillStyle = PC.lo + 'cc'; g.fillRect(x0 + 2 + half, sy + 3, cw - sw - 4 - half, 6);
-        g.font = '600 9.5px system-ui'; g.textBaseline = 'middle'; g.fillStyle = PC.up; g.fillText('Σ' + fmtUsd(totA), x0 + 3, sy + 17);
-        g.textAlign = 'right'; g.fillStyle = PC.lo; g.fillText(fmtUsd(totB), x0 + cw - sw - 3, sy + 17); g.textAlign = 'left';
+      // Σ: everything we know of the book, sellers against buyers: a split bar, then sellers' and buyers' sums on lines of
+      // their own (asks on top, as in the book), each as long as the column allows
+      if (sumH) {
+        const sy = rB, iw = cw - sw - 4, half = Math.round(iw * totA / (totA + totB));
+        g.fillStyle = PC.tip; g.fillRect(x0 + 1, sy, cw - sw - 2, sumH - 1);
+        g.fillStyle = PC.up + 'cc'; g.fillRect(x0 + 2, sy + 3, half, 5); g.fillStyle = PC.lo + 'cc'; g.fillRect(x0 + 2 + half, sy + 3, iw - half, 5);
+        g.font = '600 9.5px system-ui'; g.textBaseline = 'middle';
+        const a = fmtUsd(totA), b = fmtUsd(totB), [ta, tb] = [[`Σ прод. ${a}`, `Σ пок. ${b}`], [`Σ ${a}`, `Σ ${b}`], [a, b]].find(p => p.every(t => g.measureText(t).width <= iw - 2)) || [a, b];   // one format for both lines
+        g.fillStyle = PC.up; g.fillText(ta, x0 + 3, sy + 16); g.fillStyle = PC.lo; g.fillText(tb, x0 + 3, sy + 28);
       }
       // the row under the mouse: price range, both sides in $ and in coins, the volume-weighted price, distance from the price
       const by = this.bookY;
-      if (by != null && by >= G.T0 && by <= G.pH) {
+      if (by != null && by >= rT && by <= rB) {
         const pAt = G.mx - (by - G.T0) / ph * (G.mx - G.mn), k = keyOf(pAt), lo = A + k * step, hi = lo + step, r = byK.get(k), mid = (lo + hi) / 2;
         const yT = Math.round(G.Y(hi)), yB = Math.round(G.Y(lo)); g.strokeStyle = PC.price; g.lineWidth = 1; g.strokeRect(x0 + 0.5, yT + 0.5, cw - sw - 1, Math.max(1, yB - yT - 1));
         const pct = (mid / m - 1) * 100, lines = [`${K.fp(lo)} – ${K.fp(hi)}`];
@@ -1139,7 +1184,7 @@ class Pane {
         }
         lines.push(`${pct >= 0 ? '+' : '−'}${Math.abs(pct).toFixed(2)}% от цены${hi < bLo || lo > aHi ? ' · вне снимка: известны только изменившиеся уровни' : ''}`);
         g.font = '11.5px system-ui'; g.textBaseline = 'middle'; g.textAlign = 'left';
-        const w = Math.max(...lines.map(t => g.measureText(t).width)) + 16, hh = lines.length * 16 + 8, bx = x0 - w - 6, byy = clamp(by - hh / 2, G.T0, G.pH - hh);
+        const w = Math.max(...lines.map(t => g.measureText(t).width)) + 16, hh = lines.length * 16 + 8, bx = Math.max(2, x0 - w - 6), byy = clamp(by - hh / 2, G.T0, G.pH - hh);
         g.fillStyle = PC.tip; g.fillRect(bx, byy, w, hh); g.strokeStyle = PC.grid; g.strokeRect(bx + 0.5, byy + 0.5, w - 1, hh - 1);
         lines.forEach((t, j) => { g.fillStyle = j === 0 ? PC.price : t.startsWith('продажа') ? PC.up : t.startsWith('покупка') ? PC.lo : PC.mute; g.fillText(t, bx + 8, byy + 12 + j * 16); });
       }
@@ -1262,7 +1307,7 @@ const savePanes = () => K.save('sr_bpanes', pool.map(p => ({sym:p.sym, tf:p.tf, 
 // panes are kept (hidden, streams closed) when the layout shrinks, so switching back is instant and the heatmap survives
 let pool = [];
 function setLayout(n) {
-  K.save('sr_blay', n); if (n > 2 && matchMedia('(max-width:700px)').matches) n = 2;   // four charts don't fit a phone (the choice is kept for the computer)
+  K.save('sr_blay', n); if (n > 2 && SMALL.matches) n = 2;   // the choice is kept: turning the phone or widening the window brings it back
   layout = n; $('#bPanes').dataset.lay = n;
   const saved = K.load('sr_bpanes', []);
   for (let i = 0; i < Math.max(n, pool.length); i++) {
@@ -1303,7 +1348,10 @@ function openPop(anchor, html, cls = '') {
   pop.className = 'bpop ' + cls; pop.innerHTML = html;
   const w = pop.offsetWidth, h = pop.offsetHeight;
   pop.style.left = clamp(a.left - host.left, 8, host.width - w - 8) + 'px';
-  pop.style.top = clamp(a.bottom - host.top + 6, 8, Math.max(8, host.height - h - 8)) + 'px';
+  // under its button, but inside the visible part of the screen (it may cover the list under the charts): settings opened
+  // from the indicator list of a scrolled page anchor to the toolbar, which may be above the screen
+  const vTop = 8 - host.top, vBot = innerHeight - 8 - host.top - h;
+  pop.style.top = Math.max(8, clamp(a.bottom - host.top + 6, vTop, Math.max(vTop, vBot))) + 'px';
   popFor = anchor.getBoundingClientRect ? anchor : null; popAt = performance.now();
   pop.querySelector('textarea, [data-tf].on, [data-range].on, input')?.focus({preventScroll:true});
 }
@@ -1320,6 +1368,7 @@ function helpPop(btn) {
     + row('A · двойной клик', 'вернуть автомасштаб цены · всё сразу')
     + row('← → · + −', 'листать · масштаб (график в фокусе)')
     + row('R · V · T · P', 'линейка · VWAP от свечи · заметка · профиль участка')
+    + row('F · K', 'уровни Фибоначчи · канал Раффа')
     + row('Ctrl+Z · Esc', 'отменить · выйти из инструмента')
     + row('Клик по заметке', 'изменить или удалить; так же VWAP и профиль')
     + '</div>', 'help');
@@ -1472,11 +1521,16 @@ function wireChips() {
     if (ds.tog) { sel.delete(ds.tog); hidden.delete(ds.tog); saveInd(); }
     if (ds.cfgc) { const id = ds.cfgc; setTimeout(() => cfgPop(id, b)); }
   });
+  // with 2 and 4 charts the chips are one line: the wheel over it scrolls it sideways
+  $('#bPanes').addEventListener('wheel', e => {
+    const box = e.target.closest('.bchips'); if (!box || box.scrollWidth <= box.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault(); box.scrollLeft += e.deltaY;
+  }, {passive:false});
 }
 // ---------- indicator picker ----------
 const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 // an icon per indicator in the picker (instead of one generic icon for all)
-const ICONS = {dom:'book', imb:'imb', act:'act', tape:'tape', obsum:'sigma', heat:'heat', walls:'wall', bubbles:'bubble', flow:'wave', vol:'volbars', delta:'delta', cvd:'cvd', trades:'trades', dtint:'tint',
+const ICONS = {dom:'book', imb:'imb', act:'act', tape:'tape', obsum:'sigma', heat:'heat', walls:'wall', bubbles:'bubble', vol:'volbars', delta:'delta', cvd:'cvd', trades:'trades', dtint:'tint',
   liq:'liq', liqheat:'liqheat', oi:'oi', fp:'fp', mk:'mk', vp:'vp', poc:'poc', dpoc:'dpoc', frvp:'range', vwap:'vwap', vwapv:'vwapv', bb:'channel', rsi:'gauge', fibt:'fib', rafft:'raff'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
@@ -1553,6 +1607,7 @@ function wire() {
     if (k === 'y' || k === 'н') { e.preventDefault(); redo(); }
   });
   window.addEventListener('resize', redrawAll);
+  SMALL.addEventListener('change', () => { if (K.load('sr_blay', 1) > 2) setLayout(K.load('sr_blay', 1)); });   // a phone turned, a window resized
   // the network is back: reconnect now instead of waiting out the pause between attempts (up to a minute)
   window.addEventListener('online', () => {
     if (!loopOn) return;
@@ -1600,6 +1655,9 @@ export function open(kit) {
     drawings = K.load('sr_bdraw', {}) || {}; link = K.load('sr_blink', true); active = K.load('sr_bact', 0);
     // older single-chart settings become the first pane
     if (!K.load('sr_bpanes', null)) K.save('sr_bpanes', [{sym:K.load('sr_bsym', 'BTCUSDT'), tf:K.load('sr_btf', '5m'), range:0}]);
+    // book dynamics takes width the phone's book column doesn't have: on a phone it starts hidden (the eye in the chips brings it back)
+    if (PHONE.matches && sel.has('act') && !K.load('sr_bactph', false)) { hidden.add('act'); K.save('sr_bhide', [...hidden]); }
+    K.save('sr_bactph', true);
     chipsOpen = K.load('sr_bchips', !PHONE.matches); wire(); wireChips(); renderInd();
     setLayout(K.load('sr_blay', 1));
   }

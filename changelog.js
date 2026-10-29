@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.44 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.45 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.45', date:'26 октября 2026', title:'Стартовый баланс и сложный процент в бэктесте', items:[
+    'В бэктесте можно задать стартовый баланс.',
+    'Добавлен переключатель «Сложный процент»: без него риск считается от стартового баланса.',
+    'Исправлен подсчёт монет, снятых с биржи, для коротких периодов.',
+  ]},
   {v:'2.44', date:'26 октября 2026', title:'Интерактивный график баланса', items:[
     'График баланса показывает дату, баланс, просадку и сделку по наведению или касанию.',
     'На графике выделен участок максимальной просадки.',
