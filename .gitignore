@@ -1,3 +1,4 @@
 .vercel
-.claude/
+.claude/*
+!.claude/skills/
 tests/_ref/
