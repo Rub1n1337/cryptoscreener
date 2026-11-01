@@ -242,8 +242,8 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .toast{display:flex;gap:10px;align-items:flex-start;background:var(--s2);border:1px solid var(--line2);border-left:3px solid var(--blue);border-radius:10px;padding:11px 14px;box-shadow:var(--shadow);font-size:13px;animation:tin var(--dur-2) var(--ease);cursor:pointer}
 .toast.ok{border-left-color:var(--lo)}.toast.bad{border-left-color:var(--up)}.toast.warn{border-left-color:var(--acc)}
 .toast b{display:block;margin-bottom:2px}.toast .mute{font-size:12px}
-.toast.out{animation:tout var(--dur-1) var(--ease) forwards}
-@keyframes tin{from{transform:translateY(10px);opacity:0}}@keyframes tout{to{transform:translateX(20px);opacity:0}}
+.toast{transition:transform var(--dur-1) var(--ease),opacity var(--dur-1) var(--ease)}.toast.out{transform:translateX(20px);opacity:0;pointer-events:none}   /* leaves quicker than it came */
+@keyframes tin{from{transform:translateY(10px);opacity:0}}
 
 /* ---------- guard popover ---------- */
 .guard{position:fixed;top:64px;right:16px;z-index:45;width:min(460px,calc(100vw - 32px));background:var(--s2);border:1px solid var(--line2);border-radius:var(--r);padding:14px 16px;font-size:13px;box-shadow:var(--shadow);line-height:1.6}
@@ -420,8 +420,8 @@ section:not(.hidden){animation:pagein var(--dur-2) var(--ease)}
 .evp.open,.guard.open{animation:popin var(--dur-2) var(--ease)}
 /* closing is quicker than opening (--dur-1 against --dur-2) and is a transition, so reopening halfway turns it back smoothly;
    display waits for the fade (allow-discrete); browsers without it just hide */
-.modal,.cmdk,.evp,.guard{transition:opacity var(--dur-1) var(--ease),display var(--dur-1);transition-behavior:allow-discrete}
-.modal.hidden,.cmdk.hidden,.evp:not(.open),.guard:not(.open){opacity:0;pointer-events:none}
+.modal,.cmdk,.evp,.guard,.bpop{transition:opacity var(--dur-1) var(--ease),display var(--dur-1);transition-behavior:allow-discrete}
+.modal.hidden,.cmdk.hidden,.evp:not(.open),.guard:not(.open),.bpop.hidden{opacity:0;pointer-events:none}
 details.dis[open]>.dbody{animation:pagein var(--dur-2) var(--ease)}
 .card,.prof,.btn,.botnow,button{transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
 @media (hover:hover){.card[data-cf]:hover{transform:translateY(-2px)}.prof.pick:hover{transform:translateY(-1px)}}
@@ -3381,11 +3381,11 @@ const CHANGELOG = [
     'Раскладка графиков подстраивается при повороте телефона, окно настроек не уходит за экран.',
   ]},
   {v:'2.56', date:'29 октября 2026', title:'Плавный график', items:[
-    'Масштаб колёсиком и тачпадом стал плавным и следует за силой прокрутки.',
-    'Перетаскивание графика стало плавным, подписи времени двигаются вместе со свечами.',
+    'Масштаб и перетаскивание графика стали плавными, подписи времени двигаются вместе со свечами.',
     'Добавлена прокрутка истории свайпом тачпада вбок и колёсиком с Shift.',
     'Щипок двумя пальцами приближает вокруг точки между пальцами.',
     'Изменившаяся цена коротко подсвечивается, график баланса прорисовывается при открытии.',
+    'Кнопки откликаются на нажатие, окна и меню закрываются быстрее, заголовки переносятся ровнее.',
   ]},
   {v:'2.55', date:'28 октября 2026', title:'Стабильность и скорость «Беты»', items:[
     'Исправлены пропуски свечей после обрыва связи и возврата на вкладку.',
