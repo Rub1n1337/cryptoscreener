@@ -200,7 +200,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--acc);background:var(--accbg);color:var(--text);font-size:12.5px;cursor:pointer}
 .chip span{color:var(--mute);font-size:14px;line-height:1}.chip:hover span{color:var(--text)}.chip.clear{border-color:var(--line2);color:var(--mute)}
 @media (pointer:coarse){.chip{height:36px}}
-.whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity var(--dur-2) var(--ease);z-index:3;white-space:nowrap}.whint.show{opacity:1}
+.whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:10px;background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12.5px;pointer-events:none;opacity:0;transition:opacity var(--dur-1) var(--ease);z-index:3;white-space:nowrap}.whint.show{opacity:1;transition-duration:var(--dur-2)}
 .botnow{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--s1);cursor:pointer;font-size:13.5px}.botnow:hover{border-color:var(--line2)}.botnow:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12.5px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
 @media(max-width:560px){.botnow{display:block}.bn-dot{display:inline-block;margin-right:8px;vertical-align:1px}.bn-main{display:inline}.bn-last,.bn-go{display:block;margin-top:6px}}
@@ -242,7 +242,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .toast{display:flex;gap:10px;align-items:flex-start;background:var(--s2);border:1px solid var(--line2);border-left:3px solid var(--blue);border-radius:10px;padding:11px 14px;box-shadow:var(--shadow);font-size:13px;animation:tin var(--dur-2) var(--ease);cursor:pointer}
 .toast.ok{border-left-color:var(--lo)}.toast.bad{border-left-color:var(--up)}.toast.warn{border-left-color:var(--acc)}
 .toast b{display:block;margin-bottom:2px}.toast .mute{font-size:12px}
-.toast.out{animation:tout var(--dur-2) var(--ease) forwards}
+.toast.out{animation:tout var(--dur-1) var(--ease) forwards}
 @keyframes tin{from{transform:translateY(10px);opacity:0}}@keyframes tout{to{transform:translateX(20px);opacity:0}}
 
 /* ---------- guard popover ---------- */
@@ -418,9 +418,16 @@ section:not(.hidden){animation:pagein var(--dur-2) var(--ease)}
 .modal:not(.hidden),.cmdk:not(.hidden){animation:fadein var(--dur-1) var(--ease)}
 .modal:not(.hidden) .mbox,.cmdk:not(.hidden) .cmdbox,.cmdk:not(.hidden) .dlgbox{animation:popin var(--dur-2) var(--ease)}
 .evp.open,.guard.open{animation:popin var(--dur-2) var(--ease)}
+/* closing is quicker than opening (--dur-1 against --dur-2) and is a transition, so reopening halfway turns it back smoothly;
+   display waits for the fade (allow-discrete); browsers without it just hide */
+.modal,.cmdk,.evp,.guard{transition:opacity var(--dur-1) var(--ease),display var(--dur-1);transition-behavior:allow-discrete}
+.modal.hidden,.cmdk.hidden,.evp:not(.open),.guard:not(.open){opacity:0;pointer-events:none}
 details.dis[open]>.dbody{animation:pagein var(--dur-2) var(--ease)}
-.card,.prof,.btn,button{transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
+.card,.prof,.btn,.botnow,button{transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
 @media (hover:hover){.card[data-cf]:hover{transform:translateY(-2px)}.prof.pick:hover{transform:translateY(-1px)}}
+/* a press: buttons, tabs, chips, the bottom bar and row-buttons sink a little. Not the filter cards and profiles (their transform
+   is the hover lift), not fields, sliders or charts; nothing for people who asked for less motion */
+@media (prefers-reduced-motion:no-preference){button:not(:disabled):active,[role=button]:not(.card):active{transform:scale(.97)}}
 tr.row.newsig td{animation:rowflash 2.4s var(--ease)}
 /* a price that moved since the last update glows green / red for a moment (the arrow-less colour is a hint only: the number itself changed) */
 @keyframes tickup{0%,35%{color:var(--lo-t);background:var(--c-lo2)}}
@@ -432,7 +439,12 @@ tr.row.newsig td{animation:rowflash 2.4s var(--ease)}
 .hchart[data-first] svg{animation:eqdraw var(--dur-3) var(--ease)}
 .hchart[data-first] .hend{animation:fadein var(--dur-2) var(--ease) var(--dur-3) backwards}
 [data-first] .er-bar i{transform-origin:left;animation:erfill var(--dur-3) var(--ease)}
-@media(max-width:700px){body.sheet #cpanel{animation:sheetin var(--dur-2) var(--ease)}}
+@media(max-width:700px){body.sheet #cpanel{animation:sheetin var(--dur-2) var(--ease);transition:opacity var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+  body.sheet-out #cpanel{opacity:0;transform:translateY(24px);pointer-events:none}}   /* closeSheet: leaves quicker than it came */
+/* line breaks: headings and short titles balanced, short descriptions and list items without a lonely last word;
+   not tables, numbers, code or long text */
+h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
+.phead p,.mhead .mute,.toast .mute,.sub,.hint,.hempty,.er-note,.bh-why,li:not(.doc li){text-wrap:pretty}
 /* theme switch: the new theme spreads as a circle from the button (View Transitions; browsers without it just swap) */
 ::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
 ::view-transition-new(root){animation:themereveal var(--dur-3) var(--ease)}
@@ -3607,14 +3619,23 @@ function setHash() {
 // ---------- phone: the list comes first, a coin's chart opens as a full-screen sheet over it ----------
 // The sheet pushes a history entry, so the system back gesture closes it instead of leaving the site.
 const isPhone = () => matchMedia('(max-width:700px)').matches;
-let sheetY = 0;
+let sheetY = 0, sheetOut = 0;
 function openSheet() {
+  if (sheetOut) { clearTimeout(sheetOut); sheetOut = 0; document.body.classList.remove('sheet-out'); history.pushState({sheet:1}, ''); return; }   // a coin tapped while the sheet was leaving: it stays
   if (document.body.classList.contains('sheet')) return;
   sheetY = scrollY; document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden';
   history.pushState({sheet:1}, ''); $('#cpanel').scrollTop = 0;
   requestAnimationFrame(drawChart);   // the canvas had no size while hidden
 }
-function closeSheet() { document.body.classList.remove('sheet'); document.documentElement.style.overflow = ''; scrollTo({top:sheetY, behavior:'instant'}); }   // back to the same place in the list
+// the sheet leaves quicker than it came (DESIGN-RULES §13): .sheet-out for --dur-1, then the list is back at the same place.
+// A rotation to a wide screen (now) or reduced motion closes it at once
+function closeSheet(now) {
+  const done = () => { sheetOut = 0; document.body.classList.remove('sheet', 'sheet-out'); document.documentElement.style.overflow = ''; scrollTo({top:sheetY, behavior:'instant'}); };
+  if (now || matchMedia('(prefers-reduced-motion: reduce)').matches) { clearTimeout(sheetOut); return done(); }
+  if (sheetOut) return;
+  document.body.classList.add('sheet-out');
+  sheetOut = setTimeout(done, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dur-1')) || 160);
+}
 function openCoin(sym) {
   if (page !== 'market') go('market');   // staying on the market keeps the list's scroll position
   loadChart(sym);
@@ -3622,7 +3643,7 @@ function openCoin(sym) {
 }
 $('#sheetBack').onclick = () => history.state?.sheet ? history.back() : closeSheet();
 window.addEventListener('popstate', () => { if (document.body.classList.contains('sheet')) closeSheet(); });
-matchMedia('(max-width:700px)').addEventListener('change', e => { if (!e.matches && document.body.classList.contains('sheet')) { closeSheet(); drawChart(); } });   // rotated to a wide screen
+matchMedia('(max-width:700px)').addEventListener('change', e => { if (!e.matches && document.body.classList.contains('sheet')) { closeSheet(true); drawChart(); } });   // rotated to a wide screen
 // summary cards are shortcuts to the matching filter; a second tap clears it
 document.querySelectorAll('.card[data-cf]').forEach(c => {
   c.onclick = () => {
