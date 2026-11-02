@@ -1387,8 +1387,8 @@ details.dis>.dbody{padding:0 16px 16px}
       <p>Вход — через Telegram: сервис не запрашивает почту, телефон и пароль. Cookie, аналитика, реклама и счётчики посещений не используются.</p>
       <ul>
         <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере», профили, избранное, свои уровни, настройки и тема, а также ключ доступа к вашему серверному боту.</li>
-        <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, свои уровни и вид «Беты». Журнал бота «В браузере» в профиль не передаётся.</li>
-        <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Бот анонимный, доступ к нему есть только у браузера, где хранится ключ.</li>
+        <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, ключ доступа к серверному боту, свои уровни, вид «Беты» и доступ к ней по коду. Журнал бота «В браузере» в профиль не передаётся.</li>
+        <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Доступ к боту есть у браузера, где хранится ключ, а если вы вошли — у вашего профиля.</li>
         <li><b>На сервере, если вы подключили Telegram</b>: номер чата, имя из профиля Telegram, выбранные уведомления и состояние доставки последнего сообщения.</li>
         <li><b>IP-адрес</b> — только для ограничения частоты запросов: создание серверных ботов, вход через Telegram и попытки входа в «Бету». Удаляется автоматически в течение двух суток.</li>
       </ul>
@@ -2455,7 +2455,7 @@ function authProfile() {
   authRun++;
   $('#authT').textContent = 'Профиль';
   authBody(`<p>Вы вошли через Telegram${ME?.tg_name ? ` как <b>${esc(ME.tg_name)}</b>` : ''}${ME?.tg_username ? ` (@${esc(ME.tg_username)})` : ''}.</p>
-    <p class="faint">В профиле хранятся настройки, избранное, профили бота, уровни на графиках и вид «Беты» — они одинаковые на всех ваших устройствах. Журнал и бот в браузере у каждого устройства свои.</p>
+    <p class="faint">В профиле хранятся настройки, избранное, профили бота, серверный бот, уровни на графиках, вид и доступ к «Бете» — они одинаковые на всех ваших устройствах. Журнал и бот «В браузере» у каждого устройства свои.</p>
     <div class="authrow"><button id="authOut">Выйти</button><button id="authOutAll">Выйти на всех устройствах</button></div>
     <button class="danger" id="authDel">Удалить профиль</button>`);
 }
@@ -2503,7 +2503,7 @@ document.addEventListener('visibilitychange', () => {
 // Beta's layout and drawings. The journal and the browser bot stay on each device: two open devices would both trade one
 // journal; the bot that serves several devices is the server one. Everything is read once at start-up, so values that came
 // from another device are written to storage and the page reloads (at most once in 15 s).
-const SYNC = new Set(['sr_settings', 'sr_favs', 'sr_bot', 'sr_lv', 'sr_tfilt', 'sr_msort', 'sr_jsort', 'sr_recent',
+const SYNC = new Set(['sr_settings', 'sr_favs', 'sr_bot', 'sr_ubot', 'sr_lv', 'sr_tfilt', 'sr_msort', 'sr_jsort', 'sr_recent',
   'sr_bcfg', 'sr_bdraw', 'sr_bind', 'sr_bpanes', 'sr_blay', 'sr_bchips', 'sr_bhide', 'sr_blabels', 'sr_bvol', 'sr_bnotec', 'sr_blink']);
 let SYNCV = load('sr_sync', null), syncReady = false, syncTimer2 = 0;   // {uid, v: {key: version this device has}}
 const syncDirty = new Set();
@@ -2537,11 +2537,20 @@ async function syncPush() {
   save('sr_sync', SYNCV);
 }
 function syncApply(rows, asked) {   // values from the profile → this device's storage, then a reload so everything reads them
+  // the profile's server bot replaces this device's own one: that one is remembered, and the next start offers to delete it
+  const ub = rows.find(r => r.key === 'sr_ubot'), mine = load('sr_ubot', null);
+  if (ub && mine?.id && ub.value?.id !== mine.id) save('sr_ubot_old', mine);
   for (const r of rows) { try { localStorage.setItem(r.key, JSON.stringify(r.value)); } catch { /* full storage: the old value stays */ } SYNCV.v[r.key] = r.version; }
   save('sr_sync', SYNCV);
   const last = +sessionStorage.getItem('sr_syncreload') || 0;
   if (!asked && Date.now() - last < 15e3) return;   // never a reload loop; the values are stored and apply at the next start
   sessionStorage.setItem('sr_syncreload', Date.now()); location.reload();
+}
+async function oldBotAsk() {   // this device's own server bot, replaced by the profile's: delete it, or it keeps trading (and messaging)
+  const old = load('sr_ubot_old', null); if (!old?.id || old.id === UB?.id) return save('sr_ubot_old', null);
+  const del = await ask({title:'Удалить прежний серверный бот?', text:'На этом устройстве был свой бот на сервере, теперь здесь бот из профиля. Прежний продолжит работать, пока его не удалить: его сделки и позиции удалятся.', ok:'Удалить', no:'Оставить', danger:true});
+  if (del) { try { await rpc('ub_delete', {p_id:old.id, p_secret:old.secret}); toast('Прежний бот удалён', '', 'ok'); } catch (e) { if (!/forbidden/.test(e.message)) return toast('Не удалось удалить прежний бот', String(e.message || e), 'bad'); } }
+  save('sr_ubot_old', null);
 }
 async function syncStart() {   // after sign-in and on every start while signed in
   if (!AUTH) return;
@@ -2551,7 +2560,8 @@ async function syncStart() {   // after sign-in and on every start while signed 
     syncReady = true;
     const newer = rows.filter(r => r.version > (SYNCV.v[r.key] || 0));
     for (const k of SYNC) if (localStorage.getItem(k) != null && !rows.some(r => r.key === k)) onSaved(k);   // keys the profile doesn't have yet
-    if (newer.length) syncApply(newer);
+    if (newer.length) syncApply(newer);   // reloads, and the next start asks about a replaced bot
+    else oldBotAsk();
     return;
   }
   // the first sign-in with this profile on this device
@@ -2575,8 +2585,13 @@ async function syncCheck() {   // back to the tab: another device may have chang
 renderAcct(); scheduleRefresh(); loadMe().then(() => syncStart());
 
 // ---------- my bot on the server: this browser holds the secret of its own server bot ----------
+// signed in, calls go as the person (the profile's Telegram, the Beta, owner rights); a stale token is refreshed once
 async function rpc(fn, args) {
-  const r = await fetch(SB_URL + 'rpc/' + fn, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json'}, body:JSON.stringify(args), signal:AbortSignal.timeout(15000)});
+  if (AUTH && AUTH.exp - Date.now() < 60e3) await refreshSession();
+  const call = () => fetch(SB_URL + 'rpc/' + fn, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json', ...(AUTH ? {Authorization:'Bearer ' + AUTH.at} : {})},
+    body:JSON.stringify(args), signal:AbortSignal.timeout(15000)});
+  let r = await call();
+  if (r.status === 401 && AUTH) { await refreshSession(); r = await call(); }
   if (!r.ok) throw new Error((await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
@@ -2906,6 +2921,13 @@ $('#btg').onclick = async e => {
   if (b.dataset.tg === 'off') {
     try { await rpc('ub_tg_unlink', {p_id:UB.id, p_secret:UB.secret}); SB_MINE.tg = false; renderTg(); toast('Telegram отключён', '', 'ok'); }
     catch (err) { toast('Не удалось отключить', String(err.message || err), 'bad'); }
+    return;
+  }
+  if (AUTH && ME) {   // signed in through Telegram: the bot writes to that same account, no link to open
+    b.disabled = true;
+    try { await rpc('ub_tg_me', {p_id:UB.id, p_secret:UB.secret}); SB_MINE.tg = true; renderTg(); toast('Telegram подключён', `Сделки и сигналы бота придут в Telegram${ME.tg_username ? ' @' + ME.tg_username : ''}`, 'ok'); fetchServerBot(); }
+    catch (err) { toast('Не удалось подключить', String(err.message || err), 'bad'); }
+    finally { b.disabled = false; }
     return;
   }
   const w = window.open('', '_blank');   // opened right on the click, so the browser doesn't block it
@@ -3716,6 +3738,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.65', date:'2 ноября 2026', title:'Бот, Telegram и «Бета» в профиле', items:[
+    'Серверный бот хранится в профиле и один на всех ваших устройствах.',
+    'Если на устройстве был свой серверный бот, сайт предлагает удалить его.',
+    'Telegram подключается к серверному боту одной кнопкой — в аккаунт, через который выполнен вход.',
+    'Доступ к «Бете» по коду, введённому после входа, действует на всех устройствах профиля.',
+  ]},
   {v:'2.64', date:'2 ноября 2026', title:'Настройки в профиле', items:[
     'Настройки, избранное, профили бота, уровни на графиках и вид «Беты» хранятся в профиле и одинаковы на всех устройствах.',
     'При первом входе на устройстве можно взять настройки из профиля или оставить текущие.',
@@ -3778,10 +3806,6 @@ const CHANGELOG = [
   ]},
   {v:'2.54', date:'28 октября 2026', title:'Сделки на узких экранах', items:[
     'Исправлено обрезание дат и цен в сделках на самых узких экранах.',
-  ]},
-  {v:'2.53', date:'28 октября 2026', title:'Цены сделок на телефоне', items:[
-    'Исправлено обрезание цен в списках сделок журнала и бэктеста на телефоне.',
-    'На узких экранах цены входа и выхода показаны через стрелку.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4587,14 +4611,24 @@ function betaExpire(msg) {
   $('#betaErr').textContent = msg || 'Срок доступа истёк — попросите у владельца новый код';
   if (location.hash.startsWith('#beta')) betaOpen();
 }
+// signed in: the profile's access counts on every device — the owner's, or a code redeemed while signed in (until it ends or is revoked)
+async function betaProfile() {
+  let r; try { r = await rpc('beta_me', {}); } catch { return; }
+  const cur = load('sr_beta', false);
+  if (r?.owner) { if (cur !== true) save('sr_beta', true); }
+  else if (r?.exp) { const exp = Date.parse(r.exp); if (cur !== true && !(cur?.exp > exp)) save('sr_beta', {profile:true, exp}); }
+  else if (cur?.profile) save('sr_beta', false);
+}
 function betaWatch(st) {   // a temporary code: close the tab when it runs out, and ask the server whether it is still valid
   clearTimeout(betaTimer); betaTimer = setTimeout(() => betaExpire(), Math.min(st.exp - Date.now(), 2 ** 31 - 1));
+  if (st.profile) return;   // betaProfile has just asked the server
   rpc('beta_redeem', {p_code:st.code}).then(r => {
     if (r && !r.ok) betaExpire(r.error);
     else if (r?.expires_at) { st.exp = Date.parse(r.expires_at); save('sr_beta', st); $('#betaUntil').textContent = `доступ до ${dt(st.exp)}`; }
   }).catch(() => {});
 }
 async function betaOpen() {
+  if (AUTH) await betaProfile();
   const raw = load('sr_beta', false), st = betaState();
   if (raw && raw !== true && !st) { save('sr_beta', false); $('#betaErr').textContent = 'Срок доступа истёк — попросите у владельца новый код'; }
   $('#betaLock').classList.toggle('hidden', !!st); $('#betaApp').classList.toggle('hidden', !st);
@@ -4623,7 +4657,9 @@ $('#betaForm').onsubmit = async e => {
     if (!/^SR-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) {
       const o = await rpc('beta_owner', {p_admin:v});
       if (!o?.ok) return err('Неверный пароль или код (после 5 ошибок — пауза 15 минут)');
-      betaOwnerPass = v; $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true); return betaOpen();
+      betaOwnerPass = v; $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true);
+      if (AUTH) loadMe();   // signed in, the right password also made the profile the owner's
+      return betaOpen();
     }
     const r = await rpc('beta_redeem', {p_code:code});
     if (!r?.ok) return err(r?.error || 'Неверный пароль или код');
@@ -4641,9 +4677,10 @@ $('#betaForm').onsubmit = async e => {
 let accHours = 24;
 const accErr = t => { $('#bAccOut').innerHTML = `<div class="acc-err">${t}</div>`; };
 const accEsc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
+const ownerByProfile = () => !!(AUTH && ME?.is_owner);   // the owner's profile needs no password for codes
 async function accList() {
   const pass = $('#bAccPass').value.trim();
-  if (!pass) { $('#bAccList').innerHTML = '<div class="faint">Введите пароль владельца.</div>'; return; }
+  if (!pass && !ownerByProfile()) { $('#bAccList').innerHTML = '<div class="faint">Введите пароль владельца.</div>'; return; }
   let r; try { r = await rpc('beta_list', {p_admin:pass}); } catch { return accErr('Нет связи с сервером'); }
   if (!r?.ok) return accErr(r?.error || 'Не получилось');
   const now = Date.now();
@@ -4655,7 +4692,8 @@ async function accList() {
 }
 $('#betaAccessBtn').onclick = () => {
   $('#bAccess').classList.remove('hidden'); $('#bAccPass').value ||= betaOwnerPass; $('#bAccOut').innerHTML = '';
-  (betaOwnerPass ? $('#bAccNote') : $('#bAccPass')).focus(); if ($('#bAccPass').value) accList();
+  const prof = ownerByProfile(); $('#bAccPass').closest('label').classList.toggle('hidden', prof);
+  (betaOwnerPass || prof ? $('#bAccNote') : $('#bAccPass')).focus(); if ($('#bAccPass').value || prof) accList();
 };
 $('#bAccClose').onclick = () => $('#bAccess').classList.add('hidden');
 $('#bAccess').onclick = e => { if (e.target.id === 'bAccess') $('#bAccess').classList.add('hidden'); };
@@ -4669,7 +4707,7 @@ $('#bAccList').onclick = async e => {
   toast('Код отозван', '', 'ok'); accList();
 };
 $('#bAccIssue').onclick = async () => {
-  const pass = $('#bAccPass').value.trim(); if (!pass) { $('#bAccPass').focus(); return accErr('Введите пароль владельца'); }
+  const pass = $('#bAccPass').value.trim(); if (!pass && !ownerByProfile()) { $('#bAccPass').focus(); return accErr('Введите пароль владельца'); }
   $('#bAccIssue').disabled = true;
   try {
     const r = await rpc('beta_issue', {p_admin:pass, p_hours:accHours, p_note:$('#bAccNote').value.trim() || null});
