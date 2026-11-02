@@ -484,7 +484,10 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
   .sorthint{display:none}
   #jclosed tr.jday,#jclosed tr.jday td{display:block}#jclosed tr.jday td{padding:14px 12px 6px}
   #jopen,#jclosed,#btTrades{container:trades/inline-size}
-  #jopen tr.row,#jclosed tr.row,#btTrades tr.row{display:grid;grid-template-columns:112px minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--row-line)}
+  /* the first column grows when an entry price is longer than it (spot prices of PEPE, SHIB: «$0.000005077», 12 signs);
+     the date keeps the column's own width (max-width), so only the price widens it */
+  #jopen tr.row,#jclosed tr.row,#btTrades tr.row{display:grid;grid-template-columns:minmax(112px,max-content) minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--row-line)}
+  :is(#jopen,#jclosed,#btTrades) tr.row td:nth-child(1){max-width:112px}
   #jopen tr.row td,#jclosed tr.row td,#btTrades tr.row td{display:none;padding:0;border:0;text-align:left}
   /* closed trades (journal and backtest): 1 date · 2 coin · 3 side · 4 entry · 5 exit · 7 reason · 11 PnL · 12 R */
   :is(#jclosed,#btTrades) tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(7),:nth-child(11),:nth-child(12)){display:block}
@@ -505,7 +508,8 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
      «$0.005517 → $0.005658», the first column fits a date with a year (~94 px; one that doesn't fit goes on two lines)
      and the reason tag is compact, as in the narrow coin table */
   @container trades (max-width:359.98px){
-    :is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:96px minmax(0,1fr) auto;column-gap:8px}
+    :is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:minmax(96px,max-content) minmax(0,1fr) auto;column-gap:8px}
+    :is(#jopen,#jclosed,#btTrades) tr.row td:nth-child(1){max-width:96px}
     :is(#jopen,#jclosed,#btTrades) td:nth-child(4)::before{content:none}:is(#jopen,#jclosed,#btTrades) td:nth-child(5)::before{content:"→ "}
     :is(#jopen,#jclosed,#btTrades) td:nth-child(1){white-space:normal}:is(#jclosed,#btTrades) td:nth-child(7) .tag{padding:3px 6px;font-size:10.5px}
   }
@@ -513,9 +517,11 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
      «тайм-стоп», a $1 000+ result or «Закрыть», so everything in it is a little tighter. The first column fits a date
      without a year (~75 px) */
   @container trades (max-width:299.98px){
-    :is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:76px minmax(0,1fr) auto;column-gap:6px;padding-left:8px;padding-right:8px}
-    #jclosed tr.jday td{padding-left:8px;padding-right:8px}
-    :is(#jopen,#jclosed,#btTrades) td:is(:nth-child(4),:nth-child(5)){font-size:11px}#jopen td.jx button{min-width:0}
+    :is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:minmax(76px,max-content) minmax(0,1fr) auto;column-gap:4px;padding-left:6px;padding-right:6px}
+    :is(#jopen,#jclosed,#btTrades) tr.row td:nth-child(1){max-width:76px}
+    #jclosed tr.jday td{padding-left:6px;padding-right:6px}
+    /* «$0.000005077 → $0.000004824» beside «тайм-стоп» and a $1 000+ result: prices a little tighter, gaps 4 px, row edges 6 px */
+    :is(#jopen,#jclosed,#btTrades) td:is(:nth-child(4),:nth-child(5)){font-size:11px;letter-spacing:-.3px}#jopen td.jx button{min-width:0}
   }
   /* open positions: 1 opened · 2 coin · 3 side · 4 entry · 5 now · 9 PnL · 10 R */
   #jopen tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10)){display:block}
@@ -3373,6 +3379,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.58', date:'2 ноября 2026', title:'Цены дешёвых монет', items:[
+    'Исправлено обрезание цен самых дешёвых монет в сделках журнала и бэктеста на телефоне.',
+  ]},
   {v:'2.57', date:'29 октября 2026', title:'Аккуратная вёрстка «Беты»', items:[
     'Лента сделок перенесена в отдельную полосу у стакана и не закрывает свечи.',
     'Исправлено наложение подписей в стакане, в шапке графика и у построений.',
@@ -3429,11 +3438,6 @@ const CHANGELOG = [
     'Загрузку истории в бэктесте можно прервать; загруженные данные сохраняются.',
     'Над таблицей монет поясняется действие включённого фильтра.',
     'Названия карточек рынка полностью видны на экранах шириной 320 px.',
-  ]},
-  {v:'2.46', date:'26 октября 2026', title:'Стартовый баланс и сложный процент в «Моём боте»', items:[
-    'В профиле бота добавлен переключатель «Сложный процент».',
-    'При сбросе журнала можно задать стартовый баланс от $100 до $10 000 000.',
-    'Исправлен возможный откат сброса журнала серверного бота.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
