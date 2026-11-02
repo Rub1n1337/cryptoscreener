@@ -6,7 +6,7 @@ name: Deploy Supabase functions
 on:
   push:
     branches: [main]
-    paths: ['supabase/functions/**', 'supabase/config.toml']
+    paths: ['supabase/functions/**', 'supabase/config.toml', '.github/workflows/deploy-functions.yml']
   workflow_dispatch:
 
 concurrency:
@@ -21,9 +21,10 @@ jobs:
       PROJECT_REF: aumldylzccbmddavtrqe
     steps:
       - uses: actions/checkout@v4
+      # pinned: «latest» became the 3.0 major on 02.11.2026 and the deploy failed; move up only after a manual run passes
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.122.0
       # both share supabase/functions/_shared, so both go out together; called by pg_cron and Telegram, hence no JWT check
       - name: Deploy bot
         run: supabase functions deploy bot --project-ref "$PROJECT_REF" --no-verify-jwt
