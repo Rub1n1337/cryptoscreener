@@ -69,6 +69,9 @@
   --control-shine:linear-gradient(160deg,var(--glass-pearl),var(--glass-shine) 18%,transparent 52%,var(--glass-cool));
   --glass-reflection:linear-gradient(115deg,transparent 30%,var(--glass-pearl) 44%,transparent 58%);
   --surface-light:linear-gradient(115deg,var(--light-wash),transparent 44%,var(--glass-cool));
+  /* panels: a faint pearl sheen top-left and a cool one bottom-right; the frosted table header */
+  --panel-sheen:linear-gradient(160deg,rgba(232,247,247,.085),transparent 40%,transparent 62%,rgba(155,211,211,.065));
+  --th-glass:rgba(19,21,23,.76);
   /* its centre is set in px from the top-left and follows the logo when the header's 1500px column is centred, so the page's
      layer and the header's (same box origin) line up into one patch */
   --glow-bg:radial-gradient(60rem 30rem at max(7rem, calc(50% - 750px + 7rem)) -6rem, var(--glow), transparent 70%);
@@ -98,6 +101,8 @@
   --glass-press:rgba(74,82,82,.12);--glass-drop:rgba(44,44,50,.18);--light-wash:rgba(241,198,113,.07);--light-edge:rgba(185,142,26,.3);
   --glass-line:rgba(193,209,208,.74);--glass-line2:rgba(183,202,200,.62);--glass-top:rgba(201,214,214,.66);
   --card-lo:rgba(26,128,64,.08);--card-hi:rgba(213,43,57,.07);
+  --panel-sheen:linear-gradient(160deg,rgba(241,198,113,.06),transparent 40%,transparent 62%,rgba(133,188,188,.09));
+  --th-glass:rgba(255,255,255,.78);
   --tag-t:#334155;--up-t:#b4232f;--lo-t:#15803d;--acc-t:#8a6100;
   --bad-line:#f2b8be;--bad-bg:#fdecee;--ok-line:#a7dcb9;--warn-line:#ead198;
   --c-up:#dc2626;--c-lo:#16a34a;--c-mid:#7b8798;--c-trade:#7c3aed;--c-price:#1f2937;--c-acc:#c28a00;
@@ -900,23 +905,28 @@ details.dis>.dbody{padding:0 16px 16px}
 /* ---------- glass (Lovable, the owner's pick): light sits on surfaces — a pearl top edge, a cool reflection, a darker
    bottom — on the header, its tools, menus and dialogs; gold stays for what is chosen. Rows, numbers and chart pixels stay
    opaque and sharp; the header's own rules are with .top ---------- */
-.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
+.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
 .top .tools button:not(.primary,.on,.bad){background-color:var(--s2)}
-.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
+.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
 /* on hover a reflection crosses the button once */
 @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
-  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
-  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover{background-position:0 0,0 0}
+  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover{background-position:0 0,0 0}
 }
-.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active{box-shadow:inset 0 2px 5px var(--glass-press)}
+.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active,button.icon:active{box-shadow:inset 0 2px 5px var(--glass-press)}
 .top .tab.on::after{box-shadow:0 2px 8px var(--light-edge)}
+/* segmented controls (timeframes, filters, modes) are a glass track; the chosen tab sits in it as a lighter pane */
+.seg{background:var(--control-shine),var(--s2);border-color:var(--glass-line);box-shadow:var(--glass-inset)}
 .seg .tab.on:not([data-fl]){background:var(--control-shine),var(--s3);box-shadow:var(--glass-inset);border-radius:var(--r-s)}
 button.primary,.authgo,button.primary:hover,.authgo:hover{background-image:var(--control-shine)}
 button.primary,.authgo{box-shadow:var(--glass-inset),0 4px 12px -8px var(--light-edge)}
 button.primary:hover,.authgo:hover{box-shadow:var(--glass-inset),0 4px 16px -6px var(--light-edge)}
 /* the summary strip: warm light from the top-left; a card lights up in its meaning's colour */
 .cards,.statrow{background:var(--surface-light),var(--s1);border-top-color:var(--glass-top);box-shadow:inset 0 1px 0 var(--glass-shine)}
-.panel{box-shadow:inset 0 1px 0 var(--glass-shine)}
+/* panels are most of a wide screen, so the glass has to read there: a faint sheen, a lit top edge, a soft drop. No blur —
+   text, numbers and charts stay sharp */
+.panel{background:var(--panel-sheen),var(--s1);border-top-color:var(--glass-top);box-shadow:inset 0 1px 0 var(--glass-edge),0 10px 28px -20px var(--glass-drop)}
+th{border-bottom-color:var(--glass-top)}
 .card[data-cf]{--card-light:var(--glass-warm)}.card[data-cf=lo]{--card-light:var(--card-lo)}.card[data-cf=hi]{--card-light:var(--card-hi)}.card[data-cf=sq]{--card-light:var(--glass-cool)}
 .card[data-cf]:hover,.card[data-cf]:focus-visible{background:linear-gradient(160deg,var(--card-light),transparent 75%),var(--s2)}
 .card[data-cf].on{background:linear-gradient(160deg,var(--card-light),transparent 80%),var(--sel)}
@@ -931,16 +941,21 @@ button.primary:hover,.authgo:hover{box-shadow:var(--glass-inset),0 4px 16px -6px
 @supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty{background-color:var(--glass-fill);backdrop-filter:blur(var(--glass-blur)) saturate(115%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(115%)}
   .ctools button:not(.on){background-color:var(--glass-fill);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  /* the table header is frosted: rows blur under it while the list scrolls (the sticky coin column's cell too) */
+  th,#mhead th:nth-child(2){background:var(--th-glass);backdrop-filter:blur(10px) saturate(120%);-webkit-backdrop-filter:blur(10px) saturate(120%)}
+  /* phone: the search and filters bar that sticks under the header — the list scrolls under it */
+  @media(max-width:700px){.tpanel>.filters:first-child{background:var(--th-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}}
 }
 h1,h2,h3,h4,.card .v{letter-spacing:0}
 @media(max-width:700px){
   .top .tab.on::before{box-shadow:0 2px 8px var(--light-edge)}
   .top .tabs .tab.on svg{filter:drop-shadow(0 0 5px var(--light-edge))}
   .mbox{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .mhead{background:var(--control-shine),var(--topbg);box-shadow:var(--glass-inset)}   /* the trade card's sticky head */
 }
 /* «reduce transparency» in the system: solid surfaces, no blur */
 @media(prefers-reduced-transparency:reduce){
-  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on){background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 </style>
 </head>
@@ -3876,6 +3891,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.71', date:'2 ноября 2026', title:'Стекло на компьютере', items:[
+    'Стекло стало заметнее на большом экране: у панелей появились отблеск и светлая верхняя кромка.',
+    'Переключатели таймфрейма и фильтров, а также кнопки-иконки стали стеклянными.',
+    'Заголовок таблицы стал матовым, под ним размываются прокручиваемые строки.',
+    'На телефоне матовыми стали панель поиска над таблицей и шапка карточки сделки.',
+  ]},
   {v:'2.70', date:'2 ноября 2026', title:'Новый логотип и стекло', items:[
     'Логотип получил новую форму Σ и более благородные цвета канала: рубиновый, золотой и изумрудный.',
     'Шапка, меню и окна стали матовым стеклом, а цифры, таблицы и графики остались чёткими.',
@@ -3936,13 +3957,6 @@ const CHANGELOG = [
     'Цифры в шапке графика подписаны: диапазон, границы, RSI, T½ и канал.',
     'Цвета значков монет стали одинаково яркими, выбранная строка таблицы — золотистой.',
     'Звезда избранного над графиком стала удобнее для пальца.',
-  ]},
-  {v:'2.59', date:'2 ноября 2026', title:'Новая карточка позиции', items:[
-    'Карточка позиции показывает итог крупно и путь цены между стопом и тейком.',
-    'Цифры карточки собраны в группы, разбор сигнала стоит под графиком.',
-    'При выборе монеты на телефоне видно, что её график загружается.',
-    'Исправлены полосы поверх рынка при включённых дополнительных колонках.',
-    'Отметки версий в «Что нового» стоят ровно на линии.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
