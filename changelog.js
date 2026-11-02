@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.61 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.62 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.62', date:'2 ноября 2026', title:'Новые шрифты и навигация', items:[
+    'Текст набран шрифтом Manrope, цены и числа — моноширинным JetBrains Mono.',
+    'Панели и кнопки стали строже: скругления меньше.',
+    'Открытый раздел в шапке отмечен золотой линией, на телефоне — золотым названием.',
+    'Выбранный быстрый фильтр над таблицей монет выделен золотом.',
+  ]},
   {v:'2.61', date:'2 ноября 2026', title:'Шкалы в разборе сигнала', items:[
     'В разборе сигнала добавлены шкалы положения в диапазоне и RSI с отметками 30 и 70.',
     'Шкала диапазона в таблице стала тоньше и совпадает со шкалой в разборе.',

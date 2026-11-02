@@ -1612,7 +1612,9 @@ const SCAN_MS = 60000;
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 // a full browser storage used to fail silently (a long journal would simply stop being saved): say it once
 let saveWarned = false, onSaved = null;   // onSaved: the profile sync (accounts) hears which key changed
-const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); onSaved?.(k); } catch (e) {
+// an unchanged value is not a change: the table saves its filters on every redraw, and each save used to reach the profile as
+// a new version, so the other devices kept reloading for nothing
+const save = (k, v) => { try { const s = JSON.stringify(v); if (localStorage.getItem(k) === s) return; localStorage.setItem(k, s); onSaved?.(k); } catch (e) {
   if (!saveWarned && /quota/i.test(e?.name + e?.message)) { saveWarned = true; setTimeout(() => toast('Браузер не сохраняет данные сайта', 'Хранилище переполнено: новые сделки журнала и настройки не запомнятся после перезагрузки. Освободите место (сбросьте журнал или очистите данные сайта).', 'bad'), 0); }
 } };
 let S = Object.assign({}, DEF, load('sr_settings', {}));
@@ -2729,8 +2731,9 @@ function syncApply(rows, asked) {   // values from the profile → this device's
 }
 async function oldBotAsk() {   // this device's own server bot, replaced by the profile's: delete it, or it keeps trading (and messaging)
   const old = load('sr_ubot_old', null); if (!old?.id || old.id === UB?.id) return save('sr_ubot_old', null);
-  const del = await ask({title:'Удалить прежний серверный бот?', text:'На этом устройстве был свой бот на сервере, теперь здесь бот из профиля. Прежний продолжит работать, пока его не удалить: его сделки и позиции удалятся.', ok:'Удалить', no:'Оставить', danger:true});
+  const del = await ask({title:'Удалить прежний серверный бот?', text:'На этом устройстве был свой бот на сервере, теперь здесь бот из профиля. Прежний продолжит работать, пока его не удалить: его сделки и позиции удалятся. Сообщения в Telegram он больше не присылает.', ok:'Удалить', no:'Оставить', danger:true});
   if (del) { try { await rpc('ub_delete', {p_id:old.id, p_secret:old.secret}); toast('Прежний бот удалён', '', 'ok'); } catch (e) { if (!/forbidden/.test(e.message)) return toast('Не удалось удалить прежний бот', String(e.message || e), 'bad'); } }
+  else { try { await rpc('ub_tg_unlink', {p_id:old.id, p_secret:old.secret}); } catch (e) { if (!/forbidden/.test(e.message)) return; } }   // kept, it trades on unseen: its messages would double the profile bot's
   save('sr_ubot_old', null);
 }
 async function syncStart() {   // after sign-in and on every start while signed in
@@ -3922,6 +3925,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.74', date:'2 ноября 2026', title:'Без дублей в Telegram', items:[
+    'Исправлены повторные сообщения в Telegram от нескольких ботов одного человека: в чат пишет только последний подключённый.',
+    'Прежний бот, оставленный после перехода на бот из профиля, больше не пишет в Telegram.',
+    'Исправлены лишние перезагрузки и уведомления «Настройки изменены на другом устройстве».',
+  ]},
   {v:'2.73', date:'2 ноября 2026', title:'Единое стекло', items:[
     'Все карточки, раскрывающиеся блоки, предупреждения и форма бэктеста выглядят одинаковым стеклом.',
     'Обычные кнопки стали стеклянными, как кнопки шапки, а поля ввода и списки получили мягкую глубину.',
@@ -3982,12 +3990,6 @@ const CHANGELOG = [
   {v:'2.63', date:'2 ноября 2026', title:'Вход через Telegram', items:[
     'Добавлен вход в профиль через Telegram-бота: без пароля и почты, подтверждением кода в боте.',
     'Добавлены выход из профиля и выход на всех устройствах.',
-  ]},
-  {v:'2.62', date:'2 ноября 2026', title:'Новые шрифты и навигация', items:[
-    'Текст набран шрифтом Manrope, цены и числа — моноширинным JetBrains Mono.',
-    'Панели и кнопки стали строже: скругления меньше.',
-    'Открытый раздел в шапке отмечен золотой линией, на телефоне — золотым названием.',
-    'Выбранный быстрый фильтр над таблицей монет выделен золотом.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

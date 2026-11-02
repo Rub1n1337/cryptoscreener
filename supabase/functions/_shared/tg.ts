@@ -260,7 +260,9 @@ async function onMessage(db: any, m: any, call: Call) {
     if (!c.sub) await db.from("tg_subs").insert({ chat_id: chat, name: chatName(m.chat) });
     if (/^b[0-9a-f]{18}$/.test(arg)) {   // a link code from the site: this chat gets that bot's trades and signals
       const { data: b } = await db.from("user_bots").select("id, active_profile").eq("tg_code", arg).gt("tg_code_until", new Date().toISOString()).maybeSingle();
-      if (b) { await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ <b>Ваш бот с сайта привязан</b>${b.active_profile ? ` · «${esc(b.active_profile)}»` : ""}\nСюда будут приходить его сделки и сигналы по его правилам. Что именно присылать — «🔔 Уведомления».`); }
+      if (b) {   // one bot per chat: an older bot linked here (another device's, a forgotten one) would double every message
+        await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat).neq("id", b.id);
+        await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ <b>Ваш бот с сайта привязан</b>${b.active_profile ? ` · «${esc(b.active_profile)}»` : ""}\nСюда будут приходить его сделки и сигналы по его правилам. Что именно присылать — «🔔 Уведомления».`); }
       else await say("⌛ Ссылка устарела — на сайте нажмите «Подключить Telegram» ещё раз.", [[link("🌐 Открыть «Мой бот»", "/#journal")]]);
     }
     c = await ctx(db, chat);
