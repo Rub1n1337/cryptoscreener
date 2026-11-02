@@ -2395,15 +2395,22 @@ function signedOut() {   // this device keeps its copy of the settings; the prof
 }
 function scheduleRefresh() {
   clearTimeout(authTimer);
-  if (AUTH?.rt) authTimer = setTimeout(refreshSession, Math.max(5e3, AUTH.exp - Date.now() - 120e3));
+  // 1.5-2 minutes before the end, at a random moment: two tabs rarely refresh together
+  if (AUTH?.rt) authTimer = setTimeout(refreshSession, Math.max(5e3, AUTH.exp - Date.now() - 90e3 - Math.random() * 30e3));
 }
 function refreshSession() {   // one at a time; a refresh token works once, so another tab's fresh tokens are taken, not refreshed again
   if (refreshing || !AUTH) return refreshing;
   refreshing = (async () => {
     const cur = load('sr_auth', null);
     if (cur?.rt && cur.rt !== AUTH.rt) { AUTH = cur; if (cur.exp - Date.now() > 120e3) return scheduleRefresh(); }
-    try { setSession(await gotrue('token?grant_type=refresh_token', {refresh_token:AUTH.rt})); }
-    catch (e) { if (e.status >= 400 && e.status < 500) signedOut(); else authTimer = setTimeout(refreshSession, 60e3); }   // offline: keep the tokens, try later
+    const used = AUTH.rt;
+    try { setSession(await gotrue('token?grant_type=refresh_token', {refresh_token:used})); }
+    catch (e) {
+      const now = load('sr_auth', null);   // another tab refreshed with the same token a moment earlier: its tokens are good
+      if (now?.rt && now.rt !== used) { AUTH = now; scheduleRefresh(); }
+      else if (e.status >= 400 && e.status < 500) signedOut();
+      else authTimer = setTimeout(refreshSession, 60e3);   // offline: keep the tokens, try later
+    }
   })().finally(() => { refreshing = null; });
   return refreshing;
 }
@@ -2531,8 +2538,10 @@ document.addEventListener('visibilitychange', () => {
 // Beta's layout and drawings. The journal and the browser bot stay on each device: two open devices would both trade one
 // journal; the bot that serves several devices is the server one. Everything is read once at start-up, so values that came
 // from another device are written to storage and the page reloads (at most once in 15 s).
-const SYNC = new Set(['sr_settings', 'sr_favs', 'sr_bot', 'sr_ubot', 'sr_lv', 'sr_tfilt', 'sr_msort', 'sr_jsort', 'sr_recent',
-  'sr_bcfg', 'sr_bdraw', 'sr_bind', 'sr_bpanes', 'sr_blay', 'sr_bchips', 'sr_bhide', 'sr_blabels', 'sr_bvol', 'sr_bnotec', 'sr_blink']);
+// Not synced on purpose: recent coins (change on every open — another device would get a notice each time), the Beta's
+// number of charts and hidden panels (a phone keeps fewer than a computer).
+const SYNC = new Set(['sr_settings', 'sr_favs', 'sr_bot', 'sr_ubot', 'sr_lv', 'sr_tfilt', 'sr_msort', 'sr_jsort',
+  'sr_bcfg', 'sr_bdraw', 'sr_bind', 'sr_bpanes', 'sr_bchips', 'sr_blabels', 'sr_bvol', 'sr_bnotec', 'sr_blink']);
 let SYNCV = load('sr_sync', null), syncReady = false, syncTimer2 = 0;   // {uid, v: {key: version this device has}}
 const syncDirty = new Set();
 const authUid = () => { try { return JSON.parse(atob(AUTH.at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch { return null; } };
@@ -2599,6 +2608,8 @@ async function syncStart() {   // after sign-in and on every start while signed 
   SYNCV = {uid, v:Object.fromEntries(rows.map(r => [r.key, r.version]))};
   syncReady = true;
   if (take) return syncApply(rows, true);
+  // «Оставить эти»: this device's values win; what it doesn't have (the profile's server bot, say) comes from the profile
+  for (const r of rows) if (localStorage.getItem(r.key) == null) try { localStorage.setItem(r.key, JSON.stringify(r.value)); } catch { /* full storage */ }
   save('sr_sync', SYNCV);
   local.forEach(k => syncDirty.add(k));
   await syncPush();   // at once: a locked page reloads right after this
@@ -2954,7 +2965,7 @@ $('#btg').onclick = async e => {
   }
   if (AUTH && ME) {   // signed in through Telegram: the bot writes to that same account, no link to open
     b.disabled = true;
-    try { await rpc('ub_tg_me', {p_id:UB.id, p_secret:UB.secret}); SB_MINE.tg = true; renderTg(); toast('Telegram подключён', `Сделки и сигналы бота придут в Telegram${ME.tg_username ? ' @' + ME.tg_username : ''}`, 'ok'); fetchServerBot(); }
+    try { await rpc('ub_tg_me', {p_id:UB.id, p_secret:UB.secret}); if (SB_MINE) SB_MINE.tg = true; renderTg(); toast('Telegram подключён', `Сделки и сигналы бота придут в Telegram${ME.tg_username ? ' @' + ME.tg_username : ''}`, 'ok'); fetchServerBot(); }
     catch (err) { toast('Не удалось подключить', String(err.message || err), 'bad'); }
     finally { b.disabled = false; }
     return;
@@ -3767,6 +3778,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.67', date:'2 ноября 2026', title:'Надёжность входа', items:[
+    'Исправлен выход из профиля, который мог случиться, когда сайт открыт в нескольких вкладках.',
+    'Недавние монеты, число графиков и скрытые панели «Беты» у каждого устройства свои.',
+    'При выборе «Оставить эти» устройство получает из профиля то, чего у него не было, например серверный бот.',
+  ]},
   {v:'2.66', date:'2 ноября 2026', title:'Вход обязателен', items:[
     'Сайт открывается после входа через Telegram; без входа доступны описание сервиса и «Правовая информация».',
     'Ссылки на монеты из Telegram после входа открывают нужный график.',
@@ -3829,13 +3845,6 @@ const CHANGELOG = [
     'Щипок двумя пальцами приближает вокруг точки между пальцами.',
     'Изменившаяся цена коротко подсвечивается, график баланса прорисовывается при открытии.',
     'Кнопки откликаются на нажатие, окна и меню закрываются быстрее, заголовки переносятся ровнее.',
-  ]},
-  {v:'2.55', date:'28 октября 2026', title:'Стабильность и скорость «Беты»', items:[
-    'Исправлены пропуски свечей после обрыва связи и возврата на вкладку.',
-    'Добавлено предупреждение «нет данных», если биржа перестала присылать данные; график переподключается сам.',
-    'Подпись под графиком показывает состояние связи; после возвращения сети графики подключаются сразу.',
-    'Несколько графиков на экране работают плавнее.',
-    'История тепловой карты загружается быстрее.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4613,7 +4622,7 @@ function cmdRender() {
   $('#cmdl .cmdi.on')?.scrollIntoView({block:'nearest'});
   $('#cmdq').setAttribute('aria-activedescendant', cmdItems.length ? 'cmdo' + cmdIdx : '');
 }
-function cmdOpen() { cmdBack = document.activeElement; $('#cmdk').classList.remove('hidden'); document.documentElement.style.overflow = 'hidden'; $('#cmdq').value = ''; cmdIdx = 0; cmdRender(); $('#cmdq').focus(); }
+function cmdOpen() { if (LOCKED) return; cmdBack = document.activeElement; $('#cmdk').classList.remove('hidden'); document.documentElement.style.overflow = 'hidden'; $('#cmdq').value = ''; cmdIdx = 0; cmdRender(); $('#cmdq').focus(); }
 function cmdClose() { $('#cmdk').classList.add('hidden'); document.documentElement.style.overflow = ''; cmdBack?.focus?.({preventScroll:true}); }
 function cmdRun(i) { const it = cmdItems[i]; if (!it) return; cmdClose(); if (/^[cg]:/.test(it.id)) recentAdd(it.id); it.run(); }
 $('#cmdbtn').onclick = cmdOpen;

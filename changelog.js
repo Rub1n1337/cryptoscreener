@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.54 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.55 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.55', date:'28 октября 2026', title:'Стабильность и скорость «Беты»', items:[
+    'Исправлены пропуски свечей после обрыва связи и возврата на вкладку.',
+    'Добавлено предупреждение «нет данных», если биржа перестала присылать данные; график переподключается сам.',
+    'Подпись под графиком показывает состояние связи; после возвращения сети графики подключаются сразу.',
+    'Несколько графиков на экране работают плавнее.',
+    'История тепловой карты загружается быстрее.',
+  ]},
   {v:'2.54', date:'28 октября 2026', title:'Сделки на узких экранах', items:[
     'Исправлено обрезание дат и цен в сделках на самых узких экранах.',
   ]},

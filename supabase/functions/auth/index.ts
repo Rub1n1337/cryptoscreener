@@ -52,9 +52,12 @@ async function poll(b: any) {
   const email = `tg${q.tg_id}@users.invalid`;
   let { data: p } = await db.from("profiles").select("id").eq("tg_id", q.tg_id).maybeSingle();
   if (!p) {
-    const { data: u, error } = await db.auth.admin.createUser({ email, email_confirm: true, user_metadata: { tg_id: q.tg_id } });
-    if (error || !u?.user) return json({ error: "user: " + (error?.message || "?") }, 500);
-    const { error: e2 } = await db.from("profiles").insert({ id: u.user.id, tg_id: q.tg_id, tg_name: q.tg_name, tg_username: q.tg_username });
+    const { data: u } = await db.auth.admin.createUser({ email, email_confirm: true, user_metadata: { tg_id: q.tg_id } });
+    let uid = u?.user?.id;
+    // the Auth user can exist without a profile (an earlier sign-in stopped between the two): find it through its link
+    if (!uid) { const { data: l } = await db.auth.admin.generateLink({ type: "magiclink", email }); uid = l?.user?.id; }
+    if (!uid) return json({ error: "user" }, 500);
+    const { error: e2 } = await db.from("profiles").upsert({ id: uid, tg_id: q.tg_id, tg_name: q.tg_name, tg_username: q.tg_username });
     if (e2) return json({ error: "profile" }, 500);
   } else await db.from("profiles").update({ tg_name: q.tg_name, tg_username: q.tg_username, seen_at: new Date().toISOString() }).eq("id", p.id);
   const { data: link, error: e3 } = await db.auth.admin.generateLink({ type: "magiclink", email });
