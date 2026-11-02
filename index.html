@@ -613,6 +613,12 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
 }
 /* own confirm / prompt dialog */
 .cmdk.dlgwrap{align-items:center;padding:16px;z-index:90}
+.authbox{width:min(400px,100%)}.authh{display:flex;justify-content:space-between;align-items:center;gap:8px}.authh h3{margin:0}
+.authb{display:grid;gap:12px;margin-top:10px}.authb p{margin:0}
+.authcode{font-size:44px;line-height:1.15;text-align:center;letter-spacing:8px;padding:6px 0}
+.authgo{display:flex;align-items:center;justify-content:center;height:44px;border-radius:var(--r-s);background:var(--acc);color:var(--on-acc);font-weight:650;text-decoration:none}
+.authgo:hover{background:var(--acc-h)}.authrow{display:flex;gap:8px;flex-wrap:wrap}
+#acct.on .pt{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dlgbox{width:min(440px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:var(--r-l);box-shadow:var(--shadow);padding:20px}
 .dlgbox h3{margin:0 0 6px;font-size:17px}.dlgbox p{margin:0;color:var(--mute);font-size:14px;line-height:1.5}
 .dlgbox input:not([type=checkbox]):not([type=range]){width:100%;margin-top:14px}
@@ -872,6 +878,7 @@ details.dis>.dbody{padding:0 16px 16px}
   <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
   <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.6A9 9 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.6 3.4M6.6 6.6A15.6 15.6 0 0 0 2.5 12S6 18.5 12 18.5a8.6 8.6 0 0 0 4.3-1.1"/><path d="M9.9 9.9a2.8 2.8 0 0 0 4.2 4.2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.8-3.6 3.9-5.5 7.5-5.5s6.7 1.9 7.5 5.5"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
@@ -929,6 +936,7 @@ details.dis>.dbody{padding:0 16px 16px}
     <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей" aria-label="Состояние ботов"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
     <button class="icon" id="ntf" title="События: новые сигналы и сделки ботов" aria-label="События" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-bell"/></svg></button>
     <button class="pill cmdbtn" id="cmdbtn" title="Быстрый переход: монета, раздел или настройка" aria-label="Быстрый переход"><svg class="i"><use href="#i-search"/></svg><span class="pt">Поиск</span><kbd class="pt">Ctrl K</kbd></button>
+    <button class="pill" id="acct" title="Войти через Telegram" aria-label="Войти через Telegram"><svg class="i"><use href="#i-user"/></svg><span class="pt" id="acctTxt">Войти</span></button>
     <button class="icon" id="thm" title="Светлая или тёмная тема" aria-label="Переключить тему"><svg class="i"><use href="#i-sun"/></svg></button>
     <button class="icon" id="snd" title="Звук при новом сигнале" aria-label="Звук при новом сигнале"><svg class="i"><use href="#i-mute"/></svg></button>
   </div>
@@ -938,6 +946,10 @@ details.dis>.dbody{padding:0 16px 16px}
 <div id="dlg" class="cmdk dlgwrap hidden"><div class="dlgbox" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgD">
   <h3 id="dlgT"></h3><p id="dlgD"></p><input id="dlgIn" class="hidden" autocomplete="off" spellcheck="false">
   <div class="dlga"><button id="dlgNo">Отмена</button><button id="dlgOk" class="primary">Готово</button></div>
+</div></div>
+<div id="authDlg" class="cmdk dlgwrap hidden"><div class="dlgbox authbox" role="dialog" aria-modal="true" aria-labelledby="authT">
+  <div class="authh"><h3 id="authT">Вход через Telegram</h3><button class="icon" id="authClose" aria-label="Закрыть"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <div id="authBody" class="authb"></div>
 </div></div>
 <div id="toasts"></div>
 <div id="cmdk" class="cmdk hidden"><div class="cmdbox" role="dialog" aria-modal="true" aria-label="Быстрый переход">
@@ -2329,6 +2341,141 @@ function activeProfile() {
   const st = botRegime ? M.regimeOf(botRegime, {erMax:BP.erMax, regimeSrc:'majors'}) : 'flat';
   return profById(st === 'flat' ? BP.flat : BP.impulse);
 }
+// ---------- account: sign-in through the Telegram bot (docs/PLAN-ACCOUNTS.md) ----------
+// The tab keeps a secret and shows the code the auth function gave it; the person picks that code in the bot; the tab then
+// trades a one-time token for a Supabase session (/auth/v1/verify). Stage 1: signing in is optional, nothing else uses it yet.
+const SB_BASE = SB_URL.replace('/rest/v1/', ''), AUTH_URL = SB_BASE + '/auth/v1/', FN_URL = SB_BASE + '/functions/v1/';
+let AUTH = load('sr_auth', null), ME = null, authRun = 0, authTimer = 0, authBack = null, refreshing = null;
+const hexOf = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
+async function authFn(body) {
+  const r = await fetch(FN_URL + 'auth', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:AbortSignal.timeout(15000)})
+    .catch(() => { throw new Error('Нет связи с сервером входа. Проверьте интернет и попробуйте ещё раз.'); });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(r.status === 429 ? 'Слишком много попыток входа — попробуйте через 10 минут' : j.error || 'HTTP ' + r.status);
+  return j;
+}
+async function gotrue(path, body, token) {
+  const r = await fetch(AUTH_URL + path, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json', ...(token ? {Authorization:'Bearer ' + token} : {})},
+    body:JSON.stringify(body || {}), signal:AbortSignal.timeout(15000)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.msg || j.error_description || j.error || 'HTTP ' + r.status); e.status = r.status; throw e; }
+  return j;
+}
+function setSession(s) {   // a GoTrue session → the tokens and when the access token runs out
+  AUTH = s ? {at:s.access_token, rt:s.refresh_token, exp:Date.now() + (s.expires_in || 3600) * 1000} : null;
+  save('sr_auth', AUTH); scheduleRefresh();
+}
+function signedOut() { AUTH = null; ME = null; save('sr_auth', null); clearTimeout(authTimer); renderAcct(); }
+function scheduleRefresh() {
+  clearTimeout(authTimer);
+  if (AUTH?.rt) authTimer = setTimeout(refreshSession, Math.max(5e3, AUTH.exp - Date.now() - 120e3));
+}
+function refreshSession() {   // one at a time; a refresh token works once, so another tab's fresh tokens are taken, not refreshed again
+  if (refreshing || !AUTH) return refreshing;
+  refreshing = (async () => {
+    const cur = load('sr_auth', null);
+    if (cur?.rt && cur.rt !== AUTH.rt) { AUTH = cur; if (cur.exp - Date.now() > 120e3) return scheduleRefresh(); }
+    try { setSession(await gotrue('token?grant_type=refresh_token', {refresh_token:AUTH.rt})); }
+    catch (e) { if (e.status >= 400 && e.status < 500) signedOut(); else authTimer = setTimeout(refreshSession, 60e3); }   // offline: keep the tokens, try later
+  })().finally(() => { refreshing = null; });
+  return refreshing;
+}
+async function loadMe(again = true) {
+  if (!AUTH) return renderAcct();
+  if (AUTH.exp - Date.now() < 60e3) await refreshSession();
+  if (!AUTH) return;
+  try {
+    const r = await fetch(SB_URL + 'profiles?select=tg_name,tg_username,beta,is_owner&limit=1', {headers:{apikey:SB_KEY, Authorization:'Bearer ' + AUTH.at}, signal:AbortSignal.timeout(15000)});
+    if (r.status === 401 && again) { await refreshSession(); return loadMe(false); }
+    if (r.ok) ME = (await r.json())[0] || null;
+  } catch { /* offline: the button still says signed in; the name comes with the next try */ }
+  renderAcct();
+}
+function renderAcct() {
+  const b = $('#acct'), t = AUTH ? 'Профиль' + (ME?.tg_name ? ': ' + ME.tg_name : '') : 'Войти через Telegram';
+  $('#acctTxt').textContent = AUTH ? ME?.tg_name || 'Профиль' : 'Войти';
+  b.title = t; b.setAttribute('aria-label', t); b.classList.toggle('on', !!AUTH);
+}
+const authBody = h => { $('#authBody').innerHTML = h; };
+function openAuth() {
+  authBack = document.activeElement;
+  $('#authDlg').classList.remove('hidden');
+  if (AUTH) authProfile(); else authStart();
+  ($('#authBody').querySelector('a,button') || $('#authClose')).focus();
+}
+function closeAuth() {
+  if ($('#authDlg').classList.contains('hidden')) return;
+  authRun++; $('#authDlg').classList.add('hidden');
+  if (authBack?.isConnected) authBack.focus({preventScroll:true});
+}
+function authFail(msg, again) {
+  authBody(`<p>${esc(msg)}</p>${again ? '<button class="primary" id="authAgain">Начать заново</button>' : ''}`);
+  if (!$('#authDlg').classList.contains('hidden')) ($('#authAgain') || $('#authClose')).focus();
+}
+async function authStart() {
+  const run = ++authRun;
+  $('#authT').textContent = 'Вход через Telegram';
+  authBody('<p class="faint" role="status">Готовлю вход…</p>');
+  const secret = hexOf(crypto.getRandomValues(new Uint8Array(32)).buffer);
+  const h = hexOf(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secret)));
+  let s;
+  try { s = await authFn({op:'start', h}); } catch (e) { if (run === authRun) authFail(e.message || String(e), true); return; }
+  if (run !== authRun) return;
+  if (!s.bot) return authFail('Вход через Telegram сейчас недоступен.', true);
+  const until = Date.now() + (s.ttl || 300e3);
+  authBody(`<p>1. Откройте нашего бота в Telegram.<br>2. Нажмите в нём этот код:</p>
+    <div class="authcode" aria-label="Код для входа">${esc(s.code)}</div>
+    <a class="authgo" href="https://t.me/${encodeURIComponent(s.bot)}?start=login_${s.nonce}" target="_blank" rel="noopener">Открыть Telegram</a>
+    <p class="faint" role="status">Ждём подтверждения в Telegram. Код действует 5 минут.</p>`);
+  if (!$('#authDlg').classList.contains('hidden')) $('#authBody .authgo').focus();
+  while (run === authRun) {
+    await sleep(2000);
+    if (run !== authRun) return;
+    if (Date.now() > until) return authFail('Время на вход вышло.', true);
+    let p; try { p = await authFn({op:'poll', nonce:s.nonce, secret}); } catch { continue; }   // a dropped request: ask again
+    if (run !== authRun) return;
+    if (p.state === 'denied') return authFail('Вход отменён в Telegram.', true);
+    if (p.state === 'expired') return authFail('Время на вход вышло.', true);
+    if (p.state === 'ok') {
+      try { setSession(await gotrue('verify', {type:'magiclink', token_hash:p.token_hash})); }
+      catch (e) { return authFail('Не удалось войти: ' + (e.message || e), true); }
+      await loadMe(); closeAuth();
+      return toast('Вы вошли', ME?.tg_name ? 'Профиль: ' + ME.tg_name : '', 'ok');
+    }
+  }
+}
+function authProfile() {
+  authRun++;
+  $('#authT').textContent = 'Профиль';
+  authBody(`<p>Вы вошли через Telegram${ME?.tg_name ? ` как <b>${esc(ME.tg_name)}</b>` : ''}${ME?.tg_username ? ` (@${esc(ME.tg_username)})` : ''}.</p>
+    <p class="faint">Настройки, журнал и бот пока хранятся в этом браузере; перенос в профиль — в следующих версиях.</p>
+    <div class="authrow"><button id="authOut">Выйти</button><button id="authOutAll">Выйти на всех устройствах</button></div>`);
+}
+function signOut(all) {
+  const t = AUTH?.at;
+  signedOut(); closeAuth();
+  if (t) gotrue('logout' + (all ? '?scope=global' : ''), null, t).catch(() => {});
+  toast(all ? 'Вы вышли на всех устройствах' : 'Вы вышли из профиля', '', 'ok');
+}
+$('#acct').onclick = openAuth;
+$('#authClose').onclick = closeAuth;
+$('#authDlg').onclick = e => {
+  if (e.target.id === 'authDlg') closeAuth();
+  const id = e.target.closest('button')?.id;
+  if (id === 'authAgain') authStart().then(() => {}, () => {});
+  if (id === 'authOut' || id === 'authOutAll') signOut(id === 'authOutAll');
+};
+$('#authDlg').onkeydown = e => {
+  if (e.key === 'Escape') { e.stopPropagation(); closeAuth(); }
+  if (e.key === 'Tab') {   // keep focus inside the dialog
+    const f = [...$('#authDlg').querySelectorAll('a,button')].filter(x => x.offsetParent);
+    e.preventDefault(); f[(f.indexOf(document.activeElement) + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
+  }
+};
+window.addEventListener('storage', e => { if (e.key === 'sr_auth') { AUTH = load('sr_auth', null); scheduleRefresh(); if (AUTH) loadMe(); else { ME = null; renderAcct(); } } });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && AUTH && AUTH.exp - Date.now() < 120e3) refreshSession(); });
+renderAcct(); scheduleRefresh(); loadMe();
+
 // ---------- my bot on the server: this browser holds the secret of its own server bot ----------
 async function rpc(fn, args) {
   const r = await fetch(SB_URL + 'rpc/' + fn, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json'}, body:JSON.stringify(args), signal:AbortSignal.timeout(15000)});
@@ -3471,6 +3618,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.63', date:'2 ноября 2026', title:'Вход через Telegram', items:[
+    'Добавлен вход в профиль через Telegram-бота: без пароля и почты, подтверждением кода в боте.',
+    'Добавлены выход из профиля и выход на всех устройствах.',
+  ]},
   {v:'2.62', date:'2 ноября 2026', title:'Новые шрифты и навигация', items:[
     'Текст набран шрифтом Manrope, цены и числа — моноширинным JetBrains Mono.',
     'Панели и кнопки стали строже: скругления меньше.',
@@ -3532,12 +3683,6 @@ const CHANGELOG = [
     'Добавлена страница «Правовая информация»: условия использования, какие данные хранятся и как их удалить.',
     'Добавлена кнопка «Удалить с сервера» для серверного бота.',
     'Шрифт загружается с самого сайта, без сторонних сервисов.',
-  ]},
-  {v:'2.51', date:'27 октября 2026', title:'Улучшения мобильной версии', items:[
-    'Кнопка монеты в сообщениях Telegram открывает её график.',
-    'Панель RSI на графике стала выше на небольших экранах.',
-    '«Закрыть все» сообщает, сколько позиций закрыто, если по части монет нет цены.',
-    'Кнопка «Закрыть» у позиции стала крупнее; строка таблицы в фокусе клавиатуры выделяется.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4243,6 +4388,7 @@ const CMD_PAGES = [
   {label:'Правовая информация', hint:'условия, данные, контакты', kw:['правов', 'условия', 'конфиденц', 'privacy', 'terms', 'данные', 'cookie', 'контакт', 'владел'], run:() => go('legal')},
 ];
 const CMD_SETTINGS = [
+  {label:'Профиль: вход через Telegram', kw:['профиль', 'вход', 'войти', 'аккаунт', 'выйти', 'login', 'telegram', 'телеграм'], run:() => openAuth()},
   {label:'Плечо', kw:['плечо', 'leverage', 'lev'], run:() => editActive('#pfLev')},
   {label:'Риск на сделку', kw:['риск', 'risk', 'rm', 'мани'], run:() => editActive('#pfRisk')},
   {label:'RR — тейк к стопу', kw:['rr', 'тейк', 'take', 'стоп', 'stop', 'соотношен'], run:() => editActive('#pfRR')},

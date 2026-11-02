@@ -1,4 +1,4 @@
-# Deploys the Supabase Edge Functions (bot, tg) when they change on main, as Vercel deploys the site.
+# Deploys the Supabase Edge Functions (bot, tg, auth) when they change on main, as Vercel deploys the site.
 # Needs the repository secret SUPABASE_ACCESS_TOKEN: a Supabase access token scoped to this project with Edge Functions write.
 # A function that needs a new column or database function must have its migration applied before the push (docs/LESSONS.md).
 name: Deploy Supabase functions
@@ -29,3 +29,6 @@ jobs:
         run: supabase functions deploy bot --project-ref "$PROJECT_REF" --no-verify-jwt
       - name: Deploy tg
         run: supabase functions deploy tg --project-ref "$PROJECT_REF" --no-verify-jwt
+      # sign-in through the bot: called by a tab that isn't signed in yet, hence no JWT check either
+      - name: Deploy auth
+        run: supabase functions deploy auth --project-ref "$PROJECT_REF" --no-verify-jwt

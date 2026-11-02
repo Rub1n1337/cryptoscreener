@@ -206,9 +206,46 @@ const show = (call: Call, chat: number, s: Screen, mid?: number) => call(mid ? "
   { chat_id: chat, ...(mid ? { message_id: mid } : {}), text: s.text, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: s.kb } });
 const chatName = (ch: any) => String(ch?.title || [ch?.first_name, ch?.last_name].filter(Boolean).join(" ") || ch?.username || "").slice(0, 80);
 
+// ---------- sign-in to the site (functions/auth): the person picks the code their tab shows ----------
+// the same list is in functions/auth: single code points (4 bytes each), so "L:<nonce>:<two emoji>" fits in 64 bytes of button data
+const LOGIN_EMOJI = ["🍋", "🚀", "🐳", "🦊", "🍉", "🌵", "🎯", "🔥", "🌙", "🍀", "🐙", "🦄", "🍒", "🎲", "🐝", "🍄"];
+const LOGIN_TTL = 5 * 60e3;
+async function loginReq(db: any, nonce: string) {   // an open request: not answered, not used, not older than 5 minutes
+  if (!/^[0-9a-f]{32}$/.test(nonce)) return null;
+  const { data } = await db.from("login_requests").select("nonce, code, created_at, confirmed_at, denied_at, used_at").eq("nonce", nonce).maybeSingle();
+  return data && !data.confirmed_at && !data.denied_at && !data.used_at && Date.now() - Date.parse(data.created_at) < LOGIN_TTL ? data : null;
+}
+async function loginPrompt(db: any, nonce: string, say: (t: string, kb?: any[][]) => Promise<any>) {
+  const q = await loginReq(db, nonce);
+  if (!q) return say("⌛ Ссылка для входа устарела. На сайте нажмите «Войти через Telegram» ещё раз.");
+  const pair = () => { const a = Math.floor(Math.random() * 16); return LOGIN_EMOJI[a] + LOGIN_EMOJI[(a + 1 + Math.floor(Math.random() * 15)) % 16]; };
+  const opts = [q.code];
+  while (opts.length < 3) { const p = pair(); if (!opts.includes(p)) opts.push(p); }
+  opts.sort(() => Math.random() - 0.5);
+  return say("🔐 <b>Вход на сайт Sigma Radar</b>\nНажмите код, который показан на сайте.\n\nЕсли вход начинали не вы — нажмите «Это не я», и никто не войдёт.",
+    [opts.map((c) => btn(c, `L:${nonce}:${c}`)), [btn("✋ Это не я", `L:${nonce}:-`)]]);
+}
+async function onLogin(db: any, q: any, call: Call, raw: string) {
+  const [, nonce, pick] = raw.split(":"), chat = q.message?.chat?.id, mid = q.message?.message_id;
+  const edit = (t: string) => call("editMessageText", { chat_id: chat, message_id: mid, text: t, parse_mode: "HTML" });
+  const r = await loginReq(db, nonce);
+  if (!r) { await call("answerCallbackQuery", { callback_query_id: q.id }); return edit("⌛ Этот вход уже завершён или устарел."); }
+  const now = new Date().toISOString();
+  if (pick !== r.code) {
+    await db.from("login_requests").update({ denied_at: now }).eq("nonce", nonce).is("confirmed_at", null);
+    await call("answerCallbackQuery", { callback_query_id: q.id });
+    return edit(pick === "-" ? "✋ Вход отменён." : "❌ Код не совпал — вход отменён. Если входили вы, начните на сайте заново.");
+  }
+  const f = q.from || {};
+  const { data: ok } = await db.from("login_requests").update({ tg_id: f.id, tg_name: chatName(f) || null, tg_username: f.username || null, confirmed_at: now })
+    .eq("nonce", nonce).is("confirmed_at", null).is("denied_at", null).select("nonce");
+  await call("answerCallbackQuery", { callback_query_id: q.id, ...(ok?.length ? { text: "Вход подтверждён" } : {}) });
+  return edit(ok?.length ? "✅ <b>Вход подтверждён.</b> Вернитесь на сайт — он продолжит сам." : "⌛ Этот вход уже завершён.");
+}
+
 // ---------- entry point: one update from Telegram ----------
 export async function handleUpdate(db: any, u: any, call: Call) {
-  if (u?.callback_query) return onButton(db, u.callback_query, call);
+  if (u?.callback_query) return String(u.callback_query.data || "").startsWith("L:") ? onLogin(db, u.callback_query, call, u.callback_query.data) : onButton(db, u.callback_query, call);
   if (u?.message) return onMessage(db, u.message, call);
 }
 
@@ -217,6 +254,7 @@ async function onMessage(db: any, m: any, call: Call) {
   if (!chat || !text.startsWith("/")) return;
   const [cmd0, arg = ""] = text.split(/\s+/, 2), cmd = cmd0.replace(/@.*$/, "").toLowerCase();
   const say = (t: string, kb?: any[][]) => call("sendMessage", { chat_id: chat, text: t, parse_mode: "HTML", disable_web_page_preview: true, ...(kb ? { reply_markup: { inline_keyboard: kb } } : {}) });
+  if (cmd === "/start" && arg.startsWith("login_")) return loginPrompt(db, arg.slice(6), say);   // signing in doesn't subscribe anyone
   let c = await ctx(db, chat);
   if (cmd === "/start") {
     if (!c.sub) await db.from("tg_subs").insert({ chat_id: chat, name: chatName(m.chat) });
