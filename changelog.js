@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.48 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.49 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.49', date:'26 октября 2026', title:'Пояснения к показателям', items:[
+    'В статусе «Бот ждёт» показана шкала режима рынка по BTC, ETH и SOL.',
+    'Показатели в итогах на телефоне открывают пояснение по нажатию.',
+    'Уточнено определение максимальной просадки.',
+  ]},
   {v:'2.48', date:'26 октября 2026', title:'Прозрачность общего бота', items:[
     'В журнале общего бота указано, что его правила не показали преимущества на истории за три года.',
     'Пустой бэктест предлагает в одно нажатие проверить правила общего бота или свой профиль.',

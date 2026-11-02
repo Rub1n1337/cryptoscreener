@@ -32,7 +32,7 @@
   --shadow:0 10px 30px rgba(0,0,0,.35);
   --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#16a34a;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags, server cells, focus ring */
   --topbg:rgba(12,13,15,.82);--navbg:rgba(12,13,15,.96);--backdrop:rgba(4,5,6,.7);--ring:rgba(255,255,255,.05);
-  --hover:#414448;--row-line:#1c1d20;--sel:#272416;--gauge:#34373b;--canvas:#0e0f11;   /* selected row: a gold tint, as in the light theme */
+  --hover:#414448;--row-line:#1c1d20;--sel:#272416;--canvas:#0e0f11;   /* selected row: a gold tint, as in the light theme */
   --intro:linear-gradient(135deg,#1c1912,#131517);--intro-line:#403723;
   --tag-t:#d2d4d8;--up-t:#ff9aa3;--lo-t:#86efac;--acc-t:#fcd34d;
   --bad-line:#6b2027;--bad-bg:#2a1216;--ok-line:#1d5b35;--warn-line:#5c4a12;
@@ -51,7 +51,7 @@
   --shadow:0 10px 30px rgba(15,23,42,.12);
   --focus:rgba(47,107,240,.55);
   --topbg:rgba(244,245,248,.85);--navbg:rgba(255,255,255,.96);--backdrop:rgba(15,23,42,.35);--ring:rgba(15,23,42,.06);
-  --hover:#b9c1ce;--row-line:#edf0f4;--sel:#fff6dc;--gauge:#dfe5ef;--canvas:#ffffff;
+  --hover:#b9c1ce;--row-line:#edf0f4;--sel:#fff6dc;--canvas:#ffffff;
   --intro:linear-gradient(135deg,#fffaf0,#f6f8fc);--intro-line:#ecdcb4;
   --tag-t:#334155;--up-t:#b4232f;--lo-t:#15803d;--acc-t:#8a6100;
   --bad-line:#f2b8be;--bad-bg:#fdecee;--ok-line:#a7dcb9;--warn-line:#ead198;
@@ -187,6 +187,10 @@ body.wide .cpair.two .tf2{display:flex;flex-direction:column}body.wide .cpair.tw
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{position:sticky;top:0;z-index:3;background:var(--s1);color:var(--mute);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:10px 8px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line)}
 th:hover{color:var(--text)}th.sorted{color:var(--acc)}th[data-dir=desc]::after{content:" ↓"}th[data-dir=asc]::after{content:" ↑"}
+/* a column that sorts shows ↕ under the mouse — out of the flow, so the heading doesn't move: after the name, or before it in a
+   right-aligned (number) column, where the space after is the cell's padding */
+@media (hover:hover){th[data-s]:not([data-s=fav]):not([data-dir=asc]):not([data-dir=desc]):hover::after{content:"↕";position:absolute;margin-left:3px;color:var(--faint);font-weight:400}
+  th.n[data-s]:not([data-dir=asc]):not([data-dir=desc]):hover::after{content:none}th.n[data-s]:not([data-dir=asc]):not([data-dir=desc]):hover::before{content:"↕";position:absolute;margin-left:-11px;color:var(--faint);font-weight:400}}
 td{padding:9px 8px;border-bottom:1px solid var(--row-line);white-space:nowrap}
 tr:last-child td{border-bottom:0}
 tr.row{cursor:pointer;transition:background var(--dur-1) var(--ease)}tr.row:hover{background:var(--s2)}
@@ -197,10 +201,15 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 @media (pointer:coarse){.favbtn{min-width:40px;min-height:40px;margin:-4px}}   /* the chart's star: a finger-sized target, the same place in the line */
 .favbtn{height:32px;width:32px;padding:0;border-radius:50%;font-size:17px;color:var(--faint);background:transparent;border-color:transparent}.favbtn:hover{color:var(--acc);background:var(--s2)}.favbtn.on{color:var(--acc)}
 .star{color:var(--faint);cursor:pointer;font-size:15px}.star{height:auto;padding:0;border:0;background:none;line-height:1;font-weight:400;min-width:0}   /* a button now (keyboard, screen readers); the touch padding below still wins */.star:hover{color:var(--mute)}.star.on{color:var(--acc)}
-.gauge{display:inline-block;width:64px;height:10px;position:relative;vertical-align:middle;margin-right:8px;background:var(--s3);border-radius:5px}
-.gauge::before{content:"";position:absolute;left:14.3%;right:14.3%;top:0;bottom:0;background:var(--gauge);border-left:1px solid var(--lo);border-right:1px solid var(--up)}
-.gauge::after{content:"";position:absolute;left:50%;top:2px;bottom:2px;border-left:1px dashed var(--mid)}
-.gauge i{position:absolute;top:1px;width:8px;height:8px;margin-left:-4px;border-radius:50%;z-index:1;box-shadow:0 0 0 2px var(--canvas)}
+/* one scale for the table and the signal breakdown: a thin track, tinted green below --a and red above --b (the channel's
+   edges, or RSI 30 / 70), a mark in the middle; the dot wears a ring of the background it sits on (--ring) */
+.gauge{--a:14.3%;--b:85.7%;--ring:var(--s1);display:inline-block;width:64px;height:4px;position:relative;vertical-align:middle;margin-right:8px;background:var(--s3);border-radius:2px}
+.gauge::before{content:"";position:absolute;inset:0;border-radius:inherit;opacity:.55;background:linear-gradient(90deg,var(--lo) var(--a),transparent var(--a) var(--b),var(--up) var(--b))}
+.gauge::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;border-left:1px solid var(--hover)}
+.gauge i{position:absolute;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;z-index:1;box-shadow:0 0 0 2px var(--ring)}
+tr.row:hover .gauge,tr.row:focus-visible .gauge{--ring:var(--s2)}tr.sel .gauge{--ring:var(--sel)}
+.gauge.wide{display:block;width:auto;height:6px;margin:0;border-radius:3px}.gauge.wide i{width:11px;height:11px;margin:-5.5px 0 0 -5.5px}
+.gauge.rsi{--a:30%;--b:70%}
 .tag{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:var(--tag-t);white-space:nowrap}
 .tag.weak{opacity:.55;filter:saturate(.6)}   /* a confirmed reversal below the bot threshold: visible, but not an invitation */
 #more.dot{position:relative}#more.dot::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--acc)}   /* table filters are on */
@@ -218,6 +227,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .tag.upc{background:var(--sig-up);color:#fff}.tag.loc{background:var(--sig-lo);color:#fff}
 .tag.uo{background:transparent;color:var(--up-t);box-shadow:inset 0 0 0 1px var(--bad-line)}.tag.lout{background:transparent;color:var(--lo-t);box-shadow:inset 0 0 0 1px var(--ok-line)}
 .tag.tp{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sl{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.ts{background:var(--s3);color:var(--tag-t)}
+td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:1.5;text-wrap:pretty}td.tbl-empty button{margin:8px auto 0;display:flex}   /* a long «why empty» wraps instead of widening the table */
 .tbl-err{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 12px;text-align:center;white-space:normal}.tbl-err button{margin-top:8px}
 .sk td{color:transparent}
 .sk td::after{content:"";display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:sk 1.2s infinite}
@@ -229,6 +239,10 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 /* ---------- signal breakdown ---------- */
 .detail{margin-top:12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
 .verdict{font-size:14px;margin-bottom:10px;line-height:1.55}.verdict b{color:var(--acc)}
+.scales{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px;margin:4px 0 14px}.detail .gauge{--ring:var(--s2)}
+.sch{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:12px;color:var(--mute)}.sch b{font-size:15px;font-variant-numeric:tabular-nums}
+.sca{position:relative;height:14px;margin-top:5px;font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}.sca span{position:absolute;transform:translateX(-50%)}
+@media(max-width:400px){.scales{grid-template-columns:minmax(0,1fr)}}
 .comp{display:grid;grid-template-columns:150px 1fr 64px;gap:10px;align-items:center;font-size:12.5px;margin:6px 0}
 .comp .cb{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}.comp .cb i{display:block;height:100%;background:var(--acc);border-radius:3px}
 .comp .cn{color:var(--mute)}.comp .cv{text-align:right;font-variant-numeric:tabular-nums}
@@ -1599,11 +1613,11 @@ function renderCards() {
   const sqN = rows.filter(r => r.squeeze).length;
   $('#c5').textContent = sqN; $('#c5s').textContent =`${plur(sqN, ['монета', 'монеты', 'монет'])} без движения`;
 }
+const pbCol = pB => pB > 0.9 ? 'var(--up)' : pB < 0.1 ? 'var(--lo)' : 'var(--blue)';
+// track spans %B from -20% to 120%; the channel itself is the untinted 0..100% part
+const gaugeBar = (pB, cls = '') => `<span class="gauge ${cls}" aria-hidden="true"><i style="left:${(clamp(pB, -0.2, 1.2) + 0.2) / 1.4 * 100}%;background:${pbCol(pB)}"></i></span>`;
 function gauge(pB) {
-  // track spans %B from -20% to 120%; the channel itself is the shaded 0..100% part
-  const x = (clamp(pB, -0.2, 1.2) + 0.2) / 1.4 * 100;
-  const col = pB > 0.9 ? 'var(--up)' : pB < 0.1 ? 'var(--lo)' : 'var(--blue)';
-  return `<span class="gauge"><i style="left:${x}%;background:${col}"></i></span><span style="color:${col}">${(pB*100).toFixed(1)}%</span>`;
+  return gaugeBar(pB) + `<span style="color:${pbCol(pB)}">${(pB*100).toFixed(1)}%</span>`;
 }
 // compact labels for the table; the long wording stays in the breakdown and the glossary
 // a reversal seen on the forming candle: the bots decide when that candle closes (M.tradeRow), so the table says it is still pending
@@ -1660,10 +1674,11 @@ function renderChips(shown) {
 // why the table is empty: a searched coin hidden by the filters is named, so it never looks missing from the market
 function emptyRow() {
   const q = normQ($('#fs').value), hit = q ? rows.filter(r => base(r.sym).includes(q)).length : 0;
-  const msg = q && !hit ? `Монеты «${esc($('#fs').value.trim())}» нет среди ${rows.length} проверяемых — добавьте больше монет в фильтрах или откройте её через поиск над графиком`
+  const msg = !q && $('#fl').value === 'fav' && !favs.size ? 'В избранном пока пусто — отметьте монету звёздочкой ☆ в таблице или над графиком, и она будет здесь и вверху списка'
+    : q && !hit ?`Монеты «${esc($('#fs').value.trim())}» нет среди ${rows.length} проверяемых — добавьте больше монет в фильтрах или откройте её через поиск над графиком`
     : hit ? `«${esc($('#fs').value.trim())}»: ${hit} в списке, но не проходит фильтры — <button data-fclear>Сбросить фильтры</button>`
     : 'Нет монет под эти фильтры — <button data-fclear>Сбросить фильтры</button>';
-  return `<tr><td colspan="9" class="mute">${msg}</td></tr>`;
+  return `<tr><td colspan="9" class="mute tbl-empty">${msg}</td></tr>`;
 }
 let scanErr = null, flashSyms = new Set();
 // a price that changed since it was last shown glows green / red once (.tick-up / .tick-dn); sorting and filtering redraw the
@@ -2205,6 +2220,17 @@ function renderDetail() {
   }
   if (r.squeeze) verdict += ` Монета сейчас вдвое спокойнее обычного — возможен резкий рывок.`;
   let html = `<div class="ptitle">Разбор сигнала · ${name}</div><div class="verdict">${verdict}</div><div class="mute" style="font-size:12px;margin-bottom:8px">${hlTxt}</div>`;
+  // where the price and RSI stand, on the same scale as the table: marks at the channel's edges and at RSI 30 / 70
+  const rv = +r.rsi, rsiCol = rv < 30 ? 'var(--lo)' : rv > 70 ? 'var(--up)' : 'var(--blue)';
+  const mark = (at, t) => `<span style="left:${at}">${t}</span>`;
+  html += `<div class="scales"><div class="sc" title="Где цена внутри своего обычного диапазона: 0% — у нижней границы, 100% — у верхней, за краями — вышла за границу">`
+    + `<div class="sch"><span>Положение в диапазоне</span><b style="color:${pbCol(r.pB)}">${pct}</b></div>${gaugeBar(r.pB, 'wide')}`
+    + `<div class="sca" aria-hidden="true">${mark('14.3%', '0%')}${mark('50%', '50%')}${mark('85.7%', '100%')}</div></div>`
+    + (isFinite(rv) ? `<div class="sc" title="Сила движения: ниже 30 — монету много продавали (перепроданность), выше 70 — много покупали (перекупленность)">`
+      + `<div class="sch"><span>RSI</span><b style="color:${rsiCol}">${rv.toFixed(0)}</b></div>`
+      + `<span class="gauge wide rsi" aria-hidden="true"><i style="left:${clamp(rv, 0, 100)}%;background:${rsiCol}"></i></span>`
+      + `<div class="sca" aria-hidden="true">${mark('30%', '30')}${mark('50%', '50')}${mark('70%', '70')}</div></div>` : '')
+    + '</div>';
   html += compsHtml(r, r.side);
   for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym))
     html += `<div style="margin-top:8px;color:var(--violet)">Открыта позиция (${who} бот): ${p.side} от ${fp(p.entry)}, тейк ${fp(p.tp)}, стоп ${fp(p.sl)}.</div>`;
@@ -3427,6 +3453,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.61', date:'2 ноября 2026', title:'Шкалы в разборе сигнала', items:[
+    'В разборе сигнала добавлены шкалы положения в диапазоне и RSI с отметками 30 и 70.',
+    'Шкала диапазона в таблице стала тоньше и совпадает со шкалой в разборе.',
+    'Заголовок столбца, по которому можно сортировать, показывает ↕ при наведении.',
+    'Пустое избранное подсказывает, как добавить монету.',
+  ]},
   {v:'2.60', date:'2 ноября 2026', title:'Графитовая тема', items:[
     'Тёмная тема стала нейтрально-графитовой: цветными остаются только сигналы и акценты.',
     'Сводка рынка, журнала и бэктеста собрана в одну панель с разделителями.',
@@ -3486,11 +3518,6 @@ const CHANGELOG = [
   {v:'2.50', date:'26 октября 2026', title:'Сводка после отсутствия и журнал по дням', items:[
     'После перерыва больше двух часов сайт показывает сводку сделок ботов за это время.',
     'Закрытые сделки в журнале сгруппированы по дням с итогом за каждый день.',
-  ]},
-  {v:'2.49', date:'26 октября 2026', title:'Пояснения к показателям', items:[
-    'В статусе «Бот ждёт» показана шкала режима рынка по BTC, ETH и SOL.',
-    'Показатели в итогах на телефоне открывают пояснение по нажатию.',
-    'Уточнено определение максимальной просадки.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
