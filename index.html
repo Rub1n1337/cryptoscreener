@@ -50,6 +50,10 @@
   --topbg:rgba(12,13,15,.82);--navbg:rgba(12,13,15,.96);--backdrop:rgba(4,5,6,.7);--ring:rgba(255,255,255,.05);
   --hover:#414448;--row-line:#1c1d20;--sel:#272416;--canvas:#0e0f11;   /* selected row: a gold tint, as in the light theme */
   --intro:linear-gradient(135deg,#1c1912,#131517);--intro-line:#403723;
+  --glow:rgba(245,183,10,.07);--logo-glow:0 0 0 1px rgba(245,183,10,.4),0 8px 30px -10px rgba(245,183,10,.5);   /* gold light behind the logo */
+  /* its centre is set in px from the top-left and follows the logo when the header's 1500px column is centred, so the page's
+     layer and the header's (same box origin) line up into one patch */
+  --glow-bg:radial-gradient(60rem 30rem at max(7rem, calc(50% - 750px + 7rem)) -6rem, var(--glow), transparent 70%);
   --tag-t:#d2d4d8;--up-t:#ff9aa3;--lo-t:#86efac;--acc-t:#fcd34d;
   --bad-line:#6b2027;--bad-bg:#2a1216;--ok-line:#1d5b35;--warn-line:#5c4a12;
   /* chart colours (read by the canvas code through pal()) */
@@ -69,6 +73,7 @@
   --topbg:rgba(244,245,248,.85);--navbg:rgba(255,255,255,.96);--backdrop:rgba(15,23,42,.35);--ring:rgba(15,23,42,.06);
   --hover:#b9c1ce;--row-line:#edf0f4;--sel:#fff6dc;--canvas:#ffffff;
   --intro:linear-gradient(135deg,#fffaf0,#f6f8fc);--intro-line:#ecdcb4;
+  --glow:rgba(245,183,10,.1);--logo-glow:0 0 0 1px rgba(194,138,0,.35),0 8px 24px -10px rgba(194,138,0,.45);
   --tag-t:#334155;--up-t:#b4232f;--lo-t:#15803d;--acc-t:#8a6100;
   --bad-line:#f2b8be;--bad-bg:#fdecee;--ok-line:#a7dcb9;--warn-line:#ead198;
   --c-up:#dc2626;--c-lo:#16a34a;--c-mid:#7b8798;--c-trade:#7c3aed;--c-price:#1f2937;--c-acc:#c28a00;
@@ -96,7 +101,11 @@ input[type=search]{-webkit-appearance:none;appearance:none}input[type=search]::-
 svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ---------- top bar ---------- */
-.top{position:sticky;top:0;z-index:40;background:var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:40;background:var(--glow-bg),var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+/* the gold light from the top-left corner (Lovable v1): one still layer under everything; panels stay opaque, so it shows on
+   the page around them and in the frosted header, which carries the same patch */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--glow-bg)}
+.brand svg{border-radius:6px;box-shadow:var(--logo-glow)}
 .topin{max-width:1500px;margin:0 auto;padding:0 16px;height:58px;display:flex;align-items:center;gap:18px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:16px;white-space:nowrap}
 @media (pointer:coarse){.brand{min-width:36px;min-height:36px}}   /* the logo alone on a phone was a 28 px target */
@@ -821,7 +830,7 @@ details.dis>.dbody{padding:0 16px 16px}
   .topin{gap:10px;padding:0 10px;justify-content:space-between}
   .brand small{display:none}
   /* backdrop-filter would make the header the containing block of the fixed bottom bar */
-  .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--bg)}
+  .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--glow-bg),var(--bg)}
   /* navigation becomes a bottom tab bar on phones */
   .top .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--navbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));overflow:visible;flex:none}
   .top .tab{flex:1;flex-direction:column;height:auto;gap:3px;padding:6px 2px;font-size:10.5px;min-width:0}
@@ -3794,6 +3803,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.69', date:'2 ноября 2026', title:'Золотое свечение', items:[
+    'Добавлено мягкое золотое свечение у логотипа, которое видно сквозь шапку.',
+  ]},
   {v:'2.68', date:'2 ноября 2026', title:'Удобнее на телефоне', items:[
     'Название вкладки браузера показывает раздел или открытую монету.',
     'Ссылка на сайт в мессенджерах показывает название и описание.',
@@ -3854,13 +3866,6 @@ const CHANGELOG = [
   ]},
   {v:'2.58', date:'2 ноября 2026', title:'Цены дешёвых монет', items:[
     'Исправлено обрезание цен самых дешёвых монет в сделках журнала и бэктеста на телефоне.',
-  ]},
-  {v:'2.57', date:'29 октября 2026', title:'Аккуратная вёрстка «Беты»', items:[
-    'Лента сделок перенесена в отдельную полосу у стакана и не закрывает свечи.',
-    'Исправлено наложение подписей в стакане, в шапке графика и у построений.',
-    'Тепловая карта ликвидаций стала заметнее, футпринт текущей свечи обновляется вживую.',
-    'На телефоне добавлены «Повторить» и «Убрать всё» для построений, кнопки стали крупнее.',
-    'Раскладка графиков подстраивается при повороте телефона, окно настроек не уходит за экран.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

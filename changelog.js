@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.56 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.57 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.57', date:'29 октября 2026', title:'Аккуратная вёрстка «Беты»', items:[
+    'Лента сделок перенесена в отдельную полосу у стакана и не закрывает свечи.',
+    'Исправлено наложение подписей в стакане, в шапке графика и у построений.',
+    'Тепловая карта ликвидаций стала заметнее, футпринт текущей свечи обновляется вживую.',
+    'На телефоне добавлены «Повторить» и «Убрать всё» для построений, кнопки стали крупнее.',
+    'Раскладка графиков подстраивается при повороте телефона, окно настроек не уходит за экран.',
+  ]},
   {v:'2.56', date:'29 октября 2026', title:'Плавный график', items:[
     'Масштаб и перетаскивание графика стали плавными, подписи времени двигаются вместе со свечами.',
     'Добавлена прокрутка истории свайпом тачпада вбок и колёсиком с Shift.',
