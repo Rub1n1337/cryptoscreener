@@ -17,8 +17,9 @@
 <meta property="og:title" content="Sigma Radar — сканер Binance">
 <meta property="og:description" content="Сигналы по каналам Боллинджера, бот на виртуальных деньгах, проверка на истории и уведомления в Telegram.">
 <meta name="twitter:card" content="summary">
-<!-- the logo: Σ drawn as the channel — top band red, bottom band green, the price (gold) out to the band and back to the centre -->
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a1b1e'/><path d='M47 15H17' stroke='%23f0525f' stroke-width='7' stroke-linecap='round'/><path d='M17 49H47' stroke='%2322c55e' stroke-width='7' stroke-linecap='round'/><path d='M17 15L34 32L17 49' stroke='%23f5b70a' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<!-- the logo: Σ (the shape of Lucide's «sigma», ISC) read as the channel — the top band ruby, the bottom band emerald, the
+     price between them gold, brightest at the turn; the tile is graphite in both themes. Same colours as --logo-* (hex here) -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><defs><linearGradient id='s' gradientUnits='userSpaceOnUse' x1='0' y1='4' x2='0' y2='20'><stop offset='.2' stop-color='%23dc5465'/><stop offset='.34' stop-color='%23f3a44a'/><stop offset='.5' stop-color='%23f8d376'/><stop offset='.66' stop-color='%23f3a44a'/><stop offset='.8' stop-color='%2349b67f'/></linearGradient></defs><rect width='24' height='24' rx='5.25' fill='%231a1b1e'/><path d='M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2' transform='translate(12 12) scale(.84) translate(-12 -12)' fill='none' stroke='url(%23s)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <!-- Manrope (text) and JetBrains Mono (numbers) are served from this site, not Google Fonts: a visitor's address goes to no one
      else, and the fonts load where Google is slow or blocked. Variable files, only the subsets the text uses; the mono one only
@@ -51,6 +52,23 @@
   --hover:#414448;--row-line:#1c1d20;--sel:#272416;--canvas:#0e0f11;   /* selected row: a gold tint, as in the light theme */
   --intro:linear-gradient(135deg,#1c1912,#131517);--intro-line:#403723;
   --glow:rgba(245,183,10,.07);--logo-glow:0 0 0 1px rgba(245,183,10,.4),0 8px 30px -10px rgba(245,183,10,.5);   /* gold light behind the logo */
+  /* the mark itself, the same in both themes (an app icon keeps its colours): ruby band, gold price with a bright turn,
+     emerald band, on a graphite glass tile */
+  --logo-tile:#1a1b1e;--logo-hi:#dc5465;--logo-gold:#f3a44a;--logo-shine:#f8d376;--logo-lo:#49b67f;
+  --logo-sheen:rgba(255,255,255,.1);--logo-rim:rgba(255,255,255,.07);
+  /* glass (Lovable's smoky graphite with a cool edge; their oklch / color-mix values baked to rgba, so a browser without them
+     still gets a header): fill of blurred menus, top edge, bottom shade, pearl and cool reflections, warm light, press */
+  --glass-fill:rgba(19,24,26,.86);--glass-edge:rgba(207,229,229,.23);--glass-shine:rgba(226,245,245,.1);--glass-shade:rgba(0,3,3,.32);
+  --glass-pearl:rgba(232,247,247,.13);--glass-cool:rgba(155,211,211,.09);--glass-rim:rgba(177,208,208,.32);--glass-warm:rgba(228,200,137,.11);
+  --glass-press:rgba(0,3,3,.38);--glass-drop:rgba(0,0,0,.65);--light-wash:rgba(241,184,71,.07);--light-edge:rgba(237,188,73,.34);
+  --glass-line:rgba(66,75,75,.76);--glass-line2:rgba(77,88,88,.66);--glass-top:rgba(65,73,73,.69);   /* --line2 / --line with the rim */
+  --card-lo:rgba(38,204,102,.08);--card-hi:rgba(241,85,99,.07);   /* a summary card's light on hover: its meaning's colour */
+  --glass-blur:20px;
+  --glass-inset:inset 0 1px 0 var(--glass-edge),inset 0 -1px 0 var(--glass-shade);--glass-shadow:0 12px 32px -16px var(--glass-drop);
+  --glass-hover-shadow:0 5px 18px -9px var(--glass-rim);
+  --control-shine:linear-gradient(160deg,var(--glass-pearl),var(--glass-shine) 18%,transparent 52%,var(--glass-cool));
+  --glass-reflection:linear-gradient(115deg,transparent 30%,var(--glass-pearl) 44%,transparent 58%);
+  --surface-light:linear-gradient(115deg,var(--light-wash),transparent 44%,var(--glass-cool));
   /* its centre is set in px from the top-left and follows the logo when the header's 1500px column is centred, so the page's
      layer and the header's (same box origin) line up into one patch */
   --glow-bg:radial-gradient(60rem 30rem at max(7rem, calc(50% - 750px + 7rem)) -6rem, var(--glow), transparent 70%);
@@ -74,6 +92,12 @@
   --hover:#b9c1ce;--row-line:#edf0f4;--sel:#fff6dc;--canvas:#ffffff;
   --intro:linear-gradient(135deg,#fffaf0,#f6f8fc);--intro-line:#ecdcb4;
   --glow:rgba(245,183,10,.1);--logo-glow:0 0 0 1px rgba(194,138,0,.35),0 8px 24px -10px rgba(194,138,0,.45);
+  /* pearl glass */
+  --glass-fill:rgba(245,252,252,.91);--glass-edge:rgba(255,255,255,.95);--glass-shine:rgba(255,255,255,.52);--glass-shade:rgba(49,59,59,.1);
+  --glass-pearl:rgba(255,255,255,.72);--glass-cool:rgba(133,188,188,.09);--glass-rim:rgba(92,131,131,.25);--glass-warm:rgba(228,200,146,.11);
+  --glass-press:rgba(74,82,82,.12);--glass-drop:rgba(44,44,50,.18);--light-wash:rgba(241,198,113,.07);--light-edge:rgba(185,142,26,.3);
+  --glass-line:rgba(193,209,208,.74);--glass-line2:rgba(183,202,200,.62);--glass-top:rgba(201,214,214,.66);
+  --card-lo:rgba(26,128,64,.08);--card-hi:rgba(213,43,57,.07);
   --tag-t:#334155;--up-t:#b4232f;--lo-t:#15803d;--acc-t:#8a6100;
   --bad-line:#f2b8be;--bad-bg:#fdecee;--ok-line:#a7dcb9;--warn-line:#ead198;
   --c-up:#dc2626;--c-lo:#16a34a;--c-mid:#7b8798;--c-trade:#7c3aed;--c-price:#1f2937;--c-acc:#c28a00;
@@ -101,7 +125,7 @@ input[type=search]{-webkit-appearance:none;appearance:none}input[type=search]::-
 svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ---------- top bar ---------- */
-.top{position:sticky;top:0;z-index:40;background:var(--glow-bg),var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:40;background:var(--control-shine),var(--glow-bg),var(--topbg);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border-bottom:1px solid var(--glass-rim);box-shadow:var(--glass-inset),0 8px 20px -16px var(--glass-shade)}
 /* the gold light from the top-left corner (Lovable v1): one still layer under everything; panels stay opaque, so it shows on
    the page around them and in the frosted header, which carries the same patch */
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--glow-bg)}
@@ -555,7 +579,7 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
   .tpanel>.filters:first-child{position:sticky;top:59px;z-index:6;background:var(--s1);margin:-10px -10px 8px;padding:10px;border-radius:var(--r) var(--r) 0 0}
   #cpanel{display:none}
   body.sheet #cpanel{display:block;position:fixed;inset:0;z-index:60;overflow:auto;overscroll-behavior:contain;border:0;border-radius:0;background:var(--bg);padding:0 12px 24px}
-  body.sheet .sheetbar{display:flex;position:sticky;top:0;z-index:2;margin:0 -12px 10px;padding:8px 6px;background:var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  body.sheet .sheetbar{display:flex;position:sticky;top:0;z-index:2;margin:0 -12px 10px;padding:8px 6px;background:var(--control-shine),var(--topbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);box-shadow:var(--glass-inset)}
   .sheetbar button{background:transparent;border-color:transparent;color:var(--blue);font-weight:600;gap:2px;padding:0 8px;height:40px}
   body.sheet #cv{height:52vh}
   #cpanel .cact .search{display:none}#cpanel .cact .seg{flex:1}
@@ -830,9 +854,9 @@ details.dis>.dbody{padding:0 16px 16px}
   .topin{gap:10px;padding:0 10px;justify-content:space-between}
   .brand small{display:none}
   /* backdrop-filter would make the header the containing block of the fixed bottom bar */
-  .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--glow-bg),var(--bg)}
+  .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--control-shine),var(--glow-bg),var(--bg)}
   /* navigation becomes a bottom tab bar on phones */
-  .top .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--navbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));overflow:visible;flex:none}
+  .top .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--control-shine),linear-gradient(100deg,var(--glass-warm),transparent 45%,var(--glass-cool)),var(--navbg);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--glass-rim);box-shadow:inset 0 1px 0 var(--glass-edge);justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));overflow:visible;flex:none}
   .top .tab{flex:1;flex-direction:column;height:auto;gap:3px;padding:6px 2px;font-size:10.5px;min-width:0}
   .top .tab svg.i{width:20px;height:20px}
   .top .tab .badge{display:none}.top .tab{position:relative}
@@ -873,6 +897,51 @@ details.dis>.dbody{padding:0 16px 16px}
   .bchip-t,.bchip{height:36px}.bpop h4 button{width:36px;height:36px}#bIndClear{min-height:36px}.ind-lbl{min-height:36px}
   /* iOS zooms the page into any text field under 16px and leaves it zoomed */
   input:not([type=checkbox]):not([type=range]),select,textarea{font-size:16px!important}}
+/* ---------- glass (Lovable, the owner's pick): light sits on surfaces — a pearl top edge, a cool reflection, a darker
+   bottom — on the header, its tools, menus and dialogs; gold stays for what is chosen. Rows, numbers and chart pixels stay
+   opaque and sharp; the header's own rules are with .top ---------- */
+.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
+.top .tools button:not(.primary,.on,.bad){background-color:var(--s2)}
+.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
+/* on hover a reflection crosses the button once */
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover{background-position:0 0,0 0}
+}
+.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active{box-shadow:inset 0 2px 5px var(--glass-press)}
+.top .tab.on::after{box-shadow:0 2px 8px var(--light-edge)}
+.seg .tab.on:not([data-fl]){background:var(--control-shine),var(--s3);box-shadow:var(--glass-inset);border-radius:var(--r-s)}
+button.primary,.authgo,button.primary:hover,.authgo:hover{background-image:var(--control-shine)}
+button.primary,.authgo{box-shadow:var(--glass-inset),0 4px 12px -8px var(--light-edge)}
+button.primary:hover,.authgo:hover{box-shadow:var(--glass-inset),0 4px 16px -6px var(--light-edge)}
+/* the summary strip: warm light from the top-left; a card lights up in its meaning's colour */
+.cards,.statrow{background:var(--surface-light),var(--s1);border-top-color:var(--glass-top);box-shadow:inset 0 1px 0 var(--glass-shine)}
+.panel{box-shadow:inset 0 1px 0 var(--glass-shine)}
+.card[data-cf]{--card-light:var(--glass-warm)}.card[data-cf=lo]{--card-light:var(--card-lo)}.card[data-cf=hi]{--card-light:var(--card-hi)}.card[data-cf=sq]{--card-light:var(--glass-cool)}
+.card[data-cf]:hover,.card[data-cf]:focus-visible{background:linear-gradient(160deg,var(--card-light),transparent 75%),var(--s2)}
+.card[data-cf].on{background:linear-gradient(160deg,var(--card-light),transparent 80%),var(--sel)}
+.card[data-cf]:focus-visible{outline-offset:-3px}
+.prof.pick:not(.on):hover{background-image:var(--control-shine)}
+.prof.on{box-shadow:inset 2px 0 0 var(--acc),inset 0 1px 0 var(--glass-shine)}
+/* menus, dialogs, toasts: frosted where the browser can blur, solid otherwise. Toasts keep their coloured left edge */
+.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty{background:var(--control-shine),var(--s1);box-shadow:var(--glass-inset),var(--glass-shadow)}
+.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast{background-image:var(--control-shine),linear-gradient(115deg,var(--glass-warm),transparent 32%,transparent 78%,var(--glass-cool))}
+.cmdbox,.dlgbox,.mbox,.evp,.guard{border-color:var(--glass-line2)}.toast{border-top-color:var(--glass-line2);border-right-color:var(--glass-line2);border-bottom-color:var(--glass-line2)}
+.cmdbox:focus-within,.dlgbox:focus-within{border-color:var(--light-edge)}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty{background-color:var(--glass-fill);backdrop-filter:blur(var(--glass-blur)) saturate(115%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(115%)}
+  .ctools button:not(.on){background-color:var(--glass-fill);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+}
+h1,h2,h3,h4,.card .v{letter-spacing:0}
+@media(max-width:700px){
+  .top .tab.on::before{box-shadow:0 2px 8px var(--light-edge)}
+  .top .tabs .tab.on svg{filter:drop-shadow(0 0 5px var(--light-edge))}
+  .mbox{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
+/* «reduce transparency» in the system: solid surfaces, no blur */
+@media(prefers-reduced-transparency:reduce){
+  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on){background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+}
 </style>
 </head>
 <body>
@@ -950,7 +1019,11 @@ details.dis>.dbody{padding:0 16px 16px}
 </svg>
 <header class="top"><div class="topin">
   <a class="brand" href="#market" aria-label="Sigma Radar — на главную">
-    <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--s2)"/><path d="M47 15H17" style="stroke:var(--up)" stroke-width="5.5" stroke-linecap="round"/><path d="M17 49H47" style="stroke:var(--lo)" stroke-width="5.5" stroke-linecap="round"/><path d="M17 15L34 32L17 49" style="stroke:var(--acc)" stroke-width="5.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="34" cy="32" r="4.5" style="fill:var(--acc)"/></svg>
+    <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><defs>
+      <linearGradient id="logoS" gradientUnits="userSpaceOnUse" x1="0" y1="4" x2="0" y2="20"><stop offset=".2" style="stop-color:var(--logo-hi)"/><stop offset=".34" style="stop-color:var(--logo-gold)"/><stop offset=".5" style="stop-color:var(--logo-shine)"/><stop offset=".66" style="stop-color:var(--logo-gold)"/><stop offset=".8" style="stop-color:var(--logo-lo)"/></linearGradient>
+      <linearGradient id="logoG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--logo-sheen)"/><stop offset=".55" style="stop-color:var(--logo-sheen);stop-opacity:0"/></linearGradient></defs>
+      <rect width="24" height="24" rx="5.25" style="fill:var(--logo-tile)"/><rect width="24" height="24" rx="5.25" fill="url(#logoG)"/><rect x=".5" y=".5" width="23" height="23" rx="4.75" fill="none" style="stroke:var(--logo-rim)"/>
+      <path d="M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2" transform="translate(12 12) scale(.8) translate(-12 -12)" fill="none" stroke="url(#logoS)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <span class="bt">Sigma<span> Radar</span></span><small id="hdr"></small>
   </a>
   <nav class="tabs">
@@ -3803,6 +3876,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.70', date:'2 ноября 2026', title:'Новый логотип и стекло', items:[
+    'Логотип получил новую форму Σ и более благородные цвета канала: рубиновый, золотой и изумрудный.',
+    'Шапка, меню и окна стали матовым стеклом, а цифры, таблицы и графики остались чёткими.',
+    'Кнопки в шапке откликаются бликом при наведении и мягко проседают при нажатии.',
+    'Карточки сводки при наведении подсвечиваются цветом своего смысла.',
+    'При включённом в системе уменьшении прозрачности стекло становится сплошным.',
+  ]},
   {v:'2.69', date:'2 ноября 2026', title:'Золотое свечение', items:[
     'Добавлено мягкое золотое свечение у логотипа, которое видно сквозь шапку.',
   ]},
@@ -3863,9 +3943,6 @@ const CHANGELOG = [
     'При выборе монеты на телефоне видно, что её график загружается.',
     'Исправлены полосы поверх рынка при включённых дополнительных колонках.',
     'Отметки версий в «Что нового» стоят ровно на линии.',
-  ]},
-  {v:'2.58', date:'2 ноября 2026', title:'Цены дешёвых монет', items:[
-    'Исправлено обрезание цен самых дешёвых монет в сделках журнала и бэктеста на телефоне.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
