@@ -153,7 +153,9 @@ kbd{font:11px/1 ui-monospace,monospace;color:var(--faint);border:1px solid var(-
 /* ---------- chart ---------- */
 canvas{width:100%;display:block;background:var(--canvas);border-radius:10px;border:1px solid var(--line);touch-action:pan-y}
 #cv{height:clamp(440px,60vh,700px);cursor:crosshair}
-.cvwrap{position:relative}canvas:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.cvwrap{position:relative}
+.cvwrap[data-wait] canvas{opacity:.15;transition:opacity var(--dur-1) var(--ease)}
+.cvwrap[data-wait]::after{content:attr(data-wait);position:absolute;inset:0;display:grid;place-items:center;color:var(--mute);font-size:13px;pointer-events:none}canvas:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 /* chart toolbar: zoom, back to the latest candle, reset, wide mode */
 .ctools{position:absolute;top:8px;left:8px;display:flex;gap:4px;z-index:2;opacity:.85;transition:opacity var(--dur-1) var(--ease)}.cvwrap:hover .ctools,.ctools:focus-within{opacity:1}
 .ctools button{width:34px;height:30px;padding:0;font-size:15px;line-height:1;background:var(--s1);border-color:var(--line2);color:var(--mute)}.ctools button:hover{color:var(--text)}
@@ -260,7 +262,7 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .doc li{margin:5px 0}
 .gloss{display:grid;grid-template-columns:210px 1fr;gap:8px 18px;font-size:13px}.gloss b{color:var(--text)}.gloss span{color:var(--mute)}
 .cl-item{border-left:2px solid var(--line2);padding:2px 0 2px 18px;margin:0 0 22px;position:relative}
-.cl-item::before{content:"";position:absolute;left:-6px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--s3);border:2px solid var(--line2)}
+.cl-item::before{content:"";position:absolute;left:-6px;top:6px;width:10px;height:10px;box-sizing:border-box;border-radius:50%;background:var(--s3);border:2px solid var(--line2)}   /* border-box: * {} doesn't reach ::before, and a 14 px dot sat 2 px off the line */
 .cl-item:first-child::before{background:var(--acc);border-color:var(--acc)}
 .cl-item ul{margin:6px 0 0;padding-left:18px}
 .clold>summary{cursor:pointer;font-weight:600;padding:6px 0 14px;color:var(--blue)}.clold>summary .mute{font-weight:400}
@@ -270,10 +272,31 @@ tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .mbox{background:var(--s1);border:1px solid var(--line2);border-radius:16px;width:min(1400px,100%);padding:18px;box-shadow:var(--shadow)}
 .mhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .mhead h2{margin:0;font-size:19px}.mhead .mute{font-size:13px}.mhead button{margin-left:auto}
-.mgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:14px}
+.mgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"chart aside" "why aside";align-content:start;gap:14px}
+.mgrid>:first-child{grid-area:chart}#maside{grid-area:aside}#mwhy{grid-area:why}#maside>h4:first-child{margin-top:0}
+.twhy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 28px;align-items:start}
+@media(max-width:1100px){.mgrid{grid-template-areas:"chart" "aside" "why"}}
+@media(max-width:700px){.twhy{grid-template-columns:minmax(0,1fr)}}
 #tcv{height:560px}
-.kv{display:grid;grid-template-columns:1fr auto;gap:7px 12px;font-size:13px;margin-bottom:14px;background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-.kv span{color:var(--mute)}.kv b{font-weight:600;text-align:right}
+/* trade card aside: the result on top, the price between stop and take, then the numbers as two-column tiles */
+.thero{background:var(--s2);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.thero-k{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.thero-v{display:flex;align-items:baseline;gap:10px;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.thero-v b{font-size:28px;font-weight:750;line-height:1.15}.thero-v span{font-size:16px;font-weight:650}
+.thero-s{font-size:12.5px;color:var(--mute);font-variant-numeric:tabular-nums}
+.tpath{margin-top:14px}
+.tpath-bar{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--c-hi),var(--s3) 50%,var(--c-lo2))}
+.tpath-bar i{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--mid)}.tpath-bar i.pos{background:var(--lo)}.tpath-bar i.neg{background:var(--up)}
+.tpath-bar b{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;box-sizing:border-box;border:2px solid var(--s2)}
+.tpath-bar b.te{background:var(--c-trade)}.tpath-bar b.tc{background:var(--text)}.tpath-bar b.tc.pos{background:var(--lo)}.tpath-bar b.tc.neg{background:var(--up)}
+.tpath-l{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.tpath-l b{font-weight:650}
+.ttiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ttiles>div{background:var(--s2);padding:9px 12px;min-width:0}
+.ttiles span{display:block;font-size:11.5px;color:var(--mute)}
+.ttiles b{display:block;margin-top:2px;font-size:14px;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ttiles i{display:block;font-style:normal;font-size:11.5px;color:var(--mute);font-variant-numeric:tabular-nums}
+.ttiles:has(>div:nth-child(odd):last-child)>div:last-child{grid-column:span 2}   /* an odd tile out takes the whole row */
 .aside h4{margin:14px 0 8px;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
 .foot{text-align:center;color:var(--faint);font-size:12px;margin-top:18px}
 .sfoot{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0 16px;color:var(--faint);font-size:12px;margin-top:22px}.sfoot a{color:var(--mute);text-underline-offset:2px}
@@ -663,7 +686,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .hchart{position:relative;height:150px;touch-action:pan-y;cursor:crosshair;border-radius:4px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
 .hchart:focus{outline:none}.hchart:focus-visible{outline:2px solid var(--focus);outline-offset:6px}
 /* the balance chart's pointer: a line, a dot on the balance, a note (see eqShow); the drawdown band's size */
-.hx{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:var(--c-cross);pointer-events:none}
+.hcross{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:var(--c-cross);pointer-events:none}   /* not .hx: that marks the market table's extra columns */
 .hdot{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;box-shadow:0 0 0 4px var(--ring);pointer-events:none}
 .htip{position:absolute;top:0;z-index:2;padding:7px 10px;background:var(--c-tip);border:1px solid var(--line2);border-radius:8px;box-shadow:var(--shadow);font-size:12px;line-height:1.5;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
 .htip b{font-size:14px}
@@ -1354,6 +1377,7 @@ details.dis>.dbody{padding:0 16px 16px}
         </div>
       </div>
       <div class="aside" id="maside"></div>
+      <div class="aside" id="mwhy"></div>
     </div>
   </div>
 </div>
@@ -1705,10 +1729,12 @@ function renderChart(cv, d, o = {}) {
   // drawing inside the plot only: bars cut by the edges don't spill into the margin or under the price tags
   const clip = () => { g.save(); g.beginPath(); g.rect(padL, 0, pw, H); g.clip(); };
   // time labels at round times (hours, days…): they ride with the candles while the chart is dragged, instead of
-  // hopping to other candles. The step is the shortest that keeps labels ~115 px apart; a label goes on the first bar of
+  // hopping to other candles. The step is the shortest that keeps labels a label's width + 24 px (at least 100 px) apart,
+  // with 4 and 5 days between 3 days and a week (a phone's 4h chart had one label); a label goes on the first bar of
   // each period, shown only when it fits whole and doesn't touch the previous one
-  const tz = -new Date(t[n - 1]).getTimezoneOffset() * 6e4, need = 115 / bw * step;
-  const D = [6e4, 12e4, 3e5, 6e5, 9e5, 18e5, 36e5, 72e5, 108e5, 144e5, 216e5, 432e5, 864e5, 1728e5, 2592e5, 6048e5, 12096e5, 2592e6, 7776e6, 15552e6, 31536e6].find(x => x >= need && x >= step) || need;
+  g.font = '11px system-ui';
+  const tz = -new Date(t[n - 1]).getTimezoneOffset() * 6e4, need = Math.max(100, g.measureText(dt(t[n - 1])).width + 24) / bw * step;
+  const D = [6e4, 12e4, 3e5, 6e5, 9e5, 18e5, 36e5, 72e5, 108e5, 144e5, 216e5, 432e5, 864e5, 1728e5, 2592e5, 3456e5, 4320e5, 6048e5, 12096e5, 2592e6, 7776e6, 15552e6, 31536e6].find(x => x >= need && x >= step) || need;
   const per = i => Math.floor((tAt(i) + tz - (D % 6048e5 ? 0 : 3456e5)) / D);   // weeks start on Monday (1970-01-01 was a Thursday)
   const tLabels = []; g.font = '11px system-ui';
   for (let i = Math.max(1, s), last = -Infinity; i <= Math.floor(eView + 0.5) && step; i++) {
@@ -2038,14 +2064,18 @@ async function loadChart(sym) {
   if (sym && sym !== chartSym) { chartView = null; chart2View = null; }
   chartSym = sym || chartSym; save('sr_chart', chartSym);
   if (page === 'market') setHash();
-  const req = ++chartReq, want = chartSym;
-  if (!chart) $('#ctitle').textContent = pair(want) + ' — загрузка…';
+  const req = ++chartReq, want = chartSym, wrap = $('#cv').parentElement;
+  // another coin: until its candles come, the previous coin's chart must not pass for this one (on a phone network that
+  // takes seconds): the title says what is loading, the old chart fades under «Загружаю график…» (.cvwrap[data-wait])
+  if (!chart || chart.sym !== want) $('#ctitle').textContent = pair(want) + ' — загрузка…';
+  if (chart && chart.sym !== want) wrap.dataset.wait = 'Загружаю график…';
   try {
     const K = await klines(want, S.tf, Math.min(1000, S.candles + S.N + 5));
     if (req !== chartReq) return; // a newer request superseded this one
-    chartK = K; computeChart();
+    chartK = K; computeChart(); delete wrap.dataset.wait;
   } catch (e) {
     if (req !== chartReq) return;
+    if (wrap.dataset.wait) wrap.dataset.wait = 'Не удалось загрузить график';
     $('#ctitle').textContent = /HTTP 400/.test(e.message) ? `${pair(want)} — такой пары нет на Binance. Нужна монета к USDT, например BTC или SOL.` : `${pair(want)} — не удалось загрузить график (${e.message || 'нет связи'}). Попробуем снова через минуту.`;
   }
   document.querySelectorAll('tr.row[data-sym]').forEach(tr => tr.classList.toggle('sel', tr.dataset.sym === chartSym));
@@ -2814,7 +2844,7 @@ function equityChart(D, tEnd, key = 'j') {
       <path d="${d}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
       <span class="hlab" style="top:${ys}%">старт $${money(D.start)}</span>${ddLab}
       <span class="hend" style="top:${ye}%;background:${col}"></span>
-      <span class="hx" hidden></span><span class="hdot" hidden></span><div class="htip" hidden></div><span class="sr" aria-live="polite"></span></div>
+      <span class="hcross" hidden></span><span class="hdot" hidden></span><div class="htip" hidden></div><span class="sr" aria-live="polite"></span></div>
     <div class="haxis"><span>${dt(t0)}</span><span>${dt((t0 + t1) / 2)}</span><span>${tEnd ? dt(t1) : 'сейчас'}</span></div>`;
 }
 // the point under the pointer: the trade close nearest in time (a binary search — a long backtest has thousands)
@@ -2830,7 +2860,7 @@ function eqShow(el, i, say = false) {
   const E = EQ.get(el.dataset.eq); if (!E) return;
   i = clamp(i, 0, E.pts.length - 1);
   const p = E.pts[i], W = el.clientWidth, x = (p.t - E.t0) / Math.max(1, E.t1 - E.t0) * W, y = (E.mx - p.b) / (E.mx - E.mn) * el.clientHeight;
-  const ln = el.querySelector('.hx'), dot = el.querySelector('.hdot'), tip = el.querySelector('.htip');
+  const ln = el.querySelector('.hcross'), dot = el.querySelector('.hdot'), tip = el.querySelector('.htip');
   Object.assign(EQH, {key:el.dataset.eq, t:p.t});
   ln.hidden = dot.hidden = tip.hidden = false;
   ln.style.left = dot.style.left = x + 'px'; dot.style.top = y + 'px'; dot.style.background = E.col;
@@ -2844,7 +2874,7 @@ function eqShow(el, i, say = false) {
   if (say) el.querySelector('.sr').textContent = tip.textContent;
 }
 function eqHide(el) {
-  for (const s of ['.hx', '.hdot', '.htip']) { const n = el?.querySelector(s); if (n) n.hidden = true; }
+  for (const s of ['.hcross', '.hdot', '.htip']) { const n = el?.querySelector(s); if (n) n.hidden = true; }
   if (!el || EQH.key === el.dataset.eq) Object.assign(EQH, {key:null, t:null, sticky:false});
 }
 // the journal is redrawn every 30-60 s: a note still shown (the mouse hasn't left, the finger hasn't tapped elsewhere, the
@@ -3023,47 +3053,49 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   if ($('#modal').classList.contains('hidden')) { modalBack = document.activeElement; requestAnimationFrame(() => $('#mclose').focus({preventScroll:true})); }
   $('#modal').classList.remove('hidden'); document.body.style.overflow = 'hidden';
   $('#mtitle').textContent = `${pair(x.sym)} — ${isOpen ? 'открытая позиция' : 'сделка'}`;
-  $('#mmeta').textContent = `${x.side} · ${who} · ${isOpen ? 'открыта ' + dt(x.time) : dt(x.time) + ' → ' + dt(x.tclose)} · ${tf}`;
-  // aside
+  $('#mmeta').innerHTML = `<span class="dchip ${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</span> ${who} · ${isOpen ? 'открыта ' + dt(x.time) : dt(x.time) + ' → ' + dt(x.tclose)} · ${tf}`;
+  // aside: the result first (PnL and R), where the price stands between the stop and the take, then the numbers in groups
   const last = isOpen ? (x.last ?? x.entry) : x.exit, risk = x.risk || Math.abs(x.entry - x.sl) * x.qty;
   const gross = sg * (last - x.entry) * x.qty, fee = (x.entry + last) * x.qty * M.FEE, net = gross - fee;
   const pct = v => { const p = (v / x.entry - 1) * 100; return (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(2) + '%'; };
-  const row = (k, v, c = '') => `<span>${k}</span><b class="${c}">${v}</b>`;
-  let html = `<div class="kv">
-    ${row('Сторона', x.side, x.side === 'LONG' ? 'pos' : 'neg')}
-    ${row('Открыта', dt(x.time))}
-    ${isOpen ? row('В сделке', dur(Date.now() - x.time)) : row('Закрыта', dt(x.tclose)) + row('Длительность', dur(x.hold))}
-    ${row('Вход', fp(x.entry))}
-    ${row(isOpen ? 'Сейчас' : 'Выход', fp(last))}
-    ${row('Тейк', `${fp(x.tp)} (${pct(x.tp)})`, 'pos')}
-    ${row('Стоп', `${fp(x.sl)} (${pct(x.sl)})`, 'neg')}
-    ${row('Размер позиции', '$' + (x.entry * x.qty).toFixed(2))}
-    ${row('Кол-во монет', (+x.qty).toLocaleString('ru', {maximumFractionDigits: x.qty >= 100 ? 0 : x.qty >= 1 ? 2 : 6}))}
-    ${row('Риск (1R)', '$' + risk.toFixed(2) + (x.snap?.riskPct ? ` · ${x.snap.riskPct.toFixed(2)}% баланса` : ''))}
-    ${x.snap?.lev ? row('Плечо', x.snap.lev.toFixed(2) + '×') : ''}
-    ${row('Комиссия в R', risk ? '−' + (fee / risk).toFixed(2) + 'R' : '—', 'neg')}
-    ${isOpen ? '' : row('Причина выхода', reasonTag(x.reason))}
-    ${row(isOpen ? 'PnL до комиссий сейчас' : 'PnL до комиссий', usd(gross), cl(gross))}
-    ${row(x.fin ? 'Комиссия и заём' : 'Комиссия', usd(-fee), 'neg')}
-    ${x.fin ? row('из них заём под позицию', usd(-x.fin), 'neg') : ''}
-    ${row(isOpen ? 'PnL сейчас' : 'PnL после комиссий', usd(net), cl(net))}
-    ${row('Результат', rr(risk ? net / risk : null), cl(net))}
+  const tile = (k, v, c = '', sub = '') => `<div><span>${k}</span><b class="${c}">${v}</b>${sub ? `<i>${sub}</i>` : ''}</div>`;
+  const group = (h, tiles) => `<h4>${h}</h4><div class="ttiles">${tiles}</div>`;
+  // the stop is 0 and the take 1 for either side, so the bar always reads «risk on the left, reward on the right»
+  const at = p => (clamp((p - x.sl) / (x.tp - x.sl), 0, 1) * 100).toFixed(1), pe = at(x.entry), pc = at(last), mv = sg * (last - x.entry);
+  const nowW = isOpen ? 'сейчас' : 'выход';
+  let html = `<div class="thero">
+    <div class="thero-k">${isOpen ? 'PnL сейчас' : 'PnL после комиссий'}</div>
+    <div class="thero-v"><b class="${cl(net)}">${usd(net)}</b><span class="${cl(net)}">${rr(risk ? net / risk : null)}</span></div>
+    <div class="thero-s">до комиссий ${usd(gross)} · ${x.fin ? 'комиссия и заём' : 'комиссия'} ${usd(-fee)}${x.fin ? ` (заём ${usd(-x.fin)})` : ''}</div>
+    <div class="tpath" role="img" aria-label="Цена между стопом и тейком: вход ${fp(x.entry)}, ${nowW} ${fp(last)} (${pct(last)}), стоп ${fp(x.sl)}, тейк ${fp(x.tp)}">
+      <div class="tpath-bar"><i class="${cl(mv)}" style="left:${Math.min(pe, pc)}%;width:${Math.abs(pc - pe).toFixed(1)}%"></i><b class="te" style="left:${pe}%"></b><b class="tc ${cl(mv)}" style="left:${pc}%"></b></div>
+      <div class="tpath-l"><span>стоп <b class="neg">${pct(x.sl)}</b></span><span>${nowW} <b class="${cl(mv)}">${pct(last)}</b></span><span>тейк <b class="pos">${pct(x.tp)}</b></span></div>
+    </div>
   </div>`;
-  html += `<h4>Почему бот вошёл</h4>`;
+  html += group('Цены', tile('Вход', fp(x.entry)) + tile(isOpen ? 'Сейчас' : 'Выход', fp(last), cl(mv), pct(last))
+    + tile('Тейк', fp(x.tp), 'pos', pct(x.tp)) + tile('Стоп', fp(x.sl), 'neg', pct(x.sl)));
+  html += group('Сделка', tile('Открыта', dt(x.time))
+    + (isOpen ? tile('В сделке', dur(Date.now() - x.time)) : tile('Закрыта', dt(x.tclose)) + tile('Длительность', dur(x.hold)) + tile('Причина выхода', reasonTag(x.reason))));
+  html += group('Размер и риск', tile('Позиция', '$' + (x.entry * x.qty).toFixed(2)) + tile('Монет', (+x.qty).toLocaleString('ru', {maximumFractionDigits: x.qty >= 100 ? 0 : x.qty >= 1 ? 2 : 6}))
+    + tile('Риск (1R)', '$' + risk.toFixed(2), '', x.snap?.riskPct ? `${x.snap.riskPct.toFixed(2)}% баланса` : '') + (x.snap?.lev ? tile('Плечо', x.snap.lev.toFixed(2) + '×') : '')
+    + tile(x.fin ? 'Комиссия и заём' : 'Комиссия', usd(-fee), 'neg') + tile('Комиссия в R', risk ? '−' + (fee / risk).toFixed(2) + 'R' : '—', 'neg'));
+  // «why the bot entered» goes under the chart on a wide screen (it was empty there, and the numbers above it now fit the
+  // screen) and after the numbers on a narrow one (#mwhy's grid area): the signal's parts on the left, the reading on the right
+  let why = `<h4>Почему бот вошёл</h4>`;
   if (x.snap) {
     const s = x.snap;
-    html += `<div style="font-size:13px;margin-bottom:6px">Сила сигнала <b style="color:var(--acc)">${s.score}</b> из 100 · объём <b>×${s.volX?.toFixed(1)}</b> к обычному</div>` + compsHtml(s, x.side);
+    why += `<div class="twhy"><div><div style="font-size:13px;margin-bottom:6px">Сила сигнала <b style="color:var(--acc)">${s.score}</b> из 100 · объём <b>×${s.volX?.toFixed(1)}</b> к обычному</div>` + compsHtml(s, x.side) + '</div><div>';
     // for a bounce: how much of the way back to the centre was still ahead at the entry — the whole idea of the trade
     if (isFinite(s.mid) && !/пробой/.test(x.note || '')) {
       const room = sg * (s.mid - x.entry) / x.entry * 100, stopPct = Math.abs(x.sl / x.entry - 1) * 100;
-      html += `<div class="insight" style="margin-top:10px"><svg class="i"><use href="#i-info"/></svg><span>До середины канала на входе оставалось <b>${room.toFixed(2)}%</b> при стопе ${stopPct.toFixed(2)}%.`
+      why += `<div class="insight" style="margin-top:0"><svg class="i"><use href="#i-info"/></svg><span>До середины канала на входе оставалось <b>${room.toFixed(2)}%</b> при стопе ${stopPct.toFixed(2)}%.`
         + (room < 0.8 * stopPct ? ' Почти весь ход к середине уже случился до входа — у такого отскока мало шансов. Сейчас бот такие сделки пропускает.' : '') + '</span></div>';
     }
-    html += `<div class="faint" style="font-size:12px;margin-top:8px">Настройки на входе: ${METHOD_NAME[s.settings.method]} (${s.settings.N}, ${s.settings.k}), ${s.settings.tf}, мин. сила ${s.settings.minScore}.</div>`;
+    why += `<div class="faint" style="font-size:12px;margin-top:8px">Настройки на входе: ${METHOD_NAME[s.settings.method]} (${s.settings.N}, ${s.settings.k}), ${s.settings.tf}, мин. сила ${s.settings.minScore}.</div></div></div>`;
   } else {
-    html += `<div class="mute" style="font-size:12px">${x.note || ''}<br>Подробный снимок сигнала не сохранён: сделка открыта до обновления журнала.</div>`;
+    why += `<div class="mute" style="font-size:12px">${x.note || ''}<br>Подробный снимок сигнала не сохранён: сделка открыта до обновления журнала.</div>`;
   }
-  $('#maside').innerHTML = html;
+  $('#maside').innerHTML = html; $('#mwhy').innerHTML = why;
   // chart
   tcard = null; renderChart($('#tcv'), null);
   const cv = $('#tcv'), g = cv.getContext('2d'); cv.width = cv.clientWidth; cv.height = cv.clientHeight; g.fillStyle = PC.mute; g.font = '13px system-ui'; g.fillText('Загружаю свечи…', 16, 24);
@@ -3379,6 +3411,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.59', date:'2 ноября 2026', title:'Новая карточка позиции', items:[
+    'Карточка позиции показывает итог крупно и путь цены между стопом и тейком.',
+    'Цифры карточки собраны в группы, разбор сигнала стоит под графиком.',
+    'При выборе монеты на телефоне видно, что её график загружается.',
+    'Исправлены полосы поверх рынка при включённых дополнительных колонках.',
+    'Отметки версий в «Что нового» стоят ровно на линии.',
+  ]},
   {v:'2.58', date:'2 ноября 2026', title:'Цены дешёвых монет', items:[
     'Исправлено обрезание цен самых дешёвых монет в сделках журнала и бэктеста на телефоне.',
   ]},
@@ -3433,11 +3472,6 @@ const CHANGELOG = [
   {v:'2.48', date:'26 октября 2026', title:'Прозрачность общего бота', items:[
     'В журнале общего бота указано, что его правила не показали преимущества на истории за три года.',
     'Пустой бэктест предлагает в одно нажатие проверить правила общего бота или свой профиль.',
-  ]},
-  {v:'2.47', date:'26 октября 2026', title:'Управление бэктестом', items:[
-    'Загрузку истории в бэктесте можно прервать; загруженные данные сохраняются.',
-    'Над таблицей монет поясняется действие включённого фильтра.',
-    'Названия карточек рынка полностью видны на экранах шириной 320 px.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

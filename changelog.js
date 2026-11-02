@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.46 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.47 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.47', date:'26 октября 2026', title:'Управление бэктестом', items:[
+    'Загрузку истории в бэктесте можно прервать; загруженные данные сохраняются.',
+    'Над таблицей монет поясняется действие включённого фильтра.',
+    'Названия карточек рынка полностью видны на экранах шириной 320 px.',
+  ]},
   {v:'2.46', date:'26 октября 2026', title:'Стартовый баланс и сложный процент в «Моём боте»', items:[
     'В профиле бота добавлен переключатель «Сложный процент».',
     'При сбросе журнала можно задать стартовый баланс от $100 до $10 000 000.',
