@@ -613,6 +613,10 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
 }
 /* own confirm / prompt dialog */
 .cmdk.dlgwrap{align-items:center;padding:16px;z-index:90}
+.gate{max-width:560px;margin:8vh auto 0;padding:0 16px;display:grid;gap:16px}.gate h1{margin:0;font-size:32px;text-wrap:balance}
+.gate-lead{margin:0;font-size:17px;line-height:1.5;color:var(--text)}.gate-list{margin:0;padding-left:20px;display:grid;gap:6px;line-height:1.5}
+.gate-in{height:48px;font-size:16px;justify-self:start;padding:0 22px}.gate p.faint{margin:0;line-height:1.5}
+.locked .tabs,.locked .tools>:not(#acct){display:none}
 .authbox{width:min(400px,100%)}.authh{display:flex;justify-content:space-between;align-items:center;gap:8px}.authh h3{margin:0}
 .authb{display:grid;gap:12px;margin-top:10px}.authb p{margin:0}
 .authcode{font-size:44px;line-height:1.15;text-align:center;letter-spacing:8px;padding:6px 0}
@@ -1369,6 +1373,18 @@ details.dis>.dbody{padding:0 16px 16px}
   </section>
 
   <!-- LEGAL: terms, what is stored where and how to delete it. Keep it true to the code: storage keys, ub_delete, cleanup_abandoned_bots -->
+  <section id="gate" class="hidden"><div class="gate">
+    <h1>Sigma Radar</h1>
+    <p class="gate-lead">Сканер рынка Binance по каналам Боллинджера: сигналы касаний и разворотов, бумажный бот с журналом сделок, бэктест и уведомления в Telegram.</p>
+    <ul class="gate-list">
+      <li><b>Рынок</b> — монеты из топа по обороту, сила сигнала и график с каналом.</li>
+      <li><b>Журнал</b> — бумажный бот по вашим правилам: в браузере или на сервере круглосуточно.</li>
+      <li><b>Бэктест</b> — проверка правил на истории до запуска.</li>
+      <li><b>Telegram</b> — сделки и сигналы вашего бота в личные сообщения.</li>
+    </ul>
+    <button class="primary gate-in" id="gateIn"><svg class="i"><use href="#i-user"/></svg>Войти через Telegram</button>
+    <p class="faint">Без пароля и почты: вход подтверждается кодом в нашем Telegram-боте. Сервис бесплатный и не даёт инвестиционных рекомендаций.</p>
+  </div></section>
   <section id="legal" class="hidden">
     <div class="phead"><div><h2>Правовая информация</h2><p>Условия использования и обращение с данными. Редакция от 27 октября 2026.</p></div></div>
     <div class="panel doc">
@@ -2349,6 +2365,10 @@ function activeProfile() {
 // trades a one-time token for a Supabase session (/auth/v1/verify). Stage 1: signing in is optional, nothing else uses it yet.
 const SB_BASE = SB_URL.replace('/rest/v1/', ''), AUTH_URL = SB_BASE + '/auth/v1/', FN_URL = SB_BASE + '/functions/v1/';
 let AUTH = load('sr_auth', null), ME = null, authRun = 0, authTimer = 0, authBack = null, refreshing = null;
+// the site opens only signed in (stage 4): without a session the page starts locked — the sign-in screen and the legal page,
+// nothing scanned, no bot; signing in or out reloads the page, so everything starts (or stops) cleanly
+const LOCKED = !AUTH;
+document.documentElement.classList.toggle('locked', LOCKED);
 const hexOf = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
 async function authFn(body, token) {
   const r = await fetch(FN_URL + 'auth', {method:'POST', headers:{'Content-Type':'application/json', ...(token ? {Authorization:'Bearer ' + token} : {})}, body:JSON.stringify(body), signal:AbortSignal.timeout(15000)})
@@ -2371,6 +2391,7 @@ function setSession(s) {   // a GoTrue session → the tokens and when the acces
 function signedOut() {   // this device keeps its copy of the settings; the profile no longer hears about changes
   AUTH = null; ME = null; save('sr_auth', null); clearTimeout(authTimer); renderAcct();
   syncReady = false; syncDirty.clear(); clearTimeout(syncTimer2);
+  if (!LOCKED) setTimeout(() => location.reload(), 1200);   // back to the sign-in screen, after the toast has been seen
 }
 function scheduleRefresh() {
   clearTimeout(authTimer);
@@ -2447,7 +2468,9 @@ async function authStart() {
       catch (e) { return authFail('Не удалось войти: ' + (e.message || e), true); }
       await loadMe(); closeAuth();
       toast('Вы вошли', ME?.tg_name ? 'Профиль: ' + ME.tg_name : '', 'ok');
-      return syncStart();
+      await syncStart();
+      if (LOCKED) location.reload();   // the site starts now, signed in, where the link led
+      return;
     }
   }
 }
@@ -2491,7 +2514,12 @@ $('#authDlg').onkeydown = e => {
     e.preventDefault(); f[(f.indexOf(document.activeElement) + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
   }
 };
-window.addEventListener('storage', e => { if (e.key === 'sr_auth') { AUTH = load('sr_auth', null); scheduleRefresh(); if (AUTH) loadMe(); else { ME = null; renderAcct(); } } });
+window.addEventListener('storage', e => {
+  if (e.key !== 'sr_auth') return;
+  AUTH = load('sr_auth', null);
+  if (!AUTH !== LOCKED) return location.reload();   // signed in or out in another tab
+  scheduleRefresh(); if (AUTH) loadMe(); else { ME = null; renderAcct(); }
+});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden || !AUTH) return;
   if (AUTH.exp - Date.now() < 120e3) refreshSession();
@@ -2572,7 +2600,8 @@ async function syncStart() {   // after sign-in and on every start while signed 
   syncReady = true;
   if (take) return syncApply(rows, true);
   save('sr_sync', SYNCV);
-  local.forEach(k => onSaved(k));
+  local.forEach(k => syncDirty.add(k));
+  await syncPush();   // at once: a locked page reloads right after this
 }
 async function syncCheck() {   // back to the tab: another device may have changed something
   if (!syncReady || !AUTH || syncDirty.size) return;
@@ -3738,6 +3767,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.66', date:'2 ноября 2026', title:'Вход обязателен', items:[
+    'Сайт открывается после входа через Telegram; без входа доступны описание сервиса и «Правовая информация».',
+    'Ссылки на монеты из Telegram после входа открывают нужный график.',
+  ]},
   {v:'2.65', date:'2 ноября 2026', title:'Бот, Telegram и «Бета» в профиле', items:[
     'Серверный бот хранится в профиле и один на всех ваших устройствах.',
     'Если на устройстве был свой серверный бот, сайт предлагает удалить его.',
@@ -3803,9 +3836,6 @@ const CHANGELOG = [
     'Подпись под графиком показывает состояние связи; после возвращения сети графики подключаются сразу.',
     'Несколько графиков на экране работают плавнее.',
     'История тепловой карты загружается быстрее.',
-  ]},
-  {v:'2.54', date:'28 октября 2026', title:'Сделки на узких экранах', items:[
-    'Исправлено обрезание дат и цен в сделках на самых узких экранах.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -3968,10 +3998,11 @@ document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const 
 document.querySelectorAll('#mhead th[data-s], #jhead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
 // ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes ----------
-const PAGES = ['market', 'journal', 'backtest', 'beta', 'help', 'changes', 'legal'];   // legal has no tab: the footer links to it
+const PAGES = ['market', 'journal', 'backtest', 'beta', 'help', 'changes', 'legal', 'gate'];   // legal has no tab: the footer links to it
 let page = 'market';
 function go(t, push = true) {
   if (!PAGES.includes(t)) t = 'market';
+  if (LOCKED && t !== 'legal') { t = 'gate'; push = false; }   // signed out: the sign-in screen; the address keeps where a link led
   page = t;
   document.querySelectorAll('.tab[data-t]').forEach(x => { x.classList.toggle('on', x.dataset.t === t); x.dataset.t === t ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'); });
   PAGES.forEach(id => $('#' + id).classList.toggle('hidden', id !== t));
@@ -4039,6 +4070,7 @@ function readHash() {
 const coinLink = () => { if (openCoinSheet) { openCoinSheet = false; setHash(); if (isPhone()) openSheet(); } };
 document.querySelectorAll('.tab[data-t]').forEach(b => b.onclick = () => go(b.dataset.t));
 window.addEventListener('hashchange', () => {
+  if (LOCKED) return go(location.hash === '#legal' ? 'legal' : 'gate', false);
   if (location.hash.startsWith('#p=')) { const r = parseShared(location.hash); history.replaceState(null, '', '#journal'); jMode = 'mine'; go('journal', false); if (r.p) showImport(r.p); else toast('Не получилось открыть профиль', r.error, 'warn'); return; }
   const prev = chartSym; const t = readHash(); go(t, false); if (chartSym !== prev) loadChart(chartSym); coinLink(); });
 document.addEventListener('keydown', e => {
@@ -4482,11 +4514,13 @@ window.addEventListener('resize', () => { if (btRes) drawEquity(); });
 // the backtest opens on the rules that held up over a year (the shared bot trades by the same), not on a setup that loses
 $('#btDays').value = '60'; btFromProf(PRESETS[0]);
 renderChangelog();
-renderBotPanel();
-tgName().then(b => { if (b && !$('#journal').classList.contains('hidden')) renderJournal(); });
-if (BP.where === 'server' && UB) syncServerBot();   // the server learns this browser's "Рынок" settings for its Telegram signals
+if (!LOCKED) {   // signed out, the bot panel would fetch the market regime for a page nobody can see
+  renderBotPanel();
+  tgName().then(b => { if (b && !$('#journal').classList.contains('hidden')) renderJournal(); });
+  if (BP.where === 'server' && UB) syncServerBot();
+}   // the server learns this browser's "Рынок" settings for its Telegram signals
 if (BP.where === 'server') fetchServerBot();
-if (!load('sr_intro', false)) $('#intro').classList.remove('hidden');
+if (!load('sr_intro', false) && !LOCKED) $('#intro').classList.remove('hidden');
 $('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };
 
 // ---------- quick jump (Ctrl+K): coins, pages, profiles and individual settings ----------
@@ -4727,6 +4761,10 @@ $('#bAccOut').onclick = e => {
 
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
 let sharedIn = null;
+if (LOCKED) {   // signed out: only the sign-in screen and the legal page; nothing is scanned, no bot runs; signing in reloads
+  go(location.hash === '#legal' ? 'legal' : 'gate', false);
+  $('#gateIn').onclick = openAuth;
+} else {
 if (location.hash.startsWith('#p=')) { sharedIn = parseShared(location.hash); history.replaceState(null, '', '#journal'); jMode = 'mine'; }
 $('#mlive').innerHTML = liveTag(0, 3 * SCAN_MS); tickLive();
 const startPage = readHash();
@@ -4736,6 +4774,7 @@ setInterval(scan, SCAN_MS);
 setInterval(() => { tickFoot(); tickLive(); }, 1000);
 setInterval(() => { if (!document.hidden) loadChart(); }, SCAN_MS); // keep the chart's last candle fresh
 setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
+}
 
 // ---------- «Пока вас не было» ----------
 // Back after more than 2 hours (a new visit, or a tab left in the background): one note on what the bots did meanwhile. The

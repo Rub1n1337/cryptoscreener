@@ -1,6 +1,9 @@
-// Older «Что нового» entries (2.53 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.54 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.54', date:'28 октября 2026', title:'Сделки на узких экранах', items:[
+    'Исправлено обрезание дат и цен в сделках на самых узких экранах.',
+  ]},
   {v:'2.53', date:'28 октября 2026', title:'Цены сделок на телефоне', items:[
     'Исправлено обрезание цен в списках сделок журнала и бэктеста на телефоне.',
     'На узких экранах цены входа и выхода показаны через стрелку.',
