@@ -31,7 +31,7 @@ const link = (text: string, path = "") => ({ text, url: SITE + path });
 const mark = (on: boolean) => on ? "✅" : "▫️";
 const HOME = [btn("◀️ Меню", "h")];
 
-// who this chat is: its subscription and the site bot linked to it (one is shown if several are)
+// who this chat is: its subscription and the site bot that writes to it (a profile's bot, the chat is its Telegram; at most one)
 async function ctx(db: any, chat: number) {
   const [{ data: sub }, { data: bots }] = await Promise.all([
     db.from("tg_subs").select("*").eq("chat_id", chat).maybeSingle(),
@@ -85,7 +85,7 @@ function home(c: any): Screen {
     `${mark(v.sig.on)} Мои сигналы${v.sig.on ? ` · ${topName(v.sig.top)} · ${WHEN[v.sig.when].toLowerCase()}${v.sig.long ? " · только LONG" : ""}` : ""}`,
     `${mark(!!v.mkt && v.mkt.on !== false)} Рынок${v.mkt ? ` · ${mktName(v.mkt)}` : " · не настроен"}`,
     `${mark(!!sub?.shared)} Сделки общего бота`,
-  ] : [`${mark(!!sub?.shared)} Сделки общего бота`, "▫️ Ваш бот с сайта — не привязан"];
+  ] : [`${mark(!!sub?.shared)} Сделки общего бота`, "▫️ Ваш бот с сайта — Telegram не включён"];
   return {
     text: `📡 <b>Sigma Radar</b>\nСигналы отскока от статистического канала и бумажные боты по рынку Binance.\n\n<b>Что приходит в этот чат</b>\n${lines.join("\n")}`,
     kb: [[btn("🔔 Уведомления", "n"), btn("❓ Как читать", "?")], [btn("📊 Общий бот", "s"), btn("🤖 Мой бот", "m")], [link("🌐 Открыть сайт")]],
@@ -96,14 +96,14 @@ async function notifyScreen(_db: any, c: any): Promise<Screen> {
   const { sub, bot } = c, v = alertsView(bot), P = profileOf(bot);
   const parts = [
     `🔔 <b>Уведомления</b>\nНажмите на кнопку, чтобы изменить.`,
-    bot ? `<b>Сделки вашего бота</b> — входы и выходы, приходят всегда, пока бот привязан.\n\n` +
+    bot ? `<b>Сделки вашего бота</b> — входы и выходы, приходят всегда, пока у бота включён Telegram.\n\n` +
       `<b>Мои сигналы</b> — по правилам вашего бота «${esc(bot.active_profile || "—")}»${P?.set ? ` (${esc(P.set.tf)}, сила от ${sigMinOf(P.set)})` : ""}. ` +
       `Одно сообщение на касание: оно обновляется, когда разворот подтвердился и когда бот вошёл.\n` +
       `• <b>Монеты</b>: «как у бота» — только те, на которых он торгует; топ-50…250 — шире, для ручной торговли (бот по ним не входит, это написано в сигнале).\n` +
       `• <b>Только подтверждённые</b> — в момент, когда входит и бот. <b>Сразу при касании</b> — раньше, а о подтверждении придёт короткий ответ.\n\n` +
       `<b>Рынок</b> — отдельный фильтр со своими настройками канала, только подтверждённые развороты. ` +
       (v.mkt ? `Сейчас: ${mktName(v.mkt)}. Поменять — на сайте, «Мой бот» → Telegram.` : `Не настроен: на сайте откройте «Рынок» с нужными настройками, затем «Мой бот» → Telegram → «Сохранить» в строке «Рынок».`)
-      : `Сделки и сигналы <b>своего</b> бота с сайта — «🤖 Мой бот» → как привязать.`,
+      : `Сделки и сигналы <b>своего</b> бота с сайта — «🤖 Мой бот» → как включить.`,
     `<b>Сделки общего бота</b> — входы и выходы одного бота на всех.` +
       (bot ? `\n<b>🌙 Ночью без звука</b> — с ${hh(v.quiet.from)} до ${hh(v.quiet.to)} по вашему времени сообщения приходят беззвучно, ничего не теряется.` : ""),
     `📬 Отправлено сюда: ${sub?.sent_n || 0}${sub?.last_ok ? ` · последнее ${ago(sub.last_ok)}` : ""}${sub?.last_err ? `\n⚠️ Последняя ошибка отправки: ${esc(sub.last_err)}` : ""}`,
@@ -153,7 +153,7 @@ async function sharedScreen(db: any): Promise<Screen> {
 async function mineScreen(db: any, c: any): Promise<Screen> {
   const { bot } = c;
   if (!bot) return {
-    text: `🤖 <b>Мой бот</b>\nВаш бот с сайта ещё не привязан к этому чату. После привязки сюда придут его сделки и сигналы по его правилам.\n\n<b>Как привязать</b>\n1. На сайте откройте «Журнал» → «Мой бот».\n2. Нажмите «На сервере 24/7», чтобы бот работал, даже когда сайт закрыт.\n3. Нажмите «Подключить Telegram» — откроется этот чат, нажмите «Запустить» (Start).`,
+    text: `🤖 <b>Мой бот</b>\nTelegram у вашего бота с сайта не включён. Когда включите, сюда придут его сделки и сигналы по его правилам.\n\n<b>Как включить</b>\n1. Войдите на сайт через этот Telegram-аккаунт — пишет только бот вашего профиля и только сюда.\n2. Откройте «Журнал» → «Мой бот» и нажмите «На сервере 24/7», чтобы бот работал, даже когда сайт закрыт.\n3. Нажмите «Включить Telegram».`,
     kb: [[link("🌐 Открыть «Мой бот»", "/#journal")], HOME],
   };
   const [{ data: pos }, { data: tr }] = await Promise.all([
@@ -170,12 +170,12 @@ async function mineScreen(db: any, c: any): Promise<Screen> {
     ts.length ? `<b>Последние сделки</b>\n${ts.slice(0, 3).map(tradeLine).join("\n")}` : "",
     !bot.enabled ? "⏸ Бот на паузе — включите его на сайте." : bot.last_error ? `⚠️ ${esc(bot.last_error)}` : `<i>проверен ${ago(bot.checked_at)}</i>`,
   ];
-  return { text: parts.filter(Boolean).join("\n\n"), kb: [[btn("🔄 Обновить", "m"), link("📒 Журнал", "/#journal")], [btn("🔕 Отвязать", "u"), ...HOME]] };
+  return { text: parts.filter(Boolean).join("\n\n"), kb: [[btn("🔄 Обновить", "m"), link("📒 Журнал", "/#journal")], [btn("🔕 Выключить", "u"), ...HOME]] };
 }
 
 const unlinkAsk: Screen = {
-  text: "🔕 <b>Отвязать бота с сайта?</b>\nЕго сделки и сигналы перестанут приходить в этот чат. Сам бот на сайте продолжит работать, привязать снова можно в любой момент.",
-  kb: [[btn("Да, отвязать", "u!"), btn("Отмена", "m")]],
+  text: "🔕 <b>Выключить сообщения бота с сайта?</b>\nЕго сделки и сигналы перестанут приходить в этот чат. Сам бот продолжит работать, включить снова можно на сайте: «Мой бот» → Telegram.",
+  kb: [[btn("Да, выключить", "u!"), btn("Отмена", "m")]],
 };
 
 const help: Screen = {
@@ -256,21 +256,15 @@ async function onMessage(db: any, m: any, call: Call) {
   const say = (t: string, kb?: any[][]) => call("sendMessage", { chat_id: chat, text: t, parse_mode: "HTML", disable_web_page_preview: true, ...(kb ? { reply_markup: { inline_keyboard: kb } } : {}) });
   if (cmd === "/start" && arg.startsWith("login_")) return loginPrompt(db, arg.slice(6), say);   // signing in doesn't subscribe anyone
   let c = await ctx(db, chat);
+  // only a profile's bot writes here, and only to its profile's Telegram: it is turned on on the site («Мой бот» → Telegram),
+  // nothing links a bot from this chat (supabase/2026-11-profile-bot.sql)
   if (cmd === "/start") {
-    if (!c.sub) await db.from("tg_subs").insert({ chat_id: chat, name: chatName(m.chat) });
-    if (/^b[0-9a-f]{18}$/.test(arg)) {   // a link code from the site: this chat gets that bot's trades and signals
-      const { data: b } = await db.from("user_bots").select("id, active_profile").eq("tg_code", arg).gt("tg_code_until", new Date().toISOString()).maybeSingle();
-      if (b) {   // one bot per chat: an older bot linked here (another device's, a forgotten one) would double every message
-        await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat).neq("id", b.id);
-        await db.from("user_bots").update({ tg_chat: chat, tg_code: null, tg_code_until: null }).eq("id", b.id); await say(`✅ <b>Ваш бот с сайта привязан</b>${b.active_profile ? ` · «${esc(b.active_profile)}»` : ""}\nСюда будут приходить его сделки и сигналы по его правилам. Что именно присылать — «🔔 Уведомления».`); }
-      else await say("⌛ Ссылка устарела — на сайте нажмите «Подключить Telegram» ещё раз.", [[link("🌐 Открыть «Мой бот»", "/#journal")]]);
-    }
-    c = await ctx(db, chat);
+    if (!c.sub) { await db.from("tg_subs").insert({ chat_id: chat, name: chatName(m.chat) }); c = await ctx(db, chat); }
     return show(call, chat, home(c));
   }
   if (cmd === "/stop") {
     await db.from("tg_subs").delete().eq("chat_id", chat); await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat);
-    return say("👋 Вы отписались от всего, ваш бот с сайта отвязан. Вернуться можно в любой момент.", [[btn("▶️ Подписаться снова", "go")]]);
+    return say("👋 Вы отписались от всего, сообщения вашего бота с сайта выключены. Вернуться можно в любой момент.", [[btn("▶️ Подписаться снова", "go")]]);
   }
   if (!c.sub) return say("Сначала подпишитесь — это бесплатно и отключается в любой момент.", [[btn("▶️ Начать", "go")]]);
   // the old on/off commands still work, then show the notifications screen
@@ -282,7 +276,7 @@ async function onMessage(db: any, m: any, call: Call) {
     if (r) await say(r);
     return show(call, chat, await notifyScreen(db, await ctx(db, chat)));
   }
-  if (cmd === "/unlink") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); return say("🔕 Бот с сайта отвязан."); }
+  if (cmd === "/unlink") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); return say("🔕 Сообщения бота с сайта выключены. Включить снова — на сайте: «Мой бот» → Telegram."); }
   const key = ({ "/notify": "n", "/settings": "n", "/status": "n", "/bot": "s", "/mybot": "m", "/help": "?" } as Record<string, string>)[cmd] || "h";
   return show(call, chat, await screenFor(db, key, c));
 }
@@ -295,7 +289,7 @@ async function toggle(db: any, chat: number, c: any, k: string, want?: boolean) 
     await db.from("tg_subs").update({ shared: on }).eq("chat_id", chat);
     return `Сделки общего бота: ${on ? "вкл" : "выкл"}`;
   }
-  if (!c.bot) return "Сначала привяжите своего бота с сайта — «🤖 Мой бот».";
+  if (!c.bot) return "Сначала включите Telegram у своего бота на сайте — «🤖 Мой бот».";
   const v = alertsView(c.bot), a = { ...(c.bot.alerts || {}) }, s = { ...(a.sig || {}) };
   let msg = "";
   if (k === "sig") { s.on = want ?? !v.sig.on; msg = `Мои сигналы: ${s.on ? "вкл" : "выкл"}`; }
@@ -323,7 +317,7 @@ async function onButton(db: any, q: any, call: Call) {
   else if (!c.sub) return answer("Вы отписаны — нажмите /start, чтобы вернуться.", true);
   if (key === "ex") { await answer(); return call("sendMessage", { chat_id: chat, text: EXAMPLE, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: [[btn("🔔 Уведомления", "+n")]] } }); }
   if (key.startsWith("t:")) { note = await toggle(db, chat, c, key.slice(2)) || ""; if (!c.bot && key !== "t:shared") return answer(note, true); }
-  if (key === "u!") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); note = "Бот отвязан"; }
+  if (key === "u!") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); note = "Сообщения выключены"; }
   if (key === "s" || (key === "m" && c.bot)) note = "Обновлено";
   c = await ctx(db, chat);
   const scr = await screenFor(db, key, c);

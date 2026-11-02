@@ -35,7 +35,7 @@
   - `functions/bot/index.ts`: pg_cron вызывает её **каждую минуту**, и каждый вызов это холодный старт. Торгуют общий бот и все серверные «Мои боты». Затем идут сигналы в Telegram. Анализы берутся у коллектора, а если он не ответил или отпечаток `fingerprint` не совпал, функция считает сама.
   - `functions/tg/index.ts` + `_shared/tg.ts`: вебхук Telegram, меню, настройки уведомлений.
   - Таблицы (часть видна в `supabase/*.sql`, **часть создана миграциями прямо в Supabase и в репозитории отсутствует**, это тоже стоит отметить): `bot_state`, `positions`, `trades`, `bot_runs`, `user_bots` (конфиг, состояние, `alerts` jsonb, `sig_sent`), `tg_subs`, `tg_config` (токен бота, закрытая), коды беты.
-  - RPC с парой `(p_id uuid, p_secret text)`: `ub_create`, `ub_get`, `ub_set`, `ub_reset`, `ub_close`, `ub_alerts`, `ub_tg_link`, `ub_tg_unlink`. Для беты: `beta_redeem`, `beta_issue`, `beta_list`, `beta_revoke`. Сайт ходит в них публичным anon‑ключом.
+  - RPC с парой `(p_id uuid, p_secret text)`: `ub_get`, `ub_set`, `ub_reset`, `ub_close`, `ub_alerts`, `ub_delete`. Бот профиля (`user_bots.user_id`) открывается токеном вошедшего без секрета, бот без профиля — секретом. Без пары: `ub_create`, `ub_mine`, `ub_claim(p_id, p_secret)`, `ub_tg(p_on)` (Telegram только у бота профиля и только в Telegram профиля). Для беты: `beta_redeem`, `beta_issue`, `beta_list`, `beta_revoke`. Сайт открывается только после входа, и `ub_*` доступны только роли `authenticated`.
 - **Коллектор на Railway** (`server/index.js`, `server/scan.js`, Node): держит WebSocket к Binance (стакан, сделки, ликвидации), хранит историю тепловой карты, кластеров и ликвидаций и отдаёт её через GET (`/health`, `/symbols`, `/book`, `/heat`, `/fp`, `/liq`). `POST /scan` держит свечи в памяти и отвечает анализами для Edge Function. math.js он загружает **с сайта по URL**. CORS `*`.
 - **Торговля только бумажная.** Реальных ордеров и ключей бирж в коде быть не должно. Если найдёшь что-то похожее, это критичная находка.
 - Внешние данные: публичный API Binance (`data-api.binance.vision`, `api.binance.com`, фьючерсы `fapi`) и Telegram Bot API.
@@ -69,7 +69,7 @@ docs/PLAN-*.md, AUDIT-PLAN.md      прошлые аудиты и планы
 
 **Telegram**
 - Проверяет ли вебхук `secret_token` (заголовок `X-Telegram-Bot-Api-Secret-Token`)? Можно ли подделать апдейт и управлять чужими настройками или ботом?
-- Привязка чата к боту (`ub_tg_link`): одноразовость и срок жизни кода, возможность привязать чужой бот.
+- Telegram бота (`ub_tg`): пишет ли кто-то, кроме бота профиля, и в чат, кроме Telegram профиля (`profiles.tg_id`); проверка `user_bots_tg_needs_profile`.
 - Экранирование HTML в сообщениях (имена монет, текст из конфигов) и `callback_data` (длина ≤ 64 байт, подделка).
 
 **Сайт**

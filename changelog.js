@@ -1,6 +1,10 @@
-// Older «Что нового» entries (2.62 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.63 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.63', date:'2 ноября 2026', title:'Вход через Telegram', items:[
+    'Добавлен вход в профиль через Telegram-бота: без пароля и почты, подтверждением кода в боте.',
+    'Добавлены выход из профиля и выход на всех устройствах.',
+  ]},
   {v:'2.62', date:'2 ноября 2026', title:'Новые шрифты и навигация', items:[
     'Текст набран шрифтом Manrope, цены и числа — моноширинным JetBrains Mono.',
     'Панели и кнопки стали строже: скругления меньше.',

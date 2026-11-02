@@ -1234,13 +1234,13 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       </div></details>
       <!-- 3. rarely needed -->
       <details class="dis bmore"><summary>Дополнительно <span class="mute">· где работает бот, граница боковика, сброс журнала</span></summary><div class="dbody">
-        <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт. В браузере — только пока открыта эта вкладка; удобно, чтобы быстро проверить новый профиль. Если не заходить на сайт 30 дней, серверный бот засыпает — откройте сайт, и он продолжит.</p></div>
+        <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт; он один на профиль и одинаковый на всех ваших устройствах. В браузере — только пока открыта эта вкладка, и журнал у каждого устройства свой; удобно, чтобы быстро проверить новый профиль. Если не заходить на сайт 30 дней, серверный бот засыпает — откройте сайт, и он продолжит.</p></div>
           <div class="seg mini" id="bwhere"><button class="tab" data-w="server">На сервере 24/7</button><button class="tab" data-w="browser">В браузере</button></div></div>
         <div class="bopt"><div><b>Когда рынок считается боковиком</b><p>Бот смотрит на BTC, ETH и SOL за 7 дней: насколько цена прошла по прямой относительно всего пути (ER). Если у всех трёх ER ниже порога — боковик, иначе импульс. Здесь — граница для выбора профиля в авто-режиме (по часовым свечам) и для профилей без своей границы; сделки профиль решает по свечам своего таймфрейма, как в бэктесте.</p></div>
           <select id="bER" aria-label="Граница боковика для выбора профиля и для профилей без своей границы"><option value="0.1">ER &lt; 0.10 · строже</option><option value="0.15">ER &lt; 0.15 · обычно</option><option value="0.25">ER &lt; 0.25 · мягче</option></select></div>
         <div class="bopt"><div><b>Начать заново</b><p>Удалит все сделки вашего бота и начнёт журнал с суммы, которую вы укажете. Профили останутся.</p></div>
           <button id="jreset">Сбросить журнал</button></div>
-        <div class="bopt hidden" id="bdelOpt"><div><b>Удалить с сервера</b><p>Удалит серверного бота: его сделки, позиции и связь с Telegram. Профили останутся, бот продолжит работать в этой вкладке.</p></div>
+        <div class="bopt hidden" id="bdelOpt"><div><b>Удалить с сервера</b><p>Удалит серверного бота профиля на всех устройствах: его сделки, позиции и Telegram. Профили останутся, бот продолжит работать в этой вкладке.</p></div>
           <button id="ubdel">Удалить с сервера</button></div>
       </div></details>
       <div id="bform" class="hidden">
@@ -1449,7 +1449,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <h3>Уведомления</h3>
       <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они придут, даже когда вкладка свёрнута. Рядом — кнопка звука.</p>
       <h3>Telegram</h3>
-      <p>В журнале общего бота нажмите «Получать в Telegram», в боте — «Start»: будут приходить сделки общего бота. Чтобы получать своё, переведите «Мой бот» на сервер и нажмите «Подключить Telegram». Тогда придут:</p>
+      <p>В журнале общего бота нажмите «Получать в Telegram», в боте — «Start»: будут приходить сделки общего бота. Чтобы получать своё, переведите «Мой бот» на сервер и нажмите «Включить Telegram»: сообщения присылает только бот вашего профиля и только в Telegram, через который вы вошли. Тогда придут:</p>
       <ul>
         <li><b>сделки вашего бота</b> — входы и выходы;</li>
         <li><b>«Мои сигналы»</b> — касания и развороты по правилам вашего бота: на его монетах или шире, топ-50…250 для ручной торговли. Одно сообщение на касание: оно обновляется, когда разворот подтвердился и когда бот вошёл. Можно получать только подтверждённые или сразу при касании, только LONG;</li>
@@ -1524,7 +1524,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
     <p class="faint">Без пароля и почты: вход подтверждается кодом в нашем Telegram-боте. Сервис бесплатный и не даёт инвестиционных рекомендаций.</p>
   </div></section>
   <section id="legal" class="hidden">
-    <div class="phead"><div><h2>Правовая информация</h2><p>Условия использования и обращение с данными. Редакция от 27 октября 2026.</p></div></div>
+    <div class="phead"><div><h2>Правовая информация</h2><p>Условия использования и обращение с данными. Редакция от 2 ноября 2026.</p></div></div>
     <div class="panel doc">
       <h3>О сервисе</h3>
       <p>Sigma Radar — бесплатный учебный сервис: сканер рынка, боты на виртуальных деньгах и проверка правил на истории. Платных функций и рекламы нет. Связь с владельцем — в Telegram: <a href="https://t.me/sigmascreener" target="_blank" rel="noopener">t.me/sigmascreener</a>.</p>
@@ -1540,10 +1540,10 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <h3>Какие данные хранятся</h3>
       <p>Вход — через Telegram: сервис не запрашивает почту, телефон и пароль. Cookie, аналитика, реклама и счётчики посещений не используются.</p>
       <ul>
-        <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере», профили, избранное, свои уровни, настройки и тема, а также ключ доступа к вашему серверному боту.</li>
-        <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, ключ доступа к серверному боту, свои уровни, вид «Беты» и доступ к ней по коду. Журнал бота «В браузере» в профиль не передаётся.</li>
-        <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Доступ к боту есть у браузера, где хранится ключ, а если вы вошли — у вашего профиля.</li>
-        <li><b>На сервере, если вы подключили Telegram</b>: номер чата, имя из профиля Telegram, выбранные уведомления и состояние доставки последнего сообщения.</li>
+        <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере» — у каждого устройства свой, профили, избранное, свои уровни, настройки и тема, а также номер серверного бота вашего профиля.</li>
+        <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, свои уровни, вид «Беты» и доступ к ней по коду. Журнал бота «В браузере» в профиль не передаётся.</li>
+        <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Серверный бот закреплён за вашим профилем — один на все ваши устройства, и доступ к нему есть только у вашего профиля.</li>
+        <li><b>На сервере, если вы включили Telegram</b>: номер чата, имя из профиля Telegram, выбранные уведомления и состояние доставки последнего сообщения. Сообщения присылает только бот вашего профиля и только в Telegram, через который вы вошли.</li>
         <li><b>IP-адрес</b> — только для ограничения частоты запросов: создание серверных ботов, вход через Telegram и попытки входа в «Бету». Удаляется автоматически в течение двух суток.</li>
       </ul>
       <h3>Кому передаются данные</h3>
@@ -1553,18 +1553,19 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <li><b>Telegram</b> — доставляет сообщения бота, если вы его подключили.</li>
       </ul>
       <p>Данные не продаются и не передаются для рекламы. Шрифт загружается с этого же сайта.</p>
+      <p>Владелец сервиса технически имеет доступ к базе данных и смотрит её только для устранения неполадок.</p>
       <h3>Сроки хранения</h3>
       <ul>
-        <li>Серверный бот засыпает через 30 дней без заходов на сайт и удаляется через 90 дней, если к нему не подключён Telegram. Бот с Telegram хранится, пока вы его не удалите.</li>
+        <li>Серверный бот засыпает через 30 дней без заходов на сайт и удаляется через 90 дней, если у него не включён Telegram. Бот с Telegram хранится, пока вы не удалите его или профиль.</li>
         <li>Подписка в Telegram хранится, пока вы не отпишетесь.</li>
         <li>Профиль хранится, пока вы его не удалите. Записи о попытках входа удаляются через сутки.</li>
         <li>Данные в браузере хранятся, пока вы их не очистите.</li>
       </ul>
       <h3>Как удалить свои данные</h3>
       <ul>
-        <li><b>Профиль:</b> кнопка «Войти» / ваше имя в шапке → «Удалить профиль». Удаляются профиль и сохранённые в нём настройки.</li>
-        <li><b>Серверный бот:</b> «Журнал» → «Мой бот» → «Дополнительно» → «Удалить с сервера». Удаляются сделки, позиции и связь с Telegram.</li>
-        <li><b>Telegram:</b> команда /stop в боте удаляет подписку и отвязывает бота с сайта.</li>
+        <li><b>Профиль:</b> кнопка «Войти» / ваше имя в шапке → «Удалить профиль». Удаляются профиль, сохранённые в нём настройки и серверный бот профиля.</li>
+        <li><b>Серверный бот:</b> «Журнал» → «Мой бот» → «Дополнительно» → «Удалить с сервера». Удаляются сделки, позиции и Telegram бота.</li>
+        <li><b>Telegram:</b> команда /stop в боте удаляет подписку и выключает сообщения бота с сайта.</li>
         <li><b>Браузер:</b> очистите данные этого сайта в настройках браузера. Журнал и профили удалятся без возможности восстановления.</li>
         <li>По другим вопросам о данных напишите владельцу в Telegram.</li>
       </ul>
@@ -2463,7 +2464,7 @@ BP.profiles.forEach(p => { if (p.id === 'p-sw4h' && p.set.k === 3 && !p.set.maxH
 BP.profiles.forEach(p => { if ((p.id === 'p-flat1h' || p.id === 'p-sw4h') && / \(проверен за год\)$/.test(p.name)) p.name = p.name.replace(/ \(проверен за год\)$/, ''); });
 BP.where ||= 'browser';
 BP.profiles.forEach(p => { p.name = cleanName(p.name); });
-let UB = load('sr_ubot', null);   // {id, secret} of this browser's server bot
+let UB = load('sr_ubot', null);   // {id} of the profile's server bot (see profileBot); {id, secret} — a bot no profile has yet
 let SB_MINE = null;               // the server bot's journal, when it runs on the server
 const saveBP = () => save('sr_bot', BP);
 const profById = id => BP.profiles.find(p => p.id === id) || BP.profiles[0];
@@ -2637,12 +2638,14 @@ function authProfile() {
 }
 async function deleteProfile() {
   closeAuth();
-  if (!await ask({title:'Удалить профиль?', text:'Удалятся профиль и настройки, сохранённые в нём, на всех устройствах. Данные в этом браузере и серверный бот останутся. Отменить нельзя.', ok:'Удалить', danger:true})) return;
+  if (!await ask({title:'Удалить профиль?', text:'Удалятся профиль, сохранённые в нём настройки и серверный бот профиля со сделками — на всех устройствах. Данные в этом браузере останутся. Отменить нельзя.', ok:'Удалить', danger:true})) return;
   try {
     if (AUTH.exp - Date.now() < 60e3) await refreshSession();
     await authFn({op:'delete'}, AUTH?.at);
   } catch (e) { return toast('Не удалось удалить профиль', e.message || String(e), 'bad'); }
   SYNCV = null; save('sr_sync', null); signedOut();
+  UB = null; save('sr_ubot', null); SB_MINE = null;   // the profile's bot went with it
+  if (BP.where === 'server') { BP.where = 'browser'; saveBP(); }
   toast('Профиль удалён', 'Настройки остались только в этом браузере', 'ok');
 }
 function signOut(all) {
@@ -2685,8 +2688,9 @@ document.addEventListener('visibilitychange', () => {
 // journal; the bot that serves several devices is the server one. Everything is read once at start-up, so values that came
 // from another device are written to storage and the page reloads (at most once in 15 s).
 // Not synced on purpose: recent coins (change on every open — another device would get a notice each time), the Beta's
-// number of charts and hidden panels (a phone keeps fewer than a computer).
-const SYNC = new Set(['sr_settings', 'sr_favs', 'sr_bot', 'sr_ubot', 'sr_lv', 'sr_tfilt', 'sr_msort', 'sr_jsort',
+// number of charts and hidden panels (a phone keeps fewer than a computer), the server bot (the server knows the profile's
+// one, see profileBot).
+const SYNC = new Set(['sr_settings', 'sr_favs', 'sr_bot', 'sr_lv', 'sr_tfilt', 'sr_msort', 'sr_jsort',
   'sr_bcfg', 'sr_bdraw', 'sr_bind', 'sr_bpanes', 'sr_bchips', 'sr_blabels', 'sr_bvol', 'sr_bnotec', 'sr_blink']);
 let SYNCV = load('sr_sync', null), syncReady = false, syncTimer2 = 0;   // {uid, v: {key: version this device has}}
 const syncDirty = new Set();
@@ -2720,20 +2724,22 @@ async function syncPush() {
   save('sr_sync', SYNCV);
 }
 function syncApply(rows, asked) {   // values from the profile → this device's storage, then a reload so everything reads them
-  // the profile's server bot replaces this device's own one: that one is remembered, and the next start offers to delete it
-  const ub = rows.find(r => r.key === 'sr_ubot'), mine = load('sr_ubot', null);
-  if (ub && mine?.id && ub.value?.id !== mine.id) save('sr_ubot_old', mine);
   for (const r of rows) { try { localStorage.setItem(r.key, JSON.stringify(r.value)); } catch { /* full storage: the old value stays */ } SYNCV.v[r.key] = r.version; }
   save('sr_sync', SYNCV);
   const last = +sessionStorage.getItem('sr_syncreload') || 0;
   if (!asked && Date.now() - last < 15e3) return;   // never a reload loop; the values are stored and apply at the next start
   sessionStorage.setItem('sr_syncreload', Date.now()); location.reload();
 }
-async function oldBotAsk() {   // this device's own server bot, replaced by the profile's: delete it, or it keeps trading (and messaging)
+// this device's own server bot, replaced by the profile's: asked once, with its result. Kept, it trades on unseen and never
+// writes to Telegram (only a profile's bot does); it falls asleep 30 days after it was last opened
+async function oldBotAsk() {
   const old = load('sr_ubot_old', null); if (!old?.id || old.id === UB?.id) return save('sr_ubot_old', null);
-  const del = await ask({title:'Удалить прежний серверный бот?', text:'На этом устройстве был свой бот на сервере, теперь здесь бот из профиля. Прежний продолжит работать, пока его не удалить: его сделки и позиции удалятся. Сообщения в Telegram он больше не присылает.', ok:'Удалить', no:'Оставить', danger:true});
-  if (del) { try { await rpc('ub_delete', {p_id:old.id, p_secret:old.secret}); toast('Прежний бот удалён', '', 'ok'); } catch (e) { if (!/forbidden/.test(e.message)) return toast('Не удалось удалить прежний бот', String(e.message || e), 'bad'); } }
-  else { try { await rpc('ub_tg_unlink', {p_id:old.id, p_secret:old.secret}); } catch (e) { if (!/forbidden/.test(e.message)) return; } }   // kept, it trades on unseen: its messages would double the profile bot's
+  let r; try { r = await rpc('ub_get', {p_id:old.id, p_secret:old.secret || null}); }
+  catch (e) { if (/forbidden/.test(e.message)) save('sr_ubot_old', null); return; }   // gone, or another profile's: nothing to ask; offline: the next start
+  const b = r.bot, n = r.closed?.length || 0, pos = r.open?.length || 0, pnl = b.balance - b.start_balance;
+  const del = await ask({title:'Удалить прежний серверный бот?', ok:'Удалить', no:'Оставить', danger:true,
+    text:`На этом устройстве был свой бот на сервере, теперь здесь бот профиля. Итог прежнего: баланс $${money(b.balance)} (${usd(pnl)}), сделок ${n}, открытых позиций ${pos}. Оставленный, он продолжит торговать без Telegram; удалённый — вместе со сделками и позициями. Отменить удаление нельзя.`});
+  if (del) { try { await rpc('ub_delete', {p_id:old.id, p_secret:old.secret || null}); toast('Прежний бот удалён', '', 'ok'); } catch (e) { if (!/forbidden/.test(e.message)) return toast('Не удалось удалить прежний бот', String(e.message || e), 'bad'); } }
   save('sr_ubot_old', null);
 }
 async function syncStart() {   // after sign-in and on every start while signed in
@@ -2744,8 +2750,7 @@ async function syncStart() {   // after sign-in and on every start while signed 
     syncReady = true;
     const newer = rows.filter(r => r.version > (SYNCV.v[r.key] || 0));
     for (const k of SYNC) if (localStorage.getItem(k) != null && !rows.some(r => r.key === k)) onSaved(k);   // keys the profile doesn't have yet
-    if (newer.length) syncApply(newer);   // reloads, and the next start asks about a replaced bot
-    else oldBotAsk();
+    if (newer.length) syncApply(newer);   // reloads
     return;
   }
   // the first sign-in with this profile on this device
@@ -2755,7 +2760,7 @@ async function syncStart() {   // after sign-in and on every start while signed 
   SYNCV = {uid, v:Object.fromEntries(rows.map(r => [r.key, r.version]))};
   syncReady = true;
   if (take) return syncApply(rows, true);
-  // «Оставить эти»: this device's values win; what it doesn't have (the profile's server bot, say) comes from the profile
+  // «Оставить эти»: this device's values win; what it doesn't have comes from the profile
   for (const r of rows) if (localStorage.getItem(r.key) == null) try { localStorage.setItem(r.key, JSON.stringify(r.value)); } catch { /* full storage */ }
   save('sr_sync', SYNCV);
   local.forEach(k => syncDirty.add(k));
@@ -2769,9 +2774,9 @@ async function syncCheck() {   // back to the tab: another device may have chang
     try { syncApply(await stateRows(true, rows.map(r => r.key)), true); } catch { toast('Не удалось загрузить настройки', 'Проверьте интернет', 'bad'); }
   }, 15000);
 }
-renderAcct(); scheduleRefresh(); loadMe().then(() => syncStart());
+renderAcct(); scheduleRefresh(); loadMe().then(() => syncStart()).then(() => profileBot());   // one after the other: each may ask something
 
-// ---------- my bot on the server: this browser holds the secret of its own server bot ----------
+// ---------- my bot on the server: the profile's bot (accounts stage 5), one for all its devices ----------
 // signed in, calls go as the person (the profile's Telegram, the Beta, owner rights); a stale token is refreshed once
 async function rpc(fn, args) {
   if (AUTH && AUTH.exp - Date.now() < 60e3) await refreshSession();
@@ -2782,19 +2787,51 @@ async function rpc(fn, args) {
   if (!r.ok) throw new Error((await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
+// the server bot's id and, for a bot no profile has claimed yet, its secret (a profile's bot answers to the person's token)
+const ubArgs = (x = {}) => ({p_id:UB.id, p_secret:UB.secret || null, ...x});
+// The server knows the profile's bot; this device follows it at every start. The profile has one → it is shown here, and the
+// device's own bot, if it had another, is offered for deletion once (oldBotAsk). The profile has none → the device's own bot
+// becomes the profile's (the first device wins). Neither → the bot works in the browser until «На сервере 24/7» creates one
+async function profileBot() {
+  if (!AUTH) return;
+  // «На сервере 24/7» pressed while the answer was on its way created the profile's bot: that is newer than the answer
+  const was = UB?.id || null, moved = () => (UB?.id || null) !== was;
+  let id;
+  try { id = (await rpc('ub_mine', {}))?.id; } catch { return; }   // offline: as it was
+  if (moved()) return;
+  if (!id && UB?.secret) {
+    try { id = (await rpc('ub_claim', {p_id:UB.id, p_secret:UB.secret}))?.id; }
+    catch (e) { if (!/forbidden/.test(e.message)) return; }   // forbidden: this device's bot is gone, or another profile's
+    if (moved()) return;
+  }
+  if (id && UB?.secret && UB.id !== id) save('sr_ubot_old', UB);
+  UB = id ? {id} : null; save('sr_ubot', UB);
+  const lost = BP.where === 'server' && !UB;   // deleted on another device, or asleep too long and removed
+  if (lost) { BP.where = 'browser'; saveBP(); toast('Серверный бот не найден', 'бот работает в этой вкладке; «На сервере 24/7» создаст нового', 'warn'); }
+  if (lost || was !== (id || null)) { SB_MINE = null; renderBotPanel(); renderJournal(); renderGuard(); fetchServerBot(); }
+  oldBotAsk();
+}
 // what the server bot trades by; its Telegram settings are kept apart (alerts, see renderTg)
 const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax});
-let syncTimer;
-function syncServerBot() {   // push profiles/mode to the server bot (debounced)
+// on/off goes only with the person's own «Пауза» / «Продолжить» (on); other pushes leave it as the server has it: every device
+// pushes to the one profile bot, and a device's own journal flag would pause it for all of them
+let syncTimer, ubOn = null;
+function syncServerBot(on) {   // push profiles/mode to the server bot (debounced)
   if (BP.where !== 'server' || !UB) return;
+  if (on != null) ubOn = on;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => rpc('ub_set', {p_id:UB.id, p_secret:UB.secret, p_config:serverConfig(), p_enabled:J.on})
-    .then(() => fetchServerBot()).catch(e => toast('Не удалось сохранить на сервере', String(e.message || e), 'bad')), 400);
+  syncTimer = setTimeout(() => { const en = ubOn; ubOn = null;
+    if (BP.where !== 'server' || !UB) return;   // the bot went meanwhile (deleted, the profile too)
+    rpc('ub_set', ubArgs({p_config:serverConfig(), p_enabled:en})).then(() => fetchServerBot())
+      .catch(e => { toast('Не удалось сохранить на сервере', String(e.message || e), 'bad'); fetchServerBot(); }); }, 400);   // the panel shows what the server has
 }
 async function fetchServerBot() {
   if (BP.where !== 'server' || !UB) return;
+  const id = UB.id;
   try {
-    const r = await rpc('ub_get', {p_id:UB.id, p_secret:UB.secret}), b = r.bot, prev = SB_MINE;
+    const r = await rpc('ub_get', ubArgs()), b = r.bot, prev = SB_MINE;
+    if (UB?.id !== id) return;   // the device moved to the profile's bot meanwhile
+
     // the server trades on its own: compare with the previous poll to tell the owner about new trades
     if (prev) {
       const seenO = new Set(prev.open.map(p => p.id)), seenC = new Set(prev.closed.map(t => t.id)), toJ = () => { jMode = 'mine'; go('journal'); };
@@ -2807,22 +2844,33 @@ async function fetchServerBot() {
     if (!$('#journal').classList.contains('hidden')) renderJournal();
     if (chart) drawChart();
   } catch (e) {
-    if (/forbidden/.test(e.message)) { UB = null; save('sr_ubot', null); toast('Серверный бот не найден', 'включите режим «На сервере» заново', 'warn'); }
+    if (UB?.id !== id) return;
+    if (/forbidden/.test(e.message)) profileBot();   // deleted on another device: the profile may have another bot, or none
     // any other failure (no connection, a timeout, a server error) was dropped and the panel kept old numbers as if fresh
     else if (SB_MINE) { SB_MINE.fetchError = String(e.message || e); renderGuard(); }
   }
 }
+let ubCreating = false;   // a double tap would send two creates (the second gets the first one's bot back, with a second toast)
 async function setWhere(w) {
+  let fresh = false;
   if (w === 'server' && !UB) {
-    try { UB = await rpc('ub_create', {p_config:serverConfig()}); save('sr_ubot', UB); }
+    if (ubCreating) return;
+    let r; ubCreating = true;
+    try { r = await rpc('ub_create', {p_config:serverConfig()}); }
     catch (e) { toast('Не удалось создать серверного бота', String(e.message || e), 'bad'); return; }
-    // a new server bot starts at $10 000; with another start in the browser it begins from the same amount
-    const start = J.start >= 100 && J.start <= 1e7 ? Math.round(J.start) : 10000;
-    if (start !== 10000) await rpc('ub_reset', {p_id:UB.id, p_secret:UB.secret, p_start:start}).catch(() => {});
-    toast('Ваш бот теперь работает на сервере 24/7', `торгует по выбранному профилю, даже когда сайт закрыт. Журнал — отдельный, начинается с $${start.toLocaleString('ru')}`, 'ok');
+    finally { ubCreating = false; }
+    UB = r.secret ? {id:r.id, secret:r.secret} : {id:r.id}; save('sr_ubot', UB);
+    if (r.existing) toast('У профиля уже есть бот на сервере', 'здесь теперь его журнал', 'ok');   // another device created it a moment ago
+    else {
+      fresh = true;
+      // a new server bot starts at $10 000; with another start in the browser it begins from the same amount
+      const start = J.start >= 100 && J.start <= 1e7 ? Math.round(J.start) : 10000;
+      if (start !== 10000) await rpc('ub_reset', ubArgs({p_start:start})).catch(() => {});
+      toast('Ваш бот теперь работает на сервере 24/7', `торгует по выбранному профилю, даже когда сайт закрыт. Журнал — отдельный, начинается с $${start.toLocaleString('ru')}`, 'ok');
+    }
   }
   BP.where = w; saveBP();
-  if (w === 'server') { syncServerBot(); fetchServerBot(); } else SB_MINE = null;
+  if (w === 'server') { syncServerBot(fresh ? J.on : null); fetchServerBot(); } else SB_MINE = null;   // a new bot starts as the browser one was
   renderBotPanel(); renderJournal();
 }
 async function runBot() {
@@ -3047,7 +3095,7 @@ async function saveAlerts(a, msg) {
   // the zone's name follows summer time; the offset alone (tz) stays an hour off after the clocks change. tz is kept as a fallback
   let zone = null; try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch {}
   a = {...a, quiet:{...(a.quiet || {}), tz:-new Date().getTimezoneOffset(), ...(zone ? {zone} : {})}};
-  try { await rpc('ub_alerts', {p_id:UB.id, p_secret:UB.secret, p_alerts:a}); SB_MINE.alerts = a; renderTg(); toast('Сохранено', msg, 'ok'); }
+  try { await rpc('ub_alerts', ubArgs({p_alerts:a})); SB_MINE.alerts = a; renderTg(); toast('Сохранено', msg, 'ok'); }
   catch (e) { toast('Не удалось сохранить', String(e.message || e), 'bad'); renderTg(); }
 }
 // one plain sentence about what will come, for the current choice
@@ -3061,9 +3109,10 @@ const hourLabel = h => String(h).padStart(2, '0') + ':00';
 function renderTg() {
   const el = $('#btg'); if (!el) return;
   const srv = BP.where === 'server' && UB, linked = srv && SB_MINE?.tg;
+  const who = `Telegram, через который вы вошли${ME?.tg_username ? ` (@${esc(ME.tg_username)})` : ''}`;
   const text = !srv ? 'Бот присылает сделки и сигналы, только когда работает на сервере 24/7.'
-    : linked ? 'Подключено: сделки бота приходят всегда, сигналы — по настройкам ниже (их же можно менять в Telegram, «🔔 Уведомления»).'
-    : 'Нажмите — откроется Telegram, там нажмите «Start». Через минуту бот подтвердит, что всё связано.';
+    : linked ? `Включено: сделки бота приходят в ${who} всегда, сигналы — по настройкам ниже (их же можно менять в Telegram, «🔔 Уведомления»).`
+    : `Выключено. Включите — сделки и сигналы бота профиля будут приходить в ${who}.`;
   let set = '';
   if (linked) {
     const v = alertsView(), opt = (vals, cur) => vals.map(([k, t]) => `<option value="${k}"${String(cur) === String(k) ? ' selected' : ''}>${t}</option>`).join(''), m = v.mkt;
@@ -3083,7 +3132,7 @@ function renderTg() {
     </div>`;
   }
   el.innerHTML = `<span class="btg-i"><svg class="i"><use href="#i-bell"/></svg></span><div style="min-width:0;flex:1"><b>Telegram</b><p>${text}</p>${set}</div>${
-    !srv ? '<button data-tg="server">Перевести на сервер</button>' : linked ? '<button data-tg="off">Отключить</button>' : '<button data-tg="on" class="primary">Подключить Telegram</button>'}`;
+    !srv ? '<button data-tg="server">Перевести на сервер</button>' : linked ? '<button data-tg="off">Выключить</button>' : '<button data-tg="on" class="primary">Включить Telegram</button>'}`;
 }
 $('#btg').onchange = e => {
   const f = e.target.closest('[data-al]'); if (!f || !SB_MINE) return;
@@ -3105,27 +3154,17 @@ $('#btg').onclick = async e => {
     const m = {on:true, tf:S.tf, top:S.top, minScore:Math.max(40, S.minScore || 60), method:S.method, N:S.N, k:S.k};
     return saveAlerts({...(SB_MINE?.alerts || {}), mkt:m}, `Рынок: ${m.tf} · топ-${m.top} · сила от ${m.minScore}. Дальше эти настройки меняются только этой кнопкой.`);
   }
-  if (b.dataset.tg === 'off') {
-    try { await rpc('ub_tg_unlink', {p_id:UB.id, p_secret:UB.secret}); SB_MINE.tg = false; renderTg(); toast('Telegram отключён', '', 'ok'); }
-    catch (err) { toast('Не удалось отключить', String(err.message || err), 'bad'); }
-    return;
-  }
-  if (AUTH && ME) {   // signed in through Telegram: the bot writes to that same account, no link to open
+  // on / off: only the profile's bot writes, and only to the Telegram the person signed in with (its private chat with our bot)
+  if (b.dataset.tg === 'on' || b.dataset.tg === 'off') {
+    const on = b.dataset.tg === 'on';
     b.disabled = true;
-    try { await rpc('ub_tg_me', {p_id:UB.id, p_secret:UB.secret}); if (SB_MINE) SB_MINE.tg = true; renderTg(); toast('Telegram подключён', `Сделки и сигналы бота придут в Telegram${ME.tg_username ? ' @' + ME.tg_username : ''}`, 'ok'); fetchServerBot(); }
-    catch (err) { toast('Не удалось подключить', String(err.message || err), 'bad'); }
+    try {
+      await rpc('ub_tg', {p_on:on}); if (SB_MINE) SB_MINE.tg = on; renderTg();
+      toast(on ? 'Telegram включён' : 'Telegram выключен', on ? `Сделки и сигналы бота придут в Telegram${ME?.tg_username ? ' @' + ME.tg_username : ''}` : 'Бот продолжает торговать, сообщения не приходят', 'ok');
+    } catch (err) { toast(on ? 'Не удалось включить Telegram' : 'Не удалось выключить Telegram', String(err.message || err), 'bad'); }
     finally { b.disabled = false; }
-    return;
+    fetchServerBot();
   }
-  const w = window.open('', '_blank');   // opened right on the click, so the browser doesn't block it
-  try {
-    const r = await rpc('ub_tg_link', {p_id:UB.id, p_secret:UB.secret});
-    if (!r?.bot) { w?.close(); toast('Telegram-бот ещё не настроен', 'Владелец сайта должен подключить его — тогда кнопка заработает.', 'warn'); return; }
-    const url = `https://t.me/${encodeURIComponent(r.bot)}?start=${encodeURIComponent(r.code)}`;
-    if (w) w.location = url; else location.href = url;
-    toast('Нажмите «Start» в Telegram', 'Ссылка действует 30 минут. Бот ответит в течение минуты.', 'info');
-    setTimeout(fetchServerBot, 70e3);
-  } catch (err) { w?.close(); toast('Не удалось подключить', String(err.message || err), 'bad'); }
 };
 // rewriting a block's HTML drops the keyboard focus inside it, and the profile list and the journal are redrawn every
 // 30-60 s: the focused element is found again by its id and data- attributes and focused back
@@ -3157,7 +3196,7 @@ function renderBotPanelNow() {
   const chg = ` <button class="linkbtn" data-act="prof">сменить</button>`;
   const sub = !on ? `Новых сделок не открывает. Профиль «${act.name}»${chg}.`
     : srv ? `На сервере, даже когда сайт закрыт · профиль «${act.name}»${chg}`
-    : `Профиль «${act.name}»${chg}. Если закрыть вкладку, бот остановится.`;
+    : `Профиль «${act.name}»${chg}. Если закрыть вкладку, бот остановится. Журнал в браузере — только на этом устройстве.`;
   const live = on ? `<div style="margin-top:6px">${liveTag(checked, 3 * 60e3, 'проверка рынка')}</div>` : '';
   const why = on ? idleReason(act, regT, srv) : '';
   const ers = botRegime ? M.MAJORS.map(s => `${base(s)} ${botRegime.by?.[s] ? botRegime.by[s].er.toFixed(2) : '—'}`).join(', ') : '';
@@ -3925,6 +3964,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.75', date:'2 ноября 2026', title:'Один бот профиля', items:[
+    'Серверный бот закреплён за профилем и одинаков на всех ваших устройствах; прежний бот устройства сайт предложит удалить.',
+    'Кнопка Telegram стала переключателем: сообщения присылает только бот профиля и только в ваш Telegram.',
+    'Исправлены окна подтверждения: сброс журнала, удаление бота и профиля снова работают.',
+    'Исправлена пауза серверного бота при смене настроек на другом устройстве.',
+    'В «Правовую информацию» добавлен технический доступ владельца к базе данных.',
+  ]},
   {v:'2.74', date:'2 ноября 2026', title:'Без дублей в Telegram', items:[
     'Исправлены повторные сообщения в Telegram от нескольких ботов одного человека: в чат пишет только последний подключённый.',
     'Прежний бот, оставленный после перехода на бот из профиля, больше не пишет в Telegram.',
@@ -3986,10 +4032,6 @@ const CHANGELOG = [
     'При первом входе на устройстве можно взять настройки из профиля или оставить текущие.',
     'Изменения, сделанные на другом устройстве, применяются нажатием на уведомление.',
     'Добавлена кнопка «Удалить профиль»; в «Правовой информации» описано, что хранится в профиле.',
-  ]},
-  {v:'2.63', date:'2 ноября 2026', title:'Вход через Telegram', items:[
-    'Добавлен вход в профиль через Telegram-бота: без пароля и почты, подтверждением кода в боте.',
-    'Добавлены выход из профиля и выход на всех устройствах.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4091,7 +4133,7 @@ async function closeMine(id) {
   const what = id == null ? `все ${open.length} ${plural(open.length, ['позицию', 'позиции', 'позиций'])}` : `${open[0].side} ${pair(open[0].sym)}`;
   if (!(await ask({title:`Закрыть ${what}?`, text:'По текущей цене рынка, с обычной комиссией. Бот не будет входить в эту монету, пока не пройдёт пауза после сделки.', ok:'Закрыть', danger:true}))) return;
   if (BP.where === 'server' && UB) {
-    try { await rpc('ub_close', {p_id:UB.id, p_secret:UB.secret, p_pos:id}); }
+    try { await rpc('ub_close', ubArgs({p_pos:id})); }
     catch (e) { const m = String(e.message || e); toast('Не удалось закрыть', /ub_close|PGRST202|Could not find/.test(m) ? 'Закрытие позиций на сервере ещё не включено — скоро заработает. В браузерном режиме уже работает.' : m, 'bad'); return; }
     for (const p of open) p.closeReq = true;
     renderJournal(); toast(id == null ? 'Позиции закрываются' : 'Позиция закрывается', 'Бот на сервере закроет по рынку в течение минуты.', 'info');
@@ -4259,11 +4301,12 @@ async function toggleNtf() {
 syncNtf();
 // ---------- own dialog instead of confirm()/prompt(): says exactly what will happen, follows the theme ----------
 // ask({title, text, ok, danger}) → true/false; with `input` → the typed text or null. Destructive dialogs focus "Отмена".
-function ask({title, text = '', ok = 'Готово', no = 'Отмена', danger = false, input = null}) {
+// The cancel label is noText: a parameter named `no` was shadowed by the `const no` below and every dialog threw (2.64–2.74)
+function ask({title, text = '', ok = 'Готово', no:noText = 'Отмена', danger = false, input = null}) {
   return new Promise(res => {
     const back = document.activeElement, inp = $('#dlgIn'), withInput = input != null;
     $('#dlgT').textContent = title; $('#dlgD').textContent = text; $('#dlgD').classList.toggle('hidden', !text);
-    $('#dlgOk').textContent = ok; $('#dlgOk').className = danger ? 'danger' : 'primary'; $('#dlgNo').textContent = no;
+    $('#dlgOk').textContent = ok; $('#dlgOk').className = danger ? 'danger' : 'primary'; $('#dlgNo').textContent = noText;
     inp.classList.toggle('hidden', !withInput); inp.value = input?.value ?? ''; inp.placeholder = input?.placeholder ?? ''; inp.inputMode = input?.inputmode ?? '';
     $('#dlg').classList.remove('hidden');
     if (withInput) { inp.focus(); inp.select(); } else (danger ? $('#dlgNo') : $('#dlgOk')).focus();
@@ -4359,7 +4402,7 @@ function notifyUser(title, body, kind = 'info', onClick) {
 $('#guardPill').onclick = e => { e.stopPropagation(); $('#guard').classList.toggle('open'); };
 document.addEventListener('click', e => { if (!e.target.closest('#guard')) $('#guard').classList.remove('open'); });
 // main button of the status card: pause / resume / move to the server
-const setOn = v => { J.on = v; save('sr_journal', J); if (SB_MINE) SB_MINE.on = v; renderGuard(); renderBotPanel(); syncServerBot(); };
+const setOn = v => { J.on = v; save('sr_journal', J); if (SB_MINE) SB_MINE.on = v; renderGuard(); renderBotPanel(); syncServerBot(v); };
 $('#bhero').onclick = e => {
   const a = e.target.closest('[data-act]')?.dataset.act; if (!a) return;
   const [k, x, y] = a.split(':');
@@ -4444,21 +4487,21 @@ $('#jreset').onclick = async () => {
   const start = Math.round(+String(v).replace(/[\s,]/g, ''));   // «25 000» and «25,000» are 25000
   if (!(start >= 100 && start <= 1e7)) { toast('Сумма — от $100 до $10 000 000', `введено: «${String(v).slice(0, 20)}»`, 'warn'); return; }
   if (srv) {
-    try { await rpc('ub_reset', {p_id:UB.id, p_secret:UB.secret, p_start:start}); toast(`Журнал начат заново с $${start.toLocaleString('ru')}`, '', 'ok'); }
+    try { await rpc('ub_reset', ubArgs({p_start:start})); toast(`Журнал начат заново с $${start.toLocaleString('ru')}`, '', 'ok'); }
     catch (e) { toast('Не удалось сбросить', String(e.message || e), 'bad'); }
     fetchServerBot(); return;
   }
   J = {balance:start, start, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
   toast(`Журнал начат заново с $${start.toLocaleString('ru')}`, '', 'ok');
 };
-// the server copy goes entirely (ub_delete): trades, positions, the Telegram link. The profiles live here, so the bot carries on in
-// this tab; «На сервере 24/7» later creates a new one
+// the server copy goes entirely (ub_delete): trades, positions, the Telegram link — for every device of the profile. The profiles
+// live here, so the bot carries on in this tab; «На сервере 24/7» later creates a new one
 $('#ubdel').onclick = async () => {
   if (!UB) return;
   if (!(await ask({title:'Удалить бота с сервера?', ok:'Удалить', danger:true,
-    text:'Сделки и позиции серверного бота и его связь с Telegram удалятся. Отменить это нельзя. Профили останутся, бот продолжит работать в этой вкладке.'}))) return;
-  clearTimeout(syncTimer);
-  try { await rpc('ub_delete', {p_id:UB.id, p_secret:UB.secret}); }
+    text:'Серверный бот профиля удалится на всех ваших устройствах: его сделки, позиции и Telegram. Отменить это нельзя. Профили останутся, бот продолжит работать в этой вкладке.'}))) return;
+  clearTimeout(syncTimer); ubOn = null;
+  try { await rpc('ub_delete', ubArgs()); }
   catch (e) { if (!/forbidden/.test(e.message)) { toast('Не удалось удалить', String(e.message || e), 'bad'); return; } }   // forbidden: it is gone already
   UB = null; save('sr_ubot', null); SB_MINE = null;
   if (BP.where === 'server') { BP.where = 'browser'; saveBP(); }
@@ -4680,9 +4723,9 @@ renderChangelog();
 if (!LOCKED) {   // signed out, the bot panel would fetch the market regime for a page nobody can see
   renderBotPanel();
   tgName().then(b => { if (b && !$('#journal').classList.contains('hidden')) renderJournal(); });
-  if (BP.where === 'server' && UB) syncServerBot();
-}   // the server learns this browser's "Рынок" settings for its Telegram signals
-if (BP.where === 'server') fetchServerBot();
+  if (BP.where === 'server' && UB) syncServerBot();   // the profiles as this device has them; on/off stays as the server has it
+  if (BP.where === 'server') fetchServerBot();   // profileBot then moves this device to the profile's bot, if it was on another
+}
 if (!load('sr_intro', false) && !LOCKED) $('#intro').classList.remove('hidden');
 $('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };
 
