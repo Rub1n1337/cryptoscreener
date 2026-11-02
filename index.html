@@ -7,7 +7,7 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Sigma Radar</title>
 <!-- the logo: Σ drawn as the channel — top band red, bottom band green, the price (gold) out to the band and back to the centre -->
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23161b26'/><path d='M47 15H17' stroke='%23f0525f' stroke-width='7' stroke-linecap='round'/><path d='M17 49H47' stroke='%2322c55e' stroke-width='7' stroke-linecap='round'/><path d='M17 15L34 32L17 49' stroke='%23f5b70a' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a1b1e'/><path d='M47 15H17' stroke='%23f0525f' stroke-width='7' stroke-linecap='round'/><path d='M17 49H47' stroke='%2322c55e' stroke-width='7' stroke-linecap='round'/><path d='M17 15L34 32L17 49' stroke='%23f5b70a' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
 <!-- Inter is served from this site, not Google Fonts: a visitor's address goes to no one else, and the font loads where Google
      is slow or blocked. Variable files, weights 400–700, only the subsets the text uses (fonts/LICENSE.txt: SIL OFL 1.1) -->
@@ -19,8 +19,10 @@
 @font-face{font-family:Inter;font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/inter-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 /* ---------- design tokens ---------- */
 :root{
-  --bg:#0a0d14;--s1:#10141d;--s2:#161b26;--s3:#1d2331;--line:#222a39;--line2:#2c3547;
-  --text:#e7eaf0;--mute:#8d97aa;--faint:#7a849a;   /* faint text: 4.6–5.2:1 on the page and cards (was #5c6679, ~3:1 — below WCAG AA for small text) */
+  /* graphite: the same lightness steps as the old navy surfaces, almost no hue (oklch chroma ~.005), so gold, red and green
+     are the only colours on the page */
+  --bg:#0c0d0f;--s1:#131517;--s2:#1a1b1e;--s3:#222426;--line:#282a2d;--line2:#333539;
+  --text:#e8eaec;--mute:#979ca3;--faint:#83888f;   /* faint text: 4.8–5.5:1 on the page and cards (WCAG AA for small text) */
   --acc:#f5b70a;--accbg:rgba(245,183,10,.12);--up:#f0525f;--lo:#22c55e;--blue:#5b8cff;--violet:#a78bfa;--mid:#64748b;
   --panel:var(--s1);--panel2:var(--s2);
   --r:12px;--r-s:8px;--h:34px;
@@ -29,17 +31,17 @@
   --ease:cubic-bezier(.2,.8,.2,1);--dur-1:160ms;--dur-2:240ms;--dur-3:500ms;
   --shadow:0 10px 30px rgba(0,0,0,.35);
   --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#16a34a;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags, server cells, focus ring */
-  --topbg:rgba(10,13,20,.82);--navbg:rgba(10,13,20,.96);--backdrop:rgba(3,6,12,.7);--ring:rgba(255,255,255,.05);
-  --hover:#3a4458;--row-line:#171d29;--sel:#182033;--gauge:#2a3650;--canvas:#0b0f17;
-  --intro:linear-gradient(135deg,#151c2c,#121722);--intro-line:#26314a;
-  --tag-t:#cbd5e1;--up-t:#ff9aa3;--lo-t:#86efac;--acc-t:#fcd34d;
+  --topbg:rgba(12,13,15,.82);--navbg:rgba(12,13,15,.96);--backdrop:rgba(4,5,6,.7);--ring:rgba(255,255,255,.05);
+  --hover:#414448;--row-line:#1c1d20;--sel:#272416;--gauge:#34373b;--canvas:#0e0f11;   /* selected row: a gold tint, as in the light theme */
+  --intro:linear-gradient(135deg,#1c1912,#131517);--intro-line:#403723;
+  --tag-t:#d2d4d8;--up-t:#ff9aa3;--lo-t:#86efac;--acc-t:#fcd34d;
   --bad-line:#6b2027;--bad-bg:#2a1216;--ok-line:#1d5b35;--warn-line:#5c4a12;
   /* chart colours (read by the canvas code through pal()) */
   --heat-0:#28469f;--heat-1:#00aaff;--heat-2:#ffdc00;--heat-3:#ff5a14;
   --c-up:#ef4444;--c-lo:#22c55e;--c-mid:#64748b;--c-trade:#a78bfa;--c-price:#e5e7eb;--c-acc:#f5b70a;
-  --c-axis:#566173;--c-label:#5c6679;--c-grid:#334155;--c-cross:#475569;--c-rsi:#60a5fa;--c-mute:#8b95a5;
-  --c-band:rgba(59,130,246,.07);--c-tip:rgba(15,22,34,.95);--c-volup:rgba(34,197,94,.45);--c-voldn:rgba(239,68,68,.45);
-  --c-hi:rgba(239,68,68,.06);--c-lo2:rgba(34,197,94,.06);--c-base:#3a4458;
+  --c-axis:#66696f;--c-label:#6e7278;--c-grid:#3d4046;--c-cross:#51545a;--c-rsi:#60a5fa;--c-mute:#979ca3;
+  --c-band:rgba(59,130,246,.07);--c-tip:rgba(19,21,23,.95);--c-volup:rgba(34,197,94,.45);--c-voldn:rgba(239,68,68,.45);
+  --c-hi:rgba(239,68,68,.06);--c-lo2:rgba(34,197,94,.06);--c-base:#414448;
   color-scheme:dark;
 }
 :root[data-theme=light]{
@@ -74,6 +76,7 @@ svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-
 .topin{max-width:1500px;margin:0 auto;padding:0 16px;height:58px;display:flex;align-items:center;gap:18px}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:700;font-size:16px;white-space:nowrap}
 @media (pointer:coarse){.brand{min-width:36px;min-height:36px}}   /* the logo alone on a phone was a 28 px target */
+.brand .bt span{font-weight:500;color:var(--mute)}   /* «Sigma» carries the name, «Radar» steps back */
 .brand small{font-weight:600;font-size:12px;color:var(--acc);background:var(--accbg);padding:2px 8px;border-radius:999px}
 .tabs{display:flex;gap:2px;align-items:center}
 .top .tabs{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
@@ -141,11 +144,15 @@ kbd{font:11px/1 ui-monospace,monospace;color:var(--faint);border:1px solid var(-
 .factions button.primary{height:44px;font-size:15px}
 
 /* ---------- cards ---------- */
-.cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.cards{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:14px}
 .cards.auto{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
 .card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden}
 .card .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
 .card .v{font-size:24px;font-weight:700;margin:4px 0 2px;letter-spacing:-.02em}.card .s{font-size:12px;color:var(--mute)}
+/* summary strip: one panel, its cells split by hairlines. Each cell draws a line on its left and top; the panel clips the ones
+   on its outer edge, so any number of rows and a half-empty last row work */
+.cards,.statrow{gap:0;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.cards>.card,.statrow>.card{background:transparent;border:0;border-radius:0;box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line)}
 .meter{height:4px;background:var(--s3);border-radius:2px;margin-top:10px}.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--lo),var(--acc),var(--up));border-radius:2px}
 [title]{cursor:help}button[title],select[title],input[title],tr[title],label[title]{cursor:pointer}
 .stats{font-size:13px;color:var(--mute);line-height:1.7}.stats b{color:var(--text);font-weight:600}
@@ -186,7 +193,8 @@ tr.row{cursor:pointer;transition:background var(--dur-1) var(--ease)}tr.row:hove
 tr.row:focus{outline:none}tr.row:focus-visible{background:var(--s2)}tr.row:focus-visible>td:first-child{box-shadow:inset 3px 0 0 var(--focus)}   /* the row the arrows are on: an outline on a tr is cut or missing */
 tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
 .coin{display:inline-flex;align-items:center;gap:8px}
-.coin i{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;background:hsl(var(--h) 55% 38%)}
+.coin i{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:10.5px;font-weight:700;color:#fff;background:hsl(var(--h) 55% 38%);background:oklch(.5 .09 var(--h))}   /* oklch: every hue equally bright (in hsl yellow glared, blue sank) */
+@media (pointer:coarse){.favbtn{min-width:40px;min-height:40px;margin:-4px}}   /* the chart's star: a finger-sized target, the same place in the line */
 .favbtn{height:32px;width:32px;padding:0;border-radius:50%;font-size:17px;color:var(--faint);background:transparent;border-color:transparent}.favbtn:hover{color:var(--acc);background:var(--s2)}.favbtn.on{color:var(--acc)}
 .star{color:var(--faint);cursor:pointer;font-size:15px}.star{height:auto;padding:0;border:0;background:none;line-height:1;font-weight:400;min-width:0}   /* a button now (keyboard, screen readers); the touch padding below still wins */.star:hover{color:var(--mute)}.star.on{color:var(--acc)}
 .gauge{display:inline-block;width:64px;height:10px;position:relative;vertical-align:middle;margin-right:8px;background:var(--s3);border-radius:5px}
@@ -447,9 +455,9 @@ section:not(.hidden){animation:pagein var(--dur-2) var(--ease)}
 .modal.hidden,.cmdk.hidden,.evp:not(.open),.guard:not(.open),.bpop.hidden{opacity:0;pointer-events:none}
 details.dis[open]>.dbody{animation:pagein var(--dur-2) var(--ease)}
 .card,.prof,.btn,.botnow,button{transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
-@media (hover:hover){.card[data-cf]:hover{transform:translateY(-2px)}.prof.pick:hover{transform:translateY(-1px)}}
-/* a press: buttons, tabs, chips, the bottom bar and row-buttons sink a little. Not the filter cards and profiles (their transform
-   is the hover lift), not fields, sliders or charts; nothing for people who asked for less motion */
+@media (hover:hover){.prof.pick:hover{transform:translateY(-1px)}}
+/* a press: buttons, tabs, chips, the bottom bar and row-buttons sink a little. Not the filter cards (cells of one strip) and
+   profiles (their transform is the hover lift), not fields, sliders or charts; nothing for people who asked for less motion */
 @media (prefers-reduced-motion:no-preference){button:not(:disabled):active,[role=button]:not(.card):active{transform:scale(.97)}}
 tr.row.newsig td{animation:rowflash 2.4s var(--ease)}
 /* a price that moved since the last update glows green / red for a moment (the arrow-less colour is a hint only: the number itself changed) */
@@ -476,7 +484,9 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
 /* "what's new" tab: a dot until the latest version has been seen */
 #ver.fresh{color:var(--acc);font-weight:700}#ver.fresh::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);margin-left:4px;vertical-align:2px}
 /* summary cards double as filter shortcuts */
-.card[data-cf]{cursor:pointer;transition:border-color var(--dur-1) var(--ease)}.card[data-cf]:hover{border-color:var(--hover)}.card[data-cf].on{border-color:var(--acc)}
+.card[data-cf]{cursor:pointer;transition:background var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}.card[data-cf]:hover{background:var(--s2)}
+.card[data-cf].on{background:var(--sel);box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line),inset 0 -2px 0 var(--acc)}   /* the filter it set is on: a tint and a gold underline */
+.card[data-cf]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}   /* inside the strip: its overflow would cut an outer ring */
 .sheetbar{display:none}
 /* ---------- phone: the market is a list first; a coin's chart opens full screen ---------- */
 @media(max-width:700px){
@@ -554,7 +564,7 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
   #jopen td:nth-child(4){grid-area:entry}#jopen td:nth-child(5){grid-area:now}
   /* empty-state rows keep their single full-width cell */
   :is(#jopen,#jclosed,#btTrades) tr:not(.row) td{display:block;padding:14px 12px;white-space:normal}
-  .statrow{gap:8px}.statrow .card{padding:11px 12px}.statrow .card .v{font-size:18px}
+  .statrow .card{padding:11px 12px}.statrow .card .v{font-size:18px}
   .prof .ptech{display:none}
   .steps{gap:8px}.step{padding:12px 14px}.step .n{display:inline-grid;width:22px;height:22px;font-size:12px;margin:0 8px 0 0;vertical-align:1px}.step b{display:inline;font-size:14px}.step p{margin-top:4px}
   /* forms (backtest, profile): an even two-column grid, every control full width */
@@ -696,7 +706,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .hend{position:absolute;right:0;width:9px;height:9px;margin:-4.5px -4.5px 0 0;border-radius:50%;box-shadow:0 0 0 4px var(--ring)}
 .haxis{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:8px}
 .hempty{min-height:72px;padding:14px;text-align:center;display:grid;place-items:center;color:var(--faint);border:1px dashed var(--line2);border-radius:10px;font-size:13px}
-.statrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.statrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:14px}
 .statrow .card .v{font-size:21px}
 @media(max-width:1100px){.statrow{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.hero{padding:16px}.hero .hv{font-size:32px}.hside{gap:18px}.hchart{height:120px}.statrow{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -723,7 +733,10 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .ctitle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:18px;font-weight:700}
 .ctitle .coin i{width:30px;height:30px;font-size:13px}.ctitle .coin b{font-size:18px}
 .cprice{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
-.chead .stats{margin-top:4px;font-size:12.5px}
+.chead .stats{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:6px;line-height:1.35}
+.chead .st{display:flex;flex-direction:column;min-width:0}.chead .st i{font-style:normal;font-size:11px;color:var(--faint)}
+.chead .st b{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chead .st b.pos{color:var(--lo)}.chead .st b.neg{color:var(--up)}.chead .st b.faint{color:var(--faint);font-weight:500}   /* beat .stats b */
 .cact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cnt{font-size:11.5px;color:var(--faint);font-variant-numeric:tabular-nums;margin-left:2px}.tab.on .cnt{color:var(--mute)}
 .seg.mini{margin:0;padding:2px;border-radius:9px}.seg.mini .tab{height:30px;padding:0 10px;font-size:13px;border-radius:7px}
@@ -762,7 +775,7 @@ details.dis>.dbody{padding:0 16px 16px}
   .top .tab #ver.fresh{display:block;position:absolute;top:4px;left:calc(50% + 7px);font-size:0;padding:0;background:none;min-width:0}.top .tab #ver.fresh::after{margin:0}
   .top .tab .tt.lg{display:none}.top .tab .ts{display:inline}
   /* summary cards: the market mood on one line, the four filter shortcuts in one row under it — all on screen, nothing to swipe */
-  .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 12px;padding:0}
+  .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 12px;padding:0}
   .cards>.card,.cards>.card:nth-child(-n+2){grid-column:auto}   /* the tablet layout spans cards over a 6-column grid */
   .cards>.card:first-child{grid-column:1/-1!important;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 12px}
   .cards>.card:first-child .v{font-size:15px}
@@ -870,7 +883,7 @@ details.dis>.dbody{padding:0 16px 16px}
 <header class="top"><div class="topin">
   <a class="brand" href="#market" aria-label="Sigma Radar — на главную">
     <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" style="fill:var(--s2)"/><path d="M47 15H17" style="stroke:var(--up)" stroke-width="5.5" stroke-linecap="round"/><path d="M17 49H47" style="stroke:var(--lo)" stroke-width="5.5" stroke-linecap="round"/><path d="M17 15L34 32L17 49" style="stroke:var(--acc)" stroke-width="5.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="34" cy="32" r="4.5" style="fill:var(--acc)"/></svg>
-    <span class="bt">Sigma Radar</span><small id="hdr"></small>
+    <span class="bt">Sigma<span> Radar</span></span><small id="hdr"></small>
   </a>
   <nav class="tabs">
     <button class="tab on" data-t="market" title="Рынок" aria-label="Рынок"><svg class="i"><use href="#i-market"/></svg><span class="tt">Рынок</span></button>
@@ -2094,8 +2107,11 @@ function computeChart() {
   const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
   const fav = favs.has(chartSym);
   $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button> <span class="cprice ${tickCls('c:' + chartSym, d.c[i])}">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
-  $('#cstats').innerHTML = `${(pB*100).toFixed(0)}% диапазона · границы ${fp(B.lo[i])} — ${fp(B.up[i])} · RSI ${chart.R[i].toFixed(0)} · <span class="${hlCls(hl)}" title="${hlTip(hl)}">T½ ${isFinite(hl) && hl * TFMS[S.tf] < 30 * 864e5 ? dur(hl * TFMS[S.tf]) : 'тренд'}</span>`
-    + `<span class="faint"> · ${METHOD_NAME[S.method]} ${S.N}/${S.k}</span>`;
+  // the coin's numbers as named pairs (a small name over each value), not one line joined by dots
+  const st = (name, v, cls = '', tip = '') => `<span class="st"${tip ? ` title="${tip}"` : ''}><i>${name}</i><b class="${cls}">${v}</b></span>`;
+  $('#cstats').innerHTML = st('Диапазон', (pB*100).toFixed(0) + '%') + st('Границы', `${fp(B.lo[i])} — ${fp(B.up[i])}`) + st('RSI', chart.R[i].toFixed(0))
+    + st('T½', isFinite(hl) && hl * TFMS[S.tf] < 30 * 864e5 ? dur(hl * TFMS[S.tf]) : 'тренд', hlCls(hl), hlTip(hl))
+    + st('Канал', `${METHOD_NAME[S.method]} ${S.N}/${S.k}`, 'faint');
   drawChart(); renderDetail();
 }
 // my bot's positions live in the browser or, in server mode, in the server journal
@@ -3411,6 +3427,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.60', date:'2 ноября 2026', title:'Графитовая тема', items:[
+    'Тёмная тема стала нейтрально-графитовой: цветными остаются только сигналы и акценты.',
+    'Сводка рынка, журнала и бэктеста собрана в одну панель с разделителями.',
+    'Цифры в шапке графика подписаны: диапазон, границы, RSI, T½ и канал.',
+    'Цвета значков монет стали одинаково яркими, выбранная строка таблицы — золотистой.',
+    'Звезда избранного над графиком стала удобнее для пальца.',
+  ]},
   {v:'2.59', date:'2 ноября 2026', title:'Новая карточка позиции', items:[
     'Карточка позиции показывает итог крупно и путь цены между стопом и тейком.',
     'Цифры карточки собраны в группы, разбор сигнала стоит под графиком.',
@@ -3468,10 +3491,6 @@ const CHANGELOG = [
     'В статусе «Бот ждёт» показана шкала режима рынка по BTC, ETH и SOL.',
     'Показатели в итогах на телефоне открывают пояснение по нажатию.',
     'Уточнено определение максимальной просадки.',
-  ]},
-  {v:'2.48', date:'26 октября 2026', title:'Прозрачность общего бота', items:[
-    'В журнале общего бота указано, что его правила не показали преимущества на истории за три года.',
-    'Пустой бэктест предлагает в одно нажатие проверить правила общего бота или свой профиль.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

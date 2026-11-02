@@ -1,6 +1,10 @@
-// Older «Что нового» entries (2.47 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.48 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.48', date:'26 октября 2026', title:'Прозрачность общего бота', items:[
+    'В журнале общего бота указано, что его правила не показали преимущества на истории за три года.',
+    'Пустой бэктест предлагает в одно нажатие проверить правила общего бота или свой профиль.',
+  ]},
   {v:'2.47', date:'26 октября 2026', title:'Управление бэктестом', items:[
     'Загрузку истории в бэктесте можно прервать; загруженные данные сохраняются.',
     'Над таблицей монет поясняется действие включённого фильтра.',
