@@ -765,6 +765,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .bh-a{display:flex;gap:8px;flex-wrap:wrap}.bh-a button{height:40px;padding:0 16px}
 .bsec{margin:14px 0 0}.bsec .dbody{padding-top:4px}
 .linkbtn{display:inline;height:auto;padding:0;border:0;background:none;color:var(--blue);font:inherit;font-weight:500;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}.linkbtn:hover{background:none;border:0;text-decoration-style:solid}
+@media (pointer:coarse){.linkbtn{padding:10px 4px;margin:-10px -4px}}   /* a finger-sized target; inline padding doesn't move the line */
 #bprof{scroll-margin-top:70px}
 .bsech{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.bsech h3{margin:0;font-size:15px}
 .hint{font-size:13px;color:var(--mute);margin:8px 0 10px;max-width:820px}
@@ -917,15 +918,15 @@ details.dis>.dbody{padding:0 16px 16px}
 /* ---------- glass (Lovable, the owner's pick): light sits on surfaces — a pearl top edge, a cool reflection, a darker
    bottom — on the header, its tools, menus and dialogs; gold stays for what is chosen. Rows, numbers and chart pixels stay
    opaque and sharp; the header's own rules are with .top ---------- */
-.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
+.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(#beta *,.bpop *)){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
 .top .tools button:not(.primary,.on,.bad){background-color:var(--s2)}
-.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
+.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(#beta *,.bpop *)):hover,.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
 /* on hover a reflection crosses the button once */
 @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
-  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
-  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover{background-position:0 0,0 0}
+  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(#beta *,.bpop *)){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(#beta *,.bpop *)):hover{background-position:0 0,0 0}
 }
-.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active,button.icon:active{box-shadow:inset 0 2px 5px var(--glass-press)}
+.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active,button.icon:active,button:not([class]):not(:where(#beta *,.bpop *)):active{box-shadow:inset 0 2px 5px var(--glass-press)}
 .top .tab.on::after{box-shadow:0 2px 8px var(--light-edge)}
 /* segmented controls (timeframes, filters, modes) are a glass track; the chosen tab sits in it as a lighter pane */
 .seg{background:var(--control-shine),var(--s2);border-color:var(--glass-line);box-shadow:var(--glass-inset)}
@@ -934,10 +935,21 @@ button.primary,.authgo,button.primary:hover,.authgo:hover{background-image:var(-
 button.primary,.authgo{box-shadow:var(--glass-inset),0 4px 12px -8px var(--light-edge)}
 button.primary:hover,.authgo:hover{box-shadow:var(--glass-inset),0 4px 16px -6px var(--light-edge)}
 /* the summary strip: warm light from the top-left; a card lights up in its meaning's colour */
-.cards,.statrow{background:var(--surface-light),var(--s1);border-top-color:var(--glass-top);box-shadow:inset 0 1px 0 var(--glass-shine)}
-/* panels are most of a wide screen, so the glass has to read there: a faint sheen, a lit top edge, a soft drop. No blur —
-   text, numbers and charts stay sharp */
-.panel{background:var(--panel-sheen),var(--s1);border-top-color:var(--glass-top);box-shadow:inset 0 1px 0 var(--glass-edge),0 10px 28px -20px var(--glass-drop)}
+.cards,.statrow{background:var(--surface-light),var(--s1)}
+/* every card on a page is the same glass — panels, strips, collapsibles, the balance hero, the backtest form, profiles,
+   help steps, banners: a faint sheen, a lit top edge, a soft drop. No blur — text, numbers and charts stay sharp. Coloured
+   borders (banners, the welcome card, the chosen profile) keep their colour; tinted banners keep their tint */
+.panel{background:var(--panel-sheen),var(--s1)}
+.botnow,.sprof,.dis,.hero,.fgroup,.btg,.prof:not(.on),.banner:not(.ok,.warn,.bad),.step{background-image:var(--panel-sheen)}
+.panel,.cards,.statrow,.botnow,.sprof,.dis,.hero,.fgroup,.btg,.prof:not(.on),.banner:not(.ok,.warn,.bad),.step{border-top-color:var(--glass-top)}
+.panel,.cards,.statrow,.botnow,.sprof,.dis,.hero,.fgroup,.btg,.prof:not(.on),.banner,.intro,.step{box-shadow:inset 0 1px 0 var(--glass-edge),0 10px 28px -20px var(--glass-drop)}
+/* a card inside a card (the signal breakdown, the bot's hero, the trade card's head): only the lit edge */
+.detail,.bhero,.thero{background-image:var(--panel-sheen);box-shadow:inset 0 1px 0 var(--glass-shine)}
+/* fields sit a little into the glass: a soft shade under the top edge, the same cool rim as the buttons */
+:where(input:not([type=checkbox],[type=range]),select):not(:where(.cmdin *,#beta *,.bpop *)){border-color:var(--glass-line);box-shadow:inset 0 1px 2px var(--glass-shade)}
+/* the sign-in screen, the first thing a visitor sees: one glass card over the gold light (frosted below where it can blur) */
+.gate{width:min(560px,calc(100% - 32px));padding:28px 28px 24px;border:1px solid var(--line);border-top-color:var(--glass-top);border-radius:var(--r-l);background:var(--panel-sheen),var(--s1);box-shadow:inset 0 1px 0 var(--glass-edge),0 24px 60px -30px var(--glass-drop)}
+@media(max-width:560px){.gate{padding:22px 18px 20px}}
 th{border-bottom-color:var(--glass-top)}
 .card[data-cf]{--card-light:var(--glass-warm)}.card[data-cf=lo]{--card-light:var(--card-lo)}.card[data-cf=hi]{--card-light:var(--card-hi)}.card[data-cf=sq]{--card-light:var(--glass-cool)}
 .card[data-cf]:hover,.card[data-cf]:focus-visible{background:linear-gradient(160deg,var(--card-light),transparent 75%),var(--s2)}
@@ -957,6 +969,7 @@ th{border-bottom-color:var(--glass-top)}
   th,#mhead th:nth-child(2){background:var(--th-glass);backdrop-filter:blur(10px) saturate(120%);-webkit-backdrop-filter:blur(10px) saturate(120%)}
   /* phone: the search and filters bar that sticks under the header — the list scrolls under it */
   @media(max-width:700px){.tpanel>.filters:first-child{background:var(--th-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}}
+  .gate{background:var(--panel-sheen),var(--glass-fill);backdrop-filter:blur(var(--glass-blur)) saturate(115%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(115%)}
 }
 h1,h2,h3,h4,.card .v{letter-spacing:0}
 @media(max-width:700px){
@@ -967,7 +980,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 }
 /* «reduce transparency» in the system: solid surfaces, no blur */
 @media(prefers-reduced-transparency:reduce){
-  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child,.gate{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 </style>
 </head>
@@ -3909,6 +3922,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.73', date:'2 ноября 2026', title:'Единое стекло', items:[
+    'Все карточки, раскрывающиеся блоки, предупреждения и форма бэктеста выглядят одинаковым стеклом.',
+    'Обычные кнопки стали стеклянными, как кнопки шапки, а поля ввода и списки получили мягкую глубину.',
+    'Свет везде падает сверху слева, у сводки и панелей одна световая кромка и тень.',
+    'Экран входа стал стеклянной карточкой поверх золотого света.',
+    'Ссылка «сменить» в карточке бота стала удобнее для пальца.',
+  ]},
   {v:'2.72', date:'2 ноября 2026', title:'Подсказки и расстояния', items:[
     'В разборе сигнала под шкалой показано, сколько цене пройти до границ и до центра канала.',
     'В поле поиска монеты на компьютере видна клавиша «/», которая его открывает.',
@@ -3968,12 +3988,6 @@ const CHANGELOG = [
     'Панели и кнопки стали строже: скругления меньше.',
     'Открытый раздел в шапке отмечен золотой линией, на телефоне — золотым названием.',
     'Выбранный быстрый фильтр над таблицей монет выделен золотом.',
-  ]},
-  {v:'2.61', date:'2 ноября 2026', title:'Шкалы в разборе сигнала', items:[
-    'В разборе сигнала добавлены шкалы положения в диапазоне и RSI с отметками 30 и 70.',
-    'Шкала диапазона в таблице стала тоньше и совпадает со шкалой в разборе.',
-    'Заголовок столбца, по которому можно сортировать, показывает ↕ при наведении.',
-    'Пустое избранное подсказывает, как добавить монету.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
