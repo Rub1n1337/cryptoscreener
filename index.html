@@ -6,6 +6,17 @@
 <!-- the page may talk only to these hosts: even an injected script could not send the bot's key anywhere else -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Sigma Radar</title>
+<meta name="description" content="Сканер Binance по каналам Боллинджера: сигналы LONG и SHORT, бот на виртуальных деньгах с журналом сделок, проверка правил на истории и уведомления в Telegram.">
+<!-- the phone's browser bar in the page colour: the site is dark unless light is chosen (whatever the system theme), so one
+     value = dark --bg; applyTheme() puts the current --bg here -->
+<meta name="theme-color" content="#0c0d0f">
+<!-- iOS would turn prices like 0.01474 or 10000 into phone-call links -->
+<meta name="format-detection" content="telephone=no">
+<meta name="apple-mobile-web-app-title" content="Sigma Radar">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Sigma Radar — сканер Binance">
+<meta property="og:description" content="Сигналы по каналам Боллинджера, бот на виртуальных деньгах, проверка на истории и уведомления в Telegram.">
+<meta name="twitter:card" content="summary">
 <!-- the logo: Σ drawn as the channel — top band red, bottom band green, the price (gold) out to the band and back to the centre -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231a1b1e'/><path d='M47 15H17' stroke='%23f0525f' stroke-width='7' stroke-linecap='round'/><path d='M17 49H47' stroke='%2322c55e' stroke-width='7' stroke-linecap='round'/><path d='M17 15L34 32L17 49' stroke='%23f5b70a' stroke-width='7' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
 <script>try { const t = localStorage.getItem("sr_theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch {}</script>
@@ -75,6 +86,11 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans);
 .num,.mono,td.n,.card .v,.kv b,.sch b,.sca,.comp .cv,.thero-v,.tpath-l,.ttiles b,.hero .hv,.hchg .chip,.hside b,.cprice,.ctitle>.pos,.ctitle>.neg,.chead .st b,.cnt,kbd{font-family:var(--mono)}
 a{color:inherit}
 ::selection{background:var(--accbg)}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}   /* iOS enlarges text on turning the phone sideways */
+/* no grey flash on tap (presses scale instead) and no double-tap-zoom wait before the click */
+button,a,[role=button],label,select,summary{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+/* type=search: the system clear ✕ and «Найти» on the keyboard, but our field shape, not Safari's rounded one */
+input[type=search]{-webkit-appearance:none;appearance:none}input[type=search]::-webkit-search-decoration{-webkit-appearance:none}
 .hidden{display:none!important}
 .pos{color:var(--lo)}.neg{color:var(--up)}.mute{color:var(--mute)}.faint{color:var(--faint)}
 svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -957,7 +973,7 @@ details.dis>.dbody{padding:0 16px 16px}
 </div></div>
 <div id="toasts"></div>
 <div id="cmdk" class="cmdk hidden"><div class="cmdbox" role="dialog" aria-modal="true" aria-label="Быстрый переход">
-  <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-label="Быстрый переход" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><kbd>Esc</kbd></div>
+  <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" enterkeyhint="go" autocorrect="off" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-label="Быстрый переход" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><kbd>Esc</kbd></div>
   <div id="cmdl" class="cmdl" role="listbox"></div>
   <div class="cmdf"><span>↑↓ выбрать</span><span>Enter открыть</span><span>Esc закрыть</span></div>
 </div></div>
@@ -992,7 +1008,7 @@ details.dis>.dbody{padding:0 16px 16px}
         <div class="chead">
           <div style="min-width:0"><div class="ctitle" id="ctitle">—</div><div class="stats" id="cstats"></div></div>
           <div class="cact">
-            <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
+            <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" autocapitalize="characters" autocorrect="off" spellcheck="false" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
             <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button><button class="tab" data-tf="1d" title="Дневные свечи">1д</button><button class="tab" data-tf="1w" title="Недельные свечи">1н</button></div>
             <button class="icon" id="cset" title="Настройки канала" aria-label="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
           </div>
@@ -1029,7 +1045,7 @@ details.dis>.dbody{padding:0 16px 16px}
 
       <div class="panel tpanel">
         <div class="filters">
-          <div class="search" style="flex:1 1 110px"><svg class="i"><use href="#i-search"/></svg><input id="fs" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
+          <div class="search" style="flex:1 1 110px"><svg class="i"><use href="#i-search"/></svg><input id="fs" type="search" enterkeyhint="search" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
           <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
           <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
           <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
@@ -1110,15 +1126,15 @@ details.dis>.dbody{padding:0 16px 16px}
         <div class="row">
           <label class="fl">Название <input id="pfName" style="width:200px"></label>
           <label class="fl">Монеты <select id="pfCoins"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="150">Топ-150</option><option value="200">Топ-200</option><option value="list">Свой список…</option></select></label>
-          <label class="fl" id="pfListL">Свои монеты <input id="pfList" placeholder="BTC, ETH, SOL" style="width:220px"></label>
+          <label class="fl" id="pfListL">Свои монеты <input id="pfList" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="BTC, ETH, SOL" style="width:220px"></label>
           <label class="fl">ТФ <select id="pfTf"><option value="5m">5м</option><option value="15m">15м</option><option value="1h">1ч</option><option value="4h">4ч</option><option value="1d">1д</option></select></label>
           <label class="fl">Модель <select id="pfMethod"><option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option></select></label>
-          <label class="fl">N <input type="number" id="pfN" min="20" max="300" style="width:76px"></label>
-          <label class="fl" title="Ширина канала в σ">k <input type="number" id="pfK" min="1" max="5" step="0.1" style="width:70px"></label>
+          <label class="fl">N <input type="number" id="pfN" inputmode="numeric" enterkeyhint="done" min="20" max="300" style="width:76px"></label>
+          <label class="fl" title="Ширина канала в σ">k <input type="number" id="pfK" enterkeyhint="done" min="1" max="5" step="0.1" style="width:70px"></label>
         </div>
         <div class="row" style="margin-top:10px">
           <label class="fl">Идея входа <select id="pfStrat"><option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму</option></select></label>
-          <label class="fl">Мин. сила <input type="number" id="pfMin" min="0" max="100" style="width:76px"></label>
+          <label class="fl">Мин. сила <input type="number" id="pfMin" inputmode="numeric" enterkeyhint="done" min="0" max="100" style="width:76px"></label>
           <label class="fl">RR <select id="pfRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
           <label class="fl">Риск на сделку <select id="pfRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
           <label class="fl">Плечо до <select id="pfLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
@@ -1162,7 +1178,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></label>
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
       <label id="btPitL" title="Живой бот каждую минуту берёт топ по обороту за последние сутки. «На каждый момент» делает в прошлом так же: монета торгуется, только пока она в топе. «По сегодняшнему» берёт сегодняшний топ на весь период — быстрее, но завышает результат: сегодняшний топ знает, какие монеты потом выросли">Топ считать <select id="btPit"><option value="pit">на каждый момент — честно</option><option value="now">по сегодняшнему — быстрее, завышает</option></select></label>
-      <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
+      <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
       <button id="btRun" class="primary" style="height:var(--h);padding:0 22px"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
       <div class="btpre" role="group" aria-label="Подставить готовые настройки"><span class="faint">Подставить:</span><button id="btShared" title="Те же правила, по которым торгует общий бот — проверить их на истории">правила общего бота</button><button id="btMine" title="Канал и таймфрейм с вкладки «Рынок»">настройки «Рынка»</button></div>
     </div>
@@ -1172,20 +1188,20 @@ details.dis>.dbody{padding:0 16px 16px}
       <label title="RM: какую долю баланса теряем, если сработал стоп (без сложного процента — долю стартового баланса)">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
       <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на все позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
       <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
-      <label title="С какой суммы начинается проверка: от $100 до $10 000 000">Старт, $ <input type="number" id="btStart" min="100" max="10000000" step="100" value="10000" inputmode="numeric" style="width:120px"></label>
+      <label title="С какой суммы начинается проверка: от $100 до $10 000 000">Депозит, $ <input type="number" id="btStart" inputmode="numeric" enterkeyhint="done" min="100" max="10000000" step="100" value="10000" style="width:120px"></label>
       <label class="inline" title="Включено: риск считается от текущего баланса — после прибыли стоп больше, после убытков меньше. Выключено: риск всегда от стартового баланса — при 1% и $10 000 каждый стоп $100"><input type="checkbox" id="btComp" checked> сложный процент</label>
     </div></div>
     <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, режим рынка, фильтры T½ и ширины, канал</span></summary><div class="dbody">
       <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
-        <label class="fl" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" min="0" max="100" style="width:80px"></label>
+        <label class="fl" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" inputmode="numeric" enterkeyhint="done" min="0" max="100" style="width:80px"></label>
         <label class="fl" title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
         <label class="fl" title="Входить, только если ширина канала (от нижней до верхней границы) не меньше заданного процента от цены. Чем шире канал, тем больше ход к центру">Мин. ширина канала <select id="btW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option><option value="12">≥ 12%</option></select></label>
         <label class="fl" title="Закрыть сделку по рынку, если за это число свечей не сработали ни тейк, ни стоп">Тайм-стоп <select id="btTS"><option value="0">выкл</option><option value="24">24 свечи</option><option value="48">48 свечей</option><option value="96">96 свечей</option></select></label>
         <label class="fl" title="Модель канала">Модель <select id="btMethod">
           <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
         </select></label>
-        <label class="fl" title="Длина окна канала, свечей">N <input type="number" id="btN" min="20" max="300" style="width:80px"></label>
-        <label class="fl" title="Ширина канала в σ">k <input type="number" id="btK" min="1" max="4" step="0.1" style="width:72px"></label>
+        <label class="fl" title="Длина окна канала, свечей">N <input type="number" id="btN" inputmode="numeric" enterkeyhint="done" min="20" max="300" style="width:80px"></label>
+        <label class="fl" title="Ширина канала в σ">k <input type="number" id="btK" enterkeyhint="done" min="1" max="4" step="0.1" style="width:72px"></label>
         <label class="fl" title="Когда разрешено входить: в любом рынке, только в боковике (флэт) или только в импульсе (сильное движение)">Режим рынка <select id="btReg"><option value="any">любой</option><option value="flat">только флэт</option><option value="impulse">только импульс</option></select></label>
         <label class="fl" title="По каким монетам определять режим. «BTC+ETH+SOL» — флэт, только когда все три стоят в боковике">Режим по <select id="btSrc"><option value="btc">BTC</option><option value="majors">BTC+ETH+SOL</option></select></label>
         <label class="fl" title="ER = чистое движение за ~7 дней / весь пройденный путь. Ниже порога — флэт (боковик), выше — импульс">Флэт, если ER <select id="btER"><option value="0.1">&lt; 0.10</option><option value="0.15">&lt; 0.15</option><option value="0.25">&lt; 0.25</option></select></label>
@@ -1237,7 +1253,7 @@ details.dis>.dbody{padding:0 16px 16px}
       <div class="bgrid">
         <div class="panel bmain">
           <div class="bbar">
-            <div class="search bsym"><svg class="i"><use href="#i-search"/></svg><input id="bSym" list="bSymList" placeholder="Монета" aria-label="Монета: тикер и Enter" autocomplete="off" spellcheck="false"><datalist id="bSymList"></datalist></div>
+            <div class="search bsym"><svg class="i"><use href="#i-search"/></svg><input id="bSym" autocapitalize="characters" autocorrect="off" list="bSymList" placeholder="Монета" aria-label="Монета: тикер и Enter" autocomplete="off" spellcheck="false"><datalist id="bSymList"></datalist></div>
             <button class="pick-btn" id="bMktBtn" title="Рынок выделенного графика: спот или фьючерсы USDⓈ-M"><span id="bMktL">Спот</span></button>
             <button class="pick-btn" id="bTfBtn" aria-haspopup="dialog" title="Таймфрейм"><span id="bTfL">5м</span><svg class="i"><use href="#i-chev"/></svg></button>
             <button class="pick-btn" id="bRangeBtn" aria-haspopup="dialog" title="Сколько истории на графике"><svg class="i"><use href="#i-clock"/></svg><span id="bRangeL">авто</span></button>
@@ -3778,6 +3794,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.68', date:'2 ноября 2026', title:'Удобнее на телефоне', items:[
+    'Название вкладки браузера показывает раздел или открытую монету.',
+    'Ссылка на сайт в мессенджерах показывает название и описание.',
+    'На телефоне полоса браузера окрашена в цвет темы, цены на iPhone не превращаются в ссылки для звонка.',
+    'Числовые поля открывают цифровую клавиатуру, тикеры сразу набираются заглавными.',
+    'Поле «Старт, $» в бэктесте стало «Депозит, $».',
+  ]},
   {v:'2.67', date:'2 ноября 2026', title:'Надёжность входа', items:[
     'Исправлен выход из профиля, который мог случиться, когда сайт открыт в нескольких вкладках.',
     'Недавние монеты, число графиков и скрытые панели «Беты» у каждого устройства свои.',
@@ -3838,13 +3861,6 @@ const CHANGELOG = [
     'Тепловая карта ликвидаций стала заметнее, футпринт текущей свечи обновляется вживую.',
     'На телефоне добавлены «Повторить» и «Убрать всё» для построений, кнопки стали крупнее.',
     'Раскладка графиков подстраивается при повороте телефона, окно настроек не уходит за экран.',
-  ]},
-  {v:'2.56', date:'29 октября 2026', title:'Плавный график', items:[
-    'Масштаб и перетаскивание графика стали плавными, подписи времени двигаются вместе со свечами.',
-    'Добавлена прокрутка истории свайпом тачпада вбок и колёсиком с Shift.',
-    'Щипок двумя пальцами приближает вокруг точки между пальцами.',
-    'Изменившаяся цена коротко подсвечивается, график баланса прорисовывается при открытии.',
-    'Кнопки откликаются на нажатие, окна и меню закрываются быстрее, заголовки переносятся ровнее.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4022,11 +4038,19 @@ function go(t, push = true) {
   if (t === 'backtest' && btRes) drawEquity();
   if (t === 'market') drawChart();
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
+  setTitle();
   window.scrollTo({top:0, behavior:'instant'});
+}
+// the browser tab says where it is — «PLUME · Sigma Radar», «Журнал · Sigma Radar» — so several open tabs can be told apart
+const PAGE_TITLE = {journal:'Журнал', backtest:'Бэктест', beta:'Бета', help:'Как это работает', changes:'Что нового', legal:'Правовая информация', gate:'Вход'};
+function setTitle() {
+  const sub = page === 'market' ? base(chartSym) : PAGE_TITLE[page];
+  document.title = sub ? sub + ' · Sigma Radar' : 'Sigma Radar';
 }
 function setHash() {
   const h = '#' + page + (page === 'market' && chartSym ? '/' + base(chartSym) : '');
   if (location.hash !== h) history.replaceState(null, '', h);
+  setTitle();
 }
 // ---------- phone: the list comes first, a coin's chart opens as a full-screen sheet over it ----------
 // The sheet pushes a history entry, so the system back gesture closes it instead of leaving the site.
@@ -4355,6 +4379,7 @@ function applyTheme(t) {
   try { localStorage.setItem('sr_theme', t); } catch {}
   $('#thm').innerHTML = `<svg class="i"><use href="#i-${t === 'light' ? 'moon' : 'sun'}"/></svg>`;
   $('#thm').setAttribute('aria-label', t === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему');
+  $('meta[name=theme-color]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
   pal();
   try { drawChart(); drawCard(); renderJournal(); if (btRes) renderBacktest(); } catch {}
 }
