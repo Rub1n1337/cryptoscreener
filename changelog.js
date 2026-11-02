@@ -1,6 +1,10 @@
-// Older «Что нового» entries (2.49 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.50 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.50', date:'26 октября 2026', title:'Сводка после отсутствия и журнал по дням', items:[
+    'После перерыва больше двух часов сайт показывает сводку сделок ботов за это время.',
+    'Закрытые сделки в журнале сгруппированы по дням с итогом за каждый день.',
+  ]},
   {v:'2.49', date:'26 октября 2026', title:'Пояснения к показателям', items:[
     'В статусе «Бот ждёт» показана шкала режима рынка по BTC, ETH и SOL.',
     'Показатели в итогах на телефоне открывают пояснение по нажатию.',

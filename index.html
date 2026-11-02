@@ -72,7 +72,7 @@ body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans);
 .num,td,.card .v,.kv b,.mono{font-variant-numeric:tabular-nums}
 /* numbers in JetBrains Mono: prices, percentages, counts. Its file has Latin only, so a word in a number cell («тренд», «5.2д»,
    «Распродажа») falls back to Manrope letter by letter. The «Бета» keeps its own styles */
-.num,.mono,td.n,.card .v,.kv b,.sch b,.sca,.comp .cv,.thero-v,.tpath-l,.ttiles b,.hero .hv,.hchg .chip,.hside b,.cprice,.chead .st b,.cnt,kbd{font-family:var(--mono)}
+.num,.mono,td.n,.card .v,.kv b,.sch b,.sca,.comp .cv,.thero-v,.tpath-l,.ttiles b,.hero .hv,.hchg .chip,.hside b,.cprice,.ctitle>.pos,.ctitle>.neg,.chead .st b,.cnt,kbd{font-family:var(--mono)}
 a{color:inherit}
 ::selection{background:var(--accbg)}
 .hidden{display:none!important}
@@ -3471,6 +3471,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.62', date:'2 ноября 2026', title:'Новые шрифты и навигация', items:[
+    'Текст набран шрифтом Manrope, цены и числа — моноширинным JetBrains Mono.',
+    'Панели и кнопки стали строже: скругления меньше.',
+    'Открытый раздел в шапке отмечен золотой линией, на телефоне — золотым названием.',
+    'Выбранный быстрый фильтр над таблицей монет выделен золотом.',
+  ]},
   {v:'2.61', date:'2 ноября 2026', title:'Шкалы в разборе сигнала', items:[
     'В разборе сигнала добавлены шкалы положения в диапазоне и RSI с отметками 30 и 70.',
     'Шкала диапазона в таблице стала тоньше и совпадает со шкалой в разборе.',
@@ -3532,10 +3538,6 @@ const CHANGELOG = [
     'Панель RSI на графике стала выше на небольших экранах.',
     '«Закрыть все» сообщает, сколько позиций закрыто, если по части монет нет цены.',
     'Кнопка «Закрыть» у позиции стала крупнее; строка таблицы в фокусе клавиатуры выделяется.',
-  ]},
-  {v:'2.50', date:'26 октября 2026', title:'Сводка после отсутствия и журнал по дням', items:[
-    'После перерыва больше двух часов сайт показывает сводку сделок ботов за это время.',
-    'Закрытые сделки в журнале сгруппированы по дням с итогом за каждый день.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
