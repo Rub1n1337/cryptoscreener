@@ -1,6 +1,7 @@
 // Sign-in through the Telegram bot (docs/PLAN-ACCOUNTS.md). Deployed without JWT checks: the caller isn't signed in yet.
 //   {op:"start", h}            h = sha256 hex of a secret only the tab knows → {nonce, code, bot}
 //   {op:"poll", nonce, secret} → {state: "wait" | "denied" | "expired" | "ok", token_hash?}
+//   {op:"delete"} with the person's access token → the profile and everything synced to it are deleted
 // The tab opens t.me/<bot>?start=login_<nonce>; the bot asks to pick the code shown on the site (_shared/tg.ts) and fills
 // tg_id. A poll with the right secret then gets a one-time magic-link token hash, which the tab trades for a session at
 // /auth/v1/verify. Someone who sends a victim their own login link gains nothing: the victim's tab never shows that code,
@@ -61,6 +62,15 @@ async function poll(b: any) {
   return json({ state: "ok", token_hash: link.properties.hashed_token });
 }
 
+// the signed-in person deletes their profile: the Auth user goes, and with it (on delete cascade) the profile and synced settings
+async function remove(req: Request) {
+  const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  const { data, error } = await db.auth.getUser(token);
+  if (error || !data?.user) return json({ error: "not signed in" }, 401);
+  const { error: e2 } = await db.auth.admin.deleteUser(data.user.id);
+  return e2 ? json({ error: "delete: " + e2.message }, 500) : json({ ok: true });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
@@ -69,6 +79,7 @@ Deno.serve(async (req) => {
   try {
     if (b?.op === "start") return await start(b, ip);
     if (b?.op === "poll") return await poll(b);
+    if (b?.op === "delete") return await remove(req);
   } catch (e) { return json({ error: String((e as Error)?.message || e).slice(0, 200) }, 500); }
   return json({ error: "unknown op" }, 400);
 });

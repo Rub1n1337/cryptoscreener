@@ -1384,12 +1384,13 @@ details.dis>.dbody{padding:0 16px 16px}
         <li>Условия могут меняться; действующая редакция всегда на этой странице.</li>
       </ul>
       <h3>Какие данные хранятся</h3>
-      <p>Регистрации нет: сервис не запрашивает имя, почту, телефон и пароль. Cookie, аналитика, реклама и счётчики посещений не используются.</p>
+      <p>Вход — через Telegram: сервис не запрашивает почту, телефон и пароль. Cookie, аналитика, реклама и счётчики посещений не используются.</p>
       <ul>
         <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере», профили, избранное, свои уровни, настройки и тема, а также ключ доступа к вашему серверному боту.</li>
+        <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, свои уровни и вид «Беты». Журнал бота «В браузере» в профиль не передаётся.</li>
         <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Бот анонимный, доступ к нему есть только у браузера, где хранится ключ.</li>
         <li><b>На сервере, если вы подключили Telegram</b>: номер чата, имя из профиля Telegram, выбранные уведомления и состояние доставки последнего сообщения.</li>
-        <li><b>IP-адрес</b> — только для ограничения частоты запросов: создание серверных ботов и попытки входа в «Бету». Удаляется автоматически в течение двух суток.</li>
+        <li><b>IP-адрес</b> — только для ограничения частоты запросов: создание серверных ботов, вход через Telegram и попытки входа в «Бету». Удаляется автоматически в течение двух суток.</li>
       </ul>
       <h3>Кому передаются данные</h3>
       <ul>
@@ -1402,10 +1403,12 @@ details.dis>.dbody{padding:0 16px 16px}
       <ul>
         <li>Серверный бот засыпает через 30 дней без заходов на сайт и удаляется через 90 дней, если к нему не подключён Telegram. Бот с Telegram хранится, пока вы его не удалите.</li>
         <li>Подписка в Telegram хранится, пока вы не отпишетесь.</li>
+        <li>Профиль хранится, пока вы его не удалите. Записи о попытках входа удаляются через сутки.</li>
         <li>Данные в браузере хранятся, пока вы их не очистите.</li>
       </ul>
       <h3>Как удалить свои данные</h3>
       <ul>
+        <li><b>Профиль:</b> кнопка «Войти» / ваше имя в шапке → «Удалить профиль». Удаляются профиль и сохранённые в нём настройки.</li>
         <li><b>Серверный бот:</b> «Журнал» → «Мой бот» → «Дополнительно» → «Удалить с сервера». Удаляются сделки, позиции и связь с Telegram.</li>
         <li><b>Telegram:</b> команда /stop в боте удаляет подписку и отвязывает бота с сайта.</li>
         <li><b>Браузер:</b> очистите данные этого сайта в настройках браузера. Журнал и профили удалятся без возможности восстановления.</li>
@@ -1454,8 +1457,8 @@ const DEF ={method:'log', N:210, k:3, tf:'4h', candles:540, top:150, minScore:60
 const SCAN_MS = 60000;
 const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch { return d; } };
 // a full browser storage used to fail silently (a long journal would simply stop being saved): say it once
-let saveWarned = false;
-const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {
+let saveWarned = false, onSaved = null;   // onSaved: the profile sync (accounts) hears which key changed
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); onSaved?.(k); } catch (e) {
   if (!saveWarned && /quota/i.test(e?.name + e?.message)) { saveWarned = true; setTimeout(() => toast('Браузер не сохраняет данные сайта', 'Хранилище переполнено: новые сделки журнала и настройки не запомнятся после перезагрузки. Освободите место (сбросьте журнал или очистите данные сайта).', 'bad'), 0); }
 } };
 let S = Object.assign({}, DEF, load('sr_settings', {}));
@@ -2347,8 +2350,8 @@ function activeProfile() {
 const SB_BASE = SB_URL.replace('/rest/v1/', ''), AUTH_URL = SB_BASE + '/auth/v1/', FN_URL = SB_BASE + '/functions/v1/';
 let AUTH = load('sr_auth', null), ME = null, authRun = 0, authTimer = 0, authBack = null, refreshing = null;
 const hexOf = b => [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join('');
-async function authFn(body) {
-  const r = await fetch(FN_URL + 'auth', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), signal:AbortSignal.timeout(15000)})
+async function authFn(body, token) {
+  const r = await fetch(FN_URL + 'auth', {method:'POST', headers:{'Content-Type':'application/json', ...(token ? {Authorization:'Bearer ' + token} : {})}, body:JSON.stringify(body), signal:AbortSignal.timeout(15000)})
     .catch(() => { throw new Error('Нет связи с сервером входа. Проверьте интернет и попробуйте ещё раз.'); });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(r.status === 429 ? 'Слишком много попыток входа — попробуйте через 10 минут' : j.error || 'HTTP ' + r.status);
@@ -2365,7 +2368,10 @@ function setSession(s) {   // a GoTrue session → the tokens and when the acces
   AUTH = s ? {at:s.access_token, rt:s.refresh_token, exp:Date.now() + (s.expires_in || 3600) * 1000} : null;
   save('sr_auth', AUTH); scheduleRefresh();
 }
-function signedOut() { AUTH = null; ME = null; save('sr_auth', null); clearTimeout(authTimer); renderAcct(); }
+function signedOut() {   // this device keeps its copy of the settings; the profile no longer hears about changes
+  AUTH = null; ME = null; save('sr_auth', null); clearTimeout(authTimer); renderAcct();
+  syncReady = false; syncDirty.clear(); clearTimeout(syncTimer2);
+}
 function scheduleRefresh() {
   clearTimeout(authTimer);
   if (AUTH?.rt) authTimer = setTimeout(refreshSession, Math.max(5e3, AUTH.exp - Date.now() - 120e3));
@@ -2440,7 +2446,8 @@ async function authStart() {
       try { setSession(await gotrue('verify', {type:'magiclink', token_hash:p.token_hash})); }
       catch (e) { return authFail('Не удалось войти: ' + (e.message || e), true); }
       await loadMe(); closeAuth();
-      return toast('Вы вошли', ME?.tg_name ? 'Профиль: ' + ME.tg_name : '', 'ok');
+      toast('Вы вошли', ME?.tg_name ? 'Профиль: ' + ME.tg_name : '', 'ok');
+      return syncStart();
     }
   }
 }
@@ -2448,8 +2455,19 @@ function authProfile() {
   authRun++;
   $('#authT').textContent = 'Профиль';
   authBody(`<p>Вы вошли через Telegram${ME?.tg_name ? ` как <b>${esc(ME.tg_name)}</b>` : ''}${ME?.tg_username ? ` (@${esc(ME.tg_username)})` : ''}.</p>
-    <p class="faint">Настройки, журнал и бот пока хранятся в этом браузере; перенос в профиль — в следующих версиях.</p>
-    <div class="authrow"><button id="authOut">Выйти</button><button id="authOutAll">Выйти на всех устройствах</button></div>`);
+    <p class="faint">В профиле хранятся настройки, избранное, профили бота, уровни на графиках и вид «Беты» — они одинаковые на всех ваших устройствах. Журнал и бот в браузере у каждого устройства свои.</p>
+    <div class="authrow"><button id="authOut">Выйти</button><button id="authOutAll">Выйти на всех устройствах</button></div>
+    <button class="danger" id="authDel">Удалить профиль</button>`);
+}
+async function deleteProfile() {
+  closeAuth();
+  if (!await ask({title:'Удалить профиль?', text:'Удалятся профиль и настройки, сохранённые в нём, на всех устройствах. Данные в этом браузере и серверный бот останутся. Отменить нельзя.', ok:'Удалить', danger:true})) return;
+  try {
+    if (AUTH.exp - Date.now() < 60e3) await refreshSession();
+    await authFn({op:'delete'}, AUTH?.at);
+  } catch (e) { return toast('Не удалось удалить профиль', e.message || String(e), 'bad'); }
+  SYNCV = null; save('sr_sync', null); signedOut();
+  toast('Профиль удалён', 'Настройки остались только в этом браузере', 'ok');
 }
 function signOut(all) {
   const t = AUTH?.at;
@@ -2464,6 +2482,7 @@ $('#authDlg').onclick = e => {
   const id = e.target.closest('button')?.id;
   if (id === 'authAgain') authStart().then(() => {}, () => {});
   if (id === 'authOut' || id === 'authOutAll') signOut(id === 'authOutAll');
+  if (id === 'authDel') deleteProfile();
 };
 $('#authDlg').onkeydown = e => {
   if (e.key === 'Escape') { e.stopPropagation(); closeAuth(); }
@@ -2473,8 +2492,87 @@ $('#authDlg').onkeydown = e => {
   }
 };
 window.addEventListener('storage', e => { if (e.key === 'sr_auth') { AUTH = load('sr_auth', null); scheduleRefresh(); if (AUTH) loadMe(); else { ME = null; renderAcct(); } } });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && AUTH && AUTH.exp - Date.now() < 120e3) refreshSession(); });
-renderAcct(); scheduleRefresh(); loadMe();
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !AUTH) return;
+  if (AUTH.exp - Date.now() < 120e3) refreshSession();
+  syncCheck();
+});
+
+// ---------- profile sync (accounts stage 2): what follows the person between devices ----------
+// These browser-storage keys live in the profile (user_state): settings, favourites, bot profiles, chart levels, sorting, the
+// Beta's layout and drawings. The journal and the browser bot stay on each device: two open devices would both trade one
+// journal; the bot that serves several devices is the server one. Everything is read once at start-up, so values that came
+// from another device are written to storage and the page reloads (at most once in 15 s).
+const SYNC = new Set(['sr_settings', 'sr_favs', 'sr_bot', 'sr_lv', 'sr_tfilt', 'sr_msort', 'sr_jsort', 'sr_recent',
+  'sr_bcfg', 'sr_bdraw', 'sr_bind', 'sr_bpanes', 'sr_blay', 'sr_bchips', 'sr_bhide', 'sr_blabels', 'sr_bvol', 'sr_bnotec', 'sr_blink']);
+let SYNCV = load('sr_sync', null), syncReady = false, syncTimer2 = 0;   // {uid, v: {key: version this device has}}
+const syncDirty = new Set();
+const authUid = () => { try { return JSON.parse(atob(AUTH.at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch { return null; } };
+async function authFetch(path, init = {}) {   // PostgREST as the signed-in person
+  if (AUTH && AUTH.exp - Date.now() < 60e3) await refreshSession();
+  if (!AUTH) throw new Error('signed out');
+  const r = await fetch(SB_URL + path, {...init, headers:{apikey:SB_KEY, Authorization:'Bearer ' + AUTH.at, 'Content-Type':'application/json'}, signal:AbortSignal.timeout(15000)});
+  if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+const stateRows = (withValue, keys) => authFetch('user_state?select=key,version' + (withValue ? ',value' : '') + (keys ? '&key=in.(' + keys.join(',') + ')' : ''));
+onSaved = k => {
+  if (!syncReady || !SYNC.has(k)) return;
+  syncDirty.add(k); clearTimeout(syncTimer2); syncTimer2 = setTimeout(syncPush, 1500);
+};
+async function syncPush() {
+  for (const k of [...syncDirty]) {
+    if (!syncReady) return;
+    syncDirty.delete(k);
+    const value = load(k, null); if (value == null) continue;
+    let v = SYNCV.v[k] || 0, done = false;
+    for (let i = 0; i < 3 && !done; i++) {
+      let nv;
+      try { nv = await authFetch('rpc/state_put', {method:'POST', body:JSON.stringify({p_key:k, p_value:value, p_version:v})}); }
+      catch { syncDirty.add(k); syncTimer2 = setTimeout(syncPush, 30e3); return; }   // offline or signed out: later
+      if (nv) { SYNCV.v[k] = nv; done = true; }
+      else v = (await stateRows(false, [k]).catch(() => []))[0]?.version || 0;   // another device wrote first: this change is newer, it wins
+    }
+  }
+  save('sr_sync', SYNCV);
+}
+function syncApply(rows, asked) {   // values from the profile → this device's storage, then a reload so everything reads them
+  for (const r of rows) { try { localStorage.setItem(r.key, JSON.stringify(r.value)); } catch { /* full storage: the old value stays */ } SYNCV.v[r.key] = r.version; }
+  save('sr_sync', SYNCV);
+  const last = +sessionStorage.getItem('sr_syncreload') || 0;
+  if (!asked && Date.now() - last < 15e3) return;   // never a reload loop; the values are stored and apply at the next start
+  sessionStorage.setItem('sr_syncreload', Date.now()); location.reload();
+}
+async function syncStart() {   // after sign-in and on every start while signed in
+  if (!AUTH) return;
+  const uid = authUid(); if (!uid) return;
+  let rows; try { rows = (await stateRows(true)).filter(r => SYNC.has(r.key)); } catch { return; }
+  if (SYNCV?.uid === uid) {   // a device that synced before: take what other devices changed since
+    syncReady = true;
+    const newer = rows.filter(r => r.version > (SYNCV.v[r.key] || 0));
+    for (const k of SYNC) if (localStorage.getItem(k) != null && !rows.some(r => r.key === k)) onSaved(k);   // keys the profile doesn't have yet
+    if (newer.length) syncApply(newer);
+    return;
+  }
+  // the first sign-in with this profile on this device
+  const local = [...SYNC].filter(k => localStorage.getItem(k) != null);
+  let take = rows.length > 0;
+  if (rows.length && local.length) take = await ask({title:'Настройки в профиле', text:'В профиле уже есть настройки с другого устройства: монеты, профили бота, вид графиков. Взять их или заменить настройками этого устройства? Журнал этого устройства не меняется.', ok:'Взять из профиля', no:'Оставить эти'});
+  SYNCV = {uid, v:Object.fromEntries(rows.map(r => [r.key, r.version]))};
+  syncReady = true;
+  if (take) return syncApply(rows, true);
+  save('sr_sync', SYNCV);
+  local.forEach(k => onSaved(k));
+}
+async function syncCheck() {   // back to the tab: another device may have changed something
+  if (!syncReady || !AUTH || syncDirty.size) return;
+  let rows; try { rows = (await stateRows(false)).filter(r => SYNC.has(r.key) && r.version > (SYNCV.v[r.key] || 0)); } catch { return; }
+  if (!rows.length) return;
+  toast('Настройки изменены на другом устройстве', 'Нажмите, чтобы применить их здесь', 'info', async () => {
+    try { syncApply(await stateRows(true, rows.map(r => r.key)), true); } catch { toast('Не удалось загрузить настройки', 'Проверьте интернет', 'bad'); }
+  }, 15000);
+}
+renderAcct(); scheduleRefresh(); loadMe().then(() => syncStart());
 
 // ---------- my bot on the server: this browser holds the secret of its own server bot ----------
 async function rpc(fn, args) {
@@ -3618,6 +3716,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.64', date:'2 ноября 2026', title:'Настройки в профиле', items:[
+    'Настройки, избранное, профили бота, уровни на графиках и вид «Беты» хранятся в профиле и одинаковы на всех устройствах.',
+    'При первом входе на устройстве можно взять настройки из профиля или оставить текущие.',
+    'Изменения, сделанные на другом устройстве, применяются нажатием на уведомление.',
+    'Добавлена кнопка «Удалить профиль»; в «Правовой информации» описано, что хранится в профиле.',
+  ]},
   {v:'2.63', date:'2 ноября 2026', title:'Вход через Telegram', items:[
     'Добавлен вход в профиль через Telegram-бота: без пароля и почты, подтверждением кода в боте.',
     'Добавлены выход из профиля и выход на всех устройствах.',
@@ -3678,11 +3782,6 @@ const CHANGELOG = [
   {v:'2.53', date:'28 октября 2026', title:'Цены сделок на телефоне', items:[
     'Исправлено обрезание цен в списках сделок журнала и бэктеста на телефоне.',
     'На узких экранах цены входа и выхода показаны через стрелку.',
-  ]},
-  {v:'2.52', date:'27 октября 2026', title:'Правовая информация и данные', items:[
-    'Добавлена страница «Правовая информация»: условия использования, какие данные хранятся и как их удалить.',
-    'Добавлена кнопка «Удалить с сервера» для серверного бота.',
-    'Шрифт загружается с самого сайта, без сторонних сервисов.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -3942,11 +4041,11 @@ async function toggleNtf() {
 syncNtf();
 // ---------- own dialog instead of confirm()/prompt(): says exactly what will happen, follows the theme ----------
 // ask({title, text, ok, danger}) → true/false; with `input` → the typed text or null. Destructive dialogs focus "Отмена".
-function ask({title, text = '', ok = 'Готово', danger = false, input = null}) {
+function ask({title, text = '', ok = 'Готово', no = 'Отмена', danger = false, input = null}) {
   return new Promise(res => {
     const back = document.activeElement, inp = $('#dlgIn'), withInput = input != null;
     $('#dlgT').textContent = title; $('#dlgD').textContent = text; $('#dlgD').classList.toggle('hidden', !text);
-    $('#dlgOk').textContent = ok; $('#dlgOk').className = danger ? 'danger' : 'primary';
+    $('#dlgOk').textContent = ok; $('#dlgOk').className = danger ? 'danger' : 'primary'; $('#dlgNo').textContent = no;
     inp.classList.toggle('hidden', !withInput); inp.value = input?.value ?? ''; inp.placeholder = input?.placeholder ?? ''; inp.inputMode = input?.inputmode ?? '';
     $('#dlg').classList.remove('hidden');
     if (withInput) { inp.focus(); inp.select(); } else (danger ? $('#dlgNo') : $('#dlgOk')).focus();

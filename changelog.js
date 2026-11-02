@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.51 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.52 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.52', date:'27 октября 2026', title:'Правовая информация и данные', items:[
+    'Добавлена страница «Правовая информация»: условия использования, какие данные хранятся и как их удалить.',
+    'Добавлена кнопка «Удалить с сервера» для серверного бота.',
+    'Шрифт загружается с самого сайта, без сторонних сервисов.',
+  ]},
   {v:'2.51', date:'27 октября 2026', title:'Улучшения мобильной версии', items:[
     'Кнопка монеты в сообщениях Telegram открывает её график.',
     'Панель RSI на графике стала выше на небольших экранах.',
