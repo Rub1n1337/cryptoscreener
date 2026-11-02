@@ -216,6 +216,9 @@ kbd{font:11px/1 var(--mono);color:var(--faint);border:1px solid var(--line2);bor
 /* ---------- cards ---------- */
 .cards{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:14px}
 .cards.auto{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+/* before the first scan the summary's numbers shimmer like the table's rows (.sk), not a row of «—»; a failed scan stops it */
+.cards.wait .card .v{color:transparent;position:relative}
+.cards.wait .card .v::after{content:"";position:absolute;left:0;top:50%;width:min(70%,110px);height:14px;margin-top:-7px;border-radius:7px;background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:sk 1.2s infinite}
 .card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden}
 .card .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
 .card .v{font-size:24px;font-weight:700;margin:4px 0 2px;letter-spacing:-.02em}.card .s{font-size:12px;color:var(--mute)}
@@ -312,6 +315,13 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 .scales{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px;margin:4px 0 14px}.detail .gauge{--ring:var(--s2)}
 .sch{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:12px;color:var(--mute)}.sch b{font-size:15px;font-variant-numeric:tabular-nums}
 .sca{position:relative;height:14px;margin-top:5px;font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}.sca span{position:absolute;transform:translateX(-50%)}
+/* the search's hotkey shown in the field, with a mouse and a keyboard only; gone while typing (the ✕ takes its place) */
+.search .skey{position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;display:none}
+@media (hover:hover) and (pointer:fine){.search .skey{display:block}#fs{padding-right:30px}.search input:focus~.skey,.search input:not(:placeholder-shown)~.skey{display:none}}
+/* distances under the range scale, laid out like it: the lower edge left, the centre in the middle, the upper edge right */
+.sdist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.sdist span{display:flex;flex-direction:column;gap:1px;min-width:0}.sdist span:nth-child(2){text-align:center}.sdist span:nth-child(3){text-align:right}
+.sdist i{font-style:normal;font-size:10.5px;color:var(--faint);white-space:nowrap}.sdist b{font-size:12.5px;font-weight:600;color:var(--text)}
 @media(max-width:400px){.scales{grid-template-columns:minmax(0,1fr)}}
 .comp{display:grid;grid-template-columns:150px 1fr 64px;gap:10px;align-items:center;font-size:12.5px;margin:6px 0}
 .comp .cb{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}.comp .cb i{display:block;height:100%;background:var(--acc);border-radius:3px}
@@ -787,6 +797,8 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .hside{display:flex;gap:28px;font-size:12px;color:var(--mute)}.hside div{display:flex;flex-direction:column;gap:3px}.hside b{font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
 /* touch screens: a number's name that opens an explanation on a tap is underlined with dots (taptip shows the title) */
 @media(hover:none){.statrow .card[title] .t,.hside div[title] .tl{text-decoration:underline dotted var(--faint);text-underline-offset:3px}}
+/* a term inside running text that explains itself on hover or a tap (R in the shared bot's warning) */
+.term{text-decoration:underline dotted var(--faint);text-underline-offset:3px;cursor:help}
 .hchart{position:relative;height:150px;touch-action:pan-y;cursor:crosshair;border-radius:4px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
 .hchart:focus{outline:none}.hchart:focus-visible{outline:2px solid var(--focus);outline-offset:6px}
 /* the balance chart's pointer: a line, a dot on the balance, a note (see eqShow); the drawdown band's size */
@@ -1090,7 +1102,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       </div>
       <button id="introOk" class="primary">Понятно</button>
     </div>
-    <div class="cards">
+    <div class="cards wait" id="cards">
       <div class="card" title="Где сейчас рынок в целом: 50% — монеты в середине своих обычных диапазонов, ближе к 0% — у нижних границ, ближе к 100% — у верхних."><div class="t">Настроение рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s"></div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
       <div class="card" data-cf="lo" role="button" tabindex="0" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх. Нажмите, чтобы показать их."><div class="t" data-s="Дешевле">Дешевле обычного</div><div class="v pos" id="c2">—</div><div class="s" id="c2s"></div></div>
       <div class="card" data-cf="hi" role="button" tabindex="0" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз. Нажмите, чтобы показать их."><div class="t" data-s="Дороже">Дороже обычного</div><div class="v neg" id="c3">—</div><div class="s" id="c3s"></div></div>
@@ -1142,7 +1154,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 
       <div class="panel tpanel">
         <div class="filters">
-          <div class="search" style="flex:1 1 110px"><svg class="i"><use href="#i-search"/></svg><input id="fs" type="search" enterkeyhint="search" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Поиск монеты" title="Горячая клавиша: /"></div>
+          <div class="search" style="flex:1 1 110px"><svg class="i"><use href="#i-search"/></svg><input id="fs" type="search" enterkeyhint="search" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Поиск монеты" title="Горячая клавиша: /"><kbd class="skey" aria-hidden="true">/</kbd></div>
           <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
           <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
           <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
@@ -1761,6 +1773,7 @@ function tickFoot() {
 
 function renderCards() {
   if (!rows.length) return;
+  $('#cards').classList.remove('wait');   // the loading shimmer gives way to the numbers
   const med = median(rows.map(r => clamp(r.pB, 0, 1))) * 100;
   const cold = rows.filter(r => r.pB < 0.1).length, hot = rows.filter(r => r.pB > 0.9).length;
   $('#c1').textContent = med < 35 ? 'Распродажа' : med > 65 ? 'Разогрет' : 'Спокойный';
@@ -1850,7 +1863,7 @@ const tickCls = (key, p) => { const was = shownPx.get(key); shownPx.set(key, p);
 function renderTable() { return keepFocus(renderTableNow); }   // the star or row in focus stays focused after a rescan
 function renderTableNow() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
-  if (!rows.length) { if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
+  if (!rows.length) { $('#cards').classList.toggle('wait', !scanErr); if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
   save('sr_tfilt', Object.fromEntries(TF_FILTERS.map(s => [s, $(s).value])));
   const fz = $('#fz').value, fl = $('#fl').value, pass = baseFilter();
   // segment counts follow the other filters: «Сигналы 2» means two rows will show, not two in the whole market
@@ -2385,9 +2398,14 @@ function renderDetail() {
   // where the price and RSI stand, on the same scale as the table: marks at the channel's edges and at RSI 30 / 70
   const rv = +r.rsi, rsiCol = rv < 30 ? 'var(--lo)' : rv > 70 ? 'var(--up)' : 'var(--blue)';
   const mark = (at, t) => `<span style="left:${at}">${t}</span>`;
-  html += `<div class="scales"><div class="sc" title="Где цена внутри своего обычного диапазона: 0% — у нижней границы, 100% — у верхней, за краями — вышла за границу">`
+  // how far the price has to go: to each edge and to the centre (the bounce's target), in % of the price; minus = below it
+  const away = v => { const x = (v / r.price - 1) * 100; return (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(Math.abs(x) < 10 ? 1 : 0) + '%'; };
+  const dist = [['до нижней', r.lo], ['до центра', r.mid], ['до верхней', r.up]].filter(([, v]) => isFinite(v) && r.price > 0)
+    .map(([t, v]) => `<span><i>${t}</i><b class="mono">${away(v)}</b></span>`).join('');
+  html += `<div class="scales"><div class="sc" title="Где цена внутри своего обычного диапазона: 0% — у нижней границы, 100% — у верхней, за краями — вышла за границу. Ниже — сколько цене пройти до границ и до центра канала (цели отскока), минус — ниже цены">`
     + `<div class="sch"><span>Положение в диапазоне</span><b style="color:${pbCol(r.pB)}">${pct}</b></div>${gaugeBar(r.pB, 'wide')}`
-    + `<div class="sca" aria-hidden="true">${mark('14.3%', '0%')}${mark('50%', '50%')}${mark('85.7%', '100%')}</div></div>`
+    + `<div class="sca" aria-hidden="true">${mark('14.3%', '0%')}${mark('50%', '50%')}${mark('85.7%', '100%')}</div>`
+    + (dist ? `<div class="sdist">${dist}</div>` : '') + '</div>'
     + (isFinite(rv) ? `<div class="sc" title="Сила движения: ниже 30 — монету много продавали (перепроданность), выше 70 — много покупали (перекупленность)">`
       + `<div class="sch"><span>RSI</span><b style="color:${rsiCol}">${rv.toFixed(0)}</b></div>`
       + `<span class="gauge wide rsi" aria-hidden="true"><i style="left:${clamp(rv, 0, 100)}%;background:${rsiCol}"></i></span>`
@@ -3447,7 +3465,7 @@ function renderJournalNow() {
   const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
     ? (sharedNoEdge() ? `<div class="banner warn noedge"><svg class="i"><use href="#i-warn"/></svg><div><b>У правил общего бота не найдено преимущества.</b>
-        На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет: −0.42R, −0.40R и −0.30R на сделку.
+        На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет: <span class="term" title="R — риск одной сделки: сумма, которую она теряет, если сработал стоп. −0.42R на сделку — в среднем каждая сделка теряла почти половину этой суммы">−0.42R, −0.40R и −0.30R на сделку</span>.
         Общий бот показывает, как работает бот, а не стратегию, по которой стоит торговать. Проверить самому — кнопка «Проверить в бэктесте» ниже.</div></div>` : '')
     + `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
       <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
@@ -3481,7 +3499,7 @@ function renderJournalNow() {
      ${st.n ? `<div class="statrow">
        ${card('Сделок', st.n, `открыто ${D.open.length} из ${slots}`, '', 'Сколько сделок закрыто за всё время и сколько позиций открыто сейчас из возможных')}
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок')}
-       ${card('Ср. результат', rr(st.expR) + trend, other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR),'Средний итог сделки в рисках (R) после комиссий. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
+       ${card('Ср. результат', rr(st.expR) + trend, other ? `у общего бота ${rr(other.expR)}` : 'на сделку', cl(st.expR),'Средний итог сделки в R после комиссий. R — риск одной сделки: сумма, которую она теряет, если сработал стоп; +1R — заработали столько же. Больше 0 — у стратегии есть преимущество. Главная цифра журнала')}
        ${card('Profit factor', st.pf == null ? '—' : st.pf.toFixed(2), 'прибыли / убытки', st.pf == null ? '' : st.pf >= 1 ? 'pos' : 'neg', 'Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе')}
        ${card('Комиссии и заём', usd(-st.fees), `до них ${usd(st.gross)}`, st.fees ? 'neg' : '', 'Сколько забрала биржа: комиссия и проценты за заём под шорты и плечо. Если это больше прибыли до них — стратегия работает на биржу')}
        ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от предыдущего пика, а не от старта. На графике баланса оно подсвечено')}
@@ -3891,6 +3909,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.72', date:'2 ноября 2026', title:'Подсказки и расстояния', items:[
+    'В разборе сигнала под шкалой показано, сколько цене пройти до границ и до центра канала.',
+    'В поле поиска монеты на компьютере видна клавиша «/», которая его открывает.',
+    'Сводка рынка при загрузке показывает заглушки, как таблица, вместо прочерков.',
+    'Касание значения в R на телефоне объясняет, что такое R.',
+  ]},
   {v:'2.71', date:'2 ноября 2026', title:'Стекло на компьютере', items:[
     'Стекло стало заметнее на большом экране: у панелей появились отблеск и светлая верхняя кромка.',
     'Переключатели таймфрейма и фильтров, а также кнопки-иконки стали стеклянными.',
@@ -3950,13 +3974,6 @@ const CHANGELOG = [
     'Шкала диапазона в таблице стала тоньше и совпадает со шкалой в разборе.',
     'Заголовок столбца, по которому можно сортировать, показывает ↕ при наведении.',
     'Пустое избранное подсказывает, как добавить монету.',
-  ]},
-  {v:'2.60', date:'2 ноября 2026', title:'Графитовая тема', items:[
-    'Тёмная тема стала нейтрально-графитовой: цветными остаются только сигналы и акценты.',
-    'Сводка рынка, журнала и бэктеста собрана в одну панель с разделителями.',
-    'Цифры в шапке графика подписаны: диапазон, границы, RSI, T½ и канал.',
-    'Цвета значков монет стали одинаково яркими, выбранная строка таблицы — золотистой.',
-    'Звезда избранного над графиком стала удобнее для пальца.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.59 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.60 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.60', date:'2 ноября 2026', title:'Графитовая тема', items:[
+    'Тёмная тема стала нейтрально-графитовой: цветными остаются только сигналы и акценты.',
+    'Сводка рынка, журнала и бэктеста собрана в одну панель с разделителями.',
+    'Цифры в шапке графика подписаны: диапазон, границы, RSI, T½ и канал.',
+    'Цвета значков монет стали одинаково яркими, выбранная строка таблицы — золотистой.',
+    'Звезда избранного над графиком стала удобнее для пальца.',
+  ]},
   {v:'2.59', date:'2 ноября 2026', title:'Новая карточка позиции', items:[
     'Карточка позиции показывает итог крупно и путь цены между стопом и тейком.',
     'Цифры карточки собраны в группы, разбор сигнала стоит под графиком.',
