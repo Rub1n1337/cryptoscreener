@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.64 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.65 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.65', date:'2 ноября 2026', title:'Бот, Telegram и «Бета» в профиле', items:[
+    'Серверный бот хранится в профиле и один на всех ваших устройствах.',
+    'Если на устройстве был свой серверный бот, сайт предлагает удалить его.',
+    'Telegram подключается к серверному боту одной кнопкой — в аккаунт, через который выполнен вход.',
+    'Доступ к «Бете» по коду, введённому после входа, действует на всех устройствах профиля.',
+  ]},
   {v:'2.64', date:'2 ноября 2026', title:'Настройки в профиле', items:[
     'Настройки, избранное, профили бота, уровни на графиках и вид «Беты» хранятся в профиле и одинаковы на всех устройствах.',
     'При первом входе на устройстве можно взять настройки из профиля или оставить текущие.',

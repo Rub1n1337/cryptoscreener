@@ -49,7 +49,7 @@
   --on-acc:#1a1300;   /* text on gold: the same dark in both themes */
   --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#16a34a;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags, server cells, focus ring */
   /* how strong the glass is: every light and every see-through below is multiplied by this one number, set per device in
-     «Вид» (data-glass on <html>, the rules right after the light theme): 0 no glass, .35 quiet, .7 soft (default), 1 full, 1.5 bright */
+     the profile (data-glass on <html>, the rules right after the light theme): 0 no glass, .35 quiet, .7 soft (default), 1 full, 1.5 bright */
   --g:.7;
   --topbg:rgba(12,13,15,calc(1 - .18*var(--g)));--navbg:rgba(12,13,15,calc(1 - .06*var(--g)));--backdrop:rgba(4,5,6,.7);--ring:rgba(255,255,255,.05);
   --hover:#414448;--row-line:#1c1d20;--sel:#272416;--canvas:#0e0f11;   /* selected row: a gold tint, as in the light theme */
@@ -75,6 +75,9 @@
   /* panels: a faint pearl sheen top-left and a cool one bottom-right; the frosted table header */
   --panel-sheen:linear-gradient(160deg,rgba(232,247,247,calc(.085*var(--g))),transparent 40%,transparent 62%,rgba(155,211,211,calc(.065*var(--g))));
   --th-glass:rgba(19,21,23,calc(1 - .24*var(--g)));
+  /* the chosen pane in a segmented control or the header's group; the sample of the glass in the profile (see-through more than
+     the real fill, or the steps would be hard to tell apart in a small box) */
+  --ui-selected:var(--s3);--ui-shadow:0 1px 3px var(--glass-press);--glass-sample:rgba(19,24,26,calc(1 - .5*var(--g)));
   /* its centre is set in px from the top-left and follows the logo when the header's 1500px column is centred, so the page's
      layer and the header's (same box origin) line up into one patch */
   --glow-bg:radial-gradient(60rem 30rem at max(7rem, calc(50% - 750px + 7rem)) -6rem, var(--glow), transparent 70%);
@@ -106,6 +109,7 @@
   --card-lo:rgba(26,128,64,.08);--card-hi:rgba(213,43,57,.07);
   --panel-sheen:linear-gradient(160deg,rgba(241,198,113,calc(.06*var(--g))),transparent 40%,transparent 62%,rgba(133,188,188,calc(.09*var(--g))));
   --th-glass:rgba(255,255,255,calc(1 - .22*var(--g)));
+  --ui-selected:var(--s1);--glass-sample:rgba(255,255,255,calc(1 - .5*var(--g)));
   --tag-t:#334155;--up-t:#b4232f;--lo-t:#15803d;--acc-t:#8a6100;
   --bad-line:#f2b8be;--bad-bg:#fdecee;--ok-line:#a7dcb9;--warn-line:#ead198;
   --c-up:#dc2626;--c-lo:#16a34a;--c-mid:#7b8798;--c-trade:#7c3aed;--c-price:#1f2937;--c-acc:#c28a00;
@@ -114,7 +118,7 @@
   --c-hi:rgba(220,38,38,.05);--c-lo2:rgba(22,163,74,.05);--c-base:#c3cad5;
   color-scheme:light;
 }
-/* the five strengths in «Вид» (2 is the default --g above). «Выкл» and «Тихо» follow Lovable's material hierarchy: data and
+/* the five strengths in the profile (2 is the default --g above). «Выкл» and «Тихо» follow Lovable's material hierarchy: data and
    forms are matte, plain lines instead of the glass rims, no sheen on panels, table heads simply cover the rows */
 :root[data-glass="0"]{--g:0}:root[data-glass="1"]{--g:.35}:root[data-glass="3"]{--g:1}:root[data-glass="4"]{--g:1.5}
 :root[data-glass="0"],:root[data-glass="1"]{--glass-line:var(--line2);--glass-line2:var(--line2);--glass-top:var(--line);--glass-rim:var(--hover);--panel-sheen:none;--surface-light:none;--glass-reflection:none;--th-glass:var(--s1)}
@@ -936,7 +940,7 @@ details.dis>.dbody{padding:0 16px 16px}
 .top .tab.on::after{box-shadow:0 2px 8px var(--light-edge)}
 /* segmented controls (timeframes, filters, modes) are a glass track; the chosen tab sits in it as a lighter pane */
 .seg{background:var(--control-shine),var(--s2);border-color:var(--glass-line);box-shadow:var(--glass-inset)}
-.seg .tab.on:not([data-fl]){background:var(--control-shine),var(--s3);box-shadow:var(--glass-inset);border-radius:var(--r-s)}
+.seg .tab.on:not([data-fl]){background:var(--control-shine),var(--ui-selected);box-shadow:inset 0 0 0 1px var(--line2),var(--ui-shadow);color:var(--text);border-radius:var(--r-s)}
 button.primary,.authgo,button.primary:hover,.authgo:hover{background-image:var(--control-shine)}
 button.primary,.authgo{box-shadow:var(--glass-inset),0 4px 12px -8px var(--light-edge)}
 button.primary:hover,.authgo:hover{box-shadow:var(--glass-inset),0 4px 16px -6px var(--light-edge)}
@@ -984,26 +988,60 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
   .mbox{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
   .mhead{background:var(--control-shine),var(--topbg);box-shadow:var(--glass-inset)}   /* the trade card's sticky head */
 }
-/* the header's tools are one glass capsule, like a toolbar on iOS, not a row of separate pills: icons stay plain until
-   hovered; signed out only «Войти» is left, with its word */
-.tgroup{display:flex;align-items:center;border:1px solid var(--glass-line);border-radius:999px;background:var(--control-shine),var(--s2);box-shadow:var(--glass-inset)}
-.top .tools .tgroup button{width:var(--h);height:var(--h);padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;color:var(--mute)}
-.top .tools .tgroup button:hover,.top .tools .tgroup button:focus-visible,.top .tools .tgroup button[aria-expanded=true]{background:var(--s3);color:var(--text);box-shadow:none}
+/* the header's tools are one glass group: inside it a rounded pane marks hover and an open menu (Lovable v5), no circle that
+   touches the group's edges; signed out only «Войти» is left, with its word */
+.tgroup{display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--glass-line);border-radius:var(--r-l);background:var(--control-shine),var(--s2);box-shadow:var(--glass-inset)}
+.top .tools .tgroup button{position:relative;width:36px;height:36px;min-width:36px;padding:0;border:1px solid transparent;border-radius:var(--r);background:transparent;box-shadow:none;color:var(--mute);transition:background-color var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+.top .tools .tgroup button:hover,.top .tools .tgroup button:focus-visible{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:none}
+.top .tools .tgroup button[aria-expanded=true]{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:var(--ui-shadow)}
+.top .tools .tgroup button:active{background:var(--s3);border-color:var(--line2);box-shadow:inset 0 1px 3px var(--glass-press)}
+.top .tools .tgroup .nbadge{top:1px;right:1px;box-shadow:0 0 0 2px var(--s2);pointer-events:none}
 #acct .pt{display:none}
-.locked #acct{width:auto;padding:0 14px;gap:8px;border-radius:999px;color:var(--text)}.locked #acct .pt{display:inline}
-/* «Вид» */
-.prefp{width:min(340px,calc(100vw - 32px));padding:14px}
-.prefp .pl{margin:0 0 6px;font-size:12px;color:var(--mute)}
-.prefp .seg{display:flex;margin:0 0 12px}.prefp #prefGlass{margin-bottom:6px}
-.prefp .seg .tab{flex:1 1 0;min-width:0;padding:0 2px;font-size:12.5px}
-.prefp .pcap{margin:0 0 12px;min-height:2.9em;font-size:12px;line-height:1.45;color:var(--faint);text-wrap:pretty}
-.prow{display:flex;gap:10px;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--line);font-size:12.5px;color:var(--mute)}
-.prow button{flex:0 0 auto;font-size:12.5px}
+.top .tools .tgroup #acct:is(.locked *){width:auto;padding:0 12px;gap:8px;color:var(--text)}.locked #acct .pt{display:inline}
+/* the bots' status: all well is a small dot with a finger-sized target (its words stay for screen readers and the tooltip);
+   while loading too, so the header doesn't jump; a problem shows its words, also on a phone, where they wrap inside the row */
+.top .tools #guardPill{min-height:36px;background:transparent;box-shadow:none;border-color:transparent}
+#guardPill .dot{flex:none;width:7px;height:7px}#guardPill.ok .dot{box-shadow:none}
+.top .tools #guardPill:is(.ok,.load){width:36px;min-width:36px;padding:0;justify-content:center;border-radius:var(--r)}
+.top .tools #guardPill:is(.ok,.load):hover,.top .tools #guardPill[aria-expanded=true]:is(.ok,.load){background:var(--ui-selected);border-color:var(--line2)}
+#guardPill:is(.ok,.load) #guardTxt{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.top .tools #guardPill:not(.ok,.load){height:auto;padding:4px 9px;gap:7px;border-radius:var(--r);background:var(--s2);border-color:var(--line2);white-space:normal}
+.top .tools #guardPill.bad{background:var(--bad-bg);border-color:var(--bad-line);color:var(--up-t)}
+.top .tools #guardPill.idle:not(.load){color:var(--acc-t);border-color:var(--warn-line)}
+#guardPill:not(.ok,.load) #guardTxt{display:inline;overflow-wrap:anywhere;font-size:12px;line-height:1.3;text-align:left}
+.guard .guard-heading{display:block;margin-bottom:8px;font-size:15px}.guard:not(.bad,.idle) .guard-heading{color:var(--text)}
+.guard .guard-message{margin:0 0 12px;color:var(--text)}
+.guard .guard-bot{padding:10px 0 0;margin-top:10px;border-top:1px solid var(--line)}
+.guard .guard-bot b{color:var(--text);font-size:13px}.guard .guard-bot span{margin-top:3px}
+@media(max-width:700px){.top .tools{flex:1 1 auto;min-width:0;justify-content:flex-end}.top .tools #guardPill:not(.ok,.load){flex:0 1 auto;min-width:0}}
+/* the signed-in profile (Lovable v5): the sign-in steps in the same dialog stay as they were */
+#authDlg:not(.profile-open) :is(#profileSettings,#authFoot){display:none}
+#authDlg.profile-open .authbox{width:min(560px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;padding:0 20px 8px;background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+#authDlg.profile-open .authh{position:sticky;top:0;z-index:2;margin:0 -20px;padding:14px 20px;background:var(--s1);border-bottom:1px solid var(--line)}
+.profile-identity{display:flex;align-items:center;gap:12px;min-width:0;padding:6px 0 6px}
+.profile-avatar{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:var(--r);background:var(--s3);font-size:20px;font-weight:650}
+.profile-identity h4{margin:0;font-size:17px;overflow-wrap:anywhere}.profile-identity p{font-size:13px;color:var(--mute);overflow-wrap:anywhere}
+.profile-section{padding:16px 0;border-top:1px solid var(--line)}#profileSettings{margin-top:12px}
+.profile-section h4{margin:0 0 12px;font-size:14px}.profile-section h4 .faint{font-weight:400}
+.profile-section .pl{margin:12px 0 7px;font-size:12px;color:var(--mute)}
+.profile-section .seg{display:flex;width:100%;margin:0}
+.profile-section .seg .tab{flex:1 1 0;min-width:0;min-height:36px;padding:0 3px;font-size:12.5px;justify-content:center}
+.profile-section .pcap{min-height:2.9em;margin:8px 0 0;font-size:12px;line-height:1.45;color:var(--mute);text-wrap:pretty}
+.profile-scope{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--mute);text-wrap:pretty}
+.profile-setting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px}.profile-setting span{min-width:0}
+.profile-setting button{flex:none;min-width:96px;min-height:36px;font-size:12.5px}
+.profile-session{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.profile-session button{min-height:36px}
+.profile-danger h4{color:var(--up-t)}.profile-danger button{margin-top:12px;min-height:36px}
+/* a sample of the glass right in the window: colour bars under a real pane of it, since the dialog's backdrop hides the page */
+.glass-preview{position:relative;isolation:isolate;overflow:hidden;height:92px;margin:12px 0 0;border-radius:var(--r);background:var(--s2)}
+.preview-stripes{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);gap:22px;transform:rotate(-12deg) scale(1.8)}
+.preview-stripes i:nth-child(1){background:var(--lo)}.preview-stripes i:nth-child(2){background:var(--acc)}.preview-stripes i:nth-child(3){background:var(--blue)}
+.preview-surface{position:absolute;inset:18px 22px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:var(--r);background:var(--control-shine),var(--glass-sample);box-shadow:var(--glass-inset);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));font-size:13px;font-weight:600}
 /* «Выкл» means no blur at all (less work for a weak device); in «Тихо» table heads simply cover the rows */
 :root[data-glass="0"] :is(.top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child,.gate,.sheetbar),:root[data-glass="1"] :is(th,#mhead th:nth-child(2),.tpanel>.filters:first-child){backdrop-filter:none;-webkit-backdrop-filter:none}
 /* «reduce transparency» in the system: solid surfaces, no blur */
 @media(prefers-reduced-transparency:reduce){
-  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child,.gate{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child,.gate,.preview-surface{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 </style>
 </head>
@@ -1098,25 +1136,16 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
     <button class="tab" data-t="changes" title="Что нового" aria-label="Что нового"><svg class="i"><use href="#i-changes"/></svg><span class="tt lg">Что нового</span><span class="ts">Новое</span><span class="badge" id="ver"></span></button>
   </nav>
   <div class="tools">
-    <button class="pill" id="guardPill" title="Состояние ботов — нажмите для подробностей" aria-label="Состояние ботов"><span class="dot"></span><span class="pt" id="guardTxt">Сторож</span></button>
+    <button class="pill load" id="guardPill" title="Работа ботов" aria-label="Работа ботов" aria-haspopup="dialog" aria-expanded="false"><span class="dot"></span><span class="pt" id="guardTxt">Загрузка…</span></button>
     <div class="tgroup" role="group" aria-label="Инструменты">
-      <button class="cmdbtn" id="cmdbtn" title="Быстрый переход: монета, раздел или настройка (Ctrl K)" aria-label="Быстрый переход"><svg class="i"><use href="#i-search"/></svg></button>
+      <button class="cmdbtn" id="cmdbtn" title="Быстрый переход: монета, раздел или настройка (Ctrl K)" aria-label="Быстрый переход" aria-haspopup="dialog"><svg class="i"><use href="#i-search"/></svg></button>
       <button id="ntf" title="События: новые сигналы и сделки ботов" aria-label="События" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-bell"/></svg></button>
-      <button id="prefs" title="Вид и звук: тема, жидкое стекло, звук сигнала" aria-label="Вид и звук" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-sliders"/></svg></button>
-      <button id="acct" title="Войти через Telegram" aria-label="Войти через Telegram"><svg class="i"><use href="#i-user"/></svg><span class="pt" id="acctTxt">Войти</span></button>
+      <button id="acct" title="Войти через Telegram" aria-label="Войти через Telegram" aria-haspopup="dialog" aria-expanded="false"><svg class="i"><use href="#i-user"/></svg><span class="pt" id="acctTxt">Войти</span></button>
     </div>
   </div>
 </div></header>
-<div id="guard" class="guard" role="dialog" aria-label="Состояние ботов"><b>СОСТОЯНИЕ БОТОВ</b> загрузка…</div>
+<div id="guard" class="guard" role="dialog" aria-label="Работа ботов"><b class="guard-heading">Работа ботов</b> Загрузка…</div>
 <div id="evp" class="evp" role="dialog" aria-label="События"></div>
-<div id="prefp" class="evp prefp" role="dialog" aria-label="Вид и звук">
-  <div class="pl">Тема</div>
-  <div class="seg mini" id="prefTheme"><button class="tab" data-th="dark">Тёмная</button><button class="tab" data-th="light">Светлая</button></div>
-  <div class="pl">Жидкое стекло</div>
-  <div class="seg mini" id="prefGlass"><button class="tab" data-gl="0">Выкл</button><button class="tab" data-gl="1">Тихо</button><button class="tab" data-gl="2">Мягко</button><button class="tab" data-gl="3">Стекло</button><button class="tab" data-gl="4">Ярко</button></div>
-  <p class="pcap" id="prefGlassT" aria-live="polite"></p>
-  <div class="prow"><span>Звук при новом сигнале</span><button id="snd" aria-pressed="false">Включить</button></div>
-</div>
 <div id="dlg" class="cmdk dlgwrap hidden"><div class="dlgbox" role="alertdialog" aria-modal="true" aria-labelledby="dlgT" aria-describedby="dlgD">
   <h3 id="dlgT"></h3><p id="dlgD"></p><input id="dlgIn" class="hidden" autocomplete="off" spellcheck="false">
   <div class="dlga"><button id="dlgNo">Отмена</button><button id="dlgOk" class="primary">Готово</button></div>
@@ -1124,6 +1153,35 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 <div id="authDlg" class="cmdk dlgwrap hidden"><div class="dlgbox authbox" role="dialog" aria-modal="true" aria-labelledby="authT">
   <div class="authh"><h3 id="authT">Вход через Telegram</h3><button class="icon" id="authClose" aria-label="Закрыть"><svg class="i"><use href="#i-x"/></svg></button></div>
   <div id="authBody" class="authb"></div>
+  <div id="profileSettings">
+    <section class="profile-section" aria-labelledby="profileViewT">
+      <h4 id="profileViewT">Вид <span class="faint">· на этом устройстве</span></h4>
+      <div class="pl">Тема</div>
+      <div class="seg mini" id="prefTheme"><button class="tab" data-th="dark">Тёмная</button><button class="tab" data-th="light">Светлая</button></div>
+      <div class="pl">Жидкое стекло</div>
+      <div class="seg mini" id="prefGlass"><button class="tab" data-gl="0">Выкл</button><button class="tab" data-gl="1">Тихо</button><button class="tab" data-gl="2">Мягко</button><button class="tab" data-gl="3">Стекло</button><button class="tab" data-gl="4">Ярко</button></div>
+      <div class="glass-preview" aria-hidden="true"><div class="preview-stripes"><i></i><i></i><i></i></div><div class="preview-surface">Образец стекла</div></div>
+      <p class="pcap" id="prefGlassT" aria-live="polite"></p>
+    </section>
+    <section class="profile-section" aria-labelledby="profileNtfT">
+      <h4 id="profileNtfT">Уведомления <span class="faint">· на этом устройстве</span></h4>
+      <div class="profile-setting"><span>Звук при новом сигнале</span><button id="snd" aria-pressed="false">Включить</button></div>
+      <div class="profile-setting"><span>Уведомления браузера</span><button id="profileNtf" aria-pressed="false">Включить</button></div>
+      <p id="profileNtfNote" class="profile-scope" aria-live="polite"></p>
+    </section>
+  </div>
+  <div id="authFoot">
+    <section class="profile-section">
+      <h4>Данные профиля</h4>
+      <p class="profile-scope">Настройки, избранное, профили бота, серверный бот, уровни на графиках, вид «Беты» и доступ к ней одинаковы на всех ваших устройствах. Журнал и бот «В браузере» у каждого устройства свои.</p>
+      <div class="profile-session"><button id="authOut">Выйти</button><button id="authOutAll">Выйти на всех устройствах</button></div>
+    </section>
+    <section class="profile-section profile-danger">
+      <h4>Удаление профиля</h4>
+      <p class="profile-scope">Удалятся профиль и его серверный бот со сделками на всех устройствах. Данные в этом браузере останутся. Отменить нельзя.</p>
+      <button class="danger" id="authDel">Удалить профиль</button>
+    </section>
+  </div>
 </div></div>
 <div id="toasts"></div>
 <div id="cmdk" class="cmdk hidden"><div class="cmdbox" role="dialog" aria-modal="true" aria-label="Быстрый переход">
@@ -2608,17 +2666,20 @@ function renderAcct() {
   const b = $('#acct'), t = AUTH ? 'Профиль' + (ME?.tg_name ? ': ' + ME.tg_name : '') : 'Войти через Telegram';
   $('#acctTxt').textContent = AUTH ? ME?.tg_name || 'Профиль' : 'Войти';
   b.title = t; b.setAttribute('aria-label', t); b.classList.toggle('on', !!AUTH);
+  if (AUTH && $('#authDlg').classList.contains('profile-open') && !$('#authDlg').classList.contains('hidden')) authProfile();   // the name came while the window is open
 }
 const authBody = h => { $('#authBody').innerHTML = h; };
 function openAuth() {
   authBack = document.activeElement;
+  evClose(); closeGuard();
+  $('#acct').setAttribute('aria-expanded', 'true');
   $('#authDlg').classList.remove('hidden');
   if (AUTH) authProfile(); else authStart();
   ($('#authBody').querySelector('a,button') || $('#authClose')).focus();
 }
 function closeAuth() {
   if ($('#authDlg').classList.contains('hidden')) return;
-  authRun++; $('#authDlg').classList.add('hidden');
+  authRun++; $('#authDlg').classList.add('hidden'); $('#acct').setAttribute('aria-expanded', 'false');
   if (authBack?.isConnected) authBack.focus({preventScroll:true});
 }
 function authFail(msg, again) {
@@ -2627,6 +2688,7 @@ function authFail(msg, again) {
 }
 async function authStart() {
   const run = ++authRun;
+  $('#authDlg').classList.remove('profile-open');
   $('#authT').textContent = 'Вход через Telegram';
   authBody('<p class="faint" role="status">Готовлю вход…</p>');
   const secret = hexOf(crypto.getRandomValues(new Uint8Array(32)).buffer);
@@ -2662,11 +2724,12 @@ async function authStart() {
 }
 function authProfile() {
   authRun++;
+  $('#authDlg').classList.add('profile-open');   // shows #profileSettings and #authFoot, which stay in the page with their handlers
   $('#authT').textContent = 'Профиль';
-  authBody(`<p>Вы вошли через Telegram${ME?.tg_name ? ` как <b>${esc(ME.tg_name)}</b>` : ''}${ME?.tg_username ? ` (@${esc(ME.tg_username)})` : ''}.</p>
-    <p class="faint">В профиле хранятся настройки, избранное, профили бота, серверный бот, уровни на графиках, вид и доступ к «Бете» — они одинаковые на всех ваших устройствах. Журнал и бот «В браузере» у каждого устройства свои.</p>
-    <div class="authrow"><button id="authOut">Выйти</button><button id="authOutAll">Выйти на всех устройствах</button></div>
-    <button class="danger" id="authDel">Удалить профиль</button>`);
+  const initial = Array.from((ME?.tg_name || '').trim())[0] || 'Σ';
+  authBody(`<section class="profile-identity" aria-label="Аккаунт"><div class="profile-avatar" aria-hidden="true">${esc(initial)}</div>
+    <div><h4>${esc(ME?.tg_name || 'Аккаунт Telegram')}</h4>${ME?.tg_username ? `<p>@${esc(ME.tg_username)}</p>` : ''}<p class="profile-scope">Вход через Telegram</p></div></section>`);
+  syncProfileNtf();   // the browser's permission can change outside the site
 }
 async function deleteProfile() {
   closeAuth();
@@ -2698,7 +2761,7 @@ $('#authDlg').onclick = e => {
 $('#authDlg').onkeydown = e => {
   if (e.key === 'Escape') { e.stopPropagation(); closeAuth(); }
   if (e.key === 'Tab') {   // keep focus inside the dialog
-    const f = [...$('#authDlg').querySelectorAll('a,button')].filter(x => x.offsetParent);
+    const f = [...$('#authDlg').querySelectorAll('a,button')].filter(x => x.offsetParent && !x.disabled);   // a disabled button takes no focus: Tab would stick before it
     e.preventDefault(); f[(f.indexOf(document.activeElement) + (e.shiftKey ? -1 : 1) + f.length) % f.length]?.focus();
   }
 };
@@ -3333,11 +3396,12 @@ function renderGuard() {
       + (MD.fetchError ? ` · не удалось обновить, показано состояние ${MD.checked ? ago(Date.now() - MD.checked) + ' назад' : 'с прошлой загрузки'}` : '')
     : 'Мой бот: загружаю…';
   const open = el.classList.contains('open') ? ' open' : '';
-  const pill = (state, txt) => { $('#guardPill').className = 'pill ' + state; $('#guardTxt').textContent = txt; };
+  // with all well only a dot is shown, so the words go to the tooltip and to screen readers
+  const pill = (state, txt) => { const b = $('#guardPill'); b.className = 'pill ' + state; $('#guardTxt').textContent = txt; b.title = txt + ' — подробности'; b.setAttribute('aria-label', txt + ' — подробности'); };
   if (!SJ) {
     el.className = 'guard idle' + open;
-    el.innerHTML = `<b>СОСТОЯНИЕ БОТОВ</b> ${sharedErr ? `Не удалось загрузить общего бота (${esc(sharedErr.slice(0, 90))}), пробую снова.` : 'Загружаю общего бота…'} <span>${mineTxt}</span>`;
-    pill('idle', sharedErr ? 'Нет связи с сервером' : 'Загрузка…'); return;
+    el.innerHTML = `<b class="guard-heading">Работа ботов</b><p class="guard-message">${sharedErr ? `Нет связи с сервером, пробуем снова. ${esc(sharedErr.slice(0, 90))}` : 'Получаем данные общего бота…'}</p><div class="guard-bot"><span>${mineTxt}</span></div>`;
+    pill(sharedErr ? 'idle' : 'idle load', sharedErr ? 'Нет связи с сервером' : 'Загрузка…'); return;   // loading stays a dot: the header doesn't jump
   }
   const age = Date.now() - SJ.checked, s = M.journalStats(SJ.start, SJ.closed);
   const ok = [...SJ.open, ...myOpen()].every(p => isFinite(p.tp) && isFinite(p.sl));
@@ -3346,11 +3410,11 @@ function renderGuard() {
   const netErr = SJ.fetchError;
   const state = !ok ? 'bad' : netErr ? 'idle' : stale ? 'bad' : SJ.error ? 'idle' : 'ok';
   el.className = 'guard' + (state === 'ok' ? '' : ' ' + state) + open;
-  const msg = !ok ? 'Есть позиция без тейка или стопа!'
+  const msg = !ok ? 'У позиции нет тейка или стопа. Проверьте защиту сделки.'
     : netErr ? `Не удалось обновить данные с сервера (${esc(netErr.slice(0, 90))}): показано состояние ${ago(age)} назад, пробую снова.`
     : stale ? `Общий бот не отвечает уже ${dur(age)}.` : SJ.error ? `Общий бот работает с ошибкой: ${esc(SJ.error)}` : 'Общий бот работает 24/7, у всех позиций есть тейк и стоп.';
-  el.innerHTML = `<b>${ok && !stale ? 'ВСЁ В ПОРЯДКЕ' : 'ВНИМАНИЕ'}</b> ${msg}
-    <span>Общий бот: проверка рынка ${SJ.checked ? ago(age) + ' назад' : '—'}, позиций ${SJ.open.length}, за 24 ч ${usd(s.pnl24)}</span><span>${mineTxt}</span>`;
+  el.innerHTML = `<b class="guard-heading">${state === 'ok' ? 'Боты работают' : 'Нужно внимание'}</b><p class="guard-message">${msg}</p>
+    <div class="guard-bot"><b>Общий бот</b><span>Проверка рынка ${SJ.checked ? ago(age) + ' назад' : '—'}</span><span>Открыто позиций: ${SJ.open.length} · Итог за 24 ч: ${usd(s.pnl24)}</span></div><div class="guard-bot"><span>${mineTxt}</span></div>`;
   pill(state, state === 'ok' ? `Общий бот · ${SJ.open.length} поз.` : state === 'bad' ? (ok ? 'Бот не отвечает' : 'Нет тейка или стопа') : netErr ? 'Нет связи с сервером' : 'Ошибка бота');
 }
 
@@ -3996,6 +4060,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.77', date:'5 ноября 2026', title:'Новый профиль и шапка', items:[
+    'Профиль стал разделом с аккаунтом, видом, уведомлениями, выходом и удалением.',
+    'Тема, режим стекла и звук перенесены в профиль, режим стекла показан на образце.',
+    'Работа ботов в шапке стала маленькой точкой, а при проблеме показывает текст, в том числе на телефоне.',
+    'Подробности о работе ботов переписаны понятным языком.',
+    'Значки в шапке и переключатели получили новое аккуратное выделение.',
+  ]},
   {v:'2.76', date:'3 ноября 2026', title:'Режимы стекла и шапка', items:[
     'Добавлены пять режимов жидкого стекла: от полного отключения до самого яркого.',
     'По умолчанию стекло стало мягче, режим запоминается на каждом устройстве отдельно.',
@@ -4058,12 +4129,6 @@ const CHANGELOG = [
   {v:'2.66', date:'2 ноября 2026', title:'Вход обязателен', items:[
     'Сайт открывается после входа через Telegram; без входа доступны описание сервиса и «Правовая информация».',
     'Ссылки на монеты из Telegram после входа открывают нужный график.',
-  ]},
-  {v:'2.65', date:'2 ноября 2026', title:'Бот, Telegram и «Бета» в профиле', items:[
-    'Серверный бот хранится в профиле и один на всех ваших устройствах.',
-    'Если на устройстве был свой серверный бот, сайт предлагает удалить его.',
-    'Telegram подключается к серверному боту одной кнопкой — в аккаунт, через который выполнен вход.',
-    'Доступ к «Бете» по коду, введённому после входа, действует на всех устройствах профиля.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4321,7 +4386,15 @@ const syncSound = () => { $('#snd').setAttribute('aria-pressed', String(sound));
 sound = load('sr_sound', false); syncSound();
 // browser notifications (opt-in): new signals, my bot's trades, shared bot's trades
 const ntfOn = () => load('sr_ntf', false) && 'Notification' in window && Notification.permission === 'granted';
-const syncNtf = () => $('#ntf').classList.toggle('on', ntfOn());
+function syncProfileNtf() {   // the same switch as in the bell's list, with the browser's real permission
+  const b = $('#profileNtf'), can = 'Notification' in window, blocked = can && Notification.permission === 'denied', on = ntfOn();
+  b.setAttribute('aria-pressed', String(on)); b.disabled = !can || blocked;
+  b.textContent = !can ? 'Недоступно' : blocked ? 'Запрещено' : on ? 'Выключить' : 'Включить';
+  $('#profileNtfNote').textContent = !can ? 'Этот браузер не поддерживает уведомления.' : blocked ? 'Разрешите уведомления в настройках сайта в браузере.'
+    : on ? 'Сигналы и сделки придут, даже когда вкладка свёрнута.' : 'При включении браузер запросит разрешение.';
+}
+const syncNtf = () => { $('#ntf').classList.toggle('on', ntfOn()); syncProfileNtf(); };
+$('#profileNtf').onclick = async e => { const b = e.currentTarget; b.disabled = true; await toggleNtf(); syncProfileNtf(); b.focus(); };   // a double click would ask and toast twice
 async function toggleNtf() {
   if (!('Notification' in window)) { toast('Браузер не поддерживает уведомления', '', 'warn'); return; }
   if (ntfOn()) { save('sr_ntf', false); syncNtf(); toast('Уведомления выключены', '', 'info'); return; }
@@ -4407,7 +4480,7 @@ const openLink = l => {
 };
 const evClose = () => { $('#evp').classList.remove('open'); $('#ntf').setAttribute('aria-expanded', 'false'); };
 $('#ntf').onclick = e => {
-  e.stopPropagation(); prefClose(); $('#guard').classList.remove('open');   // one header popover at a time
+  e.stopPropagation(); closeGuard();   // one header popover at a time
   const open = !$('#evp').classList.contains('open');
   $('#evp').classList.toggle('open', open); $('#ntf').setAttribute('aria-expanded', String(open));
   if (open) renderEvents();
@@ -4431,8 +4504,10 @@ function notifyUser(title, body, kind = 'info', onClick) {
   toast(title, body, kind, onClick);
   if (ntfOn() && document.hidden) try { const n = new Notification(title, {body, tag:title}); n.onclick = () => { window.focus(); onClick?.(); n.close(); }; } catch {}
 }
-$('#guardPill').onclick = e => { e.stopPropagation(); prefClose(); evClose(); $('#guard').classList.toggle('open'); };
-document.addEventListener('click', e => { if (!e.target.closest('#guard')) $('#guard').classList.remove('open'); });
+$('#guardPill').onclick = e => { e.stopPropagation(); evClose(); const open = $('#guard').classList.toggle('open'); $('#guardPill').setAttribute('aria-expanded', String(open)); };
+const closeGuard = () => { $('#guard').classList.remove('open'); $('#guardPill').setAttribute('aria-expanded', 'false'); };
+document.addEventListener('click', e => { if (!e.target.closest('#guard')) closeGuard(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeGuard(); });
 // main button of the status card: pause / resume / move to the server
 const setOn = v => { J.on = v; save('sr_journal', J); if (SB_MINE) SB_MINE.on = v; renderGuard(); renderBotPanel(); syncServerBot(v); };
 $('#bhero').onclick = e => {
@@ -4595,7 +4670,7 @@ function setTheme(t, e) {
   const vt = document.startViewTransition(() => applyTheme(t));
   vt.ready.catch(() => {}); vt.finished.catch(() => {});   // a quick second click skips the first circle: that's fine
 }
-// ---------- «Вид»: theme, glass strength, sound; on this device, like the theme (not in SYNC: a phone may want less glass) ----------
+// ---------- the profile's view section: theme, glass strength; on this device, like the theme (not in SYNC: a phone may want less glass) ----------
 const GLASS_T = ['Без стекла: сплошные панели и меньше нагрузки на устройство.', 'Стекло только в шапке и меню, данные и формы матовые.',
   'Лёгкий отблеск на панелях и кнопках.', 'Полное стекло на всех панелях и кнопках.', 'Самые сильные блики и прозрачность.'];
 const glassNow = () => { const g = document.documentElement.dataset.glass; return /^[0-4]$/.test(g) ? +g : 2; };
@@ -4605,15 +4680,6 @@ function syncPrefs() {
   document.querySelectorAll('[data-gl]').forEach(b => mark(b, +b.dataset.gl === glassNow()));
   $('#prefGlassT').textContent = GLASS_T[glassNow()];
 }
-const prefClose = () => { $('#prefp').classList.remove('open'); $('#prefs').setAttribute('aria-expanded', 'false'); };
-$('#prefs').onclick = e => {
-  e.stopPropagation(); evClose(); $('#guard').classList.remove('open');
-  const open = !$('#prefp').classList.contains('open');
-  $('#prefp').classList.toggle('open', open); $('#prefs').setAttribute('aria-expanded', String(open));
-};
-$('#prefp').onclick = e => e.stopPropagation();
-document.addEventListener('click', prefClose);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') prefClose(); });
 $('#prefTheme').onclick = e => { const b = e.target.closest('[data-th]'); if (b) setTheme(b.dataset.th, e); };
 $('#prefGlass').onclick = e => {
   const b = e.target.closest('[data-gl]'); if (!b) return;
@@ -4829,7 +4895,7 @@ const CMD_SETTINGS = [
   {label:'Уведомления браузера', kw:['уведомлен', 'notification', 'колокол', 'push'], run:() => focusEl('#ntf')},
   {label:'Звук сигнала', kw:['звук', 'sound', 'beep'], run:() => $('#snd').click()},
   {label:'Светлая или тёмная тема', kw:['тема', 'theme', 'светл', 'тёмн', 'темн', 'dark', 'light'], run:() => setTheme(themeNow() === 'light' ? 'dark' : 'light', {clientX:0, clientY:0})},
-  {label:'Вид: жидкое стекло, тема и звук', kw:['вид', 'стекло', 'жидкое', 'прозрачн', 'glass', 'настройк'], run:() => setTimeout(() => $('#prefs').click())},   // after this click has reached the document, or it would close the panel
+  {label:'Профиль: тема, стекло и уведомления', kw:['вид', 'стекло', 'жидкое', 'прозрачн', 'glass', 'настройк', 'уведомл'], run:() => openAuth()},
   {label:'Провести свой уровень на графике', kw:['уровень', 'level', 'линия', 'line', 'алерт', 'alert', 'оповещ'], run:() => { go('market'); if (isPhone()) openSheet(); setLevelMode(true); }},
   {label:'Второй таймфрейм рядом', kw:['второй', 'таймфрейм', 'два', '2 тф', 'mtf', 'старш'], run:() => { go('market'); if (isPhone()) openSheet(); if (!tf2On) setTf2(true); focusEl('#cv2'); }},
   {label:'Развернуть график на всю ширину', kw:['развернуть', 'шире', 'весь экран', 'fullscreen', 'wide', 'график'], run:() => { go('market'); setWide(true); focusEl('#cv'); }},
