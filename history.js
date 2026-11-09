@@ -63,20 +63,23 @@ export async function gunzip(buf) {
 
 // every pair that was in the daily top-n by quote volume on some day of [d0, d1), plus `add` (the majors) — the pool of
 // research/stage05.js pools(); qv: {SYM: Map(day open time → quote volume)}
-export function topEver(qv, d0, d1, n = 75, add = []) {
+// first: a Map filled with the first day each pair made the top (the site's backtest loads a coin from a while before it)
+export function topEver(qv, d0, d1, n = 75, add = [], first = null) {
   const syms = Object.keys(qv), inPool = new Set();
   for (let d = d0; d < d1; d += DAY) {
     const day = syms.map(s => [s, qv[s].get(d) || 0]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, n);
-    for (const [s] of day) inPool.add(s);
+    for (const [s] of day) { inPool.add(s); if (first && !first.has(s)) first.set(s, d); }
   }
   for (const s of add) inPool.add(s);
   return [...inPool];
 }
 
 // ---------- reading ----------
-// fetch: replaceable for a dry run against a store in memory (scripts/history-job.js memStore)
-const cfg = { base: BASE, cap: 300e6, par: 16, log: (...a) => console.warn(...a), fetch: (...a) => fetch(...a) };
+// fetch: replaceable for a dry run against a store in memory (scripts/history-job.js memStore); off: the stored history is not
+// used at all — everything the old way from Binance (the site's ?history=off, to compare a backtest both ways)
+const cfg = { base: BASE, cap: 300e6, par: 8, off: false, log: (...a) => console.warn(...a), fetch: (...a) => fetch(...a) };
 export function config(o) { Object.assign(cfg, o); idxAt = 0; capAt = 0; }
+export const isOff = () => cfg.off;
 
 // index.json: {v, from, updated, s: {SYM: {tf: [first month, last month, last open time, p of the last month, its bytes,
 // empty months?]}}, d: {m0, m1, last, rev}, dsyms: [...]}; kept 5 min in memory, a failure is remembered for a minute
@@ -95,23 +98,27 @@ export async function index() {
   })();
 }
 
-// at most cfg.par requests to R2 at a time
-let busy = 0; const waiting = [];
+// at most cfg.par requests to R2 at a time. r2.dev throttles a busy bucket with 429 (Cloudflare: from "hundreds of requests a
+// second"; in a browser it shows as a failed fetch — the 429 has no CORS header): after a failure every request waits a little,
+// longer while failures go on, so the throttle passes instead of each coin falling back to Binance whole
+let busy = 0, pauseUntil = 0, fails = 0; const waiting = [];
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function limited(fn) {
   if (busy >= cfg.par) await new Promise(r => waiting.push(r));
   busy++;
-  try { return await fn(); } finally { busy--; waiting.shift()?.(); }
+  try { const w = pauseUntil - Date.now(); if (w > 0) await sleep(w); return await fn(); } finally { busy--; waiting.shift()?.(); }
 }
 async function getFile(key, fresh) {
   let err;
-  for (let a = 0; a < 3; a++) {
+  for (let a = 0; a < 5; a++) {
     try {
       const r = await limited(() => cfg.fetch(`${cfg.base}/${key}`, { cache: fresh ? (a ? 'reload' : 'no-cache') : 'default', signal: AbortSignal.timeout(20000) }));
-      if (r.ok) return new Uint8Array(await r.arrayBuffer());
+      if (r.ok) { fails = 0; return new Uint8Array(await r.arrayBuffer()); }
       err = new Error(`history: HTTP ${r.status} ${key}`);
       if (r.status === 404) break;
     } catch (e) { err = e; }
-    await new Promise(r => setTimeout(r, 800 * (a + 1)));
+    fails++; pauseUntil = Math.max(pauseUntil, Date.now() + Math.min(8000, 500 * fails));
+    await sleep(1000 * 2 ** a);   // 1, 2, 4, 8 s
   }
   throw err;
 }
@@ -142,7 +149,7 @@ export async function candles(sym, tf, start, end, opt = {}) {
   const keep = rows => rows.filter(r => r[0] >= start && r[0] < end && r[0] + ms <= now);
   const old = async () => keep(await api(sym, tf, start, end));
   let plan = null;
-  try { if (ms && tf !== '1d') plan = await stored(sym, tf, start, end, opt); }
+  try { if (ms && tf !== '1d' && !cfg.off) plan = await stored(sym, tf, start, end, opt); }
   catch (e) { opt.stop?.(); cfg.log(`history: ${sym} ${tf} from Binance (${e.message || e})`); plan = null; }
   if (!plan) return old();
   const { head0, rows, top, p0 } = plan;
@@ -191,6 +198,7 @@ async function stored(sym, tf, start, end, opt) {
 // res.miss lists the asked ones the daily set has never had (load those from Binance)
 export async function daily(syms, from, to) {
   try {
+    if (cfg.off) return null;
     const I = await index(), d = I?.d;
     if (!d || !Array.isArray(I.dsyms) || from < monthStart(d.m0) || to > d.last + DAY) return null;
     const months = monthsBetween(monthOf(from), monthOf(to - 1));

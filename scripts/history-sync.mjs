@@ -45,7 +45,7 @@ const store = {
 const tfs = (process.env.TFS || DEFAULT_TFS.join(',')).split(',').map(s => s.trim()).filter(Boolean);
 const minutes = +process.env.MINUTES || 320;
 const st = await sync({ store, tfs, deadline: Date.now() + minutes * 6e4 });
-const line = `host ${st.host || 'none'} · pairs ${st.pairs} · pool ${st.pool} · series +${st.series.added} ~${st.series.updated} =${st.series.unchanged} left ${st.series.left} failed ${st.series.failed} · ${st.files} files, ${(st.bytes / 1e6).toFixed(1)} MB written · stored ${Object.entries(st.storage).map(([t, b]) => `${t} ${(b / 1e9).toFixed(2)} GB`).join(', ')} · ${st.requests} requests, ${st.pauses} pauses`;
+const line = `host ${st.host || 'none'} · pairs ${st.pairs} · pool ${st.pool} · series +${st.series.added} ~${st.series.updated} =${st.series.unchanged} left ${st.series.left} failed ${st.series.failed} · ${st.files} files, ${(st.bytes / 1e6).toFixed(1)} MB written · stored ${Object.entries(st.storage).map(([t, b]) => `${t} ${(b / 1e9).toFixed(2)} GB`).join(', ')} · check ${st.check?.same ?? 0}/${st.check?.files ?? 0} months equal to Binance · ${st.requests} requests, ${st.pauses} pauses`;
 console.log(`::notice title=Candle history::${line}`);
 for (const h of st.hosts) console.log(`::notice title=Binance host::${h}`);
 for (const e of st.errors.slice(0, 10)) console.log(`::warning title=History::${e}`);

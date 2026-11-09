@@ -20,7 +20,7 @@ export function memStore(map) {
   return { async get(k) { return map.has(k) ? map.get(k).body : null; }, async put(k, body, meta) { map.set(k, { body, ...meta }); } };
 }
 
-export async function sync({ store, tfs = DEFAULT_TFS, now = Date.now(), log = console.log, deadline = Infinity, only = null, rate = 15, par = 8 }) {
+export async function sync({ store, tfs = DEFAULT_TFS, now = Date.now(), log = console.log, deadline = Infinity, only = null, rate = 15, par = 8, checks = 30 }) {
   const st = { started: new Date(now).toISOString(), finished: null, done: false, host: null, hosts: [], tfs, pairs: 0, pool: 0,
     daily: { written: 0, failed: [] }, series: { added: 0, updated: 0, unchanged: 0, nodata: 0, failed: 0, left: 0 },
     files: 0, bytes: 0, requests: 0, pauses: 0, storage: {}, errors: [] };
@@ -187,6 +187,26 @@ export async function sync({ store, tfs = DEFAULT_TFS, now = Date.now(), log = c
   });
   await saving;
   try { await saveIndex(); } catch (e) { err('index', e); }
+
+  // ---- the spot check: random stored past months downloaded again from Binance must be the same candle for candle.
+  // A difference is an error: the run fails and GitHub mails the owner (readers would still be right where joins break,
+  // but not where a whole month is wrong in a consistent way)
+  st.check = { files: 0, same: 0 };
+  const stored = Object.entries(idx.s).flatMap(([s, o]) => Object.entries(o).filter(([tf]) => tfs.includes(tf)).map(([tf, e]) => [s, tf, e]));
+  for (let k = 0; k < checks && stored.length && Date.now() < deadline; k++) {
+    const [sym, tf, [m0, m1, , , , empty]] = stored[Math.floor(Math.random() * stored.length)];
+    const months = H.monthsBetween(m0, m1).filter(m => m < m1 && !empty?.includes(m));
+    if (!months.length) continue;
+    const m = months[Math.floor(Math.random() * months.length)];
+    try {
+      const raw = await store.get(H.fileKey(tf, sym, m));
+      const mine = raw ? H.unpackMonth(JSON.parse(await H.gunzip(raw)), sym, tf, m).rows : null;
+      const theirs = await klines(sym, tf, H.monthStart(m), H.monthStart(H.nextMonth(m)));
+      st.check.files++;
+      if (JSON.stringify(mine) === JSON.stringify(theirs)) st.check.same++;
+      else err(`check ${sym} ${tf} ${m}`, `stored ${mine?.length ?? 'none'} candles, Binance ${theirs.length}, not the same`);
+    } catch (e) { err(`check ${sym} ${tf} ${m}`, e); }
+  }
   st.storage = { ...idx.bytes };
   st.done = !st.series.left && !st.series.failed && !st.errors.length;
   return finish();

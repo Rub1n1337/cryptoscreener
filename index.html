@@ -1387,7 +1387,9 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму рынка</option>
       </select></label>
       <label title="Таймфрейм свечей: на 4ч торгуют общий бот и профиль «Переключатель · 4h»">Таймфрейм <select id="btTf"><option value="15m">15м</option><option value="1h">1ч</option><option value="4h">4ч</option></select></label>
-      <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option></select></label>
+      <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option><option value="custom">Свои даты…</option></select></label>
+      <label id="btFromL" class="hidden" title="Первый день периода, по UTC">С <input type="date" id="btFrom" min="2020-01-01"></label>
+      <label id="btToL" class="hidden" title="Последний день периода включительно, по UTC">По <input type="date" id="btTo" min="2020-01-01"></label>
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
       <label id="btPitL" title="Живой бот каждую минуту берёт топ по обороту за последние сутки. «На каждый момент» делает в прошлом так же: монета торгуется, только пока она в топе. «По сегодняшнему» берёт сегодняшний топ на весь период — быстрее, но завышает результат: сегодняшний топ знает, какие монеты потом выросли">Топ считать <select id="btPit"><option value="pit">на каждый момент — честно</option><option value="now">по сегодняшнему — быстрее, завышает</option></select></label>
       <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
@@ -1439,7 +1441,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <th>Закрыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Выход</th><th class="hm">Размер</th><th>Причина выхода</th><th class="hm">Длит.</th><th class="hm">PnL до ком.</th><th class="hm">Комиссия</th><th>PnL</th><th>R</th><th class="hm">Сила</th>
         </tr></thead><tbody id="btTrades"></tbody></table></div>
       </div>
-      <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: в режиме «на каждый момент» учтены и монеты, которые за период сняли с Binance; в режиме «по сегодняшнему» их нет, а сегодняшний топ берётся на весь период — это завышает результат. Исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Комиссия 0.075% за сторону, проскальзывание 0.05%, заём под шорт и плечо — 0.03% в сутки (оценка: реальная ставка бывает выше, особенно по альткоинам). Прошлое не гарантирует будущего.</div>
+      <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: в режиме «на каждый момент» учтены все монеты, которые в какой-то день периода были в топе по обороту, — и те, что потом выпали из топа или были сняты с Binance; в режиме «по сегодняшнему» их нет, а сегодняшний топ берётся на весь период — это завышает результат. Даты — по UTC. Исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Комиссия 0.075% за сторону, проскальзывание 0.05%, заём под шорт и плечо — 0.03% в сутки (оценка: реальная ставка бывает выше, особенно по альткоинам). Прошлое не гарантирует будущего.</div>
     </div>
   </section>
 
@@ -1691,6 +1693,9 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 <script type="module">
 import * as M from './supabase/functions/_shared/math.js';
 import * as HS from './history.js';
+// ?history=off: the backtest ignores the stored history and loads everything from Binance, as before 2.78 — to run the same
+// settings both ways and compare
+if (new URLSearchParams(location.search).get('history') === 'off') HS.config({off:true});
 const { TFMS, clamp, median, bands, rsi, halfLife, parse } = M;
 
 // ---------- utils ----------
@@ -3833,36 +3838,36 @@ function trimHistory(keep) {
 // custom coin list: "btc, eth sol" → ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
 const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/[^A-Z0-9]/g, '')).filter(Boolean)
   .map(x => x.endsWith('USDT') ? x : x + 'USDT'))].slice(0, 300);
-// the honest top needs a wide pool: over a year ~200 different coins pass through the top-20 by 24 h turnover (listings, short
-// spikes). A pool of today's top-50 left most of them out, so the result was too high and changed with the day it was run
-// (Oct 2026, profile 1h/top-20: pool 50 → +0.55R…+0.75R depending on the day, 150 → +0.27R, 200–300 → +0.24R, stable)
-const poolOf = n => Math.min(400, Math.max(150, n * 2));
-// coins delisted from Binance during the test period: without them "the top at each moment" is built from survivors only.
-// In Oct 2026 about 40 USDT pairs delisted within a year had days of $10M+ turnover (TON up to $295M, OM $28M).
-// Pairs that no longer trade (stale ticker) get one daily-candle request each; their daily turnover is cached for the day, from
-// the earliest start asked for, and a shorter period counts only its own days. Before 2.45 a year's cache served a 60-day run
-// as it was: coins delisted long before its window joined the pool (19 «сняты» instead of 2) — they never traded in it, but
-// they inflated the count and the pool, and their history was downloaded for nothing.
-// A delisted coin joins the pool when its best day in the period beats today's 24 h turnover of the weakest coin already in it.
-async function delistedFor(tk, from, minQV, say) {
-  const now = Date.now(), day = Math.floor(now / 864e5);
-  let c = load('sr_delisted', null);
-  if (!c || c.day !== day || c.from > from || !c.d) {
-    let gone = tk.filter(x => x.symbol.endsWith('USDT') && !M.STABLE.has(x.symbol.slice(0, -4)) && !(x.closeTime > now - 864e5)).map(x => x.symbol);
-    const d = {}; let n = 0;
-    // the stored daily candles (history.js) answer for all of them at once when they reach yesterday; these pairs don't trade,
-    // so today has nothing to add. Pairs the stored set doesn't know, one request each as before
-    const D = await HS.daily(gone, from, day * 864e5);
-    if (D) { for (const [s, K] of Object.entries(D.rows)) d[s] = [K[0][0], K.map(k => Math.round(k[6]))]; gone = D.miss; }
-    await pool(gone, 6, async s => {
-      try { const K = await api(`/api/v3/klines?symbol=${s}&interval=1d&startTime=${from}&limit=1000`); if (K.length) d[s] = [K[0][0], K.map(k => Math.round(+k[7]))]; } catch {}
-      say(`Ищу монеты, снятые с биржи за период: ${++n}/${gone.length}…`);
-    });
-    c = {day, from, d}; save('sr_delisted', c);
-  }
-  // [first day's open time, turnover of each day]: the days of this period are those opening at `from` or later
-  return Object.entries(c.d).filter(([, [t0, q]]) => { const i = Math.max(0, Math.ceil((from - t0) / 864e5)); return q.length > i && Math.max(...q.slice(i)) >= minQV; }).map(([s]) => s);
+// The honest top («на каждый момент») trades, at each moment, only that moment's top-N by 24 h turnover, out of a pool loaded
+// in advance — so the pool must hold every coin that was in that top at some moment of the period. Until 2.79 it was today's
+// top-150…400 plus the coins delisted since: on the year to 09.11.2026 (top-20, 1h) it left out 165 of the 319 coins that were
+// in the top-20 at some moment — still trading, but no longer in today's top-150 (ALLO, RE, OPN, BANK…; 12% of all top-20
+// coin-hours), and a past period (a year of one's own) can't take today's top at all. Now: every pair that was in the daily
+// top-K by turnover on some day of the period (or the day before: a 24 h window reaches into it), delisted ones included, plus
+// today's live top-K for a period that ends now (today isn't in the daily candles yet). Checked on 2025: every coin of the
+// hourly top-20 (299) was in the daily top-40 on some day (top-30 missed one); top-50: 429 coins, all in the daily top-75.
+// Daily turnover from the stored daily candles (history.js); from Binance when they don't cover the period (one request a
+// pair). first: the day each coin first made that top — it is loaded from 450 bars before it (the warm-up every coin gets at
+// the period's start), which keeps a year of 1h on top-20 (404 coins) under the memory limit; last: its last day with candles
+const periodK = top => Math.max(top + 20, Math.round(top * 1.5));
+async function periodPool(tk, from, endT, top, say) {
+  const syms = tk.filter(x => x.symbol.endsWith('USDT') && !M.STABLE.has(x.symbol.slice(0, -4))).map(x => x.symbol);
+  const d0 = Math.floor(from / 864e5) * 864e5 - 864e5, today = Math.floor(Date.now() / 864e5) * 864e5;
+  let d1 = Math.min(Math.ceil(endT / 864e5) * 864e5, today);
+  // the stored daily candles may be a night behind: a day or two at the very end doesn't change who the pool is
+  const last = (await HS.index())?.d?.last;
+  if (last != null && d1 > last + 864e5 && d1 - last - 864e5 <= 2 * 864e5) d1 = last + 864e5;
+  const qv = {}, D = await HS.daily(syms, d0, d1);
+  let miss = syms, n = 0;
+  if (D) { Object.assign(qv, D.rows); miss = D.miss; }
+  await pool(miss, 6, async s => { try { const K = await binanceHistory(s, '1d', d0, d1); if (K.length) qv[s] = K; } catch {} say(`Собираю топ периода: ${++n}/${miss.length} пар…`); });
+  const K = periodK(top), first = new Map();
+  const list = HS.topEver(Object.fromEntries(Object.entries(qv).map(([s, R]) => [s, new Map(R.map(k => [k[0], k[6]]))])), d0, d1, K, [], first);
+  if (endT > today) for (const s of M.pickSymbols(tk, K, [], Date.now())) if (!first.has(s)) { list.push(s); first.set(s, today); }
+  return {list, first, last:Object.fromEntries(list.map(s => [s, qv[s] ? qv[s][qv[s].length - 1][0] : today]))};
 }
+// the daily turnover of delisted pairs that the pool of 2.45–2.78 kept for the day (up to ~0.5 MB): nothing reads it now
+try { localStorage.removeItem('sr_delisted'); } catch {}
 const coinsLabel = r =>r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} монет)` : `${r.pairs} монет`;
 function btSettings() {
   const custom = $('#btTop').value === 'custom' ? parseCoins($('#btCustom').value) : null;
@@ -3885,22 +3890,40 @@ function btFill(s) {
   $('#btComp').checked = !s.fixedRisk;   // the starting balance stays as the user set it
   btEstimate();
 }
+// the period: the last N days up to the current hour, or one's own dates (UTC, both days included) — a past year, say.
+// key: what the result on screen was run for (dates as typed: a period ending today keeps its key through the hours)
+const fmtDay = t => new Date(t).toLocaleDateString('ru', {timeZone:'UTC', day:'2-digit', month:'2-digit', year:'numeric'});
+function btPeriod(now = Date.now()) {
+  const hour = Math.floor(now / 36e5) * 36e5;   // whole hours → reruns hit the cache
+  if ($('#btDays').value !== 'custom') { const days = +$('#btDays').value; return {from:hour - days * 864e5, endT:hour, days, key:String(days), label:`${days} дней`}; }
+  const a = Date.parse($('#btFrom').value + 'T00:00:00Z'), b = Date.parse($('#btTo').value + 'T00:00:00Z');
+  if (!isFinite(a) || !isFinite(b)) return {err:'Выберите первый и последний день периода.'};
+  if (a < Date.UTC(2020, 0, 1)) return {err:'Период может начинаться не раньше 1 января 2020 года.'};
+  const endT = Math.min(b + 864e5, hour);
+  if (endT - a < 864e5) return {err:'Последний день периода должен быть не раньше первого и не позже сегодняшнего.'};
+  return {from:a, endT, days:(endT - a) / 864e5, key:$('#btFrom').value + '|' + $('#btTo').value, label:`${fmtDay(a)} – ${fmtDay(endT - 1)}`, custom:true};
+}
 function btEstimate() {
   if (btBusy) return;
   $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom'); $('#btPitL').classList.toggle('hidden', $('#btTop').value === 'custom');
-  const s = btSettings(), days = +$('#btDays').value, bars = days * 864e5 / TFMS[s.tf] + 450;
+  for (const id of ['#btFromL', '#btToL']) $(id).classList.toggle('hidden', $('#btDays').value !== 'custom');
+  const s = btSettings(), per = btPeriod(), days = per.days || 0, bars = days * 864e5 / TFMS[s.tf] + 450;
   // a result left on screen after the form changed belongs to the old settings: it fades and says so,
   // otherwise a screenshot shows one set of settings next to the numbers of another
-  const stale = !!btRes && (JSON.stringify(s) !== JSON.stringify(btRes.settings) || days !== btRes.days);
+  const stale = !!btRes && (JSON.stringify(s) !== JSON.stringify(btRes.settings) || per.key !== btRes.period);
   $('#btOut').classList.toggle('stale', stale);
   if (stale) { $('#btStatus').innerHTML = '<b style="color:var(--acc-t)">Настройки изменены — результат ниже ещё для прежних.</b> Нажмите «Запустить», чтобы пересчитать.'; return; }
   if (btRes) { $('#btStatus').textContent = btRes.status || ''; return; }   // back to the settings of the result on screen
   if (s.custom && !s.custom.length) { $('#btStatus').textContent = 'Впишите монеты через запятую, например: BTC, ETH, SOL.'; return; }
+  if (per.err) { $('#btStatus').textContent = per.err; return; }
   // with stored history (history.js) a coin is one file a month from R2 (r2.dev gives ~35 files a second) and one request for
   // the newest candles; without it ~1000 candles a request at the throttle's pace. Measured 09.11: 1h, a year, 209 coins —
-  // 83 s with stored history, 185 s without. The index is asked once; the estimate redraws when it comes
+  // 83 s with stored history, 185 s without. The index is asked once; the estimate redraws when it comes. The honest pool is
+  // every coin of the period's daily top-K (periodPool); measured on a year: top-20 (K 40) 383–404 coins, top-50 (K 75)
+  // 447–468, top-100 (K 150) 513; two weeks of top-50 — 129
   if (histIdx === undefined) { histIdx = null; HS.index().then(i => { histIdx = i; if (i) btEstimate(); }); }
-  const coins = s.pit ? poolOf(s.top) : s.top, stored = !!histIdx?.s?.BTCUSDT?.[s.tf];
+  const K = periodK(s.top), coins = !s.pit ? s.top : Math.round(Math.min(K * 9, K + 400) * Math.min(1, 0.3 + 0.7 * days / 365));
+  const stored = !!histIdx?.s?.BTCUSDT?.[s.tf] && per.from - 450 * TFMS[s.tf] >= HS.monthStart(histIdx.from);
   const sec = Math.max(5, Math.round((stored ? coins * ((days / 30 + 1) * 0.03 + 0.03) : Math.ceil(bars / 1000) * coins * 0.09) / 5) * 5);
   $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${coins} монет. Повторные — мгновенно.`
     + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '');
@@ -3915,38 +3938,46 @@ async function runBacktest() {
   if (btBusy) { if (btCtl) { btCtl.stop = true; $('#btRun').disabled = true; $('#btStatus').textContent = 'Останавливаю…'; } return; }
   const ctl = btCtl = {stop:false}, stop = () => { if (ctl.stop) throw STOPPED; };
   btBusy = true; btButton(true); $('#btStatus').classList.add('busy');   // a turning mark while it loads and counts
-  const s = btSettings(), days = +$('#btDays').value, tfms = TFMS[s.tf];
+  const s = btSettings(), per = btPeriod(), days = per.days, tfms = TFMS[s.tf];
   const st = $('#btStatus');
   try {
     st.textContent = 'Беру список пар…';
-    const now = Date.now(), endT = Math.floor(now / 36e5) * 36e5;   // whole hours → reruns hit the cache
-    const from = endT - days * 864e5, startT = from - 450 * tfms;      // 450 bars of warm-up covers N ≤ 300
+    if (per.err) throw new Error(per.err);
+    const now = Date.now(), {from, endT} = per, startT = from - 450 * tfms;   // 450 bars of warm-up covers N ≤ 300
     if (s.custom && !s.custom.length) throw new Error('список монет пуст');
     // honest top: a wider pool is loaded and the backtest trades, at each moment, only that moment's top by 24 h turnover
     const tk = s.custom ? null : await api('/api/v3/ticker/24hr');
-    // the pool is fixed for the day: picked by live 24 h turnover it changed from run to run at its edge, and so did the result
-    // with the same settings (Oct 2026: 106k, then 142k a minute later)
-    const day = Math.floor(now / 864e5), want = s.pit ? poolOf(s.top) : s.top, pk = load('sr_pool', null);
-    const live = s.custom ? null : pk?.day === day && pk.n === want && Array.isArray(pk.list) ? pk.list : M.pickSymbols(tk, want, [], now);
-    if (live && !(pk?.day === day && pk.n === want)) save('sr_pool', {day, n:want, list:live});
-    let traded = s.custom || live, gone = [];
-    if (s.pit) {   // plus the coins delisted meanwhile (see delistedFor)
-      const weakest = +(tk.find(x => x.symbol === traded[traded.length - 1])?.quoteVolume || 0);
-      gone = (await delistedFor(tk, from, weakest, t => { stop(); st.textContent = t; })).filter(x => !traded.includes(x));
-      traded = [...traded, ...gone];
+    let traded, gone = [], first = null, lastDay = null;
+    if (s.pit) {   // the coins that made the period's daily top (periodPool), delisted ones among them
+      ({list:traded, first, last:lastDay} = await periodPool(tk, from, endT, s.top, t => { stop(); st.textContent = t; }));
+      const quiet = new Set(tk.filter(x => !(x.closeTime > now - 864e5)).map(x => x.symbol));
+      gone = traded.filter(x => quiet.has(x));
+    } else {
+      // today's top for the whole period, fixed for the day: picked by live 24 h turnover it changed from run to run at its edge,
+      // and so did the result with the same settings (Oct 2026: 106k, then 142k a minute later)
+      const day = Math.floor(now / 864e5), pk = load('sr_pool', null);
+      const live = s.custom ? null : pk?.day === day && pk.n === s.top && Array.isArray(pk.list) ? pk.list : M.pickSymbols(tk, s.top, [], now);
+      if (live && !(pk?.day === day && pk.n === s.top)) save('sr_pool', {day, n:s.top, list:live});
+      traded = s.custom || live;
     }
     const syms = [...new Set([...traded, ...M.MAJORS])];   // BTC/ETH/SOL are always loaded: they define the market regime
+    // each coin from 450 bars before the day it first made the period's top (periodPool), the majors from the start. Checked on
+    // 2025, 4h, top-20: the trades are the same as with every coin from the start for the log, classic and robust channels (837
+    // of 837); EWMA weighs all history, so it moved 10 of 262 — an EWMA channel loads every coin from the start, as before
+    const trim = s.method !== 'ewma';
+    const startOf = x => trim && first?.has(x) && !M.MAJORS.includes(x) ? Math.max(startT, first.get(x) - 864e5 - 450 * tfms) : startT;
     // a run is held in memory whole: 15m × a year × a wide pool is ~14M candles, more than a phone (and many laptops) can hold,
-    // and the tab used to crash with nothing said. ~3M candles (~600 MB with the computed series) is where it stops
-    const bars = syms.length * Math.ceil((endT - startT) / tfms);
-    if (bars > 3e6) throw new Error(`слишком большой прогон: ${syms.length} монет × ${Math.round((endT - startT) / tfms)} свечей ≈ ${(bars / 1e6).toFixed(1)} млн свечей, вкладке не хватит памяти. Возьмите период короче, таймфрейм крупнее или меньше монет`);
-    trimHistory(key => key.endsWith(`|${s.tf}|${startT}|${endT}`) && syms.includes(key.split('|')[0]));
+    // and the tab used to crash with nothing said. ~3M candles (~600 MB with the computed series) is where it stops. The pool
+    // knows each coin's own span (from startOf to its last day with candles), so the count is close to the real one
+    const bars = syms.reduce((a, x) => a + Math.max(0, Math.ceil((Math.min(endT, lastDay?.[x] != null ? lastDay[x] + 864e5 : endT) - startOf(x)) / tfms)), 0);
+    if (bars > 3e6) throw new Error(`слишком большой прогон: ${syms.length} монет, около ${(bars / 1e6).toFixed(1)} млн свечей — вкладке не хватит памяти. Возьмите период короче, таймфрейм крупнее или меньше монет`);
+    trimHistory(key => { const [x, tf, a, b] = key.split('|'); return tf === s.tf && +b === endT && syms.includes(x) && +a === startOf(x); });
     // 8 coins at a time: with stored history a coin is a few files from R2 and one request to Binance (≤ ~800 weight a run
     // in all); full downloads from Binance keep their pace through throttled()
     const hist = {}; let done = 0;
     await pool(syms, 8, async sym => {
       stop();
-      try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT, stop)).filter(k => k[6] < now); } catch {}
+      try { hist[sym] = (await fetchHistory(sym, s.tf, startOf(sym), endT, stop)).filter(k => k[6] < now); } catch {}
       if (!ctl.stop) st.textContent = `Загружаю историю: ${++done}/${syms.length} пар…`;
     });
     stop();
@@ -3955,21 +3986,22 @@ async function runBacktest() {
     let failed = syms.filter(x => !hist[x]);
     for (let round = 1; round <= 2 && failed.length; round++) {
       st.textContent = `Догружаю ${failed.length} пар (попытка ${round + 1})…`; await sleep(1500 * round);
-      for (const sym of failed) { stop(); try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT, stop)).filter(k => k[6] < now); } catch {} }
+      for (const sym of failed) { stop(); try { hist[sym] = (await fetchHistory(sym, s.tf, startOf(sym), endT, stop)).filter(k => k[6] < now); } catch {} }
       stop();
       failed = failed.filter(x => !hist[x]);
     }
     st.textContent = 'Считаю…'; $('#btRun').disabled = true; await sleep(30);   // the calculation can't be stopped: no «Прервать» during it
     const t0 = performance.now();
-    btHist = {hist, from};
+    btHist = {hist, from, endT, only:traded, top:s.pit ? s.top : 0};   // window.__sr.btHist: to check a run by hand
     btRes = M.backtest(hist, s, {start:s.start, from, only:traded, top:s.pit ? s.top : 0});
-    btRes.settings = s; btRes.days = days;
+    btRes.settings = s; btRes.days = days; btRes.period = per.key; btRes.periodLabel = per.label;
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
     const goneN = gone.filter(x => hist[x]?.length).length;
-    st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${dt(btRes.from)} → ${dt(btRes.to + tfms)}, расчёт ${Math.round(performance.now() - t0)} мс.`
+    st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${per.custom ? per.label + ' (UTC)' : `${dt(btRes.from)} → ${dt(btRes.to + tfms)}`}, расчёт ${Math.round(performance.now() - t0)} мс.`
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · старт $${money(s.start)} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ` от старта ($${money(s.start * s.risk)} со сделки)` : ' от баланса (сложный процент)'} · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '')
-      + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} монет (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '');
+      + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} монет (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '')
+      + (HS.isOff() ? ' История загружена только с Binance (?history=off).' : '');
     btRes.status = st.textContent; renderBacktest();
     if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
@@ -4017,7 +4049,7 @@ function renderBacktest() {
   $('#btCards').innerHTML =
     `<div class="hero">
        <div class="htop">
-         <div><div class="t">Итоговый баланс · ${r.days} дней · ${coinsLabel(r)}</div>
+         <div><div class="t">Итоговый баланс · ${r.periodLabel || r.days + ' дней'} · ${coinsLabel(r)}</div>
            <div class="hv">$${money(r.balance)}</div>
            <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">после комиссий</span></div></div>
          <div class="hside">
@@ -4084,6 +4116,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.79', date:'9 ноября 2026', title:'Свой период и честный топ', items:[
+    'Добавлен период бэктеста «Свои даты»: любые даты с 2020 года, например прошлый год.',
+    'Честный топ «на каждый момент» стал точнее: в нём учтены монеты, которые были в топе тогда, а потом из него выпали.',
+    'Итоги бэктеста в режиме «на каждый момент» могут отличаться от прежних.',
+    'История свечей загружается надёжнее при высокой нагрузке.',
+  ]},
   {v:'2.78', date:'9 ноября 2026', title:'Быстрая история бэктеста', items:[
     'Первый запуск бэктеста стал заметно быстрее.',
     'Повторные запуски стали быстрыми и после перезагрузки страницы.',
@@ -4150,11 +4188,6 @@ const CHANGELOG = [
     'На телефоне полоса браузера окрашена в цвет темы, цены на iPhone не превращаются в ссылки для звонка.',
     'Числовые поля открывают цифровую клавиатуру, тикеры сразу набираются заглавными.',
     'Поле «Старт, $» в бэктесте стало «Депозит, $».',
-  ]},
-  {v:'2.67', date:'2 ноября 2026', title:'Надёжность входа', items:[
-    'Исправлен выход из профиля, который мог случиться, когда сайт открыт в нескольких вкладках.',
-    'Недавние монеты, число графиков и скрытые панели «Беты» у каждого устройства свои.',
-    'При выборе «Оставить эти» устройство получает из профиля то, чего у него не было, например серверный бот.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4869,7 +4902,16 @@ $('#btEmpty').onclick = e => {
   runBacktest();
 };
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp', '#btFrom', '#btTo'].forEach(s => $(s).onchange = btEstimate);
+// «Свои даты…» start on the previous calendar year (UTC); the dates can't run past today
+$('#btDays').addEventListener('change', () => {
+  if ($('#btDays').value !== 'custom') return;
+  const y = new Date().getUTCFullYear() - 1, today = new Date().toISOString().slice(0, 10);
+  $('#btFrom').max = $('#btTo').max = today;
+  if (!$('#btFrom').value) $('#btFrom').value = `${y}-01-01`;
+  if (!$('#btTo').value) $('#btTo').value = `${y}-12-31`;
+  btEstimate();
+});
 $('#btStart').addEventListener('change', () => { $('#btStart').value = btSettings().start; });   // shows the amount the test will use: 50 → 100
 $('#btTf').addEventListener('change', () => hlOpts('#btHL', $('#btTf').value));
 $('#pfTf').addEventListener('change', () => hlOpts('#pfHL', $('#pfTf').value));
@@ -4931,7 +4973,7 @@ const CMD_SETTINGS = [
   {label:'Новый профиль', kw:['новый', 'создать', 'new', 'профиль', 'profile'], run:() => { openMine(); openForm(null); focusEl('#pfName'); }},
   {label:'Добавить профиль по ссылке', kw:['импорт', 'import', 'ссылк', 'добавить', 'поделить', 'share'], run:() => { openMine(); importByLink(); }},
   {label:'Настройки канала: модель, N, k', kw:['модель', 'канал', 'боллинджер', 'bollinger', 'сигма', 'sigma', 'ширина'], run:() => { go('market'); $('#cset').click(); focusEl('#method'); }},
-  {label:'Бэктест за год', kw:['бэктест', 'backtest', 'история', 'год', '365'], run:() => { go('backtest'); $('#btDays').value = '365'; focusEl('#btRun'); }},
+  {label:'Бэктест за год', kw:['бэктест', 'backtest', 'история', 'год', '365'], run:() => { go('backtest'); $('#btDays').value = '365'; btEstimate(); focusEl('#btRun'); }},
   {label:'Уведомления браузера', kw:['уведомлен', 'notification', 'колокол', 'push'], run:() => focusEl('#ntf')},
   {label:'Звук сигнала', kw:['звук', 'sound', 'beep'], run:() => $('#snd').click()},
   {label:'Светлая или тёмная тема', kw:['тема', 'theme', 'светл', 'тёмн', 'темн', 'dark', 'light'], run:() => setTheme(themeNow() === 'light' ? 'dark' : 'light', {clientX:0, clientY:0})},

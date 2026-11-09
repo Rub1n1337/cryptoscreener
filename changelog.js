@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.66 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.67 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.67', date:'2 ноября 2026', title:'Надёжность входа', items:[
+    'Исправлен выход из профиля, который мог случиться, когда сайт открыт в нескольких вкладках.',
+    'Недавние монеты, число графиков и скрытые панели «Беты» у каждого устройства свои.',
+    'При выборе «Оставить эти» устройство получает из профиля то, чего у него не было, например серверный бот.',
+  ]},
   {v:'2.66', date:'2 ноября 2026', title:'Вход обязателен', items:[
     'Сайт открывается после входа через Telegram; без входа доступны описание сервиса и «Правовая информация».',
     'Ссылки на монеты из Telegram после входа открывают нужный график.',
