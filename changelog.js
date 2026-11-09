@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.73 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.74 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.74', date:'2 ноября 2026', title:'Без дублей в Telegram', items:[
+    'Исправлены повторные сообщения в Telegram от нескольких ботов одного человека: в чат пишет только последний подключённый.',
+    'Прежний бот, оставленный после перехода на бот из профиля, больше не пишет в Telegram.',
+    'Исправлены лишние перезагрузки и уведомления «Настройки изменены на другом устройстве».',
+  ]},
   {v:'2.73', date:'2 ноября 2026', title:'Единое стекло', items:[
     'Все карточки, раскрывающиеся блоки, предупреждения и форма бэктеста выглядят одинаковым стеклом.',
     'Обычные кнопки стали стеклянными, как кнопки шапки, а поля ввода и списки получили мягкую глубину.',

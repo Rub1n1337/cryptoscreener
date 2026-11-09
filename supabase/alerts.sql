@@ -3,6 +3,8 @@
 --   sig: the bot's own signals — {on, top: 0 (the bot's coins) | 50..250 (wider, for trading by hand),
 --        when: 'confirmed' (a confirmed reversal, as the bot enters) | 'touch' (at the touch, then updated), sides: 'both' | 'long'}
 --   mkt: a separate filter with its own channel settings, saved explicitly — {on, tf, top, minScore, method, N, k} or null
+-- Since 2.86 saved in parts and merged by the database: ub_alerts below is replaced by supabase/2026-11-alerts-parts.sql;
+-- the values are read by supabase/functions/_shared/alerts.js.
 alter table public.user_bots add column if not exists alerts jsonb;
 
 -- once: the old switches and the "Рынок" settings the site used to send with every sync become explicit settings

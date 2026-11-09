@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Проверка alerts.js</title>
+<style>
+  :root{color-scheme:dark;--bg:#0a0d14;--text:#e6e9ef;--mute:#8b95a5;--ok:#22c55e;--bad:#f0525f}
+  body{margin:0;padding:20px;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,sans-serif}
+  h1{font-size:18px;margin:0 0 4px}p{color:var(--mute);margin:0 0 16px}
+  #sum{font-weight:700;margin:0 0 12px}.ok{color:var(--ok)}.bad{color:var(--bad)}
+  li{margin:2px 0;overflow-wrap:anywhere}code{color:var(--mute)}
+</style>
+</head>
+<body>
+<h1>Проверка alerts.js</h1>
+<p>Настройки уведомлений (<code>user_bots.alerts</code>): новое чтение против трёх прежних копий — сайта, меню Telegram и бота (2.85), на правильных значениях и на мусоре.</p>
+<div id="sum">Считаю…</div>
+<ol id="out"></ol>
+<script type="module">
+// supabase/functions/_shared/alerts.js replaced three copies of the same reading (2.86). Their text as of 2.85 is kept below as the
+// reference. What must hold:
+//   - the bot acts exactly as before on every value, junk included (alertsOf);
+//   - the site and the menu show exactly what they showed on every value the site and the menu write;
+//   - on junk, where the three copies used to disagree, the site and the menu now show what the bot does.
+// Run it in the preview after every change to alerts.js; window.__TEST holds the counts for scripted runs.
+import { TOPS, alertsView, alertsOf } from '../supabase/functions/_shared/alerts.js';
+const out = document.getElementById('out'), res = {pass:0, fail:0, failed:[]};
+const check = (name, ok, info = '') => {
+  ok ? res.pass++ : (res.fail++, res.failed.push(name));
+  const li = document.createElement('li'); li.className = ok ? 'ok' : 'bad';
+  li.textContent = `${ok ? 'PASS' : 'FAIL'} — ${name}${info ? ' · ' + info : ''}`; out.append(li);
+};
+const sorted = x => Array.isArray(x) ? x.map(sorted) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().map(k => [k, sorted(x[k])])) : x;
+const same = (a, b) => JSON.stringify(sorted(a)) === JSON.stringify(sorted(b));
+const show = x => JSON.stringify(x) ?? String(x);
+
+// ---------- the three copies as of 2.85 ----------
+// index.html (read SB_MINE.alerts; here the value is the argument)
+const OLD_SITE_TOPS = [0, 50, 100, 150, 250];
+const oldSite = (A) => { const a = A || {}, s = a.sig || {}, q = a.quiet || {};
+  return {sig:{on:s.on !== false, top:OLD_SITE_TOPS.includes(+s.top) ? +s.top : 0, when:s.when === 'touch' ? 'touch' : 'confirmed', sides:s.sides === 'long' ? 'long' : 'both'}, mkt:a.mkt || null,
+    quiet:{on:!!q.on, from:Number.isInteger(q.from) ? q.from : 23, to:Number.isInteger(q.to) ? q.to : 8}}; };
+// functions/_shared/tg.ts (types removed)
+const OLD_TG_TOPS = [0, 50, 100, 150, 250];
+function oldTg(bot) {
+  const a = bot?.alerts && typeof bot.alerts === "object" ? bot.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {};
+  const q = a.quiet && typeof a.quiet === "object" ? a.quiet : {};
+  return { sig: { on: s.on !== false, top: OLD_TG_TOPS.includes(Number(s.top)) ? Number(s.top) : 0, when: s.when === "touch" ? "touch" : "confirmed", long: s.sides === "long" },
+    mkt: a.mkt && typeof a.mkt === "object" ? a.mkt : null,
+    quiet: { on: !!q.on, from: Number.isInteger(q.from) ? q.from : 23, to: Number.isInteger(q.to) ? q.to : 8, tz: Number.isFinite(q.tz) ? q.tz : 180,
+      ...(typeof q.zone === "string" ? { zone: q.zone } : {}) } };
+}
+// functions/bot/index.ts (types removed)
+const num = (v, a, b, d) => { const x = Number(v); return Number.isFinite(x) ? Math.min(b, Math.max(a, x)) : d; };
+const oneOf = (v, ok, d) => ok.includes(v) ? v : d;
+const SIG_TOPS = [0, 50, 100, 150, 250];
+function oldBot(b) {
+  const a = b.alerts && typeof b.alerts === "object" ? b.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {}, m = a.mkt, q = a.quiet;
+  return {
+    quiet: q && typeof q === "object" && q.on ? { from: Math.round(num(q.from, 0, 23, 23)), to: Math.round(num(q.to, 0, 23, 8)), tz: Math.round(num(q.tz, -720, 840, 180)),
+      zone: typeof q.zone === "string" && /^[A-Za-z]+(\/[A-Za-z0-9_+\-]+){0,2}$/.test(q.zone) ? q.zone : null } : null,
+    sig: { on: s.on !== false, top: oneOf(Math.round(Number(s.top) || 0), SIG_TOPS, 0), when: oneOf(s.when, ["confirmed", "touch"], "confirmed"), long: s.sides === "long" },
+    mkt: m && typeof m === "object" && m.on !== false ? {
+      method: oneOf(m.method, ["log", "classic", "robust", "ewma"], "log"), N: Math.round(num(m.N, 20, 300, 210)), k: num(m.k, 1, 5, 3),
+      tf: oneOf(m.tf, ["5m", "15m", "1h", "4h", "1d"], "4h"), minScore: num(m.minScore, 40, 100, 60), top: Math.round(num(m.top, 10, 400, 150)) } : null,
+  };
+}
+
+// ---------- values ----------
+// what the site and the menu write (and the shapes in the database on 09.11: mkt null, quiet with tz only, sig without sides, alerts null)
+const mk = (o = {}) => ({on:true, tf:'1h', top:150, minScore:60, method:'log', N:210, k:3, ...o});
+const CLEAN = [
+  null, undefined, {},
+  {sig:{on:true, top:0, when:'confirmed', sides:'both'}, mkt:null},
+  {sig:{on:true, top:0, when:'confirmed'}, mkt:mk({tf:'4h'}), quiet:{tz:180, zone:'Europe/Moscow'}},
+  {sig:{on:false, top:50, when:'touch', sides:'long'}, mkt:mk(), quiet:{tz:180}},
+  {sig:{on:true, top:100, when:'touch', sides:'both'}, mkt:mk({on:false, tf:'4h', top:400, minScore:75, method:'robust', N:100, k:2.5}), quiet:{on:true, from:22, to:7, tz:120, zone:'Europe/Berlin'}},
+  {sig:{on:true, top:150}, mkt:mk({tf:'5m', top:100, minScore:40, method:'classic', N:20, k:1}), quiet:{on:false, from:0, to:23, tz:-300, zone:'America/New_York'}},
+  {sig:{top:250, sides:'long'}, mkt:mk({tf:'15m', top:250, minScore:100, method:'ewma', N:300, k:5}), quiet:{on:true, from:23, to:8, tz:180, zone:'Europe/Moscow'}},
+  {sig:{on:true}, mkt:mk({tf:'1d'}), quiet:{on:true, from:1, to:6, tz:540, zone:'America/Argentina/Buenos_Aires'}},
+  {mkt:mk({on:true}), quiet:{on:true, from:0, to:0, tz:0, zone:'UTC'}},
+  {quiet:{on:true, from:20, to:9, tz:-180, zone:'Etc/GMT+3'}},
+  {sig:{on:false}, quiet:{on:false}},
+];
+// what nothing writes, but the column would take (any object up to 2000 bytes)
+const JUNK = [
+  'x', 5, true, [], [1, 2],
+  {sig:'x'}, {sig:[]}, {sig:null}, {sig:{on:'no'}}, {sig:{on:0}}, {sig:{on:null}},
+  {sig:{top:'50'}}, {sig:{top:49.6}}, {sig:{top:50.4}}, {sig:{top:-50}}, {sig:{top:1000}}, {sig:{top:null}}, {sig:{top:true}}, {sig:{top:[100]}},
+  {sig:{when:'TOUCH'}}, {sig:{when:['touch']}}, {sig:{sides:'short'}}, {sig:{sides:'LONG'}},
+  {quiet:'x'}, {quiet:[]}, {quiet:null}, {quiet:{on:1}}, {quiet:{on:'yes', from:'5', to:null}}, {quiet:{on:true, from:99, to:-3}},
+  {quiet:{on:true, from:7.6, to:'x'}}, {quiet:{on:true, from:'', to:true}}, {quiet:{on:false, from:99, to:-3}},
+  {quiet:{on:true, tz:'180'}}, {quiet:{on:true, tz:10000}}, {quiet:{on:true, tz:-9999}}, {quiet:{on:true, tz:90.4}}, {quiet:{on:true, tz:null}},
+  {quiet:{on:true, zone:'Europe/Moscow; drop'}}, {quiet:{on:true, zone:5}}, {quiet:{on:true, zone:''}}, {quiet:{on:true, zone:'a/b/c/d'}}, {quiet:{on:false, zone:'x y'}},
+  {mkt:'x'}, {mkt:5}, {mkt:true}, {mkt:[]}, {mkt:{}}, {mkt:{on:false}}, {mkt:{on:'false'}}, {mkt:{on:0}},
+  {mkt:{tf:'1w', top:'500', minScore:10, method:'x', N:5, k:9}}, {mkt:{tf:'1h', top:null, minScore:null, N:null, k:null}},
+  {mkt:{on:true, tf:'4h', top:150.6, minScore:59.5, N:210.5, k:2.25}}, {mkt:{on:false, tf:'1w', top:-1, minScore:500}},
+  {sig:{on:false}, mkt:null, quiet:null}, {sig:{on:true, top:50, extra:1}, other:{x:1}},
+];
+
+// ---------- 1. the bot: exactly as before, everywhere ----------
+let botSame = 0; const botDiff = [];
+for (const raw of [...CLEAN, ...JUNK]) same(alertsOf(raw), oldBot({alerts:raw})) ? botSame++ : botDiff.push(show(raw));
+check('бот: новое alertsOf совпадает с прежним на всех значениях, включая мусор', !botDiff.length, botDiff.length ? 'разные: ' + botDiff.join(' · ') : `${botSame} значений`);
+check('бот: строки таблицы — значение целиком, как у бота', same(alertsOf({sig:{on:false}}), oldBot({alerts:{sig:{on:false}}})) && same(alertsOf(undefined), oldBot({})));
+
+// what a screen shows, in one form for the old and the new copies
+const siteShows = v => ({sig:{on:v.sig.on, top:v.sig.top, when:v.sig.when, long:'long' in v.sig ? v.sig.long : v.sig.sides === 'long'},
+  quiet:{on:v.quiet.on, from:v.quiet.from, to:v.quiet.to},
+  mkt:v.mkt ? {on:v.mkt.on !== false, tf:String(v.mkt.tf), top:+v.mkt.top, minScore:+v.mkt.minScore} : null});
+const tgShows = v => ({...siteShows(v), quietTz:v.quiet.tz});
+
+// ---------- 2. the site and the menu: the same on what they write ----------
+for (const [name, oldFn, shows] of [['сайт', oldSite, siteShows], ['меню Telegram', raw => oldTg({alerts:raw}), siteShows]]) {
+  const diff = CLEAN.filter(raw => !same(shows(alertsView(raw)), shows(oldFn(raw)))).map(show);
+  check(`${name}: показывает то же, что прежде, на значениях, которые пишут сайт и меню`, !diff.length, diff.length ? 'разные: ' + diff.join(' · ') : `${CLEAN.length} значений`);
+}
+{ const diff = CLEAN.filter(raw => (oldTg({alerts:raw}).quiet.tz !== alertsView(raw).quiet.tz)).map(show);
+  check('меню Telegram: часовой пояс тихих часов тот же', !diff.length, diff.join(' · ')); }
+
+// ---------- 3. on junk: the site and the menu now show what the bot does ----------
+const botReads = raw => { const v = alertsView(raw), b = oldBot({alerts:raw});
+  return same(v.sig, b.sig)
+    && (v.quiet.on ? same({from:v.quiet.from, to:v.quiet.to, tz:v.quiet.tz, zone:v.quiet.zone}, b.quiet) : b.quiet === null)
+    && (v.mkt && v.mkt.on ? same((({on, ...m}) => m)(v.mkt), b.mkt) : b.mkt === null); };
+{ const bad = [...CLEAN, ...JUNK].filter(raw => !botReads(raw)).map(show);
+  check('сайт и меню показывают то, что делает бот (сигналы, тихие часы, «Рынок»)', !bad.length, bad.length ? 'расходятся: ' + bad.join(' · ') : `${CLEAN.length + JUNK.length} значений`); }
+for (const [name, oldFn] of [['сайт', oldSite], ['меню Telegram', raw => oldTg({alerts:raw})]]) {
+  const changed = JUNK.filter(raw => !same(siteShows(alertsView(raw)), siteShows(oldFn(raw)))).map(show);
+  check(`${name}: на мусоре показ сменился на чтение бота (для сведения)`, true, changed.length ? `${changed.length}: ${changed.join(' · ')}` : 'нигде');
+}
+
+// ---------- 4. the shape the screens rely on ----------
+check('TOPS прежний', same(TOPS, SIG_TOPS));
+check('«Рынок» выключен: бот его не берёт, а сайт и меню показывают строку без галочки',
+  alertsOf({mkt:mk({on:false})}).mkt === null && alertsView({mkt:mk({on:false})}).mkt?.on === false && alertsView({mkt:mk({on:false})}).mkt.tf === '1h');
+check('ничего не настроено: «Рынок» null, тихие часы выкл. 23–08, сигналы вкл. по монетам бота',
+  same(alertsView(null), {sig:{on:true, top:0, when:'confirmed', long:false}, quiet:{on:false, from:23, to:8, tz:180, zone:null}, mkt:null}));
+check('значение не меняется при чтении', (() => { const raw = {sig:{on:false, top:50}, quiet:{on:true, from:'5'}, mkt:mk()}, copy = JSON.stringify(raw); alertsView(raw); alertsOf(raw); return JSON.stringify(raw) === copy; })());
+
+const sum = document.getElementById('sum');
+sum.className = res.fail ? 'bad' : 'ok';
+sum.textContent = res.fail ? `Провалено ${res.fail} из ${res.pass + res.fail}` : `Все ${res.pass} проверок пройдены`;
+window.__TEST = res;
+</script>
+</body>
+</html>

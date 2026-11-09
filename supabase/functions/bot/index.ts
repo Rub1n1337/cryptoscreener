@@ -2,6 +2,7 @@
 // All strategy math lives in ../_shared/math.js — the same file the site uses.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as M from "../_shared/math.js";
+import { alertsOf } from "../_shared/alerts.js";
 import { COMMANDS, SITE, coin, dur, esc, fp, handleUpdate, pct, rr, usd } from "../_shared/tg.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -313,21 +314,8 @@ function cleanSet(s: any = {}) {
     timeStop: oneOf(s.timeStop === undefined ? 48 : Number(s.timeStop), [0, 24, 48, 96], 48),
     maxOpen: oneOf(s.maxOpen === undefined ? M.MAX_OPEN : Number(s.maxOpen), M.SLOTS, M.MAX_OPEN) };
 }
-// a linked chat's notification settings (user_bots.alerts, see supabase/alerts.sql), re-checked like the config
-const SIG_TOPS = [0, 50, 100, 150, 250];
-function alertsOf(b: any) {
-  const a = b.alerts && typeof b.alerts === "object" ? b.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {}, m = a.mkt, q = a.quiet;
-  return {
-    // quiet hours in the owner's time zone: zone (an IANA name like "Europe/Berlin", set by the site — follows summer time), or the
-    // older tz (minutes east of UTC at the moment of saving; Moscow when unknown)
-    quiet: q && typeof q === "object" && q.on ? { from: Math.round(num(q.from, 0, 23, 23)), to: Math.round(num(q.to, 0, 23, 8)), tz: Math.round(num(q.tz, -720, 840, 180)),
-      zone: typeof q.zone === "string" && /^[A-Za-z]+(\/[A-Za-z0-9_+\-]+){0,2}$/.test(q.zone) ? q.zone : null } : null,
-    sig: { on: s.on !== false, top: oneOf(Math.round(Number(s.top) || 0), SIG_TOPS, 0), when: oneOf(s.when, ["confirmed", "touch"], "confirmed"), long: s.sides === "long" },
-    mkt: m && typeof m === "object" && m.on !== false ? {
-      method: oneOf(m.method, ["log", "classic", "robust", "ewma"], "log"), N: Math.round(num(m.N, 20, 300, 210)), k: num(m.k, 1, 5, 3),
-      tf: oneOf(m.tf, ["5m", "15m", "1h", "4h", "1d"], "4h"), minScore: num(m.minScore, 40, 100, 60), top: Math.round(num(m.top, 10, 400, 150)) } : null,
-  };
-}
+// a linked chat's notification settings (user_bots.alerts) are read by alertsOf (_shared/alerts.js, one copy with the site and
+// the Telegram menu): quiet hours in the owner's time zone, the bot's own signals, the «Рынок» filter — null when switched off
 const zoneHour = (zone: string) => { try { return Number(new Intl.DateTimeFormat("en-GB", { timeZone: zone, hour: "numeric", hourCycle: "h23" }).format(new Date())); } catch { return NaN; } };
 const quietNow = (q: any) => {
   if (!q) return false;
@@ -455,7 +443,7 @@ async function runUserBots(now: number, reqStart: number) {
       if (ec) throw ec;
       if (wrote === false) { done++; continue; }
       if (b.tg_chat) {
-        if (quietNow(alertsOf(b).quiet)) QUIET.add(String(b.tg_chat));
+        if (quietNow(alertsOf(b.alerts).quiet)) QUIET.add(String(b.tg_chat));
         await sendTo([b.tg_chat], [
           ...res.closed.map((t: any) => closedMsg(t, `ваш бот «${esc(pname)}»`)),
           ...res.opened.map((p: any) => openedMsg(p, `ваш бот «${esc(pname)}»`))], [...res.opened, ...res.closed].map((x: any) => x.sym));
@@ -471,7 +459,7 @@ async function runUserBots(now: number, reqStart: number) {
   // the wider tops and "Рынок" scans of all linked chats in one request too (lazy: candles may be minutes old)
   const sigGroups: Groups = new Map();
   for (const { b, P, S, list } of later) {
-    const A = alertsOf(b);
+    const A = alertsOf(b.alerts);
     if (A.sig.on && A.sig.top > list.length && P.coins?.mode !== "list") addTask(sigGroups, S, M.pickSymbols(ticker, A.sig.top, [], now));
     if (A.mkt) addTask(sigGroups, A.mkt, M.pickSymbols(ticker, A.mkt.top, [], now));
   }
@@ -479,7 +467,7 @@ async function runUserBots(now: number, reqStart: number) {
   for (const { b, P, S, pname, list, rows, res } of later) {
     if (over(80_000)) break;
     try {
-      const A = alertsOf(b), sent = b.sig_sent || {}, chat = b.tg_chat, before = JSON.stringify(sent);
+      const A = alertsOf(b.alerts), sent = b.sig_sent || {}, chat = b.tg_chat, before = JSON.stringify(sent);
       if (A.sig.on) await mySignals(A.sig, sent, chat, P, S, pname, list, rows, res);
       if (A.mkt) await marketSignals(A.mkt, sent, chat, S);
       // written only when something changed: up to ~20 KB a bot, every minute, was a new copy of the row for nothing

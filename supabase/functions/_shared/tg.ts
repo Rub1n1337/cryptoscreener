@@ -1,4 +1,5 @@
 import { LOGIN_EMOJI, LOGIN_TTL } from "./login.ts";
+import { TOPS, alertsView } from "./alerts.js";
 // Telegram: commands and buttons, shared by the "tg" function (the webhook: Telegram calls it the moment a message or a
 // button press arrives) and the bot function (falls back to reading updates once a minute while the webhook isn't registered).
 // Every screen is one message with buttons under it; a press edits that message in place instead of sending a new one.
@@ -46,18 +47,9 @@ const visited = (db: any, c: any) => c.bot ? db.from("user_bots").update({ last_
   .eq("id", c.bot.id).lt("last_seen", new Date(Date.now() - 6e5).toISOString()) : null;
 const profileOf = (bot: any) => { const ps = Array.isArray(bot?.config?.profiles) ? bot.config.profiles : []; return ps.find((p: any) => p.name === bot.active_profile) || ps[0] || null; };
 const sigMinOf = (set: any) => Math.max(40, Number(set?.minScore ?? 60));
-// the linked bot's notification settings (user_bots.alerts, see supabase/alerts.sql), with the defaults filled in
-const TOPS = [0, 50, 100, 150, 250];
+// the linked bot's notification settings (user_bots.alerts) are read by alertsView (./alerts.js, one copy with the site and the bot)
 const WHEN: Record<string, string> = { confirmed: "Только подтверждённые", touch: "Сразу при касании" };
 const topName = (n: number) => n ? `топ-${n}` : "как у бота";
-function alertsView(bot: any) {
-  const a = bot?.alerts && typeof bot.alerts === "object" ? bot.alerts : {}, s = a.sig && typeof a.sig === "object" ? a.sig : {};
-  const q = a.quiet && typeof a.quiet === "object" ? a.quiet : {};
-  return { sig: { on: s.on !== false, top: TOPS.includes(Number(s.top)) ? Number(s.top) : 0, when: s.when === "touch" ? "touch" : "confirmed", long: s.sides === "long" },
-    mkt: a.mkt && typeof a.mkt === "object" ? a.mkt : null,
-    quiet: { on: !!q.on, from: Number.isInteger(q.from) ? q.from : 23, to: Number.isInteger(q.to) ? q.to : 8, tz: Number.isFinite(q.tz) ? q.tz : 180,
-      ...(typeof q.zone === "string" ? { zone: q.zone } : {}) } };   // the zone stays when the menu toggles quiet hours
-}
 const hh = (h: number) => String(h).padStart(2, "0") + ":00";
 const quietName = (q: any) => `${hh(q.from)}–${hh(q.to)}`;
 // what a signal looks like, with every line explained (the "👀 Пример сигнала" button)
@@ -84,7 +76,7 @@ const REG: Record<string, string> = { flat: "↔️ боковик", up: "📈 �
 
 // ---------- screens ----------
 function home(c: any): Screen {
-  const { sub, bot } = c, v = alertsView(bot);
+  const { sub, bot } = c, v = alertsView(bot?.alerts);
   const lines = bot ? [
     `✅ Сделки вашего бота «${esc(bot.active_profile || "—")}»`,
     `${mark(v.sig.on)} Мои сигналы${v.sig.on ? ` · ${topName(v.sig.top)} · ${WHEN[v.sig.when].toLowerCase()}${v.sig.long ? " · только LONG" : ""}` : ""}`,
@@ -98,7 +90,7 @@ function home(c: any): Screen {
 }
 
 async function notifyScreen(_db: any, c: any): Promise<Screen> {
-  const { sub, bot } = c, v = alertsView(bot), P = profileOf(bot);
+  const { sub, bot } = c, v = alertsView(bot?.alerts), P = profileOf(bot);
   const parts = [
     `🔔 <b>Уведомления</b>\nНажмите на кнопку, чтобы изменить.`,
     bot ? `<b>Сделки вашего бота</b> — входы и выходы, приходят всегда, пока у бота включён Telegram.\n\n` +
@@ -295,20 +287,21 @@ async function toggle(db: any, chat: number, c: any, k: string, want?: boolean) 
     return `Сделки общего бота: ${on ? "вкл" : "выкл"}`;
   }
   if (!c.bot) return "Сначала включите Telegram у своего бота на сайте — «🤖 Мой бот».";
-  const v = alertsView(c.bot), a = { ...(c.bot.alerts || {}) }, s = { ...(a.sig || {}) };
-  let msg = "";
-  if (k === "sig") { s.on = want ?? !v.sig.on; msg = `Мои сигналы: ${s.on ? "вкл" : "выкл"}`; }
-  else if (k === "top") { s.top = TOPS[(TOPS.indexOf(v.sig.top) + 1) % TOPS.length]; msg = `Монеты: ${topName(s.top)}`; }
-  else if (k === "when") { s.when = v.sig.when === "touch" ? "confirmed" : "touch"; msg = WHEN[s.when]; }
-  else if (k === "side") { s.sides = v.sig.long ? "both" : "long"; msg = s.sides === "long" ? "Только LONG" : "LONG и SHORT"; }
-  else if (k === "quiet") { a.quiet = { ...v.quiet, on: want ?? !v.quiet.on }; msg = a.quiet.on ? `Ночью без звука: ${quietName(a.quiet)}` : "Ночью — со звуком"; }
+  // only the changed setting goes to the database, which merges it into what is stored (tg_alerts, supabase/2026-11-alerts-parts.sql):
+  // a whole copy written from here would undo a change the site made since this chat's screen was read
+  const v = alertsView(c.bot.alerts);
+  let part: Record<string, unknown>, msg = "";
+  if (k === "sig") { const on = want ?? !v.sig.on; part = { sig: { on } }; msg = `Мои сигналы: ${on ? "вкл" : "выкл"}`; }
+  else if (k === "top") { const top = TOPS[(TOPS.indexOf(v.sig.top) + 1) % TOPS.length]; part = { sig: { top } }; msg = `Монеты: ${topName(top)}`; }
+  else if (k === "when") { const when = v.sig.when === "touch" ? "confirmed" : "touch"; part = { sig: { when } }; msg = WHEN[when]; }
+  else if (k === "side") { const sides = v.sig.long ? "both" : "long"; part = { sig: { sides } }; msg = sides === "long" ? "Только LONG" : "LONG и SHORT"; }
+  else if (k === "quiet") { const on = want ?? !v.quiet.on; part = { quiet: { on } }; msg = on ? `Ночью без звука: ${quietName(v.quiet)}` : "Ночью — со звуком"; }
   else if (k === "mkt") {
-    if (!a.mkt) return "Фильтр «Рынка» ещё не настроен: на сайте в «Мой бот» → Telegram нажмите «Сохранить» в строке «Рынок».";
-    a.mkt = { ...a.mkt, on: want ?? a.mkt.on === false }; msg = `Рынок: ${a.mkt.on ? "вкл" : "выкл"}`;
+    if (!v.mkt) return "Фильтр «Рынка» ещё не настроен: на сайте в «Мой бот» → Telegram нажмите «Сохранить» в строке «Рынок».";
+    const on = want ?? !v.mkt.on; part = { mkt: { on } }; msg = `Рынок: ${on ? "вкл" : "выкл"}`;
   } else return "";
-  a.sig = s;
-  await db.from("user_bots").update({ alerts: a }).eq("id", c.bot.id);
-  return msg;
+  const { error } = await db.rpc("tg_alerts", { p_chat: chat, p_part: part });
+  return error ? "Не удалось сохранить — попробуйте ещё раз." : msg;
 }
 
 async function onButton(db: any, q: any, call: Call) {

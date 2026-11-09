@@ -804,6 +804,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .bopt{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.bopt:first-child{border-top:0;padding-top:0}
 .btg{display:flex;align-items:center;gap:12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--s1)}.btg p{margin:2px 0 0;font-size:12.5px;color:var(--mute)}.btg-i{display:grid;place-items:center;width:32px;height:32px;border-radius:var(--r-s);background:var(--accbg);color:var(--acc);flex:0 0 auto}.btg button{flex:0 0 auto}
 .btg-hint{margin:6px 0 0;font-size:12.5px;color:var(--text)}.btg-set{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;font-size:12.5px;color:var(--mute)}.btg-set select{height:32px;font-size:12.5px;max-width:100%}.btg-set button{height:32px;font-size:12.5px}
+@media (pointer:coarse){.btg-set select,.btg-set button{height:36px}}   /* notification fields: finger-sized on a phone */
 @media(max-width:560px){.btg{flex-wrap:wrap}.btg button{width:100%}}
 .bopt>div{flex:1 1 320px;min-width:0}.bopt b{font-size:14px}.bopt p{margin:3px 0 0;font-size:13px;color:var(--mute);max-width:640px}
 #bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
@@ -1711,6 +1712,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 
 <script type="module">
 import * as M from './supabase/functions/_shared/math.js';
+import {TOPS as AL_TOPS, alertsView} from './supabase/functions/_shared/alerts.js';
 import * as HS from './history.js';
 // ?history=off: the backtest ignores the stored history and loads everything from Binance, as before 2.78 — to run the same
 // settings both ways and compare
@@ -2693,6 +2695,7 @@ BP.where ||= 'browser';
 BP.profiles.forEach(p => { p.name = cleanName(p.name); });
 let UB = load('sr_ubot', null);   // {id} of the profile's server bot (see profileBot); {id, secret} — a bot no profile has yet
 let SB_MINE = null;               // the server bot's journal, when it runs on the server
+let alertsQ = Promise.resolve(), alertsAt = 0;   // its notification settings' saves, one after another (saveAlerts)
 const saveBP = () => save('sr_bot', BP);
 const profById = id => BP.profiles.find(p => p.id === id) || BP.profiles[0];
 // the flat / impulse border: the profile's own when it has one (presets, shared links and saved backtests carry it), else the bot's
@@ -3069,7 +3072,7 @@ function syncServerBot(on) {   // push profiles/mode to the server bot (debounce
 }
 async function fetchServerBot() {
   if (BP.where !== 'server' || !UB) return;
-  const id = UB.id;
+  const id = UB.id, sent = Date.now();
   try {
     const r = await rpc('ub_get', ubArgs()), b = r.bot, prev = SB_MINE;
     if (UB?.id !== id) return;   // the device moved to the profile's bot meanwhile
@@ -3081,7 +3084,8 @@ async function fetchServerBot() {
       for (const t of (r.closed || []).filter(t => !seenC.has(t.id))) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', toJ);
     }
     SB_MINE = {balance:b.balance, start:b.start_balance, open:r.open || [], closed:r.closed || [], on:b.enabled,
-      checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error, tg:!!b.tg_chat, alerts:b.alerts || null};
+      checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error, tg:!!b.tg_chat,
+      alerts:prev && sent < alertsAt ? prev.alerts : b.alerts || null};   // a notification setting saved while this was on its way is newer
     // once per page, after the sync has caught up with the profile: the server's profiles differ from the profile's (a push
     // that failed) → send them. Before 2.84 every device sent its own at every start, even before it knew of newer ones
     if (!cfgChecked && syncReady) { cfgChecked = true; if (canon(b.config || {}) !== canon(serverConfig())) syncServerBot(); }
@@ -3351,25 +3355,30 @@ let bprofInit = false;
 let tgBot;   // the Telegram bot's username, or null when the owner hasn't set it up
 const tgName = async () => tgBot !== undefined ? tgBot : (tgBot = await rpc('tg_bot_name', {}).catch(() => null) || null);
 // what the linked chat gets (user_bots.alerts, edited here and in the Telegram menu): the bot's own signals, by its rules, on its
-// coins or a wider top for trading by hand; "Рынок" — a separate filter whose channel settings are saved only on request
-const AL_TOPS = [0, 50, 100, 150, 250];
-const alertsView = () => { const a = SB_MINE?.alerts || {}, s = a.sig || {}, q = a.quiet || {};
-  return {sig:{on:s.on !== false, top:AL_TOPS.includes(+s.top) ? +s.top : 0, when:s.when === 'touch' ? 'touch' : 'confirmed', sides:s.sides === 'long' ? 'long' : 'both'}, mkt:a.mkt || null,
-    quiet:{on:!!q.on, from:Number.isInteger(q.from) ? q.from : 23, to:Number.isInteger(q.to) ? q.to : 8}}; };
-// the owner's time zone goes with every save, so quiet hours are counted in their time (minutes east of UTC)
-async function saveAlerts(a, msg) {
+// coins or a wider top for trading by hand; "Рынок" — a separate filter whose channel settings are saved only on request.
+// Read by alertsView (supabase/functions/_shared/alerts.js), the same copy the menu and the bot use.
+// Only the changed part is sent ({sig:{when:'touch'}}…): the database merges it into what is stored and returns the result
+// (ub_alerts, supabase/2026-11-alerts-parts.sql). A whole copy from SB_MINE — up to a minute old — would undo a change made in
+// the Telegram menu meanwhile. The owner's time zone goes with every save, so quiet hours are counted in their time.
+// msg(view of what is now saved) → the toast's text.
+// Saves go one after another: two at once could answer out of order, and the older answer would redraw the field back.
+// alertsAt (next to SB_MINE) — when the last answer came: a ub_get poll sent before it has an older value (fetchServerBot keeps this one)
+const saveAlerts = (part, msg) => alertsQ = alertsQ.then(async () => {
   // the zone's name follows summer time; the offset alone (tz) stays an hour off after the clocks change. tz is kept as a fallback
   let zone = null; try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || null; } catch {}
-  a = {...a, quiet:{...(a.quiet || {}), tz:-new Date().getTimezoneOffset(), ...(zone ? {zone} : {})}};
-  try { await rpc('ub_alerts', ubArgs({p_alerts:a})); SB_MINE.alerts = a; renderTg(); toast('Сохранено', msg, 'ok'); }
-  catch (e) { toast('Не удалось сохранить', String(e.message || e), 'bad'); renderTg(); }
-}
+  part = {...part, quiet:{...(part.quiet || {}), tz:-new Date().getTimezoneOffset(), ...(zone ? {zone} : {})}};
+  try {
+    const a = await rpc('ub_alerts', ubArgs({p_alerts:part}));
+    if (a && typeof a === 'object' && SB_MINE) { SB_MINE.alerts = a; alertsAt = Date.now(); }
+    keepFocus(renderTg); toast('Сохранено', msg(alertsView(SB_MINE?.alerts)), 'ok');
+  } catch (e) { toast('Не удалось сохранить', String(e.message || e), 'bad'); keepFocus(renderTg); }
+});
 // one plain sentence about what will come, for the current choice
 function alertsHint(v) {
   if (!v.sig.on) return 'Сигналы бота выключены — приходят только его сделки.';
   const coins = v.sig.top ? `по топ-${v.sig.top} монет (бот входит только по своим — в остальных сигналах написано «✋ для ручной торговли»)` : 'по монетам, на которых торгует бот';
   const when = v.sig.when === 'touch' ? 'сразу при касании границы, а о подтверждении придёт короткий ответ' : 'когда разворот подтвердится — в тот же момент входит и бот';
-  return `Сигнал придёт ${when}, ${coins}${v.sig.sides === 'long' ? ', только LONG' : ''}. Одна монета — одно сообщение: дальше оно обновляется.`;
+  return `Сигнал придёт ${when}, ${coins}${v.sig.long ? ', только LONG' : ''}. Одна монета — одно сообщение: дальше оно обновляется.`;
 }
 const hourLabel = h => String(h).padStart(2, '0') + ':00';
 function renderTg() {
@@ -3381,15 +3390,15 @@ function renderTg() {
     : `Выключено. Включите — сделки и сигналы бота профиля будут приходить в ${who}.`;
   let set = '';
   if (linked) {
-    const v = alertsView(), opt = (vals, cur) => vals.map(([k, t]) => `<option value="${k}"${String(cur) === String(k) ? ' selected' : ''}>${t}</option>`).join(''), m = v.mkt;
+    const v = alertsView(SB_MINE?.alerts), opt = (vals, cur) => vals.map(([k, t]) => `<option value="${k}"${String(cur) === String(k) ? ' selected' : ''}>${t}</option>`).join(''), m = v.mkt;
     const hours = Array.from({length:24}, (_, h) => [h, hourLabel(h)]), now = `${S.tf} · ${S.top} монет · сила от ${Math.max(40, S.minScore || 60)}`;
     set = `<div class="btg-set">
       <label class="fl inl"><input type="checkbox" data-al="on"${v.sig.on ? ' checked' : ''}> Мои сигналы</label>
       <select data-al="top" aria-label="По каким монетам"${v.sig.on ? '' : ' disabled'}>${opt(AL_TOPS.map(n => [n, n ? `топ-${n} (для ручной торговли)` : 'монеты бота']), v.sig.top)}</select>
       <select data-al="when" aria-label="Когда присылать"${v.sig.on ? '' : ' disabled'}>${opt([['confirmed', 'только подтверждённые'], ['touch', 'сразу при касании']], v.sig.when)}</select>
-      <select data-al="sides" aria-label="Стороны"${v.sig.on ? '' : ' disabled'}>${opt([['both', 'LONG и SHORT'], ['long', 'только LONG']], v.sig.sides)}</select>
+      <select data-al="sides" aria-label="Стороны"${v.sig.on ? '' : ' disabled'}>${opt([['both', 'LONG и SHORT'], ['long', 'только LONG']], v.sig.long ? 'long' : 'both')}</select>
     </div><p class="btg-hint">${alertsHint(v)}</p><div class="btg-set">
-      ${m ? `<label class="fl inl"><input type="checkbox" data-al="mkt"${m.on !== false ? ' checked' : ''}> Рынок: ${esc(m.tf)} · топ-${+m.top} · сила от ${+m.minScore}</label>` : '<span>Рынок: не настроен</span>'}
+      ${m ? `<label class="fl inl"><input type="checkbox" data-al="mkt"${m.on ? ' checked' : ''}> Рынок: ${esc(m.tf)} · топ-${m.top} · сила от ${m.minScore}</label>` : '<span>Рынок: не настроен</span>'}
       <button data-tg="mkt" title="Отдельный фильтр со своими настройками канала, только подтверждённые развороты. Сохраняется то, что сейчас выбрано на странице «Рынок»; дальше сайт эти настройки не трогает">${m ? 'Заменить' : 'Сохранить'}: ${esc(now)}</button>
     </div><div class="btg-set">
       <label class="fl inl"><input type="checkbox" data-al="quiet"${v.quiet.on ? ' checked' : ''}> 🌙 Ночью без звука</label>
@@ -3402,15 +3411,13 @@ function renderTg() {
 }
 $('#btg').onchange = e => {
   const f = e.target.closest('[data-al]'); if (!f || !SB_MINE) return;
-  const a = {...(SB_MINE.alerts || {})}, s = {...(a.sig || {})}, k = f.dataset.al, v = alertsView();
-  if (k === 'mkt') { a.mkt = {...a.mkt, on:f.checked}; return saveAlerts(a, f.checked ? 'Сигналы «Рынка» включены' : 'Сигналы «Рынка» выключены'); }
+  const k = f.dataset.al;   // each field sends only itself (saveAlerts)
+  if (k === 'mkt') return saveAlerts({mkt:{on:f.checked}}, n => n.mkt?.on ? 'Сигналы «Рынка» включены' : 'Сигналы «Рынка» выключены');
   if (k === 'quiet' || k === 'qfrom' || k === 'qto') {
-    a.quiet = {...v.quiet, ...(a.quiet || {}), ...(k === 'quiet' ? {on:f.checked} : {[k === 'qfrom' ? 'from' : 'to']:+f.value})};
-    return saveAlerts(a, a.quiet.on ? `С ${hourLabel(a.quiet.from)} до ${hourLabel(a.quiet.to)} сообщения придут без звука.` : 'Ночью — со звуком.');
+    return saveAlerts({quiet:k === 'quiet' ? {on:f.checked} : {[k === 'qfrom' ? 'from' : 'to']:+f.value}},
+      n => n.quiet.on ? `С ${hourLabel(n.quiet.from)} до ${hourLabel(n.quiet.to)} сообщения придут без звука.` : 'Ночью — со звуком.');
   }
-  if (k === 'on') s.on = f.checked; else if (k === 'top') s.top = +f.value || 0; else s[k] = f.value;
-  a.sig = s;
-  saveAlerts(a, alertsHint({...v, sig:{...v.sig, ...s, on:s.on !== false, top:+s.top || 0}}));
+  saveAlerts({sig:k === 'on' ? {on:f.checked} : k === 'top' ? {top:+f.value || 0} : {[k]:f.value}}, alertsHint);
 };
 $('#btg').onclick = async e => {
   const b = e.target.closest('[data-tg]'); if (!b) return;
@@ -3418,7 +3425,7 @@ $('#btg').onclick = async e => {
   if (b.dataset.tg === 'mkt') {   // the "Рынок" page's current channel settings, saved for Telegram until replaced
     if (!['5m', '15m', '1h', '4h', '1d'].includes(S.tf)) return toast('Недельный таймфрейм в Telegram не поддерживается', 'выберите на «Рынке» от 5м до 1д', 'warn');
     const m = {on:true, tf:S.tf, top:S.top, minScore:Math.max(40, S.minScore || 60), method:S.method, N:S.N, k:S.k};
-    return saveAlerts({...(SB_MINE?.alerts || {}), mkt:m}, `Рынок: ${m.tf} · топ-${m.top} · сила от ${m.minScore}. Дальше эти настройки меняются только этой кнопкой.`);
+    return saveAlerts({mkt:m}, () => `Рынок: ${m.tf} · топ-${m.top} · сила от ${m.minScore}. Дальше эти настройки меняются только этой кнопкой.`);
   }
   // on / off: only the profile's bot writes, and only to the Telegram the person signed in with (its private chat with our bot)
   if (b.dataset.tg === 'on' || b.dataset.tg === 'off') {
@@ -4280,6 +4287,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.86', date:'9 ноября 2026', title:'Уведомления без потерь', items:[
+    'Исправлено: изменение уведомлений в меню Telegram больше не отменяется следующей правкой на сайте.',
+    'Исправлено: две быстрые правки уведомлений подряд теперь сохраняются обе.',
+    'Поля настроек уведомлений на телефоне стали крупнее.',
+  ]},
   {v:'2.85', date:'9 ноября 2026', title:'Telegram и срок бота', items:[
     'Исправлено: если заблокировать бота в Telegram, сообщения бота профиля больше не отправляются, а сайт показывает, что Telegram выключен.',
     'Команды и кнопки в меню бота в Telegram продлевают работу серверного бота так же, как заход на сайт.',
@@ -4341,11 +4353,6 @@ const CHANGELOG = [
     'Исправлены окна подтверждения: сброс журнала, удаление бота и профиля снова работают.',
     'Исправлена пауза серверного бота при смене настроек на другом устройстве.',
     'В «Правовую информацию» добавлен технический доступ владельца к базе данных.',
-  ]},
-  {v:'2.74', date:'2 ноября 2026', title:'Без дублей в Telegram', items:[
-    'Исправлены повторные сообщения в Telegram от нескольких ботов одного человека: в чат пишет только последний подключённый.',
-    'Прежний бот, оставленный после перехода на бот из профиля, больше не пишет в Telegram.',
-    'Исправлены лишние перезагрузки и уведомления «Настройки изменены на другом устройстве».',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5421,7 +5428,7 @@ if (matchMedia('(hover: none)').matches) {
 
 // ---------- auto-update: reload open tabs when a new version is deployed ----------
 // Journal and settings live in localStorage, so a reload loses nothing.
-const UPDATE_FILES = [location.pathname, new URL('./supabase/functions/_shared/math.js', location.href).pathname, new URL('./beta.js', location.href).pathname];
+const UPDATE_FILES = [location.pathname, ...['./supabase/functions/_shared/math.js', './supabase/functions/_shared/alerts.js', './beta.js'].map(p => new URL(p, location.href).pathname)];
 const hashText = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
 const IS_DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // no auto-reload while developing locally
 const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + Date.now(), {cache:'no-store', signal:AbortSignal.timeout(15000)}).then(r => r.ok ? r.text() : null)))
