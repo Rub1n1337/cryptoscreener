@@ -1,0 +1,40 @@
+# Nightly copy of Binance's public candles into Cloudflare R2 (bucket sigma-history), read by the site's backtest and the research
+# scripts through history.js. Plan and format: docs/PLAN-HISTORY.md. Needs the repository secrets R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,
+# R2_SECRET_ACCESS_KEY (an R2 API token with write access to the bucket). The outcome of each run is in the bucket's status.json
+# and in the run's annotations (readable without a GitHub sign-in through the check-runs API).
+name: Candle history
+
+on:
+  schedule:
+    - cron: '25 0 * * *'   # after Binance's daily candle closes at 00:00 UTC
+  workflow_dispatch:
+    inputs:
+      tfs:
+        description: 'Timeframes, comma-separated (empty: the default in scripts/history-job.js)'
+        required: false
+        default: ''
+  push:
+    branches: [main]
+    paths: ['scripts/history-job.js', 'scripts/history-sync.mjs', '.github/workflows/history.yml']
+
+concurrency:
+  group: candle-history
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sync candles to R2
+        run: node scripts/history-sync.mjs
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          TFS: ${{ inputs.tfs }}
+          MINUTES: '320'
