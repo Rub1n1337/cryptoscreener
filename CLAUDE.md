@@ -5,6 +5,7 @@
 - Edge Functions `bot` and `tg` deploy from GitHub Actions on push to `main` (`.github/workflows/deploy-functions.yml`); apply a migration they need before pushing. Run status: `https://api.github.com/repos/Rub1n1337/cryptoscreener/actions/runs?per_page=1`.
 - Design/UX rules: follow `docs/DESIGN-RULES.md`; run its checklist (section 12) before every push.
 - Changed a button that changes state (bot, journal, backtest, server data)? Run the `click-path-audit` skill (`.claude/skills/`) on that area before pushing.
+- The same kind of bug keeps coming back in one area, or a big change is due there? The `untangle-area` skill: map and plan first (`docs/PLAN-UNTANGLE-<area>.md`), code only after the owner picks the fixes.
 - Colours only through CSS tokens (`:root` = dark, `:root[data-theme=light]`); canvas code reads them via `pal()` into `PC`.
 - Local preview: `serve.ps1` (http://localhost:8765). Pushing to `main` auto-deploys to Vercel and reloads open tabs.
 - After changing `math.js`: open `tests/math.html?ref=_ref/math.js` in the preview (the previous copy saved to `tests/_ref/math.js` first); every check must pass.
