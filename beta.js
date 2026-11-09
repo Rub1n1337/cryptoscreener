@@ -1,5 +1,5 @@
 // «Графики» (the tab was «Бета» during its closed test; the file, page id and storage keys keep that name): order book and
-// order flow on top of the usual chart. Loaded when the tab is first opened (betaOpen in index.html).
+// order flow on top of the usual chart. Loaded on first use — the tab or the coin card's «Стакан» (betaSync in index.html).
 // Everything comes straight from Binance spot in the browser: candles over REST + the kline stream, the order book as a
 // REST snapshot kept current by the depth diff stream, trades from the aggTrade stream. Nothing is stored on a server yet,
 // so the liquidity heatmap accumulates from the moment the tab is opened.
@@ -545,7 +545,7 @@ class Pane {
       // a coin sent from the market's card (spot) that futures don't list: the same coin on spot, not the previous coin.
       // If spot fails too (a mistyped #charts/SYM), the previous coin comes back on futures (prevSym + prevMkt)
       const toSpot = this.toSpot; this.toSpot = false;
-      if (toSpot && missing && this.mkt === 'fut') { K.toast(`${K.base(bad)} нет на фьючерсах Binance`, 'Открыл спот.', 'info'); this.prevSym = back; this.prevMkt = 'fut'; this.mkt = 'spot'; savePanes(); syncBar(); this.label(); this.restart(); return; }
+      if (toSpot && missing && this.mkt === 'fut') { K.toast(`${K.base(bad)} нет на фьючерсах Binance`, 'Открыл спот.', 'info'); this.prevSym = back; this.prevMkt = 'fut'; this.mkt = 'spot'; this.autoSpot = true; savePanes(); syncBar(); this.label(); this.restart(); return; }
       if (!back && this.prevMkt) { const m0 = this.prevMkt; this.prevMkt = null; K.toast(`${K.base(bad)} нет на ${this.mkt === 'fut' ? 'фьючерсах' : 'споте'} Binance`, 'Вернул прежний рынок.', 'bad'); this.mkt = m0; savePanes(); syncBar(); this.label(); this.restart(); return; }
       K.toast(back && missing ? `Монеты ${K.base(bad)} нет на ${this.mkt === 'fut' ? 'фьючерсах' : 'споте'} Binance` : 'Не удалось загрузить свечи', back ? `Вернул ${K.base(back)}.${missing ? ' Пишите тикер, например SOL или PEPE.' : ''}` : `${bad}: ${e.message || e}`, 'bad');
       if (back) {
@@ -1314,12 +1314,19 @@ function syncBar() {
 }
 // sr_bpanes is in the profile, and each device opens its own number of charts (sr_blay is not): a phone with one chart keeps
 // the profile's charts 2–4 as they are instead of cutting the list to its own
-const savePanes = () => { const own = pool.map(p => ({sym:p.sym, tf:p.tf, range:p.range, mkt:p.mkt})), was = K.load('sr_bpanes', []);
-  K.save('sr_bpanes', own.concat(Array.isArray(was) ? was.slice(own.length, 4) : [])); };
-// panes are kept (hidden, streams closed) when the layout shrinks, so switching back is instant and the heatmap survives
-let pool = [];
-function setLayout(n) {
-  K.save('sr_blay', n); if (n > 2 && SMALL.matches) n = 2;   // the choice is kept: turning the phone or widening the window brings it back
+// In the coin card the chart follows the card's coin, which stays on this device (sr_chart): the profile keeps the full
+// view's coin, so browsing the market doesn't tell other devices «настройки изменены». A chart put on spot only
+// because futures don't list its coin (autoSpot) keeps «фьючерсы»
+const savePanes = () => { const was = K.load('sr_bpanes', []), w = Array.isArray(was) ? was : [];
+  const own = pool.map((p, i) => ({sym:card && i === 0 && w[0]?.sym || p.sym, tf:p.tf, range:p.range, mkt:p.autoSpot ? 'fut' : p.mkt}));
+  K.save('sr_bpanes', own.concat(w.slice(own.length, 4))); };
+// panes are kept (hidden, streams closed) when the layout shrinks, so switching back is instant and the heatmap survives.
+// card: the charts sit in the market's coin card («Стакан» mode) — one chart, the first; the chosen layout (sr_blay) waits
+// for the full view
+let pool = [], card = false;
+function setLayout(n) { K.save('sr_blay', n); applyLayout(); }
+function applyLayout() {
+  let n = card ? 1 : K.load('sr_blay', 1); if (n > 2 && SMALL.matches) n = 2;   // the choice is kept: turning the phone or widening the window brings it back
   layout = n; $('#bPanes').dataset.lay = n;
   const saved = K.load('sr_bpanes', []);
   for (let i = 0; i < Math.max(n, pool.length); i++) {
@@ -1581,7 +1588,7 @@ function wire() {
   });
   $('#bTools').onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.tool) setTool(tool === b.dataset.tool ? null : b.dataset.tool); if (b.dataset.act) toolAct(b.dataset.act); };
   $('#bToolHint').onclick = e => { if (e.target.closest('[data-tcancel]')) setTool(null); };
-  $('#bMktBtn').onclick = () => { const p = act(); if (!p) return; p.prevMkt = p.mkt; p.mkt = p.mkt === 'fut' ? 'spot' : 'fut'; savePanes(); syncBar(); p.restart(); K.toast(p.mkt === 'fut' ? 'Фьючерсы USDⓈ-M' : 'Спот', p.mkt === 'fut' ? 'Видны ликвидации, открытый интерес и фандинг — включите их в «Индикаторах».' : '', 'info'); };
+  $('#bMktBtn').onclick = () => { const p = act(); if (!p) return; p.autoSpot = false; p.prevMkt = p.mkt; p.mkt = p.mkt === 'fut' ? 'spot' : 'fut'; savePanes(); syncBar(); p.restart(); K.toast(p.mkt === 'fut' ? 'Фьючерсы USDⓈ-M' : 'Спот', p.mkt === 'fut' ? 'Видны ликвидации, открытый интерес и фандинг — включите их в «Индикаторах».' : '', 'info'); };
   $('#bTfBtn').onclick = () => popFor === $('#bTfBtn') ? closePop() : tfPop();
   $('#bRangeBtn').onclick = () => popFor === $('#bRangeBtn') ? closePop() : rangePop();
   document.querySelectorAll('#bLay .tab').forEach(b => b.onclick = () => setLayout(+b.dataset.lay));
@@ -1619,7 +1626,9 @@ function wire() {
     if (k === 'y' || k === 'н') { e.preventDefault(); redo(); }
   });
   window.addEventListener('resize', redrawAll);
-  SMALL.addEventListener('change', () => { if (K.load('sr_blay', 1) > 2) setLayout(K.load('sr_blay', 1)); });   // a phone turned, a window resized
+  // the charts move between places (the coin card, the full view), and the phone's card opens and closes: draw at the new size
+  new ResizeObserver(redrawAll).observe($('#bPanes'));
+  SMALL.addEventListener('change', () => { if (K.load('sr_blay', 1) > 2) applyLayout(); });   // a phone turned, a window resized
   // the network is back: reconnect now instead of waiting out the pause between attempts (up to a minute)
   window.addEventListener('online', () => {
     if (!loopOn) return;
@@ -1634,11 +1643,13 @@ function wire() {
   window.addEventListener('offline', () => { if (loopOn) { setLive(); redrawAll(); } });
   wirePop();
 }
-function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.prevSym = p.sym; p.sym = sym; savePanes(); p.restart(); renderList(); }
+function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.autoSpot = false; p.prevSym = p.sym; p.sym = sym; savePanes(); p.restart(); renderList(); }
 // a coin sent from outside (the market's coin card, a #charts/SYM link) goes on the active chart, as if typed there.
 // Before the streams start (open() connects next), only the pane's coin changes: its old candles are dropped, so it restarts
 function want(sym) {
   const p = act(); if (!p || p.sym === sym) return;
+  if (p.autoSpot && p.mkt === 'spot') { p.mkt = 'fut'; syncBar(); }   // the previous coin was on spot only for want of futures
+  p.autoSpot = false;
   p.toSpot = true;
   if (loopOn) return setSym(sym);
   p.prevSym = p.sym; p.sym = sym; p.d = null; savePanes(); syncBar(); p.label();
@@ -1663,9 +1674,11 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// ---------- public: called by index.html when the «Графики» tab opens / closes; sym — a coin to show (the coin card's button) ----------
+// ---------- public: called by index.html when the charts come into view / leave it ----------
+// sym — a coin for the active chart (the coin card, a #charts/SYM link); where — 'card' (the market's coin card, one chart)
+// or 'tab' (the full view: 1 / 2 / 4 charts and the list). index.html moves their elements there first
 let wired = false, sampler = null;
-export function open(kit, sym) {
+export function open(kit, sym, where = 'tab') {
   K = kit;
   if (!wired) {
     wired = true;
@@ -1679,8 +1692,8 @@ export function open(kit, sym) {
     if (PHONE.matches && sel.has('act') && !K.load('sr_bactph', false)) { hidden.add('act'); K.save('sr_bhide', [...hidden]); }
     K.save('sr_bactph', true);
     chipsOpen = K.load('sr_bchips', !PHONE.matches); wire(); wireChips(); renderInd();
-    setLayout(K.load('sr_blay', 1));
   }
+  if (!pool.length || card !== (where === 'card')) { card = where === 'card'; closePop(); applyLayout(); }
   if (sym) want(sym);
   if (loopOn) return;
   loopOn = true; renderList();
@@ -1689,5 +1702,6 @@ export function open(kit, sym) {
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
-// leaving the tab closes the streams (no traffic in the background); the heatmap collected so far stays in memory
-export function pause() { if (!loopOn) return; loopOn = false; clearInterval(sampler); panes.forEach(p => p.disconnect()); closePop(); if (tool) setTool(null); }
+// out of view the streams close (no traffic in the background); the heatmap collected so far stays in memory. The indicator
+// window covers the whole page, so it closes too
+export function pause() { if (!loopOn) return; loopOn = false; clearInterval(sampler); panes.forEach(p => p.disconnect()); closePop(); closeInd(); if (tool) setTool(null); }

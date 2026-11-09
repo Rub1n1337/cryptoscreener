@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.79 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.80 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.80', date:'9 ноября 2026', title:'Правки шапки и поиска', items:[
+    'Исправлено: поля дат в бэктесте выходили за край экрана на iPhone.',
+    'Исправлено: на телефоне поиск и колокольчик оставались подсвеченными после закрытия.',
+    'На телефоне поиск закрывается крестиком рядом с полем, а подсказки к пунктам больше не обрезают названия.',
+    'Исправлено: на компьютере кнопка «Войти» стояла рядом с логотипом вместо правого угла.',
+  ]},
   {v:'2.79', date:'9 ноября 2026', title:'Свой период и честный топ', items:[
     'Добавлен период бэктеста «Свои даты»: любые даты с 2020 года, например прошлый год.',
     'Честный топ «на каждый момент» стал точнее: в нём учтены монеты, которые были в топе тогда, а потом из него выпали.',

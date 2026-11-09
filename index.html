@@ -480,6 +480,12 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bhint button{height:28px;padding:0 10px;font-size:12.5px}
 .bph .bpx{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text)}.bph .live{font-size:11.5px}
 @media(max-width:1250px){#bIndBtn .ib-t{display:none}}
+/* the coin card's two views: «Канал» (the channel chart) and «Стакан» (the charts' bar and one chart, moved in from beta.js's
+   place). In the card the coin comes from the card (its search, the list), so the charts' own coin field and layout hide */
+#cpanel.ob #cpair,#cpanel.ob #ulv,#cpanel.ob>.legend,#cpanel.ob #sheet,#cpanel.ob #tfseg,#cpanel.ob #cset,#cpanel:not(.ob) #cBeta{display:none}
+.cbeta{margin-top:12px}.cbeta .bmain{padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+.cbeta .bsym,.cbeta .bbar-r{display:none}.cbeta .bcv{height:clamp(440px,60vh,700px)}body.wide .cbeta .bcv{height:min(74vh,820px)}
+.cbeta #bLive{margin-top:8px;font-size:12.5px}
 /* phone: the tool hint covers the chart's header (legend, chips), not the plot, and doesn't push the chart down — a chart that
    moved under the finger between choosing a tool and drawing, and jumped back after it */
 @media(max-width:700px){#bLay [data-lay="4"]{display:none}.bhint{top:0;bottom:auto;left:0;right:0;transform:none;justify-content:space-between;white-space:normal;border-radius:12px;line-height:1.35}}
@@ -607,7 +613,7 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
   .sheetbar button{background:transparent;border-color:transparent;color:var(--blue);font-weight:600;gap:2px;padding:0 8px;height:40px}
   .sheetbar .sb-r{margin-left:auto;gap:6px}#cCharts{display:none}   /* on a phone «Графики» sit in the sheet's bar, not among the timeframes */
   body.sheet #cv{height:52vh}
-  #cpanel .cact .search{display:none}#cpanel .cact .seg{flex:1}
+  #cpanel .cact .search{display:none}#cpanel .cact .seg{flex:1}#cpanel .cact #cmode{flex:1 1 100%}   /* «Канал | Стакан» on a row of its own */
   #refresh{display:none}
   /* chart toolbar above the canvas, not over it */
   .cvwrap{display:flex;flex-direction:column-reverse}.ctools{position:static;opacity:1;margin-bottom:6px;flex-wrap:wrap}
@@ -936,18 +942,18 @@ details.dis>.dbody{padding:0 16px 16px}
 /* ---------- glass (Lovable, the owner's pick): light sits on surfaces — a pearl top edge, a cool reflection, a darker
    bottom — on the header, its tools, menus and dialogs; gold stays for what is chosen. Rows, numbers and chart pixels stay
    opaque and sharp; the header's own rules are with .top ---------- */
-.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(#beta *,.bpop *)){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
+.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
 .top .tools button:not(.primary,.on,.bad){background-color:var(--s2)}
 .top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
 /* hover glass only with a real pointer: a phone keeps :hover on the last tapped button — the bell stayed framed after the tap
    that closed its panel (2.81; the fill was moved under hover:hover in 2.80, this border wasn't) */
-@media (hover:hover){.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(#beta *,.bpop *)):hover{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}}
+@media (hover:hover){.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)):hover{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}}
 /* on hover a reflection crosses the button once */
 @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
-  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(#beta *,.bpop *)){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
-  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(#beta *,.bpop *)):hover{background-position:0 0,0 0}
+  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)):hover{background-position:0 0,0 0}
 }
-.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active,button.icon:active,button:not([class]):not(:where(#beta *,.bpop *)):active{box-shadow:inset 0 2px 5px var(--glass-press)}
+.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active,button.icon:active,button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)):active{box-shadow:inset 0 2px 5px var(--glass-press)}
 .top .tab.on::after{box-shadow:0 2px 8px var(--light-edge)}
 /* segmented controls (timeframes, filters, modes) are a glass track; the chosen tab sits in it as a lighter pane */
 .seg{background:var(--control-shine),var(--s2);border-color:var(--glass-line);box-shadow:var(--glass-inset)}
@@ -967,7 +973,7 @@ button.primary:hover,.authgo:hover{box-shadow:var(--glass-inset),0 4px 16px -6px
 /* a card inside a card (the signal breakdown, the bot's hero, the trade card's head): only the lit edge */
 .detail,.bhero,.thero{background-image:var(--panel-sheen);box-shadow:inset 0 1px 0 var(--glass-shine)}
 /* fields sit a little into the glass: a soft shade under the top edge, the same cool rim as the buttons */
-:where(input:not([type=checkbox],[type=range]),select):not(:where(.cmdin *,#beta *,.bpop *)){border-color:var(--glass-line);box-shadow:inset 0 1px 2px var(--glass-shade)}
+:where(input:not([type=checkbox],[type=range]),select):not(:where(.cmdin *,.bmain *,.bside *,#bInd *,.bpop *)){border-color:var(--glass-line);box-shadow:inset 0 1px 2px var(--glass-shade)}
 /* the sign-in screen, the first thing a visitor sees: one glass card over the gold light (frosted below where it can blur) */
 .gate{width:min(560px,calc(100% - 32px));padding:28px 28px 24px;border:1px solid var(--line);border-top-color:var(--glass-top);border-radius:var(--r-l);background:var(--panel-sheen),var(--s1);box-shadow:inset 0 1px 0 var(--glass-edge),0 24px 60px -30px var(--glass-drop)}
 @media(max-width:560px){.gate{padding:22px 18px 20px}}
@@ -1235,6 +1241,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <div style="min-width:0"><div class="ctitle" id="ctitle">—</div><div class="stats" id="cstats"></div></div>
           <div class="cact">
             <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" autocapitalize="characters" autocorrect="off" spellcheck="false" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
+            <div class="seg mini" id="cmode" role="group" aria-label="Вид графика"><button class="tab on" data-cm="ch" aria-pressed="true" title="Канал: границы обычного диапазона, сигналы, свои уровни, второй таймфрейм">Канал</button><button class="tab" data-cm="ob" aria-pressed="false" title="Стакан: заявки, сделки и ликвидации Binance вживую на графике этой монеты">Стакан</button></div>
             <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button><button class="tab" data-tf="1d" title="Дневные свечи">1д</button><button class="tab" data-tf="1w" title="Недельные свечи">1н</button></div>
             <button class="icon" id="cCharts" data-charts title="Эта монета на «Графиках»: стакан, сделки, ликвидации" aria-label="Открыть на «Графиках»"><svg class="i"><use href="#i-layers"/></svg></button>
             <button class="icon" id="cset" title="Настройки канала" aria-label="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
@@ -1254,6 +1261,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <button id="reset" title="Вернуть стандартные настройки">Сбросить</button>
           <div class="mute" style="font-size:12px;flex-basis:100%" id="mhint"></div>
         </div>
+        <div class="cbeta" id="cBeta"></div>   <!-- «Стакан»: the charts' bar and chart (beta.js) move in here -->
         <div class="cpair" id="cpair" style="margin-top:12px">
           <div class="cvwrap"><canvas id="cv" tabindex="0" aria-label="График цены. Стрелки — листать, плюс и минус — масштаб, End — к последней свече, L — свой уровень, T — второй таймфрейм"></canvas></div>
           <div id="tf2box" class="tf2 hidden"><div class="tf2head"><span>Второй таймфрейм</span><div class="seg mini" id="tf2seg"><button class="tab" data-tf2="15m">15м</button><button class="tab" data-tf2="1h">1ч</button><button class="tab" data-tf2="4h">4ч</button><button class="tab" data-tf2="1d">1д</button><button class="tab" data-tf2="1w">1н</button></div><span class="mute" id="tf2stat"></span></div>
@@ -1791,7 +1799,7 @@ const KEYS = {
   sr_recent:'device', sr_chart:'device', sr_seen:'device', sr_seenv:'device', sr_events:'device', sr_evread:'device',
   // how this screen looks: a phone wants other than a computer (the number of Beta charts, hidden panels, open sections)
   sr_theme:'device', sr_glass:'device', sr_wide:'device', sr_more:'device', sr_bmore:'device', sr_btadv:'device',
-  sr_bprof:'device', sr_jmode:'device', sr_blay:'device', sr_bhide:'device', sr_bact:'device', sr_bactph:'device',
+  sr_bprof:'device', sr_jmode:'device', sr_blay:'device', sr_bhide:'device', sr_bact:'device', sr_bactph:'device', sr_cmode:'device',
   // this browser's notification permission and sound, the intro, caches, the charts' server override
   sr_ntf:'device', sr_sound:'device', sr_intro:'device', sr_pool:'device', sr_bsrv:'device',
   // old keys, read once to move to newer ones or removed on start (sr_delisted, sr_beta)
@@ -2501,11 +2509,13 @@ const barAt = (t, time) => { let i = 0; while (i + 1 < t.length && t[i + 1] <= t
 
 // ---------- market chart ----------
 let chartSym = load('sr_chart', 'BTCUSDT'), chart = null, chartK = null, chartReq = 0, hoverI = null, hoverY = null, chartGeo = null, chartView = null, zm = null, lastPx = {};
+let cmode = load('sr_cmode', 'ch') === 'ob' ? 'ob' : 'ch';   // the card's view: «Канал» (ch) or «Стакан» (ob, setCmode)
 async function loadChart(sym) {
   if (sym && sym !== chartSym) { chartView = null; chart2View = null; }
   chartSym = sym || chartSym; save('sr_chart', chartSym);
   if (page === 'market') setHash();
   loadWalls();
+  if (cmode === 'ob') betaSync();   // «Стакан»: the same coin on its chart
   const req = ++chartReq, want = chartSym, wrap = $('#cv').parentElement;
   // another coin: until its candles come, the previous coin's chart must not pass for this one (on a phone network that
   // takes seconds): the title says what is loading, the old chart fades under «Загружаю график…» (.cvwrap[data-wait])
@@ -4325,6 +4335,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.92', date:'9 ноября 2026', title:'Стакан в карточке монеты', items:[
+    'Добавлен переключатель «Канал | Стакан» над графиком в карточке монеты на «Рынке».',
+    'В режиме «Стакан» — живой график со стаканом, сделками и ликвидациями той же монеты, со своими индикаторами и таймфреймом.',
+    'Выбор монеты в списке меняет и график стакана.',
+    'Поток данных идёт, только пока график стакана на экране.',
+  ]},
   {v:'2.91', date:'9 ноября 2026', title:'Справка о стакане', items:[
     'Добавлен раздел справки о стакане и потоке сделок, а в словарь — новые термины.',
     'В правовой информации описаны данные стаканов, сделок и ликвидаций.',
@@ -4376,12 +4392,6 @@ const CHANGELOG = [
   ]},
   {v:'2.81', date:'9 ноября 2026', title:'Колокольчик на телефоне', items:[
     'Исправлено: на телефоне колокольчик и значок работы ботов оставались выделенными после повторного нажатия.',
-  ]},
-  {v:'2.80', date:'9 ноября 2026', title:'Правки шапки и поиска', items:[
-    'Исправлено: поля дат в бэктесте выходили за край экрана на iPhone.',
-    'Исправлено: на телефоне поиск и колокольчик оставались подсвеченными после закрытия.',
-    'На телефоне поиск закрывается крестиком рядом с полем, а подсказки к пунктам больше не обрезают названия.',
-    'Исправлено: на компьютере кнопка «Войти» стояла рядом с логотипом вместо правого угла.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4559,7 +4569,7 @@ function go(t, push = true) {
   $('#foot').classList.toggle('hidden', t !== 'market');   // the scanner status belongs to the market tab
   if (push) setHash();
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
-  if (t === 'beta') betaOpen(); else betaPause?.();
+  betaSync();   // the live charts: on «Графики» or in the card's «Стакан», paused elsewhere
   if (t === 'backtest' && btRes) drawEquity();
   if (t === 'market') { drawChart(); loadWalls(); }
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
@@ -4589,12 +4599,12 @@ function openSheet() {
   sheetY = scrollY; document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden';
   history.pushState({sheet:1}, ''); $('#cpanel').scrollTop = 0;
   requestAnimationFrame(drawChart);   // the canvas had no size while hidden
-  loadWalls();
+  loadWalls(); betaSync();
 }
 // the sheet leaves quicker than it came (DESIGN-RULES §13): .sheet-out for --dur-1, then the list is back at the same place.
 // A rotation to a wide screen (now) or reduced motion closes it at once
 function closeSheet(now) {
-  const done = () => { sheetOut = 0; document.body.classList.remove('sheet', 'sheet-out'); document.documentElement.style.overflow = ''; scrollTo({top:sheetY, behavior:'instant'}); };
+  const done = () => { sheetOut = 0; document.body.classList.remove('sheet', 'sheet-out'); document.documentElement.style.overflow = ''; scrollTo({top:sheetY, behavior:'instant'}); betaSync(); };
   if (now || matchMedia('(prefers-reduced-motion: reduce)').matches) { clearTimeout(sheetOut); return done(); }
   if (sheetOut) return;
   document.body.classList.add('sheet-out');
@@ -4607,7 +4617,7 @@ function openCoin(sym) {
 }
 $('#sheetBack').onclick = () => history.state?.sheet ? history.back() : closeSheet();
 window.addEventListener('popstate', () => { if (document.body.classList.contains('sheet')) closeSheet(); });
-matchMedia('(max-width:700px)').addEventListener('change', e => { if (!e.matches && document.body.classList.contains('sheet')) { closeSheet(true); drawChart(); } });   // rotated to a wide screen
+matchMedia('(max-width:700px)').addEventListener('change', e => { if (!e.matches && document.body.classList.contains('sheet')) { closeSheet(true); drawChart(); } betaSync(); });   // rotated to a wide screen; a phone's closed card has no live charts
 // summary cards are shortcuts to the matching filter; a second tap clears it
 document.querySelectorAll('.card[data-cf]').forEach(c => {
   c.onclick = () => {
@@ -5254,11 +5264,37 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); $('#cmdk').classList.contains('hidden') ? cmdOpen() : cmdClose(); }
 });
 
-// ---------- «Графики» (page id «beta»): live order books, trades and candles; their code (beta.js) loads on the first open ----------
+// ---------- live charts (beta.js, loaded on first use): «Графики» (page id «beta») and the coin card's «Стакан» ----------
 // Open to everyone signed in since 2.88. The closed test's access codes stay in the database (beta_* functions and tables) for
 // a future closed check; the site no longer calls them. sr_beta, this device's old access check, is dropped.
+// One set of elements (the bar, the charts, their pop-ups, the live line) moves to where it is shown; ids stay, beta.js finds
+// them by id. The indicator window covers the page, so it lives in <body>, out of both places.
 let betaMod = null, betaPause = null, betaWant = null;   // betaWant: a coin to put on the active chart on opening (readHash, openCharts)
 try { localStorage.removeItem('sr_beta'); } catch {}
+document.body.append($('#bInd'));
+// where the live charts are on screen: the «Графики» tab, the card in «Стакан» (on a phone — the open sheet), or nowhere
+const betaWhere = () => page === 'beta' ? 'tab' : page === 'market' && cmode === 'ob' && (!isPhone() || document.body.classList.contains('sheet')) ? 'card' : null;
+// streams run only where the charts are seen; anywhere else — and after a minute in a background tab — they pause
+function betaSync() {
+  const w = betaWhere();
+  if (!w || betaBgPaused) return betaPause?.();
+  const m = $('.bmain'), box = w === 'card' ? $('#cBeta') : $('#beta .bgrid'), liveBox = w === 'card' ? $('#cBeta') : $('#beta .bhead-r');
+  if (m.parentElement !== box) box.prepend(m);   // moved only when the place changes: a move drops the focus
+  if ($('#bLive').parentElement !== liveBox) liveBox.append($('#bLive'));
+  betaOpen(w);
+}
+// the card's view: «Канал» or «Стакан» (remembered on this device); each keeps its own timeframe
+function setCmode(m) {
+  cmode = m; save('sr_cmode', m);
+  $('#cpanel').classList.toggle('ob', m === 'ob');
+  document.querySelectorAll('#cmode .tab').forEach(b => { b.classList.toggle('on', b.dataset.cm === m); b.setAttribute('aria-pressed', String(b.dataset.cm === m)); });
+  if (m === 'ob' && levelMode) setLevelMode(false);
+  if (m === 'ch') requestAnimationFrame(drawChart);   // the canvas had no size while hidden
+  betaSync();
+}
+$('#cmode').onclick = e => { const b = e.target.closest('[data-cm]'); if (b && b.dataset.cm !== cmode) setCmode(b.dataset.cm); };
+$('#cpanel').classList.toggle('ob', cmode === 'ob');
+document.querySelectorAll('#cmode .tab').forEach(b => { b.classList.toggle('on', b.dataset.cm === cmode); b.setAttribute('aria-pressed', String(b.dataset.cm === cmode)); });
 // the coin card's «Графики» buttons: the same coin there. On a phone the card is a sheet: it closes at once, and the tab's
 // address replaces the sheet's history entry, so Back returns to the market
 function openCharts(sym) {
@@ -5266,20 +5302,21 @@ function openCharts(sym) {
   if (document.body.classList.contains('sheet')) closeSheet(true);
   go('beta');
 }
-async function betaOpen() {
+async function betaOpen(w) {
   try {
     betaMod ||= await import('./beta.js'); betaPause = betaMod.pause;
-    const sym = betaWant; betaWant = null;
-    if (page === 'beta') betaMod.open(window.__sr.kit, sym);   // left the tab while beta.js was loading: start no streams behind another tab
-  } catch (e) { toast('Графики не загрузились', String(e.message || e), 'bad'); }
+    if (betaWhere() !== w || betaBgPaused) { if (w === 'tab') betaWant = null; return; }   // left while beta.js was loading: start no streams out of sight
+    const sym = w === 'card' ? chartSym : betaWant; if (w === 'tab') betaWant = null;
+    betaMod.open(window.__sr.kit, sym, w);
+  } catch (e) { toast('Графики не загрузились', String(e.message || e), 'bad'); if (w === 'card' && cmode === 'ob') setCmode('ch'); }
 }
-// a forgotten background tab must not keep the Beta's live streams (10 book updates a second per chart) busy:
+// a forgotten background tab must not keep the live streams (10 book updates a second per chart) busy:
 // after a minute out of sight they close, and come back — with a fresh book — when the tab is looked at again
 let betaBgTimer = null, betaBgPaused = false;
 document.addEventListener('visibilitychange', () => {
   clearTimeout(betaBgTimer);
-  if (document.hidden) { if (page === 'beta') betaBgTimer = setTimeout(() => { if (document.hidden && page === 'beta' && betaPause) { betaPause(); betaBgPaused = true; } }, 60000); }
-  else if (betaBgPaused) { betaBgPaused = false; if (page === 'beta') betaOpen(); }
+  if (document.hidden) { if (betaWhere()) betaBgTimer = setTimeout(() => { if (document.hidden && betaPause) { betaPause(); betaBgPaused = true; } }, 60000); }
+  else if (betaBgPaused) { betaBgPaused = false; betaSync(); }
 });
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
 let sharedIn = null;
@@ -5380,10 +5417,10 @@ async function checkUpdate() {
   let h; try { h = await fetchVersion(); } finally { updBusy = false; }
   if (reloading || h == null || h === selfHash) return;
   if (btBusy) return;   // a backtest downloading a year of history is not cut off: the next check (3 min) reloads after it
-  // never reload over unsaved edits, an open dialog, an open trade card or «Графики» (live order books: a reload re-syncs them) —
-  // ask once instead (the next check after they close or the page changes reloads by itself)
+  // never reload over unsaved edits, an open dialog, an open trade card or live charts («Графики», the card's «Стакан»: a reload
+  // re-syncs their books) — ask once instead (the next check after they close or the page changes reloads by itself)
   const dirty = formDirty();
-  if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || page === 'beta') {
+  if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || betaWhere()) {
     if (!updWarned) toast('Вышла новая версия сайта', dirty ? 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.'
       : 'Обновите страницу, когда закончите — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
     updWarned = true; return;
