@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.78 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.79 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.79', date:'9 ноября 2026', title:'Свой период и честный топ', items:[
+    'Добавлен период бэктеста «Свои даты»: любые даты с 2020 года, например прошлый год.',
+    'Честный топ «на каждый момент» стал точнее: в нём учтены монеты, которые были в топе тогда, а потом из него выпали.',
+    'Итоги бэктеста в режиме «на каждый момент» могут отличаться от прежних.',
+    'История свечей загружается надёжнее при высокой нагрузке.',
+  ]},
   {v:'2.78', date:'9 ноября 2026', title:'Быстрая история бэктеста', items:[
     'Первый запуск бэктеста стал заметно быстрее.',
     'Повторные запуски стали быстрыми и после перезагрузки страницы.',
