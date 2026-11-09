@@ -1,3 +1,4 @@
+import { LOGIN_EMOJI, LOGIN_TTL } from "./login.ts";
 // Telegram: commands and buttons, shared by the "tg" function (the webhook: Telegram calls it the moment a message or a
 // button press arrives) and the bot function (falls back to reading updates once a minute while the webhook isn't registered).
 // Every screen is one message with buttons under it; a press edits that message in place instead of sending a new one.
@@ -39,6 +40,10 @@ async function ctx(db: any, chat: number) {
   ]);
   return { sub, bot: bots?.[0] || null };
 }
+// a command or a button in the bot's chat counts as a visit: the site bot writing here keeps running 30 days from it, as from
+// opening the site (the owner's decision, 09.11; supabase/2026-11-keepalive.sql). At most one write in 10 minutes
+const visited = (db: any, c: any) => c.bot ? db.from("user_bots").update({ last_seen: new Date().toISOString() })
+  .eq("id", c.bot.id).lt("last_seen", new Date(Date.now() - 6e5).toISOString()) : null;
 const profileOf = (bot: any) => { const ps = Array.isArray(bot?.config?.profiles) ? bot.config.profiles : []; return ps.find((p: any) => p.name === bot.active_profile) || ps[0] || null; };
 const sigMinOf = (set: any) => Math.max(40, Number(set?.minScore ?? 60));
 // the linked bot's notification settings (user_bots.alerts, see supabase/alerts.sql), with the defaults filled in
@@ -207,9 +212,7 @@ const show = (call: Call, chat: number, s: Screen, mid?: number) => call(mid ? "
 const chatName = (ch: any) => String(ch?.title || [ch?.first_name, ch?.last_name].filter(Boolean).join(" ") || ch?.username || "").slice(0, 80);
 
 // ---------- sign-in to the site (functions/auth): the person picks the code their tab shows ----------
-// the same list is in functions/auth: single code points (4 bytes each), so "L:<nonce>:<two emoji>" fits in 64 bytes of button data
-const LOGIN_EMOJI = ["🍋", "🚀", "🐳", "🦊", "🍉", "🌵", "🎯", "🔥", "🌙", "🍀", "🐙", "🦄", "🍒", "🎲", "🐝", "🍄"];
-const LOGIN_TTL = 5 * 60e3;
+// the emoji and the request's lifetime are shared with functions/auth (_shared/login.ts)
 async function loginReq(db: any, nonce: string) {   // an open request: not answered, not used, not older than 5 minutes
   if (!/^[0-9a-f]{32}$/.test(nonce)) return null;
   const { data } = await db.from("login_requests").select("nonce, code, created_at, confirmed_at, denied_at, used_at").eq("nonce", nonce).maybeSingle();
@@ -256,6 +259,7 @@ async function onMessage(db: any, m: any, call: Call) {
   const say = (t: string, kb?: any[][]) => call("sendMessage", { chat_id: chat, text: t, parse_mode: "HTML", disable_web_page_preview: true, ...(kb ? { reply_markup: { inline_keyboard: kb } } : {}) });
   if (cmd === "/start" && arg.startsWith("login_")) return loginPrompt(db, arg.slice(6), say);   // signing in doesn't subscribe anyone
   let c = await ctx(db, chat);
+  await visited(db, c);
   // only a profile's bot writes here, and only to its profile's Telegram: it is turned on on the site («Мой бот» → Telegram),
   // nothing links a bot from this chat (supabase/2026-11-profile-bot.sql)
   if (cmd === "/start") {
@@ -264,7 +268,7 @@ async function onMessage(db: any, m: any, call: Call) {
     return show(call, chat, home(c));
   }
   if (cmd === "/stop") {
-    await db.from("tg_subs").delete().eq("chat_id", chat); await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat);
+    await db.rpc("tg_chat_off", { p_chat: chat, p_unsubscribe: true });   // the one «Telegram off» (supabase/2026-11-tg-off.sql)
     return say("👋 Вы отписались от всего, сообщения вашего бота с сайта выключены. Вернуться можно в любой момент.", [[btn("▶️ Подписаться снова", "go")]]);
   }
   if (!c.sub) return say("Сначала подпишитесь — это бесплатно и отключается в любой момент.", [[btn("▶️ Начать", "go")]]);
@@ -277,7 +281,7 @@ async function onMessage(db: any, m: any, call: Call) {
     if (r) await say(r);
     return show(call, chat, await notifyScreen(db, await ctx(db, chat)));
   }
-  if (cmd === "/unlink") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); return say("🔕 Сообщения бота с сайта выключены. Включить снова — на сайте: «Мой бот» → Telegram."); }
+  if (cmd === "/unlink") { await db.rpc("tg_chat_off", { p_chat: chat }); return say("🔕 Сообщения бота с сайта выключены. Включить снова — на сайте: «Мой бот» → Telegram."); }
   const key = ({ "/notify": "n", "/settings": "n", "/status": "n", "/bot": "s", "/mybot": "m", "/help": "?" } as Record<string, string>)[cmd] || "h";
   return show(call, chat, await screenFor(db, key, c));
 }
@@ -314,11 +318,12 @@ async function onButton(db: any, q: any, call: Call) {
   const answer = (text = "", alert = false) => call("answerCallbackQuery", { callback_query_id: q.id, ...(text ? { text, show_alert: alert } : {}) });
   if (!chat) return answer();
   let c = await ctx(db, chat), note = "";
+  await visited(db, c);
   if (key === "go") { if (!c.sub) await db.from("tg_subs").upsert({ chat_id: chat, name: chatName(q.message.chat) }, { onConflict: "chat_id", ignoreDuplicates: true }); note = "Подписка включена"; }
   else if (!c.sub) return answer("Вы отписаны — нажмите /start, чтобы вернуться.", true);
   if (key === "ex") { await answer(); return call("sendMessage", { chat_id: chat, text: EXAMPLE, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: [[btn("🔔 Уведомления", "+n")]] } }); }
   if (key.startsWith("t:")) { note = await toggle(db, chat, c, key.slice(2)) || ""; if (!c.bot && key !== "t:shared") return answer(note, true); }
-  if (key === "u!") { await db.from("user_bots").update({ tg_chat: null }).eq("tg_chat", chat); note = "Сообщения выключены"; }
+  if (key === "u!") { await db.rpc("tg_chat_off", { p_chat: chat }); note = "Сообщения выключены"; }
   if (key === "s" || (key === "m" && c.bot)) note = "Обновлено";
   c = await ctx(db, chat);
   const scr = await screenFor(db, key, c);

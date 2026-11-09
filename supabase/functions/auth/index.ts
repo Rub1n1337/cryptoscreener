@@ -7,11 +7,11 @@
 // /auth/v1/verify. Someone who sends a victim their own login link gains nothing: the victim's tab never shows that code,
 // and the session goes only to the tab that holds the secret.
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { LOGIN_EMOJI, LOGIN_TTL } from "../_shared/login.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-const TTL = 5 * 60e3, MAX_STARTS = 10, MAX_POLLS = 200;
-// the same list is in _shared/tg.ts: single code points only (4 bytes each), so two of them fit in Telegram's 64-byte button data
-export const EMOJI = ["🍋", "🚀", "🐳", "🦊", "🍉", "🌵", "🎯", "🔥", "🌙", "🍀", "🐙", "🦄", "🍒", "🎲", "🐝", "🍄"];
+// the emoji and the request's lifetime are shared with the bot's buttons (_shared/login.ts)
+const TTL = LOGIN_TTL, EMOJI = LOGIN_EMOJI, MAX_STARTS = 10, MAX_POLLS = 200;
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "content-type, apikey, authorization", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");

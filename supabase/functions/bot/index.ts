@@ -138,7 +138,9 @@ async function tgSend(chat: number | string, text: string, syms: string[] = [], 
       ...(reply ? { reply_parameters: { message_id: reply, allow_sending_without_reply: true } } : {}) };
     let r = await tgCall("sendMessage", reply ? base : { ...base, reply_markup: keyboard(syms) });
     if (r && !r.ok && r.error_code === 400 && !reply) r = await tgCall("sendMessage", base);   // buttons refused: send without them
-    if (r && !r.ok && r.error_code === 403) { await db.from("tg_subs").delete().eq("chat_id", chat); return 0; }   // the user blocked the bot
+    // the user blocked the bot: the chat is gone — its subscription and the site bot's messages (before, only the subscription
+    // went, and the profile's bot kept sending here while the site showed «Включено»); see supabase/2026-11-tg-off.sql
+    if (r && !r.ok && r.error_code === 403) { await db.rpc("tg_chat_off", { p_chat: Number(chat), p_unsubscribe: true }); return 0; }
     // what happened to the last message in this chat, so a "nothing came" can be checked (one statement, see tg_sent)
     await db.rpc("tg_sent", { p_chat: Number(chat), p_ok: !!r?.ok, p_err: r?.ok ? null : String(r?.description || "нет ответа") });
     return r?.ok ? Number(r.result?.message_id) || 0 : 0;
@@ -294,7 +296,7 @@ async function run() {
   return { scanned: rows.length, signals: rows.filter((r) => M.wants(M.tradeRow(r), S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, notes };
 }
 
-// ---------- personal bots (one per browser; config = profiles chosen on the site) ----------
+// ---------- personal bots (one per profile, user_bots.user_id; config = the profiles chosen on the site) ----------
 let AN = 0;   // coin analyses in the last run of the personal bots (reported in the response, to watch the load)
 const AW = new WeakMap<object, Map<string, any>>();   // analyses of a kept candle array, reused while it is not refreshed (lazy candles)
 const PROFILE_DEF = { method: "log", N: 210, k: 3, tf: "15m", minScore: 60, strategy: "revert", rr: 0, risk: 0.02, lev: 1, minWidth: 0, maxHL: 0, longOnly: false, coinErMax: 0 };
