@@ -98,7 +98,8 @@ async function remote(groups: Groups, lazy: boolean, now: number, out: Map<strin
     const r = await fetch(SCAN_URL, { method: "POST", headers: { "content-type": "application/json", ...(SCAN_TOK ? { "x-scan-token": SCAN_TOK } : {}) },
       body: JSON.stringify({ fp: FPRINT, now, tasks }), signal: AbortSignal.timeout(timeout) });
     // T½ = ∞ can't travel in JSON: it comes as "__Infinity"
-    const j = JSON.parse(await r.text(), (_k, v) => typeof v === "string" && v.startsWith("__") ? Number(v.slice(2)) : v);
+    // only the exact values scan.js encode() writes: any other string that merely starts with "__" stays a string
+    const j = JSON.parse(await r.text(), (_k, v) => typeof v === "string" && /^__(-?Infinity|NaN)$/.test(v) ? Number(v.slice(2)) : v);
     if (j.error || !Array.isArray(j.rows)) throw new Error(j.error || "no rows");
     let n = 0;
     tasks.forEach((t, i) => { for (const [sym, row] of Object.entries(j.rows[i] || {})) if (row) { out.set(rkey(sym, t), row); n++; } });

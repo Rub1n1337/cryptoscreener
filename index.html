@@ -942,7 +942,10 @@ details.dis>.dbody{padding:0 16px 16px}
    opaque and sharp; the header's own rules are with .top ---------- */
 .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(#beta *,.bpop *)){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
 .top .tools button:not(.primary,.on,.bad){background-color:var(--s2)}
-.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(#beta *,.bpop *)):hover,.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
+.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
+/* hover glass only with a real pointer: a phone keeps :hover on the last tapped button — the bell stayed framed after the tap
+   that closed its panel (2.81; the fill was moved under hover:hover in 2.80, this border wasn't) */
+@media (hover:hover){.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(#beta *,.bpop *)):hover{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}}
 /* on hover a reflection crosses the button once */
 @media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
   .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(#beta *,.bpop *)){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
@@ -1018,7 +1021,8 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 .top .tools #guardPill{min-height:36px;background:transparent;box-shadow:none;border-color:transparent}
 #guardPill .dot{flex:none;width:7px;height:7px}#guardPill.ok .dot{box-shadow:none}
 .top .tools #guardPill:is(.ok,.load){width:36px;min-width:36px;padding:0;justify-content:center;border-radius:var(--r)}
-.top .tools #guardPill:is(.ok,.load):hover,.top .tools #guardPill[aria-expanded=true]:is(.ok,.load){background:var(--ui-selected);border-color:var(--line2)}
+.top .tools #guardPill[aria-expanded=true]:is(.ok,.load){background:var(--ui-selected);border-color:var(--line2)}
+@media (hover:hover){.top .tools #guardPill:is(.ok,.load):hover{background:var(--ui-selected);border-color:var(--line2)}}   /* no stuck pad after a tap (2.81) */
 #guardPill:is(.ok,.load) #guardTxt{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .top .tools #guardPill:not(.ok,.load){height:auto;padding:4px 9px;gap:7px;border-radius:var(--r);background:var(--s2);border-color:var(--line2);white-space:normal}
 .top .tools #guardPill.bad{background:var(--bad-bg);border-color:var(--bad-line);color:var(--up-t)}
@@ -4131,6 +4135,9 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.81', date:'9 ноября 2026', title:'Колокольчик на телефоне', items:[
+    'Исправлено: на телефоне колокольчик и значок работы ботов оставались выделенными после повторного нажатия.',
+  ]},
   {v:'2.80', date:'9 ноября 2026', title:'Правки шапки и поиска', items:[
     'Исправлено: поля дат в бэктесте выходили за край экрана на iPhone.',
     'Исправлено: на телефоне поиск и колокольчик оставались подсвеченными после закрытия.',
@@ -4199,9 +4206,6 @@ const CHANGELOG = [
     'Кнопки в шапке откликаются бликом при наведении и мягко проседают при нажатии.',
     'Карточки сводки при наведении подсвечиваются цветом своего смысла.',
     'При включённом в системе уменьшении прозрачности стекло становится сплошным.',
-  ]},
-  {v:'2.69', date:'2 ноября 2026', title:'Золотое свечение', items:[
-    'Добавлено мягкое золотое свечение у логотипа, которое видно сквозь шапку.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

@@ -1,6 +1,9 @@
-// Older «Что нового» entries (2.68 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.69 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.69', date:'2 ноября 2026', title:'Золотое свечение', items:[
+    'Добавлено мягкое золотое свечение у логотипа, которое видно сквозь шапку.',
+  ]},
   {v:'2.68', date:'2 ноября 2026', title:'Удобнее на телефоне', items:[
     'Название вкладки браузера показывает раздел или открытую монету.',
     'Ссылка на сайт в мессенджерах показывает название и описание.',

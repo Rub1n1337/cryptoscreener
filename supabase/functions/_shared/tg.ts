@@ -259,7 +259,8 @@ async function onMessage(db: any, m: any, call: Call) {
   // only a profile's bot writes here, and only to its profile's Telegram: it is turned on on the site («Мой бот» → Telegram),
   // nothing links a bot from this chat (supabase/2026-11-profile-bot.sql)
   if (cmd === "/start") {
-    if (!c.sub) { await db.from("tg_subs").insert({ chat_id: chat, name: chatName(m.chat) }); c = await ctx(db, chat); }
+    // two /start in the same second: the second one finds the row made by the first instead of failing on the key
+    if (!c.sub) { await db.from("tg_subs").upsert({ chat_id: chat, name: chatName(m.chat) }, { onConflict: "chat_id", ignoreDuplicates: true }); c = await ctx(db, chat); }
     return show(call, chat, home(c));
   }
   if (cmd === "/stop") {
@@ -313,7 +314,7 @@ async function onButton(db: any, q: any, call: Call) {
   const answer = (text = "", alert = false) => call("answerCallbackQuery", { callback_query_id: q.id, ...(text ? { text, show_alert: alert } : {}) });
   if (!chat) return answer();
   let c = await ctx(db, chat), note = "";
-  if (key === "go") { if (!c.sub) await db.from("tg_subs").insert({ chat_id: chat, name: chatName(q.message.chat) }); note = "Подписка включена"; }
+  if (key === "go") { if (!c.sub) await db.from("tg_subs").upsert({ chat_id: chat, name: chatName(q.message.chat) }, { onConflict: "chat_id", ignoreDuplicates: true }); note = "Подписка включена"; }
   else if (!c.sub) return answer("Вы отписаны — нажмите /start, чтобы вернуться.", true);
   if (key === "ex") { await answer(); return call("sendMessage", { chat_id: chat, text: EXAMPLE, parse_mode: "HTML", disable_web_page_preview: true, reply_markup: { inline_keyboard: [[btn("🔔 Уведомления", "+n")]] } }); }
   if (key.startsWith("t:")) { note = await toggle(db, chat, c, key.slice(2)) || ""; if (!c.bot && key !== "t:shared") return answer(note, true); }
