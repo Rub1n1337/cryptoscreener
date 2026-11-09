@@ -1,6 +1,7 @@
 # Sigma Radar
 
 - Site: single `index.html` (ES module); strategy math in `supabase/functions/_shared/math.js`, shared with the Edge Function `supabase/functions/bot`.
+- Candle history: a copy of Binance candles in Cloudflare R2, written nightly by `.github/workflows/history.yml` (`scripts/history-job.js`), read through `history.js` by the backtest and `research/stage05.js` (`docs/PLAN-HISTORY.md`; last run: `status.json` in the bucket). Any new external host the site fetches must be added to the CSP `connect-src` in `index.html`.
 - Edge Functions `bot` and `tg` deploy from GitHub Actions on push to `main` (`.github/workflows/deploy-functions.yml`); apply a migration they need before pushing. Run status: `https://api.github.com/repos/Rub1n1337/cryptoscreener/actions/runs?per_page=1`.
 - Design/UX rules: follow `docs/DESIGN-RULES.md`; run its checklist (section 12) before every push.
 - Changed a button that changes state (bot, journal, backtest, server data)? Run the `click-path-audit` skill (`.claude/skills/`) on that area before pushing.

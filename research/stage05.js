@@ -2,8 +2,8 @@
 // the same way in each of three years? If nothing does, an order-book filter has little to build on.
 // In the preview (localhost:8765):
 //   const R = await import('/research/stage05.js?' + Date.now()); R.start({tf: '1h'});   then poll R.S; R.analyze('1h') when done
-// Data: Binance public API (klines), 6 requests at a time (well under the weight limit; no timers between them: a hidden
-// preview pane throttles timers). Nothing is written anywhere.
+// Data: the stored candle history (history.js: R2, cached in this origin's IndexedDB) and Binance's public API for the rest, 6 coins
+// at a time (no timers between requests: a hidden preview pane throttles timers). Nothing else is written anywhere.
 //
 // Events: every band touch with a confirmed reversal (math.js signalAt, judged at the bar's close, as the backtest), on the
 // honest top-50 by 24 h turnover at that bar, from a pool of every coin that was ever in the daily top-75 of that year —
@@ -11,6 +11,8 @@
 // Outcome: from the close of the signal bar, which comes first — the price 1 stop distance in the trade's favour (win) or
 // against it (loss); stop distance as math.js levels(); both in one bar counts as a loss; unresolved in 48 bars is left out.
 import * as M from '../supabase/functions/_shared/math.js';
+import * as HS from '../history.js';
+HS.config({ cap: 1.5e9 });   // three years of 1h for ~600 coins is ~0.4 GB of files: kept for reruns (the site keeps 0.3 GB)
 
 const API = 'https://data-api.binance.vision/api/v3', DAY = 864e5;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -26,8 +28,12 @@ export async function get(path) {
   }
   throw new Error('fetch failed ' + path);
 }
-// rows [openTime, o, h, l, c, volume, quoteVolume]
+// rows [openTime, o, h, l, c, volume, quoteVolume]: stored months from R2 (history.js, cached in this origin's IndexedDB) and
+// the rest from Binance; whatever doesn't check out comes from Binance whole (binanceKlines, the old loader)
 export async function klines(sym, tf, start, end) {
+  return HS.candles(sym, tf, start, end, { api: binanceKlines });
+}
+export async function binanceKlines(sym, tf, start, end) {
   const out = [];
   for (let t = start; t < end;) {
     const K = await get(`/klines?symbol=${sym}&interval=${tf}&startTime=${t}&endTime=${end - 1}&limit=1000`);
@@ -48,24 +54,20 @@ let QV = null;   // daily turnover of every pair (sym -> Map(day -> quote volume
 export const yearsBack = (end = Math.floor(Date.now() / DAY) * DAY) => [0, 1, 2].map(y => [end - (3 - y) * 365 * DAY, end - (2 - y) * 365 * DAY]);
 // daily turnover of every pair over the three years, delisted ones included (the ticker still lists them):
 // the pool of each year is what was ever in its daily top-75, plus the majors
+// The stored daily candles (history.js) cover every pair of the ticker at once when they reach the end; pairs they don't know,
+// or all of them when they don't reach it, one request each as before. The top itself: history.js topEver (the nightly job
+// picks the coins it stores with it)
 export async function pools(years) {
   if (!QV) {
     const tk = await get('/ticker/24hr');
-    const syms = tk.map(x => x.symbol).filter(s => s.endsWith('USDT') && !M.STABLE.has(s.slice(0, -4)));
+    let syms = tk.map(x => x.symbol).filter(s => s.endsWith('USDT') && !M.STABLE.has(s.slice(0, -4)));
+    const from = years[0][0] - 2 * DAY, to = years[2][1], qv = {}, D = await HS.daily(syms, from, to);
+    if (D) { for (const [s, K] of Object.entries(D.rows)) qv[s] = new Map(K.map(k => [k[0], k[6]])); syms = D.miss; }
     S.phase = 'daily'; S.total = syms.length; S.done = 0;
-    const qv = {};
-    await pool(syms, 6, async s => { try { const K = await klines(s, '1d', years[0][0] - 2 * DAY, years[2][1]); if (K.length) qv[s] = new Map(K.map(k => [k[0], k[6]])); } catch {} S.done++; });
+    await pool(syms, 6, async s => { try { const K = await binanceKlines(s, '1d', from, to); if (K.length) qv[s] = new Map(K.map(k => [k[0], k[6]])); } catch {} S.done++; });
     QV = qv;
   }
-  return years.map(([y0, y1]) => {
-    const inPool = new Set();
-    for (let d = y0; d < y1; d += DAY) {
-      const day = Object.keys(QV).map(s => [s, QV[s].get(d) || 0]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 75);
-      for (const [s] of day) inPool.add(s);
-    }
-    for (const s of M.MAJORS) inPool.add(s);
-    return [...inPool];
-  });
+  return years.map(([y0, y1]) => HS.topEver(QV, y0, y1, 75, M.MAJORS));
 }
 
 export async function start(opt = {}) {

@@ -1,6 +1,10 @@
-// Older «Что нового» entries (2.65 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.66 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.66', date:'2 ноября 2026', title:'Вход обязателен', items:[
+    'Сайт открывается после входа через Telegram; без входа доступны описание сервиса и «Правовая информация».',
+    'Ссылки на монеты из Telegram после входа открывают нужный график.',
+  ]},
   {v:'2.65', date:'2 ноября 2026', title:'Бот, Telegram и «Бета» в профиле', items:[
     'Серверный бот хранится в профиле и один на всех ваших устройствах.',
     'Если на устройстве был свой серверный бот, сайт предлагает удалить его.',

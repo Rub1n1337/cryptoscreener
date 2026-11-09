@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <!-- the page may talk only to these hosts: even an injected script could not send the bot's key anywhere else -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; connect-src 'self' https://pub-edb3115ccf904c00bd02f3372a9cb8d9.r2.dev https://data-api.binance.vision https://api.binance.com https://fapi.binance.com https://aumldylzccbmddavtrqe.supabase.co https://cryptoscreener-production-f6ba.up.railway.app wss://stream.binance.com:9443 wss://fstream.binance.com; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Sigma Radar</title>
 <meta name="description" content="Сканер Binance по каналам Боллинджера: сигналы LONG и SHORT, бот на виртуальных деньгах с журналом сделок, проверка правил на истории и уведомления в Telegram.">
 <!-- the phone's browser bar in the page colour: the site is dark unless light is chosen (whatever the system theme), so one
@@ -1420,6 +1420,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <label class="fl" title="Не ловить отскок на монете, которая сама в сильном тренде (ER монеты за ~7 дней выше порога)">Тренд монеты <select id="btCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
         <label class="fl inl" title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
         <button id="btSave" title="Сохранить текущие настройки бэктеста как профиль «Моего бота»">Сохранить как профиль бота</button>
+        <button id="btCache" title="История свечей хранится в этом браузере, чтобы повторные запуски не загружали её заново">Очистить кэш истории<span class="mute" id="btCacheN"></span></button>
       </div>
     </div></details>
     <div class="mute" id="btStatus" style="margin-bottom:14px;font-size:13px"></div>
@@ -1614,7 +1615,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
     <p class="faint">Без пароля и почты: вход подтверждается кодом в нашем Telegram-боте. Сервис бесплатный и не даёт инвестиционных рекомендаций.</p>
   </div></section>
   <section id="legal" class="hidden">
-    <div class="phead"><div><h2>Правовая информация</h2><p>Условия использования и обращение с данными. Редакция от 2 ноября 2026.</p></div></div>
+    <div class="phead"><div><h2>Правовая информация</h2><p>Условия использования и обращение с данными. Редакция от 9 ноября 2026.</p></div></div>
     <div class="panel doc">
       <h3>О сервисе</h3>
       <p>Sigma Radar — бесплатный учебный сервис: сканер рынка, боты на виртуальных деньгах и проверка правил на истории. Платных функций и рекламы нет. Связь с владельцем — в Telegram: <a href="https://t.me/sigmascreener" target="_blank" rel="noopener">t.me/sigmascreener</a>.</p>
@@ -1630,7 +1631,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <h3>Какие данные хранятся</h3>
       <p>Вход — через Telegram: сервис не запрашивает почту, телефон и пароль. Cookie, аналитика, реклама и счётчики посещений не используются.</p>
       <ul>
-        <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере» — у каждого устройства свой, профили, избранное, свои уровни, настройки и тема, а также номер серверного бота вашего профиля.</li>
+        <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере» — у каждого устройства свой, профили, избранное, свои уровни, настройки и тема, номер серверного бота вашего профиля, а также история свечей для бэктеста (её очищает кнопка «Очистить кэш истории» в его дополнительных настройках).</li>
         <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, свои уровни, вид «Беты» и доступ к ней по коду. Журнал бота «В браузере» в профиль не передаётся.</li>
         <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Серверный бот закреплён за вашим профилем — один на все ваши устройства, и доступ к нему есть только у вашего профиля.</li>
         <li><b>На сервере, если вы включили Telegram</b>: номер чата, имя из профиля Telegram, выбранные уведомления и состояние доставки последнего сообщения. Сообщения присылает только бот вашего профиля и только в Telegram, через который вы вошли.</li>
@@ -1639,7 +1640,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <h3>Кому передаются данные</h3>
       <ul>
         <li><b>Binance</b> — браузер сам загружает цены, свечи и стаканы с открытого API биржи; биржа видит ваш IP-адрес, как любой сайт, который вы открываете.</li>
-        <li><b>Vercel</b> — хостинг сайта, <b>Supabase</b> — база данных и серверные боты, <b>Railway</b> — сервер сбора рыночных данных. Как любой хостинг, они ведут технические журналы запросов.</li>
+        <li><b>Vercel</b> — хостинг сайта, <b>Supabase</b> — база данных и серверные боты, <b>Railway</b> — сервер сбора рыночных данных, <b>Cloudflare R2</b> — история свечей: копия открытых рыночных данных Binance, из которой бэктест загружает прошлые свечи. Как любой хостинг, они ведут технические журналы запросов.</li>
         <li><b>Telegram</b> — доставляет сообщения бота, если вы его подключили.</li>
       </ul>
       <p>Данные не продаются и не передаются для рекламы. Шрифт загружается с этого же сайта.</p>
@@ -1660,7 +1661,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <li>По другим вопросам о данных напишите владельцу в Telegram.</li>
       </ul>
       <h3>Лицензии</h3>
-      <p>Шрифт Inter распространяется по лицензии <a href="/fonts/LICENSE.txt" target="_blank" rel="noopener">SIL Open Font License 1.1</a>. Рыночные данные предоставляет Binance.</p>
+      <p>Шрифт Inter распространяется по лицензии <a href="/fonts/LICENSE.txt" target="_blank" rel="noopener">SIL Open Font License 1.1</a>. Рыночные данные предоставляет Binance; история свечей хранится копией его открытых данных в Cloudflare R2.</p>
     </div>
   </section>
 
@@ -1689,6 +1690,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 
 <script type="module">
 import * as M from './supabase/functions/_shared/math.js';
+import * as HS from './history.js';
 const { TFMS, clamp, median, bands, rsi, halfLife, parse } = M;
 
 // ---------- utils ----------
@@ -3785,26 +3787,37 @@ function closeModal() {
 // ---------- backtest ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const histCache = new Map();
-let lastReq = 0, btRes = null, btBusy = false, btHist = null;
+let lastReq = 0, btRes = null, btBusy = false, btHist = null, histIdx;
 async function throttled(path) { // backtest downloads stay well under Binance's weight limit: ≤ 750 requests a minute of weight 2 is a quarter of it
   const wait = Math.max(0, lastReq + 80 - Date.now()); lastReq = Date.now() + wait;
   if (wait) await sleep(wait);
   return api(path);
 }
+// candles straight from Binance, rows as history.js ([open time, o, h, l, c, volume, quote volume]); a multi-page download is
+// throttled, the one-request tail after the stored history is not
+async function binanceHistory(sym, tf, startT, endT, stop) {
+  const tfms = TFMS[tf], out = [], get = endT - startT > 1000 * tfms ? throttled : api;
+  for (let t = startT; t < endT;) {
+    stop?.();
+    const K = await get(`/api/v3/klines?symbol=${sym}&interval=${tf}&startTime=${t}&endTime=${endT - 1}&limit=1000`);
+    if (!K.length) break;
+    for (const k of K) out.push([k[0], +k[1], +k[2], +k[3], +k[4], +k[5], +k[7]]);
+    t = K[K.length - 1][0] + tfms;
+    if (K.length < 1000) break;
+  }
+  return out;
+}
+// history.js: stored months from R2 (cached in IndexedDB), the rest from Binance; anything off → all from Binance.
+// Only closed candles come back. Only numbers are kept (open time, o, h, l, c, volume, close time): Binance's 12-field rows of
+// strings took ~4× the memory. The close time is open + interval − 1: Binance's own differs only on outage and delisting candles,
+// and nothing reads it but the "closed" check.
 // stop: throws to end the download between requests (see runBacktest); a coin cut off half-way is not cached
 async function fetchHistory(sym, tf, startT, endT, stop) {
   const key = `${sym}|${tf}|${startT}|${endT}`;
   if (histCache.has(key)) return histCache.get(key);
-  const tfms = TFMS[tf], out = [];
-  for (let t = startT; t < endT;) {
-    stop?.();
-    const K = await throttled(`/api/v3/klines?symbol=${sym}&interval=${tf}&startTime=${t}&endTime=${endT - 1}&limit=1000`);
-    if (!K.length) break;
-    // only numbers are kept (open time, o, h, l, c, volume, close time): Binance's 12-field rows of strings took ~4× the memory
-    for (const k of K) out.push([k[0], +k[1], +k[2], +k[3], +k[4], +k[5], k[6]]);
-    t = K[K.length - 1][0] + tfms;
-    if (K.length < 1000) break;
-  }
+  const tfms = TFMS[tf];
+  const K = await HS.candles(sym, tf, startT, endT, {api:(s, t, a, b) => binanceHistory(s, t, a, b, stop), stop});
+  const out = K.map(k => [k[0], k[1], k[2], k[3], k[4], k[5], k[0] + tfms - 1]);
   histCache.set(key, out); histBars += out.length;
   return out;
 }
@@ -3835,8 +3848,12 @@ async function delistedFor(tk, from, minQV, say) {
   const now = Date.now(), day = Math.floor(now / 864e5);
   let c = load('sr_delisted', null);
   if (!c || c.day !== day || c.from > from || !c.d) {
-    const gone = tk.filter(x => x.symbol.endsWith('USDT') && !M.STABLE.has(x.symbol.slice(0, -4)) && !(x.closeTime > now - 864e5)).map(x => x.symbol);
+    let gone = tk.filter(x => x.symbol.endsWith('USDT') && !M.STABLE.has(x.symbol.slice(0, -4)) && !(x.closeTime > now - 864e5)).map(x => x.symbol);
     const d = {}; let n = 0;
+    // the stored daily candles (history.js) answer for all of them at once when they reach yesterday; these pairs don't trade,
+    // so today has nothing to add. Pairs the stored set doesn't know, one request each as before
+    const D = await HS.daily(gone, from, day * 864e5);
+    if (D) { for (const [s, K] of Object.entries(D.rows)) d[s] = [K[0][0], K.map(k => Math.round(k[6]))]; gone = D.miss; }
     await pool(gone, 6, async s => {
       try { const K = await api(`/api/v3/klines?symbol=${s}&interval=1d&startTime=${from}&limit=1000`); if (K.length) d[s] = [K[0][0], K.map(k => Math.round(+k[7]))]; } catch {}
       say(`Ищу монеты, снятые с биржи за период: ${++n}/${gone.length}…`);
@@ -3879,9 +3896,13 @@ function btEstimate() {
   if (stale) { $('#btStatus').innerHTML = '<b style="color:var(--acc-t)">Настройки изменены — результат ниже ещё для прежних.</b> Нажмите «Запустить», чтобы пересчитать.'; return; }
   if (btRes) { $('#btStatus').textContent = btRes.status || ''; return; }   // back to the settings of the result on screen
   if (s.custom && !s.custom.length) { $('#btStatus').textContent = 'Впишите монеты через запятую, например: BTC, ETH, SOL.'; return; }
-  const req = Math.ceil(bars / 1000) * (s.pit ? poolOf(s.top) : s.top);
-  const sec = Math.max(5, Math.round(req * 0.09 / 5) * 5);
-  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${s.pit ? poolOf(s.top) : s.top} монет. Повторные — мгновенно.`
+  // with stored history (history.js) a coin is one file a month from R2 (r2.dev gives ~35 files a second) and one request for
+  // the newest candles; without it ~1000 candles a request at the throttle's pace. Measured 09.11: 1h, a year, 209 coins —
+  // 83 s with stored history, 185 s without. The index is asked once; the estimate redraws when it comes
+  if (histIdx === undefined) { histIdx = null; HS.index().then(i => { histIdx = i; if (i) btEstimate(); }); }
+  const coins = s.pit ? poolOf(s.top) : s.top, stored = !!histIdx?.s?.BTCUSDT?.[s.tf];
+  const sec = Math.max(5, Math.round((stored ? coins * ((days / 30 + 1) * 0.03 + 0.03) : Math.ceil(bars / 1000) * coins * 0.09) / 5) * 5);
+  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${coins} монет. Повторные — мгновенно.`
     + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '');
 }
 // while the history loads, «Запустить» is «Прервать»: a year on a wide pool takes minutes. Each run has its own stop flag,
@@ -3920,8 +3941,10 @@ async function runBacktest() {
     const bars = syms.length * Math.ceil((endT - startT) / tfms);
     if (bars > 3e6) throw new Error(`слишком большой прогон: ${syms.length} монет × ${Math.round((endT - startT) / tfms)} свечей ≈ ${(bars / 1e6).toFixed(1)} млн свечей, вкладке не хватит памяти. Возьмите период короче, таймфрейм крупнее или меньше монет`);
     trimHistory(key => key.endsWith(`|${s.tf}|${startT}|${endT}`) && syms.includes(key.split('|')[0]));
+    // 8 coins at a time: with stored history a coin is a few files from R2 and one request to Binance (≤ ~800 weight a run
+    // in all); full downloads from Binance keep their pace through throttled()
     const hist = {}; let done = 0;
-    await pool(syms, 4, async sym => {
+    await pool(syms, 8, async sym => {
       stop();
       try { hist[sym] = (await fetchHistory(sym, s.tf, startT, endT, stop)).filter(k => k[6] < now); } catch {}
       if (!ctl.stop) st.textContent = `Загружаю историю: ${++done}/${syms.length} пар…`;
@@ -3953,6 +3976,7 @@ async function runBacktest() {
     st.textContent = e === STOPPED ? 'Остановлено. Загруженная история сохранилась — следующий запуск продолжит с неё.' : 'Ошибка: ' + (e.message || e);
   }
   btBusy = false; btCtl = null; btButton(false); $('#btRun').disabled = false; $('#btStatus').classList.remove('busy');
+  if ($('#btAdv').open) setTimeout(btCacheShow, 1500);   // the files of this run are still being written to the cache
 }
 function groupRow(name, list) {
   const g = M.journalStats(10000, list);
@@ -4060,6 +4084,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.78', date:'9 ноября 2026', title:'Быстрая история бэктеста', items:[
+    'Первый запуск бэктеста стал заметно быстрее.',
+    'Повторные запуски стали быстрыми и после перезагрузки страницы.',
+    'Добавлена кнопка «Очистить кэш истории» в дополнительных настройках бэктеста.',
+    'В правовой информации указано, где хранится копия истории свечей.',
+  ]},
   {v:'2.77', date:'5 ноября 2026', title:'Новый профиль и шапка', items:[
     'Профиль стал разделом с аккаунтом, видом, уведомлениями, выходом и удалением.',
     'Тема, режим стекла и звук перенесены в профиль, режим стекла показан на образце.',
@@ -4125,10 +4155,6 @@ const CHANGELOG = [
     'Исправлен выход из профиля, который мог случиться, когда сайт открыт в нескольких вкладках.',
     'Недавние монеты, число графиков и скрытые панели «Беты» у каждого устройства свои.',
     'При выборе «Оставить эти» устройство получает из профиля то, чего у него не было, например серверный бот.',
-  ]},
-  {v:'2.66', date:'2 ноября 2026', title:'Вход обязателен', items:[
-    'Сайт открывается после входа через Telegram; без входа доступны описание сервиса и «Правовая информация».',
-    'Ссылки на монеты из Telegram после входа открывают нужный график.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4570,6 +4596,20 @@ $('#blist').onclick = async e => {
   }
 };
 $('#blist').onkeydown = e => { const c = e.target.closest('.prof.pick'); if (c && e.target === c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); pickProfile(c.dataset.pick); } };
+// the stored candle history this browser keeps (history.js, IndexedDB): its size on the button, and clearing it together with
+// the downloads held in memory — the next run loads everything again
+async function btCacheShow() {
+  const s = await HS.cacheStats(), mb = s?.bytes ? s.bytes / 1e6 : 0;
+  $('#btCacheN').textContent = mb ? ` · ${mb < 10 ? mb.toFixed(1).replace('.', ',') : Math.round(mb)} МБ` : '';
+}
+$('#btAdv').addEventListener('toggle', () => { if ($('#btAdv').open) btCacheShow(); });
+$('#btCache').onclick = async () => {
+  if (btBusy) return toast('Идёт бэктест', 'Очистите кэш, когда он закончится.', 'warn');
+  histCache.clear(); histBars = 0;
+  const ok = await HS.clearCache();
+  toast(ok ? 'Кэш истории очищен' : 'История в памяти очищена', ok ? 'Следующий запуск загрузит историю заново.' : 'Хранилище браузера недоступно — в нём нечего очищать.', ok ? 'ok' : 'info');
+  btCacheShow();
+};
 // backtest → bot: keep the tested settings as a profile
 $('#btSave').onclick = async () => {
   const s = btSettings(), usesReg = s.regimeOnly !== 'any' || s.strategy === 'switch';

@@ -88,7 +88,8 @@ export async function index() {
     try {
       const r = await limited(() => cfg.fetch(cfg.base + '/index.json', { cache: 'no-cache', signal: AbortSignal.timeout(10000) }));
       if (r.ok) { const o = await r.json(); if (o?.v === FMT && typeof o.from === 'string' && o.s && typeof o.s === 'object') got = o; }
-    } catch { /* no stored history: everything from Binance */ }
+      if (!got) cfg.log(`history: index.json unusable (HTTP ${r.status}), everything from Binance`);
+    } catch (e) { cfg.log(`history: no index.json (${e.message || e}; the page's CSP connect-src must list ${cfg.base}), everything from Binance`); }
     idx = got; idxAt = Date.now(); idxP = null;
     return idx;
   })();
@@ -242,10 +243,16 @@ async function cacheGet(key) {
     return { buf: new Uint8Array(buf), last: meta.last };
   } catch { return null; }
 }
+// a touch updates only a row that is still there: one flushed after a clear or an eviction must not bring it back
 async function flushTouch() {
   touchT = 0;
   const list = [...touched]; touched.clear();
-  try { const d = await db(); if (!d) return; const tx = d.transaction('meta', 'readwrite'), st = tx.objectStore('meta'); for (const [k, m] of list) st.put({ ...m, used: Date.now() }, k); await done(tx); } catch {}
+  try {
+    const d = await db(); if (!d) return;
+    const tx = d.transaction('meta', 'readwrite'), st = tx.objectStore('meta');
+    for (const [k] of list) { const g = st.get(k); g.onsuccess = () => { if (g.result) st.put({ ...g.result, used: Date.now() }, k); }; }
+    await done(tx);
+  } catch {}
 }
 async function sizeNow(d) {
   if (total == null) {
@@ -254,7 +261,14 @@ async function sizeNow(d) {
   }
   return total;
 }
-async function cachePut(key, buf, last) {
+// writes are not awaited by the readers; clearCache waits for the ones on the way
+const putting = new Set();
+function cachePut(key, buf, last) {
+  const p = cachePut0(key, buf, last).finally(() => putting.delete(p));
+  putting.add(p);
+  return p;
+}
+async function cachePut0(key, buf, last) {
   try {
     const d = await db(); if (!d) return;
     await sizeNow(d);
@@ -300,5 +314,7 @@ export async function cacheStats() {
 }
 export async function clearCache() {
   idx = null; idxAt = 0;
+  touched.clear(); clearTimeout(touchT); touchT = 0;
+  await Promise.allSettled([...putting]);   // the last run's files still on their way to the cache land first, then go
   try { const d = await db(); if (!d) return false; const tx = d.transaction(['data', 'meta'], 'readwrite'); tx.objectStore('data').clear(); tx.objectStore('meta').clear(); await done(tx); total = 0; return true; } catch { return false; }
 }

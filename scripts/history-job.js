@@ -9,7 +9,8 @@
 import * as H from '../history.js';
 import { STABLE, MAJORS } from '../supabase/functions/_shared/math.js';
 
-export const DEFAULT_TFS = ['1h', '4h'];
+// 15m since the first run (09.11): 1h + 4h took ~0.3 GB, 15m adds ~1 GB — far under the free 10 GB
+export const DEFAULT_TFS = ['1h', '4h', '15m'];
 const HOSTS = ['https://data-api.binance.vision', 'https://api.binance.com', 'https://api-gcp.binance.com'];
 const DAY = H.DAY, POOL_N = 75, SPAN = 3 * 365 + 120;   // three years and the warm-up of a 4h run before them
 const sleep = ms => new Promise(r => setTimeout(r, ms));
