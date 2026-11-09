@@ -1303,7 +1303,10 @@ function syncBar() {
   document.querySelectorAll('#bLay .tab').forEach(b => b.classList.toggle('on', +b.dataset.lay === layout));
   $('#bLink').setAttribute('aria-pressed', link); $('#bLink').classList.toggle('hidden', layout === 1);
 }
-const savePanes = () => K.save('sr_bpanes', pool.map(p => ({sym:p.sym, tf:p.tf, range:p.range, mkt:p.mkt})));
+// sr_bpanes is in the profile, and each device opens its own number of charts (sr_blay is not): a phone with one chart keeps
+// the profile's charts 2–4 as they are instead of cutting the list to its own
+const savePanes = () => { const own = pool.map(p => ({sym:p.sym, tf:p.tf, range:p.range, mkt:p.mkt})), was = K.load('sr_bpanes', []);
+  K.save('sr_bpanes', own.concat(Array.isArray(was) ? was.slice(own.length, 4) : [])); };
 // panes are kept (hidden, streams closed) when the layout shrinks, so switching back is instant and the heatmap survives
 let pool = [];
 function setLayout(n) {

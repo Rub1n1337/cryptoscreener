@@ -1,7 +1,8 @@
 // One-call layout checks for the preview, instead of several scripts and screenshots per width and theme:
 //   await (await import('/tests/smoke.js?' + Date.now())).run()
 // Returns a short report: version, width, theme, horizontal scroll, what sticks out of the screen, cut text (including the
-// short card titles drawn by ::after, which scrollWidth doesn't see), touch targets under 36 px on touch screens.
+// short card titles drawn by ::after, which scrollWidth doesn't see), touch targets under 36 px on touch screens, and
+// browser-storage keys that index.html's KEYS doesn't declare (keys).
 // Errors are not here: read_console_messages has them, including the ones before this loads.
 const sel = el => el.id ? '#' + el.id : el.tagName.toLowerCase() + (el.classList.length ? '.' + [...el.classList].slice(0, 2).join('.') : '');
 const shown = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
@@ -27,5 +28,8 @@ export async function run({ limit = 8 } = {}) {
     .map(el => [el.matches('input') && el.closest('label') || el, el])   // a checkbox inside its label: the label is what is tapped
     .map(([t, el]) => [el, t.getBoundingClientRect()]).filter(([el, r]) => r.width && r.height < 36 && !el.closest('#cmdk'))
     .slice(0, limit).map(([el, r]) => `${sel(el)} ${Math.round(r.width)}×${Math.round(r.height)}`);
+  // every browser-storage key is declared «profile» or «device» (KEYS in index.html): a new one is not synced, or kept, by accident
+  const K = window.__sr?.KEYS;
+  if (K) { const unk = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith('sr_') && !(k in K)) unk.push(k); } if (unk.length) out.keys = unk; }
   return out;
 }

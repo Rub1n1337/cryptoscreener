@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.69 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.70 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.70', date:'2 ноября 2026', title:'Новый логотип и стекло', items:[
+    'Логотип получил новую форму Σ и более благородные цвета канала: рубиновый, золотой и изумрудный.',
+    'Шапка, меню и окна стали матовым стеклом, а цифры, таблицы и графики остались чёткими.',
+    'Кнопки в шапке откликаются бликом при наведении и мягко проседают при нажатии.',
+    'Карточки сводки при наведении подсвечиваются цветом своего смысла.',
+    'При включённом в системе уменьшении прозрачности стекло становится сплошным.',
+  ]},
   {v:'2.69', date:'2 ноября 2026', title:'Золотое свечение', items:[
     'Добавлено мягкое золотое свечение у логотипа, которое видно сквозь шапку.',
   ]},
