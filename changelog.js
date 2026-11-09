@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.77 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.78 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.78', date:'9 ноября 2026', title:'Быстрая история бэктеста', items:[
+    'Первый запуск бэктеста стал заметно быстрее.',
+    'Повторные запуски стали быстрыми и после перезагрузки страницы.',
+    'Добавлена кнопка «Очистить кэш истории» в дополнительных настройках бэктеста.',
+    'В правовой информации указано, где хранится копия истории свечей.',
+  ]},
   {v:'2.77', date:'5 ноября 2026', title:'Новый профиль и шапка', items:[
     'Профиль стал разделом с аккаунтом, видом, уведомлениями, выходом и удалением.',
     'Тема, режим стекла и звук перенесены в профиль, режим стекла показан на образце.',

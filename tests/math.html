@@ -110,6 +110,13 @@ for (const [name, S] of Object.entries(VARIANTS)) {
   const pick = (m, side) => [...m].filter(([, v]) => v >= med * 5 && v >= 2e4).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => ({price:k * bk.step, usd:v, side}));
   check('стенки: то же правило, что было в «Графиках»', JSON.stringify([...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')]) === JSON.stringify(W));
   check('стенки: порог «не меньше» отсекает', M.wallsOf(bk, undefined, {min:1e9}).length === 0);
+  // the bot's record at signals (signal_books): how far the snapshot reaches and the dollars within 0.5 / 1 %
+  check('стакан: охват — по короткой стороне', Math.abs(M.bookReach(bids, asks, 100) - 0.01) < 1e-9, M.bookReach(bids, asks, 100));
+  // the shares sit a hair past a level (100 × 1.005 is 100.49999… in floating point: a level exactly on the edge is a coin toss)
+  const sm = M.bookSums(bids, asks, 100, [0.00505, 0.01005]), near = (a, b) => Math.abs(a - b) < 1e-6;
+  const exp = (L, n) => L.slice(0, n).reduce((s, [p, q]) => s + p * q, 0);
+  check('стакан: суммы в ±0.5 % и ±1 %', near(sm.bid[0], exp(bids, 50)) && near(sm.bid[1], exp(bids, 100)) && near(sm.ask[0], exp(asks, 50)) && near(sm.ask[1], exp(asks, 100)),
+    JSON.stringify({bid:sm.bid.map(Math.round), ask:sm.ask.map(Math.round)}));
 }
 
 // ---------- 3. against the previous copy: nothing else changed ----------

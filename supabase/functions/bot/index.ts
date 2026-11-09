@@ -294,7 +294,43 @@ async function run() {
   if (error) throw error;
   // its Telegram messages go out after the personal bots have traded (see Deno.serve): a long subscriber list must not hold them up
   const notes = { lines: [...res.closed.map((t: any) => closedMsg(t)), ...res.opened.map((p: any) => openedMsg(p))], syms: [...res.opened, ...res.closed].map((x: any) => x.sym) };
-  return { scanned: rows.length, signals: rows.filter((r) => M.wants(M.tradeRow(r), S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, notes };
+  // the book at its confirmed signals, for research (never breaks the run: a failure is told in bot_runs.error)
+  let books = 0; BOOKERR = "";
+  try { books = await recordBooks(rows, S, res.opened); } catch (e) { BOOKERR = String((e as Error)?.message ?? e).slice(0, 200); }
+  return { scanned: rows.length, signals: rows.filter((r) => M.wants(M.tradeRow(r), S)).length, opened: res.opened.length, closed: res.closed.length, open: upserts.length, books, notes };
+}
+
+// ---------- the order book at the shared bot's signals (signal_books; docs/PLAN-WALLS.md) ----------
+// Every confirmed signal in its pool (M.tradeRow(r).rev: the reversal held to the candle's close, as the bot trades), once: one
+// spot snapshot of 1000 levels (weight 50) in the run that first sees it, normally the minute after that candle closed. Sums of
+// bids and asks within 0.5 / 1 / 2 % and the walls by the site's rule (M.wallsOf). At most 10 a run; a snapshot that failed is
+// tried again next minute (later, so `at` says when it was taken).
+let BOOKERR = "";
+async function recordBooks(rows: any[], S: any, opened: any[]) {
+  const sigs = rows.map((r) => ({ r, t: M.tradeRow(r) })).filter((x) => x.t?.rev && x.t.touchTime && (x.t.side === "low" || x.t.side === "up"));
+  if (!sigs.length) return 0;
+  const { data: had, error: eh } = await db.from("signal_books").select("sym, touch_time").eq("tf", S.tf)
+    .gte("touch_time", Math.min(...sigs.map((x) => x.t.touchTime)));
+  if (eh) throw eh;
+  const seen = new Set((had ?? []).map((x: any) => `${x.sym}:${x.touch_time}`));
+  const todo = sigs.filter((x) => !seen.has(`${x.r.sym}:${x.t.touchTime}`)).slice(0, 10), out: any[] = [];
+  const took = new Set(opened.map((p: any) => p.sym));
+  await pool(todo, 5, async ({ r, t }) => {
+    try {
+      const b = await api(`/api/v3/depth?symbol=${r.sym}&limit=1000`), m = (+b.bids[0][0] + +b.asks[0][0]) / 2;
+      if (!(m > 0)) return;
+      const reach = M.bookReach(b.bids, b.asks, m), sum = M.bookSums(b.bids, b.asks, m, [0.005, 0.01, 0.02]);
+      const walls = M.wallsOf(M.bookBins(b.bids, b.asks, m, Math.min(M.WALL.range / 100, reach), M.bookStep(m)))
+        .map((w: any) => ({ price: +w.price.toPrecision(10), usd: Math.round(w.usd), side: w.side }));
+      out.push({ sym: r.sym, tf: S.tf, side: t.side, touch_time: t.touchTime, score: Math.round(t.score), price: m, lo: t.lo, mid: t.mid, up: t.up,
+        wanted: !!M.wants(t, S), entered: took.has(r.sym), reach, bid05: sum.bid[0], bid1: sum.bid[1], bid2: sum.bid[2],
+        ask05: sum.ask[0], ask1: sum.ask[1], ask2: sum.ask[2], walls });
+    } catch { /* this signal's book is tried again next minute */ }
+  });
+  if (!out.length) return 0;
+  const { error } = await db.from("signal_books").upsert(out, { onConflict: "sym,tf,touch_time", ignoreDuplicates: true });
+  if (error) throw error;
+  return out.length;
 }
 
 // ---------- personal bots (one per profile, user_bots.user_id; config = the profiles chosen on the site) ----------
@@ -635,7 +671,7 @@ Deno.serve(async (req) => {
     // the run is fine, but when the collector did not answer the bot computed everything itself: said in `error` of an ok run,
     // so «Работа сервера» shows it (it used to be visible only in this response, and only as a longer run)
     await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed,
-      error: RSTAT.err ? `коллектор: ${RSTAT.err}` : null });
+      error: [RSTAT.err && `коллектор: ${RSTAT.err}`, BOOKERR && `стакан сигналов: ${BOOKERR}`].filter(Boolean).join("; ") || null });
     // where the time goes (shared bot / personal bots / the shared bot's messages) and how many coins' candles are kept warm
     return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: t2 - t1, notify: Date.now() - t2 }, kept: KC.size, remote: RSTAT });
   } catch (e) {

@@ -581,6 +581,14 @@ export function bookBins(bids, asks, m, range, step) {
   for (const [p0, q] of asks) { const p = +p0; if (p <= m * (1 + range)) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); } }
   return { m, step, bid, ask };
 }
+// how far a snapshot reaches from the middle on its shorter side (a share): 1000 levels of BTC are ~0.2–1 %, of a small coin more
+export const bookReach = (bids, asks, m) => Math.min(m / +bids[bids.length - 1][0] - 1, +asks[asks.length - 1][0] / m - 1);
+// dollars resting within each share of the middle, per side: {bid: [...], ask: [...]} in the order of shares (beyond the reach
+// a sum is only what the snapshot holds)
+export function bookSums(bids, asks, m, shares) {
+  const side = (L, inside) => shares.map((s) => { let v = 0; for (const [p0, q] of L) { const p = +p0; if (inside(p, s)) v += p * q; } return v; });
+  return { bid: side(bids, (p, s) => p >= m * (1 - s)), ask: side(asks, (p, s) => p <= m * (1 + s)) };
+}
 // the typical bin of both sides (the upper middle one, as «Графики» have always taken it)
 export const binMedian = bk => { const a = [...bk.bid.values(), ...bk.ask.values()].sort((x, y) => x - y); return a[a.length >> 1] || 0; };
 // the walls, biggest first on each side: [{price, usd, side: 'ask' | 'bid'}]. med: the typical bin, when it must not count
