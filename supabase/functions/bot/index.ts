@@ -162,13 +162,13 @@ async function sendTo(chats: (number | string)[], lines: string[], syms: string[
   await pool([...new Set(chats.map(String))], 8, async (chat) => { if (await tgSend(chat, lines.join("\n\n"), syms)) ok++; });
   return ok;
 }
-// who gets the shared bot's trades: every subscribed chat that kept them on (plus the owner's old single chat, if set)
-async function chatsFor(kind: "shared") {
-  const tg = await tgConf(); if (!tg) return [];
-  const { data } = await db.from("tg_subs").select("chat_id").eq(kind, true);
-  return [...(data ?? []).map((x: any) => x.chat_id), ...(kind === "shared" && tg.chat_id ? [tg.chat_id] : [])];
+// who gets the shared bot's trades: every subscribed chat that kept them on
+async function sharedChats() {
+  if (!(await tgConf())) return [];
+  const { data } = await db.from("tg_subs").select("chat_id").eq("shared", true);
+  return (data ?? []).map((x: any) => x.chat_id);
 }
-const notify = async (lines: string[], syms: string[] = []) => sendTo(await chatsFor("shared"), lines, syms);
+const notify = async (lines: string[], syms: string[] = []) => sendTo(await sharedChats(), lines, syms);
 
 // commands and button presses from Telegram: the "tg" function answers them at once (a webhook); this registers it
 // (with the command menu), and until that works reads them here once a minute (getUpdates)

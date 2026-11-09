@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.74 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.75 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.75', date:'2 ноября 2026', title:'Один бот профиля', items:[
+    'Серверный бот закреплён за профилем и одинаков на всех ваших устройствах; прежний бот устройства сайт предложит удалить.',
+    'Кнопка Telegram стала переключателем: сообщения присылает только бот профиля и только в ваш Telegram.',
+    'Исправлены окна подтверждения: сброс журнала, удаление бота и профиля снова работают.',
+    'Исправлена пауза серверного бота при смене настроек на другом устройстве.',
+    'В «Правовую информацию» добавлен технический доступ владельца к базе данных.',
+  ]},
   {v:'2.74', date:'2 ноября 2026', title:'Без дублей в Telegram', items:[
     'Исправлены повторные сообщения в Telegram от нескольких ботов одного человека: в чат пишет только последний подключённый.',
     'Прежний бот, оставленный после перехода на бот из профиля, больше не пишет в Telegram.',
