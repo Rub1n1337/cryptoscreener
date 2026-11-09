@@ -1343,7 +1343,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       </div></details>
       <!-- 3. rarely needed -->
       <details class="dis bmore"><summary>Дополнительно <span class="mute">· где работает бот, граница боковика, сброс журнала</span></summary><div class="dbody">
-        <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт; он один на профиль и одинаковый на всех ваших устройствах. В браузере — только пока открыта эта вкладка, и журнал у каждого устройства свой; удобно, чтобы быстро проверить новый профиль. Если не заходить на сайт 30 дней, серверный бот засыпает — откройте сайт, и он продолжит.</p></div>
+        <div class="bopt"><div><b>Где работает бот</b><p>На сервере бот торгует круглосуточно, даже когда сайт закрыт; он один на профиль и одинаковый на всех ваших устройствах. В браузере — только пока открыта эта вкладка, и журнал у каждого устройства свой; удобно, чтобы быстро проверить новый профиль. Серверный бот на это время встаёт на паузу и не пишет в Telegram, а «На сервере 24/7» возвращает его. Если не заходить на сайт 30 дней, серверный бот засыпает — откройте сайт, и он продолжит.</p></div>
           <div class="seg mini" id="bwhere"><button class="tab" data-w="server">На сервере 24/7</button><button class="tab" data-w="browser">В браузере</button></div></div>
         <div class="bopt"><div><b>Когда рынок считается боковиком</b><p>Бот смотрит на BTC, ETH и SOL за 7 дней: насколько цена прошла по прямой относительно всего пути (ER). Если у всех трёх ER ниже порога — боковик, иначе импульс. Здесь — граница для выбора профиля в авто-режиме (по часовым свечам) и для профилей без своей границы; сделки профиль решает по свечам своего таймфрейма, как в бэктесте.</p></div>
           <select id="bER" aria-label="Граница боковика для выбора профиля и для профилей без своей границы"><option value="0.1">ER &lt; 0.10 · строже</option><option value="0.15">ER &lt; 0.15 · обычно</option><option value="0.25">ER &lt; 0.25 · мягче</option></select></div>
@@ -2861,8 +2861,7 @@ async function deleteProfile() {
     await authFn({op:'delete'}, AUTH?.at);
   } catch (e) { return toast('Не удалось удалить профиль', e.message || String(e), 'bad'); }
   SYNCV = null; save('sr_sync', null); signedOut();
-  UB = null; save('sr_ubot', null); SB_MINE = null;   // the profile's bot went with it
-  if (BP.where === 'server') { BP.where = 'browser'; saveBP(); }
+  botGone();   // the profile's bot went with it
   toast('Профиль удалён', 'Настройки остались только в этом браузере', 'ok');
 }
 function signOut(all) {
@@ -3050,7 +3049,7 @@ async function profileBot() {
   if (id && UB?.secret && UB.id !== id) save('sr_ubot_old', UB);
   UB = id ? {id} : null; save('sr_ubot', UB);
   const lost = BP.where === 'server' && !UB;   // deleted on another device, or asleep too long and removed
-  if (lost) { BP.where = 'browser'; saveBP(); toast('Серверный бот не найден', 'бот работает в этой вкладке; «На сервере 24/7» создаст нового', 'warn'); }
+  if (lost) { botGone(); toast('Серверный бот не найден', 'бот работает в этой вкладке; «На сервере 24/7» создаст нового', 'warn'); }
   if (lost || was !== (id || null)) { SB_MINE = null; renderBotPanel(); renderJournal(); renderGuard(); fetchServerBot(); }
   oldBotAsk();
 }
@@ -3058,7 +3057,7 @@ async function profileBot() {
 const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax});
 // on/off goes only with the person's own «Пауза» / «Продолжить» (on); other pushes leave it as the server has it: every device
 // pushes to the one profile bot, and a device's own journal flag would pause it for all of them
-let syncTimer, ubOn = null;
+let syncTimer, ubOn = null, cfgChecked = false;
 function syncServerBot(on) {   // push profiles/mode to the server bot (debounced)
   if (BP.where !== 'server' || !UB) return;
   if (on != null) ubOn = on;
@@ -3083,6 +3082,9 @@ async function fetchServerBot() {
     }
     SB_MINE = {balance:b.balance, start:b.start_balance, open:r.open || [], closed:r.closed || [], on:b.enabled,
       checked:b.checked_at ? Date.parse(b.checked_at) : 0, profile:b.active_profile, regime:b.regime, error:b.last_error, tg:!!b.tg_chat, alerts:b.alerts || null};
+    // once per page, after the sync has caught up with the profile: the server's profiles differ from the profile's (a push
+    // that failed) → send them. Before 2.84 every device sent its own at every start, even before it knew of newer ones
+    if (!cfgChecked && syncReady) { cfgChecked = true; if (canon(b.config || {}) !== canon(serverConfig())) syncServerBot(); }
     renderBotPanel(); renderAway();
     if (!$('#journal').classList.contains('hidden')) renderJournal();
     if (chart) drawChart();
@@ -3092,6 +3094,13 @@ async function fetchServerBot() {
     // any other failure (no connection, a timeout, a server error) was dropped and the panel kept old numbers as if fresh
     else if (SB_MINE) { SB_MINE.fetchError = String(e.message || e); renderGuard(); }
   }
+}
+// this device no longer has the profile's server bot (deleted here or on another device, asleep and removed, or the profile
+// went): the bot carries on in this tab. One place for the three ways it happens
+function botGone() {
+  clearTimeout(syncTimer); ubOn = null;
+  UB = null; save('sr_ubot', null); SB_MINE = null;
+  if (BP.where === 'server' || BP.srvPaused != null) { BP.where = 'browser'; delete BP.srvPaused; saveBP(); }
 }
 let ubCreating = false;   // a double tap would send two creates (the second gets the first one's bot back, with a second toast)
 async function setWhere(w) {
@@ -3112,8 +3121,22 @@ async function setWhere(w) {
       toast('Ваш бот теперь работает на сервере 24/7', `торгует по выбранному профилю, даже когда сайт закрыт. Журнал — отдельный, начинается с $${start.toLocaleString('ru')}`, 'ok');
     }
   }
-  BP.where = w; saveBP();
-  if (w === 'server') { syncServerBot(fresh ? J.on : null); fetchServerBot(); } else SB_MINE = null;   // a new bot starts as the browser one was
+  // «В браузере» pauses the profile's server bot (the owner's decision, 09.11): before 2.84 it went on trading and writing to
+  // Telegram unseen, the site showed the browser journal, and 30 days later it fell asleep. srvPaused (in sr_bot, so every device
+  // knows) — it was running when paused here: «На сервере 24/7» runs it again; one the person had paused stays paused
+  let paused = null;
+  if (w === 'browser' && BP.where === 'server' && UB) {
+    paused = SB_MINE ? SB_MINE.on !== false : true;
+    clearTimeout(syncTimer); ubOn = null;
+    try { await rpc('ub_set', ubArgs({p_config:serverConfig(), p_enabled:false})); }
+    catch (e) { toast('Не удалось поставить серверного бота на паузу', String(e.message || e), 'bad'); renderBotPanel(); return; }   // the switch stays where it was
+  }
+  const resume = w === 'server' && !fresh && BP.srvPaused === true;
+  BP.where = w;
+  if (paused != null) BP.srvPaused = paused; else if (w === 'server') delete BP.srvPaused;
+  saveBP();
+  if (w === 'server') { syncServerBot(fresh ? J.on : resume ? true : null); fetchServerBot(); } else SB_MINE = null;   // a new bot starts as the browser one was
+  if (paused != null) toast('Бот работает в этой вкладке', 'серверный бот на паузе и не пишет в Telegram; «На сервере 24/7» вернёт его', 'info');
   renderBotPanel(); renderJournal();
 }
 async function runBot() {
@@ -4257,6 +4280,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.84', date:'9 ноября 2026', title:'Бот в браузере', items:[
+    'Когда бот переведён в браузер, серверный бот профиля встаёт на паузу и не пишет в Telegram.',
+    'Кнопка «На сервере 24/7» возвращает серверного бота в прежнее состояние.',
+  ]},
   {v:'2.83', date:'9 ноября 2026', title:'Без перезагрузки при открытии', items:[
     'Настройки, изменённые на другом устройстве, применяются сразу при открытии сайта, без перезагрузки страницы.',
     'Исправлено: открытие сайта на другом устройстве больше не возвращает серверному боту прежние профили.',
@@ -4322,12 +4349,6 @@ const CHANGELOG = [
     'Экран входа стал стеклянной карточкой поверх золотого света.',
     'Ссылка «сменить» в карточке бота стала удобнее для пальца.',
   ]},
-  {v:'2.72', date:'2 ноября 2026', title:'Подсказки и расстояния', items:[
-    'В разборе сигнала под шкалой показано, сколько цене пройти до границ и до центра канала.',
-    'В поле поиска монеты на компьютере видна клавиша «/», которая его открывает.',
-    'Сводка рынка при загрузке показывает заглушки, как таблица, вместо прочерков.',
-    'Касание значения в R на телефоне объясняет, что такое R.',
-  ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
 const loadOldChangelog = () => { if (oldAsked) return; oldAsked = true; import('./changelog.js').then(m => { CHANGELOG_OLD = m.OLD; renderChangelog(); }).catch(() => { oldAsked = false; }); };
@@ -4371,7 +4392,8 @@ const setMore = on => { $('#mtable').classList.toggle('more', on); $('#morebar')
 $('#more').onclick = () => setMore(!$('#mtable').classList.contains('more'));
 setMore(load('sr_more', false));
 let scanTimer;
-const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); syncServerBot(); };   // the server bot sends this market's signals to Telegram
+// the server bot's config has no market settings: Telegram's «Рынок» keeps its own, saved by its button (alerts.mkt)
+const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); };
 $('#N').oninput = e => { S.N = +e.target.value; $('#Nv').textContent = S.N; computeChartSoon(); };
 $('#k').oninput = e => { S.k = +e.target.value; $('#kv').textContent = S.k; computeChartSoon(); };
 $('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').textContent = S.candles; chartView = null; drawChartSoon(); };
@@ -4826,8 +4848,7 @@ $('#ubdel').onclick = async () => {
   clearTimeout(syncTimer); ubOn = null;
   try { await rpc('ub_delete', ubArgs()); }
   catch (e) { if (!/forbidden/.test(e.message)) { toast('Не удалось удалить', String(e.message || e), 'bad'); return; } }   // forbidden: it is gone already
-  UB = null; save('sr_ubot', null); SB_MINE = null;
-  if (BP.where === 'server') { BP.where = 'browser'; saveBP(); }
+  botGone();
   renderBotPanel(); renderJournal(); renderGuard();
   toast('Бот удалён с сервера', 'Профили остались, бот работает в этой вкладке', 'ok');
 };
@@ -5074,8 +5095,7 @@ renderChangelog();
 if (!LOCKED) {   // signed out, the bot panel would fetch the market regime for a page nobody can see
   renderBotPanel();
   tgName().then(b => { if (b && !$('#journal').classList.contains('hidden')) renderJournal(); });
-  if (BP.where === 'server' && UB) syncServerBot();   // the profiles as this device has them; on/off stays as the server has it
-  if (BP.where === 'server') fetchServerBot();   // profileBot then moves this device to the profile's bot, if it was on another
+  if (BP.where === 'server') fetchServerBot();   // it also sends the profiles, if the server has others (see cfgChecked)   // profileBot then moves this device to the profile's bot, if it was on another
 }
 if (!load('sr_intro', false) && !LOCKED) $('#intro').classList.remove('hidden');
 $('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };

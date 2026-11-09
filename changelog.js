@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.71 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.72 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.72', date:'2 ноября 2026', title:'Подсказки и расстояния', items:[
+    'В разборе сигнала под шкалой показано, сколько цене пройти до границ и до центра канала.',
+    'В поле поиска монеты на компьютере видна клавиша «/», которая его открывает.',
+    'Сводка рынка при загрузке показывает заглушки, как таблица, вместо прочерков.',
+    'Касание значения в R на телефоне объясняет, что такое R.',
+  ]},
   {v:'2.71', date:'2 ноября 2026', title:'Стекло на компьютере', items:[
     'Стекло стало заметнее на большом экране: у панелей появились отблеск и светлая верхняя кромка.',
     'Переключатели таймфрейма и фильтров, а также кнопки-иконки стали стеклянными.',
