@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.81 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.82 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.82', date:'9 ноября 2026', title:'Надёжнее синхронизация настроек', items:[
+    'Исправлено: настройки, изменённые без интернета, теперь доходят до других устройств профиля.',
+    'Исправлено: графики «Беты» на компьютере больше не сбрасываются после открытия «Беты» на телефоне.',
+    'Исправлено: две открытые вкладки больше не вызывают лишних уведомлений «Настройки изменены на другом устройстве».',
+    'Закрытый без выбора вопрос «Настройки в профиле» больше не заменяет настройки профиля: он появится при следующем открытии.',
+  ]},
   {v:'2.81', date:'9 ноября 2026', title:'Колокольчик на телефоне', items:[
     'Исправлено: на телефоне колокольчик и значок работы ботов оставались выделенными после повторного нажатия.',
   ]},

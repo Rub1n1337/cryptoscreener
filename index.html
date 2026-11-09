@@ -627,6 +627,10 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
   .cvwrap{display:flex;flex-direction:column-reverse}.ctools{position:static;opacity:1;margin-bottom:6px;flex-wrap:wrap}
   .tpanel>.filters:first-child .seg{flex:1 1 auto;min-width:0}.tpanel>.filters:first-child .seg .tab{flex:1;padding:0 8px}
 }
+/* five quick filters on a narrow phone: «Бот» without its count (the line «Показано N из …» has it while the filter is on),
+   and at 320 tighter tabs that still keep 36 px for the finger */
+@media(max-width:400px){#cntBot{display:none}}
+@media(max-width:359px){#flseg .tab{flex:1 0 auto;padding:0 5px;min-width:36px}}
 /* ---------- phone: trade tables become cards (coin, side and result first; details under them) ---------- */
 @media(max-width:700px){
   .phead p{display:none}
@@ -1320,7 +1324,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <div class="panel tpanel">
         <div class="filters">
           <div class="search" style="flex:1 1 110px"><svg class="i"><use href="#i-search"/></svg><input id="fs" type="search" enterkeyhint="search" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Поиск монеты" title="Горячая клавиша: /"><kbd class="skey" aria-hidden="true">/</kbd></div>
-          <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
+          <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="bot" title="Монеты, которыми торгует «Мой бот»: свой список его профиля или топ монет из профиля">Бот <span class="cnt" id="cntBot"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
           <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
           <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
         </div>
@@ -1329,7 +1333,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <select id="fmin" title="Только монеты с силой сигнала не ниже"><option value="0">Любая сила</option><option value="40">Сила от 40</option><option value="50">Сила от 50</option><option value="60">Сила от 60</option><option value="70">Сила от 70</option><option value="80">Сила от 80</option></select>
           <select id="fhl" title="Только монеты, которые быстро возвращаются к центру: T½ в свечах выбранного таймфрейма"><option value="0">Любой T½</option><option value="20">T½ ≤ 20 свечей</option><option value="40">T½ ≤ 40 свечей</option></select>
           <select id="fside" title="Сторона касания: LONG — у нижней границы, SHORT — у верхней"><option value="">LONG и SHORT</option><option value="low">Только LONG</option><option value="up">Только SHORT</option></select>
-          <select id="fl" class="hidden"><option value="">Все</option><option value="sig">Сигналы</option><option value="touch">Касания</option><option value="sq">Затишье</option><option value="fav">Избранное</option></select>
+          <select id="fl" class="hidden"><option value="">Все</option><option value="sig">Сигналы</option><option value="touch">Касания</option><option value="sq">Затишье</option><option value="bot">Бот</option><option value="fav">Избранное</option></select>
           <select id="top" title="Сколько самых ликвидных монет проверять"><option value="100">100 монет</option><option value="150">150 монет</option><option value="250">250 монет</option><option value="400">400 монет</option></select>
         </div>
         <div class="fchips hidden" id="fchips" aria-live="polite"></div>
@@ -1972,7 +1976,11 @@ async function scan() {
   try {
     foot.textContent = 'загружаю список пар…';
     const now = Date.now();
-    const list = M.pickSymbols(await api('/api/v3/ticker/24hr'), S.top, myOpen().map(p => p.sym), now);
+    const tk = await api('/api/v3/ticker/24hr'), P = activeProfile();
+    scanTk = {d:tk, now};   // «Бот» picks the bot's top-N from it (botSet)
+    // besides the top: my bot's open positions and its profile's own coins (the «Бот» filter shows them even outside the top)
+    const list = M.pickSymbols(tk, S.top, [...myOpen().map(p => p.sym), ...(P?.coins.mode === 'list' ? P.coins.list : [])], now);
+    scanAsked = new Set(list);
     const limit = barsFor(set), res = [], fresh = {}; let done = 0, fails = 0;
     await pool(list, 10, async sym => {
       try { const K = await klines(sym, tf, limit); fresh[sym] = K; const r = M.analyze(sym, K, {...set, N:effN(K.length, set)}); if (r) res.push(r); }
@@ -2078,7 +2086,30 @@ const TF_FILTERS = ['#fl', '#fz', '#fmin', '#fhl', '#fside'];
 const esc = s => String(s).replace(/[<>&"]/g, c => ({"<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;"}[c]));   // user text into HTML
 // «ARB», «arb/usdt», «ARB USDT» all find ARB; «USDT» alone is not a coin
 const normQ = v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/USDT$/, '');
-const QUICK = {sig:r => r.rev || r.wasRev, touch:r => r.touch || r.kind === 'out', sq:r => r.squeeze, fav:r => favs.has(r.sym)};
+const QUICK = {sig:r => r.rev || r.wasRev, touch:r => r.touch || r.kind === 'out', sq:r => r.squeeze, bot:r => botSet().has(r.sym), fav:r => favs.has(r.sym)};
+// «Бот»: the coins «Мой бот» trades now — the active profile's own list, or its top-N by volume picked as the bot picks it
+// (math.js pickSymbols, from the scan's ticker). In «Авто» the profile follows the market, and the filter follows the profile
+let scanTk = null, scanAsked = new Set(), botMemo = null;
+// back on the market after the bot's profile changed («Журнал» → «Мой бот»): «Бот» shows the new coins at once; a list's
+// coins the last scan didn't ask for come with a scan now (a coin Binance doesn't have is asked once, not on every return)
+function botRefresh() {
+  const P = activeProfile();
+  if (rows.length && P?.coins.mode === 'list' && P.coins.list.some(s => !scanAsked.has(s))) scan();
+  else if ($('#fl').value === 'bot') renderTable();
+}
+function botSet() {
+  const P = activeProfile(); if (!P) return new Set();
+  const key = P.id + JSON.stringify(P.coins) + (scanTk?.now || 0);
+  if (botMemo?.key !== key) botMemo = {key, set:new Set(P.coins.mode === 'list' ? P.coins.list : scanTk ? M.pickSymbols(scanTk.d, P.coins.top, [], scanTk.now) : [])};
+  return botMemo.set;
+}
+// the words under the table while «Бот» is on: which profile and which coins
+function botHint() {
+  const P = activeProfile(); if (!P) return '';
+  const what = P.coins.mode === 'list' ? 'свой список' : `топ-${P.coins.top} монет по объёму`;
+  return `Монеты «Моего бота»: профиль «${P.name}»${BP.mode === 'auto' ? ' (выбран по рынку)' : ''}, ${what}.`
+    + (P.coins.mode !== 'list' && P.coins.top > S.top ? ` В таблице — только из ${S.top} проверяемых.` : '');
+}
 // every filter but the quick one (the segment counts show how many each quick filter would leave)
 function baseFilter() {
   const fz = $('#fz').value, q = normQ($('#fs').value), fmin = +$('#fmin').value, fhl = +$('#fhl').value, fside = $('#fside').value;
@@ -2092,7 +2123,8 @@ function renderChips(shown) {
   const chips = [...['#fz', '#fmin', '#fhl', '#fside'].filter(s => $(s).selectedIndex > 0).map(s => [s, sel(s)]), ...(q ? [['#fs', `«${q}»`]] : [])];
   const sortTh = sortKey !== 'ext' && [...document.querySelectorAll('#mhead th')].find(th => th.dataset.s === sortKey);
   // a filter a summary card stands for is said in words: on a phone the card's tooltip needs a long press nobody knows of
-  const hint = [$('#fz').value, $('#fl').value].map(v => v && document.querySelector(`.card[data-cf="${v}"]`)?.title.replace(/\s*Нажмите.*$/, '')).filter(Boolean).join(' ');
+  const hint = [$('#fz').value, $('#fl').value].map(v => v && document.querySelector(`.card[data-cf="${v}"]`)?.title.replace(/\s*Нажмите.*$/, '')).filter(Boolean)
+    .concat($('#fl').value === 'bot' ? [botHint()] : []).join(' ');
   const on = chips.length || $('#fl').value || sortTh;
   $('#fchips').classList.toggle('hidden', !on);
   if (!on) return;
@@ -2123,7 +2155,7 @@ function renderTableNow() {
   const fz = $('#fz').value, fl = $('#fl').value, pass = baseFilter();
   // segment counts follow the other filters: «Сигналы 2» means two rows will show, not two in the whole market
   const base0 = rows.filter(pass);
-  $('#cntSig').textContent = base0.filter(QUICK.sig).length || ''; $('#cntSq').textContent = base0.filter(QUICK.sq).length || ''; $('#cntFav').textContent = base0.filter(QUICK.fav).length || '';
+  $('#cntSig').textContent = base0.filter(QUICK.sig).length || ''; $('#cntSq').textContent = base0.filter(QUICK.sq).length || ''; $('#cntBot').textContent = base0.filter(QUICK.bot).length || ''; $('#cntFav').textContent = base0.filter(QUICK.fav).length || '';
   document.querySelectorAll('.card[data-cf]').forEach(c => c.classList.toggle('on', c.dataset.cf === fz || c.dataset.cf === fl));
   // filters behind the sliders button: a dot on it, an accent on each select that is set
   const extra = ['#fz', '#fmin', '#fhl', '#fside'].filter(s => $(s).selectedIndex > 0);
@@ -4345,6 +4377,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.94', date:'9 ноября 2026', title:'Монеты моего бота', items:[
+    'Добавлен фильтр «Бот» в списке монет на «Рынке»: монеты, которыми сейчас торгует «Мой бот».',
+    'Монеты из своего списка в профиле бота видны в таблице, даже если их нет среди самых популярных.',
+  ]},
   {v:'2.93', date:'9 ноября 2026', title:'Стакан внутри «Рынка»', items:[
     'Добавлена кнопка «Развернуть» в режиме «Стакан»: «Рынок» во всю ширину — до четырёх графиков и свой список монет.',
     'Вкладки «Графики» больше нет: всё, что в ней было, теперь на «Рынке».',
@@ -4399,12 +4435,6 @@ const CHANGELOG = [
     'Исправлено: открытие сайта на другом устройстве больше не возвращает серверному боту прежние профили.',
     'Исправлено: при перегрузке сервера входа сайт больше не выходит из профиля.',
     'Исправлено: несколько открытых вкладок больше не мешают друг другу оставаться в профиле.',
-  ]},
-  {v:'2.82', date:'9 ноября 2026', title:'Надёжнее синхронизация настроек', items:[
-    'Исправлено: настройки, изменённые без интернета, теперь доходят до других устройств профиля.',
-    'Исправлено: графики «Беты» на компьютере больше не сбрасываются после открытия «Беты» на телефоне.',
-    'Исправлено: две открытые вкладки больше не вызывают лишних уведомлений «Настройки изменены на другом устройстве».',
-    'Закрытый без выбора вопрос «Настройки в профиле» больше не заменяет настройки профиля: он появится при следующем открытии.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4584,7 +4614,7 @@ function go(t, push = true) {
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
   betaSync();   // the live charts: in the card's «Стакан» or the market's «Развернуть», paused elsewhere
   if (t === 'backtest' && btRes) drawEquity();
-  if (t === 'market') { drawChart(); loadWalls(); }
+  if (t === 'market') { drawChart(); loadWalls(); botRefresh(); }
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
   setTitle();
   window.scrollTo({top:0, behavior:'instant'});
