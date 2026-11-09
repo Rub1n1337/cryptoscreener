@@ -1,4 +1,5 @@
 .vercel
 .claude/*
 !.claude/skills/
+!.claude/settings.json
 tests/_ref/

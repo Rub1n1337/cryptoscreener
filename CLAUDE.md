@@ -17,7 +17,7 @@
 
 ## Working economically
 - `index.html` is ~4.5k lines: find places with grep, read only ranges (sed -n / Read offset+limit). Never read or cat it whole; same for `beta.js`, `math.js`, `bot/index.ts` unless the whole file is the task.
-- Text with Cyrillic or other non-ASCII: change it with Edit only, never perl/sed substitutions.
+- Text with Cyrillic or other non-ASCII: change it with Edit only, never perl/sed substitutions. A hook (`scripts/check-encoding.sh`, `.claude/settings.json`) checks the changed files after every Edit / Write / Bash / PowerShell call and reports double encoding or invalid UTF-8; fix that before anything else.
 - Checks in the preview: `await (await import('/tests/smoke.js?' + Date.now())).run()` at 320 / 375 / desktop (horizontal scroll, overflow, cut text, small touch targets) plus `read_console_messages`; own assertions in the same call; screenshots only for visual changes, at scale ≤ 0.6. A hidden preview pane stops `requestAnimationFrame` — wait with setTimeout in scripts.
 - After a push: `bash scripts/after-push.sh <version>` waits for Vercel and the functions deploy and prints one line each.
 - One session per plan wave (`docs/PLAN-*.md` keeps the status and is the hand-off); a long session gets compacted and loses detail.
