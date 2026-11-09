@@ -96,6 +96,22 @@ for (const [name, S] of Object.entries(VARIANTS)) {
   }
 }
 
+// ---------- 2b. walls in the book (wallsOf): the coin card, «Графики» and the bot read one rule ----------
+{
+  const bids = [], asks = [];
+  for (let i = 1; i <= 100; i++) { bids.push([(100 - i * 0.01).toFixed(2), i === 50 ? '2000' : '10']); asks.push([(100 + i * 0.01).toFixed(2), i === 40 ? '1500' : '10']); }
+  const step = M.bookStep(100), bk = M.bookBins(bids, asks, 100, 0.02, step), W = M.wallsOf(bk);
+  check('стенки: шаг корзины ≈ 0.05 % цены', step === 0.05, step);
+  check('стенки: по одной с каждой стороны, где лежит крупная заявка', W.length === 2 && Math.abs(W.find(w => w.side === 'bid')?.price - 99.5) < 1e-9 && Math.abs(W.find(w => w.side === 'ask')?.price - 100.4) < 1e-9, JSON.stringify(W.map(w => [w.side, +w.price.toFixed(4), Math.round(w.usd)])));
+  const mapBk = M.bookBins(new Map(bids.map(([p, q]) => [+p, +q])), new Map(asks.map(([p, q]) => [+p, +q])), 100, 0.02, step);
+  check('стенки: стакан строками Binance и Map дают одно и то же', JSON.stringify(M.wallsOf(mapBk)) === JSON.stringify(W));
+  // the rule «Графики» had inline before 2.89
+  const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;
+  const pick = (m, side) => [...m].filter(([, v]) => v >= med * 5 && v >= 2e4).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => ({price:k * bk.step, usd:v, side}));
+  check('стенки: то же правило, что было в «Графиках»', JSON.stringify([...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')]) === JSON.stringify(W));
+  check('стенки: порог «не меньше» отсекает', M.wallsOf(bk, undefined, {min:1e9}).length === 0);
+}
+
 // ---------- 3. against the previous copy: nothing else changed ----------
 const refPath = new URLSearchParams(location.search).get('ref');
 if (refPath) {

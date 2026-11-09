@@ -565,3 +565,28 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
   for (const p of [...open]) { const Q = P[p.sym]; const j = Q.n - 1; close(p, Q.c[j] * (1 - (p.side === 'LONG' ? 1 : -1) * SLIP), 'конец теста', Q.t[j]); }
   return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: top || tradable.length, pool: tradable.length };
 }
+
+// ---------- order book: walls — one definition for the coin card, «Графики» (beta.js) and the bot (docs/PLAN-WALLS.md) ----------
+// A wall is a price bin holding WALL.x times the typical bin's dollars and at least WALL.min, the WALL.n biggest per side,
+// within ±WALL.range % of the middle. «Графики» lets each be changed (sr_bcfg: wallX, wallMin, wallN, domRange).
+export const WALL = { x: 5, min: 2e4, n: 2, range: 8 };
+// a "nice" step ≈ share of the price (1, 2, 2.5 or 5 × 10ⁿ); the book's bins are bookStep(price) ≈ 0.05 % of it
+export const niceStep = (p, share) => { const raw = p * share, m = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].find(x => x * m >= raw) * m; };
+export const bookStep = p => niceStep(p, 0.0005);
+// dollars per bin within ±range (a share) of the middle m: {m, step, bid: Map(bin → $), ask}. bids and asks are [price, qty]
+// pairs: a Map, or Binance's REST pairs of strings
+export function bookBins(bids, asks, m, range, step) {
+  const bid = new Map(), ask = new Map();
+  for (const [p0, q] of bids) { const p = +p0; if (p >= m * (1 - range)) { const k = Math.round(p / step); bid.set(k, (bid.get(k) || 0) + p * q); } }
+  for (const [p0, q] of asks) { const p = +p0; if (p <= m * (1 + range)) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); } }
+  return { m, step, bid, ask };
+}
+// the typical bin of both sides (the upper middle one, as «Графики» have always taken it)
+export const binMedian = bk => { const a = [...bk.bid.values(), ...bk.ask.values()].sort((x, y) => x - y); return a[a.length >> 1] || 0; };
+// the walls, biggest first on each side: [{price, usd, side: 'ask' | 'bid'}]. med: the typical bin, when it must not count
+// bins added to bk afterwards («Графики» add the server's far book)
+export function wallsOf(bk, med = binMedian(bk), { x = WALL.x, min = WALL.min, n = WALL.n } = {}) {
+  const pick = (m, side) => [...m].filter(([, v]) => v >= med * x && v >= min).sort((a, b) => b[1] - a[1]).slice(0, n)
+    .map(([k, v]) => ({ price: k * bk.step, usd: v, side }));
+  return [...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')];
+}

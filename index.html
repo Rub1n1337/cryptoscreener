@@ -326,6 +326,14 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 
 /* ---------- signal breakdown ---------- */
 .detail{margin-top:12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+/* walls in the coin card: sells above the price, buys below, as in a book */
+.cwh{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap;margin-bottom:8px}.cwh .ptitle{margin:0}
+.cwl{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:6px 20px;align-items:baseline;font-size:13px}
+@media(max-width:420px){.cwl{column-gap:14px}}   /* 320 px: «$0.000005077  −1.68%  $1.4M» fits */
+.cwr{display:contents}.cwr>:not(:first-child){text-align:right}
+.cwg,.cwp{grid-column:1/-1;font-size:12px}.cwg.ask{color:var(--up-t)}.cwg.bid{color:var(--lo-t)}.cwg:not(:first-child){margin-top:2px}
+.cwp{color:var(--mute);border-block:1px dashed var(--line);padding:4px 0}.cwp b{color:var(--text);font-weight:500}
+.cwm{font-size:13px}.cwn{font-size:12px;margin-top:10px;line-height:1.45;text-wrap:pretty}.cwalls:empty{display:none}
 .verdict{font-size:14px;margin-bottom:10px;line-height:1.55}.verdict b{color:var(--acc)}
 .scales{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px;margin:4px 0 14px}.detail .gauge{--ring:var(--s2)}
 .sch{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:12px;color:var(--mute)}.sch b{font-size:15px;font-variant-numeric:tabular-nums}
@@ -597,6 +605,7 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
   body.sheet #cpanel{display:block;position:fixed;inset:0;z-index:60;overflow:auto;overscroll-behavior:contain;border:0;border-radius:0;background:var(--bg);padding:0 12px 24px}
   body.sheet .sheetbar{display:flex;position:sticky;top:0;z-index:2;margin:0 -12px 10px;padding:8px 6px;background:var(--control-shine),var(--topbg);backdrop-filter:blur(var(--glass-blur-s));-webkit-backdrop-filter:blur(var(--glass-blur-s));border-bottom:1px solid var(--line);box-shadow:var(--glass-inset)}
   .sheetbar button{background:transparent;border-color:transparent;color:var(--blue);font-weight:600;gap:2px;padding:0 8px;height:40px}
+  .sheetbar .sb-r{margin-left:auto;gap:6px}#cCharts{display:none}   /* on a phone «Графики» sit in the sheet's bar, not among the timeframes */
   body.sheet #cv{height:52vh}
   #cpanel .cact .search{display:none}#cpanel .cact .seg{flex:1}
   #refresh{display:none}
@@ -1221,12 +1230,13 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 
     <div class="grid">
       <div class="panel" id="cpanel">
-        <div class="sheetbar"><button id="sheetBack" aria-label="Назад к списку монет"><svg class="i"><use href="#i-back"/></svg>Монеты</button></div>
+        <div class="sheetbar"><button id="sheetBack" aria-label="Назад к списку монет"><svg class="i"><use href="#i-back"/></svg>Монеты</button><button id="sheetCharts" class="sb-r" data-charts title="Эта монета на «Графиках»: стакан, сделки, ликвидации">Графики<svg class="i"><use href="#i-layers"/></svg></button></div>
         <div class="chead">
           <div style="min-width:0"><div class="ctitle" id="ctitle">—</div><div class="stats" id="cstats"></div></div>
           <div class="cact">
             <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" autocapitalize="characters" autocorrect="off" spellcheck="false" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
             <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button><button class="tab" data-tf="1d" title="Дневные свечи">1д</button><button class="tab" data-tf="1w" title="Недельные свечи">1н</button></div>
+            <button class="icon" id="cCharts" data-charts title="Эта монета на «Графиках»: стакан, сделки, ликвидации" aria-label="Открыть на «Графиках»"><svg class="i"><use href="#i-layers"/></svg></button>
             <button class="icon" id="cset" title="Настройки канала" aria-label="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
           </div>
         </div>
@@ -1258,6 +1268,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <span class="faint hint-mouse">нажмите на график и крутите колёсико (или − +) — масштаб · перетаскивание, Shift + колёсико или ← → — время · F — во всю ширину · двойной клик — сброс</span><span class="faint hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span>
         </div>
         <div class="detail" id="detail"></div>
+        <div class="detail cwalls" id="cwalls"></div>
       </div>
 
       <div class="panel tpanel">
@@ -2474,6 +2485,7 @@ async function loadChart(sym) {
   if (sym && sym !== chartSym) { chartView = null; chart2View = null; }
   chartSym = sym || chartSym; save('sr_chart', chartSym);
   if (page === 'market') setHash();
+  loadWalls();
   const req = ++chartReq, want = chartSym, wrap = $('#cv').parentElement;
   // another coin: until its candles come, the previous coin's chart must not pass for this one (on a phone network that
   // takes seconds): the title says what is loading, the old chart fades under «Загружаю график…» (.cvwrap[data-wait])
@@ -2623,6 +2635,50 @@ function renderDetail() {
     html += `<div style="margin-top:8px;color:var(--violet)">Открыта позиция (${who} бот): ${p.side} от ${fp(p.entry)}, тейк ${fp(p.tp)}, стоп ${fp(p.sl)}.</div>`;
   el.innerHTML = html;
 }
+
+// ---------- walls in the coin card: big resting orders near the price ----------
+// One spot book snapshot from Binance (1000 levels, ~45 KB) when a coin opens and every 30 s while its card is in view (on a
+// phone — the open sheet). A wall is math.js wallsOf, with the thresholds set on «Графики» (sr_bcfg), within their range and
+// as far as the snapshot reaches.
+const CW_MS = 30000;
+let cw = null, cwBusy = false;   // cw: {sym, at, m, range, x, min, walls} or {sym, at, err}
+const usdS = v => '$' + (v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? Math.round(v / 1e3) + 'K' : Math.round(v));
+const cardShown = () => page === 'market' && !document.hidden && (!isPhone() || document.body.classList.contains('sheet'));
+async function loadWalls() {
+  const sym = chartSym;
+  if (!sym || !cardShown()) return;
+  if (cw?.sym !== sym) { cw = null; renderWalls(); }   // the first or another coin: «загружается», not the previous coin's walls
+  if (cwBusy || (cw && Date.now() - cw.at < CW_MS)) return;
+  cwBusy = true; let res;
+  try {
+    const b = await api(`/api/v3/depth?symbol=${sym}&limit=1000`), m = (+b.bids[0][0] + +b.asks[0][0]) / 2;
+    if (!(m > 0)) throw new Error('empty book');
+    const c = load('sr_bcfg', {}) || {}, x = c.wallX ?? M.WALL.x, min = c.wallMin ?? M.WALL.min;
+    const reach = Math.min(m / +b.bids[b.bids.length - 1][0] - 1, +b.asks[b.asks.length - 1][0] / m - 1), range = Math.min((c.domRange ?? M.WALL.range) / 100, reach);
+    const bk = M.bookBins(b.bids, b.asks, m, range, M.bookStep(m) * (c.stepX ?? 1));
+    res = {sym, at:Date.now(), m, range, x, min, walls:M.wallsOf(bk, undefined, {x, min, n:c.wallN})};
+  } catch { res = {sym, at:Date.now(), err:true}; }
+  finally { cwBusy = false; }
+  if (sym !== chartSym) return loadWalls();   // the coin changed while its book was loading: this one is not shown, the new one's is fetched
+  cw = res; renderWalls();
+}
+function renderWalls() {
+  const el = $('#cwalls');
+  const head = `<div class="cwh"><div class="ptitle">Стенки в стакане · ${base(chartSym)}</div><button class="linkbtn" data-charts>Стакан и сделки на «Графиках»</button></div>`;
+  if (!cw || cw.sym !== chartSym) { el.innerHTML = head + '<div class="mute cwm">Стакан загружается…</div>'; return; }
+  if (cw.err) { el.innerHTML = head + '<div class="mute cwm">Стакан Binance не загрузился — попробую снова через 30 секунд.</div>'; return; }
+  const pct = v => { const d = (v / cw.m - 1) * 100; return (d > 0 ? '+' : d < 0 ? '−' : '') + Math.abs(d).toFixed(2) + '%'; };
+  const row = w => `<div class="cwr"><b class="mono">${fp(w.price)}</b><span class="mono mute">${pct(w.price)}</span><b class="mono">${usdS(w.usd)}</b></div>`;
+  const side = s => { const W = cw.walls.filter(w => w.side === s).sort((a, b) => b.price - a.price);
+    return W.length ? `<div class="cwg ${s}">${s === 'ask' ? 'Продажи — выше цены' : 'Покупки — ниже цены'}</div>` + W.map(row).join('') : ''; };
+  const R = '±' + (cw.range * 100).toFixed(cw.range < 0.01 ? 2 : 1) + '%';
+  el.innerHTML = head + (cw.walls.length
+    ? `<div class="cwl">${side('ask')}<div class="cwp">цена <b class="mono">${fp(cw.m)}</b></div>${side('bid')}</div>`
+    : `<div class="mute cwm">В пределах ${R} от цены крупных стенок нет.</div>`)
+    + `<div class="faint cwn">Стакан спота Binance в пределах ${R} от цены. Стенка — уровень, где заявок в ${cw.x} ${cw.x % 10 >= 2 && cw.x % 10 <= 4 && (cw.x % 100 < 12 || cw.x % 100 > 14) ? 'раза' : 'раз'} больше обычного и не меньше ${usdS(cw.min)}; пороги меняются в настройках «Стен в стакане» на «Графиках». Обновляется раз в 30 секунд.</div>`;
+}
+// «Графики» from the card: the button in its header (computer), in the sheet's bar (phone) and in the walls block
+document.addEventListener('click', e => { if (e.target.closest('#cpanel [data-charts]')) openCharts(chartSym); });
 
 // ---------- my bot (browser): profiles ----------
 // A profile = which coins + which rules. "Auto" picks the flat or the impulse profile from the BTC/ETH/SOL regime.
@@ -4249,6 +4305,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.89', date:'9 ноября 2026', title:'Стенки в карточке монеты', items:[
+    'Добавлены стенки в стакане в карточке монеты на «Рынке»: крупные заявки рядом с ценой.',
+    'Монету из карточки можно открыть на «Графиках» одной кнопкой.',
+    'Монета, которой нет на фьючерсах, открывается на «Графиках» на споте.',
+  ]},
   {v:'2.88', date:'9 ноября 2026', title:'Графики для всех', items:[
     'Вкладка «Бета» стала «Графиками» и открыта всем, кто вошёл на сайт.',
     'Пароль и временный код для этой вкладки больше не нужны.',
@@ -4304,13 +4365,6 @@ const CHANGELOG = [
     'Повторные запуски стали быстрыми и после перезагрузки страницы.',
     'Добавлена кнопка «Очистить кэш истории» в дополнительных настройках бэктеста.',
     'В правовой информации указано, где хранится копия истории свечей.',
-  ]},
-  {v:'2.77', date:'5 ноября 2026', title:'Новый профиль и шапка', items:[
-    'Профиль стал разделом с аккаунтом, видом, уведомлениями, выходом и удалением.',
-    'Тема, режим стекла и звук перенесены в профиль, режим стекла показан на образце.',
-    'Работа ботов в шапке стала маленькой точкой, а при проблеме показывает текст, в том числе на телефоне.',
-    'Подробности о работе ботов переписаны понятным языком.',
-    'Значки в шапке и переключатели получили новое аккуратное выделение.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4490,7 +4544,7 @@ function go(t, push = true) {
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
   if (t === 'beta') betaOpen(); else betaPause?.();
   if (t === 'backtest' && btRes) drawEquity();
-  if (t === 'market') drawChart();
+  if (t === 'market') { drawChart(); loadWalls(); }
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
   setTitle();
   window.scrollTo({top:0, behavior:'instant'});
@@ -4518,6 +4572,7 @@ function openSheet() {
   sheetY = scrollY; document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden';
   history.pushState({sheet:1}, ''); $('#cpanel').scrollTop = 0;
   requestAnimationFrame(drawChart);   // the canvas had no size while hidden
+  loadWalls();
 }
 // the sheet leaves quicker than it came (DESIGN-RULES §13): .sheet-out for --dur-1, then the list is back at the same place.
 // A rotation to a wide screen (now) or reduced motion closes it at once
@@ -4551,10 +4606,13 @@ document.querySelectorAll('.card[data-cf]').forEach(c => {
 // over the list on every return to the site
 let openCoinSheet = false;
 function readHash() {
-  const [t, sym] = location.hash.replace(/^#/, '').split('/');
-  if (sym) { let d = sym; try { d = decodeURIComponent(sym); } catch {} const s = d.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (s) chartSym = s.endsWith('USDT') ? s : s + 'USDT'; }
+  const [t, sym] = location.hash.replace(/^#/, '').split('/'), charts = t === 'charts' || t === 'beta';
+  if (sym) {
+    let d = sym; try { d = decodeURIComponent(sym); } catch {} const s = d.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (s) { const p = s.endsWith('USDT') ? s : s + 'USDT'; if (charts) betaWant = p; else chartSym = p; }   // #charts/SOL: SOL on «Графики»
+  }
   if (t === 'coin') { openCoinSheet = true; return 'market'; }
-  if (t === 'charts') return 'beta';
+  if (charts) return 'beta';
   return t || 'market';
 }
 const coinLink = () => { if (openCoinSheet) { openCoinSheet = false; setHash(); if (isPhone()) openSheet(); } };
@@ -5182,12 +5240,20 @@ document.addEventListener('keydown', e => {
 // ---------- «Графики» (page id «beta»): live order books, trades and candles; their code (beta.js) loads on the first open ----------
 // Open to everyone signed in since 2.88. The closed test's access codes stay in the database (beta_* functions and tables) for
 // a future closed check; the site no longer calls them. sr_beta, this device's old access check, is dropped.
-let betaMod = null, betaPause = null;
+let betaMod = null, betaPause = null, betaWant = null;   // betaWant: a coin to put on the active chart on opening (readHash, openCharts)
 try { localStorage.removeItem('sr_beta'); } catch {}
+// the coin card's «Графики» buttons: the same coin there. On a phone the card is a sheet: it closes at once, and the tab's
+// address replaces the sheet's history entry, so Back returns to the market
+function openCharts(sym) {
+  betaWant = sym;
+  if (document.body.classList.contains('sheet')) closeSheet(true);
+  go('beta');
+}
 async function betaOpen() {
   try {
     betaMod ||= await import('./beta.js'); betaPause = betaMod.pause;
-    if (page === 'beta') betaMod.open(window.__sr.kit);   // left the tab while beta.js was loading: start no streams behind another tab
+    const sym = betaWant; betaWant = null;
+    if (page === 'beta') betaMod.open(window.__sr.kit, sym);   // left the tab while beta.js was loading: start no streams behind another tab
   } catch (e) { toast('Графики не загрузились', String(e.message || e), 'bad'); }
 }
 // a forgotten background tab must not keep the Beta's live streams (10 book updates a second per chart) busy:
@@ -5213,6 +5279,7 @@ setInterval(scan, SCAN_MS);
 setInterval(() => { tickFoot(); tickLive(); }, 1000);
 setInterval(() => { if (!document.hidden) loadChart(); }, SCAN_MS); // keep the chart's last candle fresh
 setInterval(() => { if (!document.hidden) fetchShared(); }, 30000);
+setInterval(loadWalls, 5000);   // the coin card's walls: a fresh book every 30 s while the card is in view (loadWalls decides)
 }
 
 // ---------- «Пока вас не было» ----------

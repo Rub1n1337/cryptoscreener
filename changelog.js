@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.76 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.77 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.77', date:'5 ноября 2026', title:'Новый профиль и шапка', items:[
+    'Профиль стал разделом с аккаунтом, видом, уведомлениями, выходом и удалением.',
+    'Тема, режим стекла и звук перенесены в профиль, режим стекла показан на образце.',
+    'Работа ботов в шапке стала маленькой точкой, а при проблеме показывает текст, в том числе на телефоне.',
+    'Подробности о работе ботов переписаны понятным языком.',
+    'Значки в шапке и переключатели получили новое аккуратное выделение.',
+  ]},
   {v:'2.76', date:'3 ноября 2026', title:'Режимы стекла и шапка', items:[
     'Добавлены пять режимов жидкого стекла: от полного отключения до самого яркого.',
     'По умолчанию стекло стало мягче, режим запоминается на каждом устройстве отдельно.',

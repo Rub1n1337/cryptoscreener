@@ -92,11 +92,11 @@ const PARAMS = {
     {k:'heatOp', name:'Непрозрачность', min:20, max:100, step:5, def:70, u:v => v + '%'},
     {k:'heatFloor', name:'Порог отсечения: слабее — не рисовать', min:0, max:50, step:1, def:12, u:v => v + '% от самых плотных'},
     {k:'heatCut', name:'Контраст: самые яркие — верхние', min:0.5, max:20, step:0.5, def:3, u:v => v + '% уровней'}, stepParam],
-  walls:[{k:'domRange', name:'Искать стены в пределах (дальше ±1–2% — только с сервером)', min:0.5, max:15, step:0.5, def:8, u:v => '±' + v + '%'},
+  walls:[{k:'domRange', name:'Искать стены в пределах (дальше ±1–2% — только с сервером)', min:0.5, max:15, step:0.5, def:M.WALL.range, u:v => '±' + v + '%'},
     {k:'wallAlert', name:'Уведомлять о новой стене от', min:0, max:50e6, step:1e6, def:5e6, u:v => v ? '$' + fmtUsd(v) : 'не уведомлять'},
-    {k:'wallX', name:'Стена — во сколько раз больше обычного уровня', min:2, max:20, step:1, def:5, u:v => v + '×'},
-    {k:'wallMin', name:'И не меньше', min:5e3, max:2e6, step:5e3, def:2e4, u:v => '$' + fmtUsd(v)},
-    {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:2, u:v => v}],
+    {k:'wallX', name:'Стена — во сколько раз больше обычного уровня', min:2, max:20, step:1, def:M.WALL.x, u:v => v + '×'},
+    {k:'wallMin', name:'И не меньше', min:5e3, max:2e6, step:5e3, def:M.WALL.min, u:v => '$' + fmtUsd(v)},
+    {k:'wallN', name:'Стен с каждой стороны', min:1, max:5, step:1, def:M.WALL.n, u:v => v}],   // the defaults: math.js WALL (the coin card uses them too)
   bubbles:[{k:'bubPct', name:'Показывать самые крупные сделки', min:0.2, max:5, step:0.1, def:1.5, u:v => v + '% от всех'},
     {k:'bubMin', name:'И не меньше', min:1e3, max:1e6, step:1e3, def:5e3, u:v => '$' + fmtUsd(v)}],
   mk:[{k:'mkMode', name:'Что отмечать', def:0, opts:[[0, 'покупки / продажи'], [1, 'перевес на уровне'], [2, 'общий объём']]},
@@ -124,7 +124,7 @@ const fmtQty = v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3)
 const niceNum = v => v >= 1 ? +v.toFixed(2) + '' : v.toPrecision(2);
 const durTxt = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + ' мин' : m < 1440 ? (m / 60).toFixed(m < 600 ? 1 : 0) + ' ч' : (m / 1440).toFixed(1) + ' д'; };
 // price buckets of a "nice" size ≈ share of the price, fixed per coin so heatmap columns line up over time
-const niceStep = (p, share) => { const raw = p * share, m = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].find(x => x * m >= raw) * m; };
+const {niceStep} = M;
 const maxDays = tf => Math.floor((MAXBARS - C('bbN') - 30) * TFMS[tf] / 864e5 * 10) / 10;
 
 // ---------- drawings (Smart VWAP anchors, text notes): per coin, saved, with undo / redo ----------
@@ -383,7 +383,7 @@ class Pane {
   // (a wall put at +8% is reported by Binance's stream, the server keeps it, the browser's snapshot doesn't reach it)
   walls() {
     const rng = C('domRange') / 100, bk = this.buckets(rng, this.step, !!this.far); if (!bk) return [];
-    const all = [...bk.bid.values(), ...bk.ask.values()].sort((a, b) => a - b), med = all[all.length >> 1] || 0;   // typical bin: dense local book only
+    const med = M.binMedian(bk);   // typical bin: dense local book only
     if (this.far && this.book) {
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
       for (const [p, usd, side] of this.far) {
@@ -394,8 +394,7 @@ class Pane {
       }
     }
     this.wallBk = bk;   // every bin, for the new-wall notices
-    const pick = (m, side) => [...m].filter(([, v]) => v >= med * C('wallX') && v >= C('wallMin')).sort((a, b) => b[1] - a[1]).slice(0, C('wallN')).map(([k, v]) => ({price:k * bk.step, usd:v, side}));
-    return [...pick(bk.ask, 'ask'), ...pick(bk.bid, 'bid')];
+    return M.wallsOf(bk, med, {x:C('wallX'), min:C('wallMin'), n:C('wallN')});
   }
   // once a second: walls are recomputed (not on every frame) and a new big one raises a notice
   scanWalls() {
@@ -541,14 +540,23 @@ class Pane {
     try { if (!await this.load()) return; }
     catch (e) {
       // a mistyped coin: go back to the previous one instead of leaving an empty chart (and saving it)
-      const bad = this.sym, back = this.prevSym; this.prevSym = null;
+      // HTTP 400: Binance has no such pair here (a network failure is not «no such coin»)
+      const bad = this.sym, back = this.prevSym, missing = /HTTP 400/.test(e?.message); this.prevSym = null;
+      // a coin sent from the market's card (spot) that futures don't list: the same coin on spot, not the previous coin.
+      // If spot fails too (a mistyped #charts/SYM), the previous coin comes back on futures (prevSym + prevMkt)
+      const toSpot = this.toSpot; this.toSpot = false;
+      if (toSpot && missing && this.mkt === 'fut') { K.toast(`${K.base(bad)} нет на фьючерсах Binance`, 'Открыл спот.', 'info'); this.prevSym = back; this.prevMkt = 'fut'; this.mkt = 'spot'; savePanes(); syncBar(); this.label(); this.restart(); return; }
       if (!back && this.prevMkt) { const m0 = this.prevMkt; this.prevMkt = null; K.toast(`${K.base(bad)} нет на ${this.mkt === 'fut' ? 'фьючерсах' : 'споте'} Binance`, 'Вернул прежний рынок.', 'bad'); this.mkt = m0; savePanes(); syncBar(); this.label(); this.restart(); return; }
-      K.toast(back ? `Монеты ${K.base(bad)} нет на споте Binance` : 'Не удалось загрузить свечи', back ? `Вернул ${K.base(back)}. Пишите тикер, например SOL или PEPE.` : `${bad}: ${e.message || e}`, 'bad');
-      if (back) { this.sym = back; savePanes(); renderList(); this.restart(); }
+      K.toast(back && missing ? `Монеты ${K.base(bad)} нет на ${this.mkt === 'fut' ? 'фьючерсах' : 'споте'} Binance` : 'Не удалось загрузить свечи', back ? `Вернул ${K.base(back)}.${missing ? ' Пишите тикер, например SOL или PEPE.' : ''}` : `${bad}: ${e.message || e}`, 'bad');
+      if (back) {
+        this.sym = back;
+        if (this.prevMkt) { this.mkt = this.prevMkt; this.prevMkt = null; syncBar(); this.label(); }   // back to the market it was on too
+        savePanes(); renderList(); this.restart();
+      }
       return;
     }
-    this.prevSym = null; this.prevMkt = null;
-    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = niceStep(p, 0.0005); this.fine = niceStep(p, 0.00025); renderChips(); }   // chips show steps in $
+    this.prevSym = null; this.prevMkt = null; this.toSpot = false;
+    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = M.bookStep(p); this.fine = niceStep(p, 0.00025); renderChips(); }   // chips show steps in $
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
     this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.rows = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp();
   }
@@ -1627,6 +1635,14 @@ function wire() {
   wirePop();
 }
 function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.prevSym = p.sym; p.sym = sym; savePanes(); p.restart(); renderList(); }
+// a coin sent from outside (the market's coin card, a #charts/SYM link) goes on the active chart, as if typed there.
+// Before the streams start (open() connects next), only the pane's coin changes: its old candles are dropped, so it restarts
+function want(sym) {
+  const p = act(); if (!p || p.sym === sym) return;
+  p.toSpot = true;
+  if (loopOn) return setSym(sym);
+  p.prevSym = p.sym; p.sym = sym; p.d = null; savePanes(); syncBar(); p.label();
+}
 function setLive() {
   const p = act(); if (!p) return;
   const st = p.state(), ok = st === 'live', mins = Math.floor(p.heatMs / 6e4), all = panes.filter(q => q.live()).length;
@@ -1647,9 +1663,9 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// ---------- public: called by index.html when the Beta tab opens / closes ----------
+// ---------- public: called by index.html when the «Графики» tab opens / closes; sym — a coin to show (the coin card's button) ----------
 let wired = false, sampler = null;
-export function open(kit) {
+export function open(kit, sym) {
   K = kit;
   if (!wired) {
     wired = true;
@@ -1665,6 +1681,7 @@ export function open(kit) {
     chipsOpen = K.load('sr_bchips', !PHONE.matches); wire(); wireChips(); renderInd();
     setLayout(K.load('sr_blay', 1));
   }
+  if (sym) want(sym);
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0, tickAt = Date.now();
