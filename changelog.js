@@ -1,6 +1,9 @@
-// Older «Что нового» entries (2.80 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.81 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.81', date:'9 ноября 2026', title:'Колокольчик на телефоне', items:[
+    'Исправлено: на телефоне колокольчик и значок работы ботов оставались выделенными после повторного нажатия.',
+  ]},
   {v:'2.80', date:'9 ноября 2026', title:'Правки шапки и поиска', items:[
     'Исправлено: поля дат в бэктесте выходили за край экрана на iPhone.',
     'Исправлено: на телефоне поиск и колокольчик оставались подсвеченными после закрытия.',

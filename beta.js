@@ -1,5 +1,6 @@
-// «Графики» (the tab was «Бета» during its closed test; the file, page id and storage keys keep that name): order book and
-// order flow on top of the usual chart. Loaded on first use — the tab or the coin card's «Стакан» (betaSync in index.html).
+// Live charts with the order book (the closed «Бета», then the tab «Графики»; the file, ids and storage keys keep the old
+// name): order book and order flow on top of the usual chart, inside «Рынок» — the coin card's «Стакан» and «Развернуть».
+// Loaded on first use (betaSync in index.html).
 // Everything comes straight from Binance spot in the browser: candles over REST + the kline stream, the order book as a
 // REST snapshot kept current by the depth diff stream, trades from the aggTrade stream. Nothing is stored on a server yet,
 // so the liquidity heatmap accumulates from the moment the tab is opened.
@@ -635,7 +636,7 @@ class Pane {
     openPop({left:x, bottom:y, top:y}, head(`Свеча ${K.dt(d.t[i])} · ${TFL[this.tf]}`)
       + `<div class="fps"><span>покупки по рынку<b class="pos">$${fmtUsd(B)}</b></span><span>продажи по рынку<b class="neg">$${fmtUsd(S)}</b></span><span>дельта<b class="${B - S >= 0 ? 'pos' : 'neg'}">${B - S >= 0 ? '+' : ''}${fmtUsd(B - S)} (${((B - S) / ((B + S) || 1) * 100).toFixed(0)}%)</b></span><span>POC<b>${K.fp(poc[0] * step)} – ${K.fp((poc[0] + 1) * step)}</b></span></div>`
       + `<div class="fpr fph"><span>крупнейшие уровни</span><span>продажи</span><span>покупки</span><span>дельта</span></div>${[...top].sort((a, b) => b[0] - a[0]).map(row).join('')}`
-      + `<p class="phint">Шаг строк $${niceNum(step)}. ${this.fpHist?.cols.has(d.t[i]) ? 'История — с нашего сервера.' : 'Только сделки с момента открытия вкладки.'}</p>`, 'fpp');
+      + `<p class="phint">Шаг строк $${niceNum(step)}. ${this.fpHist?.cols.has(d.t[i]) ? 'История — с нашего сервера.' : 'Только сделки с момента открытия графика.'}</p>`, 'fpp');
   }
   // the cluster row step: the average visible candle range / 10 (like ZeroSynapse), or the fixed step from the settings
   fpStepFor(G) {
@@ -1318,28 +1319,29 @@ function syncBar() {
 // view's coin, so browsing the market doesn't tell other devices «настройки изменены». A chart put on spot only
 // because futures don't list its coin (autoSpot) keeps «фьючерсы»
 const savePanes = () => { const was = K.load('sr_bpanes', []), w = Array.isArray(was) ? was : [];
-  const own = pool.map((p, i) => ({sym:card && i === 0 && w[0]?.sym || p.sym, tf:p.tf, range:p.range, mkt:p.autoSpot ? 'fut' : p.mkt}));
+  const own = pool.map((p, i) => ({sym:card && i === cardAt && w[i]?.sym || p.sym, tf:p.tf, range:p.range, mkt:p.autoSpot ? 'fut' : p.mkt}));
   K.save('sr_bpanes', own.concat(w.slice(own.length, 4))); };
 // panes are kept (hidden, streams closed) when the layout shrinks, so switching back is instant and the heatmap survives.
-// card: the charts sit in the market's coin card («Стакан» mode) — one chart, the first; the chosen layout (sr_blay) waits
-// for the full view
-let pool = [], card = false;
+// card: the charts sit in the market's coin card («Стакан») — one chart, the one that is active at full width (cardAt);
+// the chosen layout (sr_blay) waits for «Развернуть»
+let pool = [], card = false, cardAt = 0;
 function setLayout(n) { K.save('sr_blay', n); applyLayout(); }
 function applyLayout() {
-  let n = card ? 1 : K.load('sr_blay', 1); if (n > 2 && SMALL.matches) n = 2;   // the choice is kept: turning the phone or widening the window brings it back
-  layout = n; $('#bPanes').dataset.lay = n;
+  let n = K.load('sr_blay', 1); if (n > 2 && SMALL.matches) n = 2;   // the choice is kept: turning the phone or widening the window brings it back
   const saved = K.load('sr_bpanes', []);
-  for (let i = 0; i < Math.max(n, pool.length); i++) {
-    if (i < n && !pool[i]) {
-      const used = new Set(pool.map(p => p.sym)), conf = saved[i] || {sym:DEF_SYMS.find(s => !used.has(s)) || 'BTCUSDT', tf:pool[0]?.tf || '5m'};
-      pool[i] = new Pane(conf);
-    }
-    const p = pool[i], show = i < n; if (!p) continue;
-    p.el.classList.toggle('hidden', !show);
-    if (!show) p.disconnect(); else if (loopOn && !p.ws) p.d ? p.connect() : p.restart();
+  for (let i = 0; i < n; i++) if (!pool[i]) {
+    const used = new Set(pool.map(p => p.sym)), conf = saved[i] || {sym:DEF_SYMS.find(s => !used.has(s)) || 'BTCUSDT', tf:pool[0]?.tf || '5m'};
+    pool[i] = new Pane(conf);
   }
-  panes = pool.slice(0, n);
-  if (active >= n) active = 0;
+  if (card && !pool[cardAt]) cardAt = 0;
+  const show = i => card ? i === cardAt : i < n;
+  pool.forEach((p, i) => {
+    p.el.classList.toggle('hidden', !show(i));
+    if (!show(i)) p.disconnect(); else if (loopOn && !p.ws) p.d ? p.connect() : p.restart();
+  });
+  panes = card ? [pool[cardAt]] : pool.slice(0, n);
+  layout = panes.length; $('#bPanes').dataset.lay = layout;
+  if (active >= layout) active = 0;
   panes.forEach((p, k) => p.el.classList.toggle('on', k === active));
   savePanes(); syncBar(); renderChips(); redrawAll(); requestAnimationFrame(redrawAll);
 }
@@ -1675,10 +1677,11 @@ function loop() {
 }
 
 // ---------- public: called by index.html when the charts come into view / leave it ----------
-// sym — a coin for the active chart (the coin card, a #charts/SYM link); where — 'card' (the market's coin card, one chart)
-// or 'tab' (the full view: 1 / 2 / 4 charts and the list). index.html moves their elements there first
+// sym — a coin for the active chart (the card's coin); where — 'card' (the market's coin card in «Стакан»: the active chart
+// alone) or 'full' (the market at full width after «Развернуть»: 1 / 2 / 4 charts and the list). index.html moves their
+// elements there first
 let wired = false, sampler = null;
-export function open(kit, sym, where = 'tab') {
+export function open(kit, sym, where = 'full') {
   K = kit;
   if (!wired) {
     wired = true;
@@ -1693,7 +1696,11 @@ export function open(kit, sym, where = 'tab') {
     K.save('sr_bactph', true);
     chipsOpen = K.load('sr_bchips', !PHONE.matches); wire(); wireChips(); renderInd();
   }
-  if (!pool.length || card !== (where === 'card')) { card = where === 'card'; closePop(); applyLayout(); }
+  const c = where === 'card';
+  if (!pool.length || c !== card) {
+    if (c && !card) cardAt = active; else if (!c && card) active = cardAt;   // the card shows the active chart, and keeps it active
+    card = c; closePop(); applyLayout();
+  }
   if (sym) want(sym);
   if (loopOn) return;
   loopOn = true; renderList();
@@ -1702,6 +1709,8 @@ export function open(kit, sym, where = 'tab') {
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
+// the active chart's coin and market: «Свернуть» gives the card that coin
+export const activeSym = () => { const p = act(); return p ? {sym:p.sym, mkt:p.mkt} : null; };
 // out of view the streams close (no traffic in the background); the heatmap collected so far stays in memory. The indicator
 // window covers the whole page, so it closes too
 export function pause() { if (!loopOn) return; loopOn = false; clearInterval(sampler); panes.forEach(p => p.disconnect()); closePop(); closeInd(); if (tool) setTool(null); }
