@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.67 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.68 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.68', date:'2 ноября 2026', title:'Удобнее на телефоне', items:[
+    'Название вкладки браузера показывает раздел или открытую монету.',
+    'Ссылка на сайт в мессенджерах показывает название и описание.',
+    'На телефоне полоса браузера окрашена в цвет темы, цены на iPhone не превращаются в ссылки для звонка.',
+    'Числовые поля открывают цифровую клавиатуру, тикеры сразу набираются заглавными.',
+    'Поле «Старт, $» в бэктесте стало «Депозит, $».',
+  ]},
   {v:'2.67', date:'2 ноября 2026', title:'Надёжность входа', items:[
     'Исправлен выход из профиля, который мог случиться, когда сайт открыт в нескольких вкладках.',
     'Недавние монеты, число графиков и скрытые панели «Беты» у каждого устройства свои.',

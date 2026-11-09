@@ -200,6 +200,10 @@ button.icon{width:var(--h);padding:0;color:var(--mute)}button.icon.on{color:var(
 input:not([type=checkbox]):not([type=range]):focus,select:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 input::placeholder{color:var(--faint)}
 input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
+/* iOS Safari gives a date field its own minimum width (the backtest's «По» spilled past the form on an iPhone) and centres the
+   date: the field takes its cell's width and reads from the left like the selects next to it (2.80) */
+input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left}
 input[type=range]{padding:0;width:120px;accent-color:var(--acc)}
 .ctrl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:10px 0}
 .ctrl label{color:var(--mute);font-size:12px;display:flex;align-items:center;gap:8px}
@@ -692,6 +696,7 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
 .gate-lead{margin:0;font-size:17px;line-height:1.5;color:var(--text)}.gate-list{margin:0;padding-left:20px;display:grid;gap:6px;line-height:1.5}
 .gate-in{height:48px;font-size:16px;justify-self:start;padding:0 22px}.gate p.faint{margin:0;line-height:1.5}
 .locked .tabs,.locked .tools>:not(.tgroup),.locked .tgroup>:not(#acct){display:none}
+.locked .top .tools{margin-left:auto}   /* the tabs (flex:1) pushed «Войти» right; signed out they're hidden (2.80) */
 .authbox{width:min(400px,100%)}.authh{display:flex;justify-content:space-between;align-items:center;gap:8px}.authh h3{margin:0}
 .authb{display:grid;gap:12px;margin-top:10px}.authb p{margin:0}
 .authcode{font-size:44px;line-height:1.15;text-align:center;letter-spacing:8px;padding:6px 0}
@@ -763,6 +768,13 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .cmdempty{padding:22px 12px;text-align:center;color:var(--mute);font-size:13px}
 .cmdf{display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
 @media(max-width:700px){.cmdk{padding:10px}.cmdbox{max-height:80vh}.cmdf{display:none}}
+/* the close control: «Esc» where there is a keyboard and a mouse, a cross a finger can hit on a touch screen — closing used to
+   need the thin strip of backdrop under the list (2.80) */
+.cmdin .cmdx,.cmdin .cmdx:hover,.cmdin .cmdx:active{height:auto;padding:0;border:0;background:none;box-shadow:none;color:var(--faint);flex:0 0 auto}
+.cmdin .cmdx svg{display:none}
+/* a narrow phone: the hint goes under the name instead of cutting it («Журнал общего бота» at 320 px) (2.80) */
+@media(max-width:420px){.cmdi{flex-direction:column;align-items:flex-start;gap:2px}.cmdi .ct{flex:none;max-width:100%;white-space:normal}.cmdi .ch{white-space:normal}}
+@media (hover:none),(pointer:coarse){.cmdin .cmdx kbd{display:none}.cmdin .cmdx svg{display:block;color:var(--mute)}:is(.cmdin .cmdx,.cmdin .cmdx:hover,.cmdin .cmdx:active){width:44px;height:44px;margin-right:-10px}}
 .flash{animation:flash 1.6s var(--ease)}
 @keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 3px transparent}}
 /* my bot: status, profile picker, extra options */
@@ -992,7 +1004,10 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
    touches the group's edges; signed out only «Войти» is left, with its word */
 .tgroup{display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--glass-line);border-radius:var(--r-l);background:var(--control-shine),var(--s2);box-shadow:var(--glass-inset)}
 .top .tools .tgroup button{position:relative;width:36px;height:36px;min-width:36px;padding:0;border:1px solid transparent;border-radius:var(--r);background:transparent;box-shadow:none;color:var(--mute);transition:background-color var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
-.top .tools .tgroup button:hover,.top .tools .tgroup button:focus-visible{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:none}
+/* hover only where there is a real pointer: a phone keeps :hover on the last tapped button, so the bell and search stayed lit
+   after the second tap that closed them (2.80) */
+.top .tools .tgroup button:focus-visible{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:none}
+@media (hover:hover){.top .tools .tgroup button:hover{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:none}}
 .top .tools .tgroup button[aria-expanded=true]{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:var(--ui-shadow)}
 .top .tools .tgroup button:active{background:var(--s3);border-color:var(--line2);box-shadow:inset 0 1px 3px var(--glass-press)}
 .top .tools .tgroup .nbadge{top:1px;right:1px;box-shadow:0 0 0 2px var(--s2);pointer-events:none}
@@ -1185,7 +1200,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
 </div></div>
 <div id="toasts"></div>
 <div id="cmdk" class="cmdk hidden"><div class="cmdbox" role="dialog" aria-modal="true" aria-label="Быстрый переход">
-  <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" enterkeyhint="go" autocorrect="off" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-label="Быстрый переход" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><kbd>Esc</kbd></div>
+  <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" enterkeyhint="go" autocorrect="off" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-label="Быстрый переход" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><button type="button" class="cmdx" id="cmdx" title="Закрыть (Esc)" aria-label="Закрыть поиск"><kbd>Esc</kbd><svg class="i"><use href="#i-x"/></svg></button></div>
   <div id="cmdl" class="cmdl" role="listbox"></div>
   <div class="cmdf"><span>↑↓ выбрать</span><span>Enter открыть</span><span>Esc закрыть</span></div>
 </div></div>
@@ -4116,6 +4131,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.80', date:'9 ноября 2026', title:'Правки шапки и поиска', items:[
+    'Исправлено: поля дат в бэктесте выходили за край экрана на iPhone.',
+    'Исправлено: на телефоне поиск и колокольчик оставались подсвеченными после закрытия.',
+    'На телефоне поиск закрывается крестиком рядом с полем, а подсказки к пунктам больше не обрезают названия.',
+    'Исправлено: на компьютере кнопка «Войти» стояла рядом с логотипом вместо правого угла.',
+  ]},
   {v:'2.79', date:'9 ноября 2026', title:'Свой период и честный топ', items:[
     'Добавлен период бэктеста «Свои даты»: любые даты с 2020 года, например прошлый год.',
     'Честный топ «на каждый момент» стал точнее: в нём учтены монеты, которые были в топе тогда, а потом из него выпали.',
@@ -4181,13 +4202,6 @@ const CHANGELOG = [
   ]},
   {v:'2.69', date:'2 ноября 2026', title:'Золотое свечение', items:[
     'Добавлено мягкое золотое свечение у логотипа, которое видно сквозь шапку.',
-  ]},
-  {v:'2.68', date:'2 ноября 2026', title:'Удобнее на телефоне', items:[
-    'Название вкладки браузера показывает раздел или открытую монету.',
-    'Ссылка на сайт в мессенджерах показывает название и описание.',
-    'На телефоне полоса браузера окрашена в цвет темы, цены на iPhone не превращаются в ссылки для звонка.',
-    'Числовые поля открывают цифровую клавиатуру, тикеры сразу набираются заглавными.',
-    'Поле «Старт, $» в бэктесте стало «Депозит, $».',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5029,7 +5043,10 @@ function cmdRender() {
   $('#cmdq').setAttribute('aria-activedescendant', cmdItems.length ? 'cmdo' + cmdIdx : '');
 }
 function cmdOpen() { if (LOCKED) return; cmdBack = document.activeElement; $('#cmdk').classList.remove('hidden'); document.documentElement.style.overflow = 'hidden'; $('#cmdq').value = ''; cmdIdx = 0; cmdRender(); $('#cmdq').focus(); }
-function cmdClose() { $('#cmdk').classList.add('hidden'); document.documentElement.style.overflow = ''; cmdBack?.focus?.({preventScroll:true}); }
+// focus goes back to where it was only with a keyboard and a mouse: on a phone it lit the search button up as focused (the field
+// before it counts as keyboard focus), and a phone has no keyboard path to keep
+function cmdClose() { $('#cmdk').classList.add('hidden'); document.documentElement.style.overflow = ''; if (matchMedia('(hover:hover)').matches) cmdBack?.focus?.({preventScroll:true}); }
+$('#cmdx').onclick = cmdClose;
 function cmdRun(i) { const it = cmdItems[i]; if (!it) return; cmdClose(); if (/^[cg]:/.test(it.id)) recentAdd(it.id); it.run(); }
 $('#cmdbtn').onclick = cmdOpen;
 if (/Mac|iPhone|iPad/.test(navigator.platform)) $('#cmdbtn').title = $('#cmdbtn').title.replace('Ctrl K', '⌘K');
