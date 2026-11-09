@@ -12,6 +12,8 @@
 - Changelog (`CHANGELOG` in index.html) is for users, in an official, concise style: a 2–5-word title; 1–5 items of one short sentence each («Добавлено…», «Исправлено…», «… стало …»). No mentions of AI, reviews or the development process; no causes, internals, px, «раньше…» stories or numbers that may later change. Entries before 2.40 live in `changelog.js` (loaded when «Что нового» opens); when `CHANGELOG` grows past ~12, move its oldest there.
 - `docs/AUDIT-STATE.md` is what other AIs get instead of past rounds: update its version and lists with every release. Their replies are triaged against it first (stale snapshot → one line).
 - Problems hit and how they were fixed: `docs/LESSONS.md`. Before work read its short checklist at the top, then grep the section of the area you touch (the whole file is ~36 KB); add a row with every non-trivial fix.
+- Before writing what the site does (help, `#legal`, the changelog, `docs/AUDIT-STATE.md`, `docs/LESSONS.md`, a reply to the owner), reopen the code and check it; never from memory, even if it was right an hour ago.
+- Do what the task names. Extras you would add (a button, a menu entry, a refactor) go into the report as suggestions, not into the commit; bugs found on the way are fixed and named in the report.
 
 ## Working economically
 - `index.html` is ~4.5k lines: find places with grep, read only ranges (sed -n / Read offset+limit). Never read or cat it whole; same for `beta.js`, `math.js`, `bot/index.ts` unless the whole file is the task.
