@@ -127,7 +127,7 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
 .num,td,.card .v,.kv b,.mono{font-variant-numeric:tabular-nums}
 /* numbers in JetBrains Mono: prices, percentages, counts. Its file has Latin only, so a word in a number cell («тренд», «5.2д»,
-   «Распродажа») falls back to Manrope letter by letter. The «Бета» keeps its own styles */
+   «Распродажа») falls back to Manrope letter by letter. «Графики» (#beta) keep their own styles */
 .num,.mono,td.n,.card .v,.kv b,.sch b,.sca,.comp .cv,.thero-v,.tpath-l,.ttiles b,.hero .hv,.hchg .chip,.hside b,.cprice,.ctitle>.pos,.ctitle>.neg,.chead .st b,.cnt,kbd{font-family:var(--mono)}
 a{color:inherit}
 ::selection{background:var(--accbg)}
@@ -427,13 +427,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);margin-bottom:6px;background:var(--s1)}
 .prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
 .prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12.5px}
-/* ---------- Beta ---------- */
-.betalock{display:flex;justify-content:center;padding:6vh 0}
-.betalock .panel{width:min(440px,100%);text-align:center;padding:28px 24px}
-.betalock h2{margin:10px 0 6px}.betalock p{color:var(--mute);font-size:14px;margin:0 0 18px;line-height:1.5}
-.bl-ic{width:48px;height:48px;border-radius:14px;display:inline-grid;place-items:center;background:var(--accbg);color:var(--acc)}.bl-ic svg{width:22px;height:22px}
-#betaForm{display:flex;gap:8px}#betaForm input{flex:1;min-width:0;height:42px}#betaForm button{height:42px;padding:0 18px}
-.bl-err{color:var(--up);font-size:13px;min-height:18px;margin-top:8px}
+/* ---------- «Графики» (the page id, files and keys keep the name «beta» from its test days) ---------- */
 .bgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
 .bbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .bsym{flex:0 1 160px}.bsym input{width:100%}
@@ -461,15 +455,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 #bMktBtn.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 .bpop.fpp{width:min(380px,calc(100vw - 32px))}.fps{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px;font-size:12px;color:var(--mute)}.fps span{display:grid;gap:1px}.fps b{font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}.fpr{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:6px;font-size:12px;padding:4px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}.fpr span:not(:first-child){text-align:right}.fph{color:var(--faint);font-size:11px;border-top:0}
 .bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
-.bhead-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.bhead-r #betaUntil{font-size:12px}.bhead-r:empty{display:none}
-.accbox{width:min(520px,100%);max-height:86vh}.acc-body{padding:14px 16px 16px;overflow:auto;display:grid;gap:12px}
-.acc-f{display:grid;gap:6px;font-size:12.5px;color:var(--mute)}.acc-f input{height:var(--h)}
-.acc-code{display:grid;gap:6px;padding:12px;border:1px solid var(--blue);border-radius:12px;background:var(--s2)}
-.acc-code code{font-size:22px;font-weight:700;letter-spacing:.06em;color:var(--text);user-select:all}.acc-act{display:flex;gap:8px;flex-wrap:wrap}
-.acc-err{color:var(--up-t);font-size:13px}
-.acc-lh{display:flex;justify-content:space-between;align-items:center;margin-top:4px}.acc-list{display:grid;gap:6px}
-.acc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:13px}
-.acc-row>span{display:grid;gap:2px}.acc-row .faint{font-size:12px}.acc-row.dim{opacity:.55}
+.bhead-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.bhead-r:empty{display:none}
 @media(max-width:700px){.bhead-r{align-items:flex-start}}
 .bchips{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:0 2px 6px;min-height:0}.bchips:empty{display:none}
 .bchip-t,.bchip{display:inline-flex;align-items:center;gap:5px;height:26px;border:1px solid var(--line);border-radius:8px;background:var(--s1);font-size:11.5px;color:var(--text)}
@@ -1130,7 +1116,6 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
   <symbol id="i-vp" viewBox="0 0 24 24"><path d="M4 4v16" opacity=".45"/><path d="M4 6h6M4 10h11M4 14h15M4 18h8"/></symbol>
   <symbol id="i-dpoc" viewBox="0 0 24 24"><path d="M3 17h5v-5h5v3h4V7h4"/><path d="M3 21h18" opacity=".35"/></symbol>
   <symbol id="i-vwapv" viewBox="0 0 24 24"><path d="M6 4H3v16h3M18 4h3v16h-3"/><path d="M6 15c2-3 4-5 6-5s4 2 6 5" stroke-dasharray="3 2"/></symbol>
-  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
@@ -1151,7 +1136,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
     <button class="tab on" data-t="market" title="Рынок" aria-label="Рынок"><svg class="i"><use href="#i-market"/></svg><span class="tt">Рынок</span></button>
     <button class="tab" data-t="journal" title="Журнал" aria-label="Журнал"><svg class="i"><use href="#i-journal"/></svg><span class="tt">Журнал</span></button>
     <button class="tab" data-t="backtest" title="Бэктест" aria-label="Бэктест"><svg class="i"><use href="#i-backtest"/></svg><span class="tt">Бэктест</span></button>
-    <button class="tab" data-t="beta" title="Бета" aria-label="Бета"><svg class="i"><use href="#i-layers"/></svg><span class="tt">Бета</span></button>
+    <button class="tab" data-t="beta" title="Графики" aria-label="Графики"><svg class="i"><use href="#i-layers"/></svg><span class="tt">Графики</span></button>
     <button class="tab" data-t="help" title="Как это работает" aria-label="Как это работает"><svg class="i"><use href="#i-help"/></svg><span class="tt lg">Как это работает</span><span class="ts">Справка</span></button>
     <button class="tab" data-t="changes" title="Что нового" aria-label="Что нового"><svg class="i"><use href="#i-changes"/></svg><span class="tt lg">Что нового</span><span class="ts">Новое</span><span class="badge" id="ver"></span></button>
   </nav>
@@ -1193,7 +1178,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
   <div id="authFoot">
     <section class="profile-section">
       <h4>Данные профиля</h4>
-      <p class="profile-scope">Настройки, избранное, профили бота, серверный бот, уровни на графиках, вид «Беты» и доступ к ней одинаковы на всех ваших устройствах. Журнал и бот «В браузере» у каждого устройства свои.</p>
+      <p class="profile-scope">Настройки, избранное, профили бота, серверный бот, уровни на графиках и вид вкладки «Графики» одинаковы на всех ваших устройствах. Журнал и бот «В браузере» у каждого устройства свои.</p>
       <div class="profile-session"><button id="authOut">Выйти</button><button id="authOutAll">Выйти на всех устройствах</button></div>
     </section>
     <section class="profile-section profile-danger">
@@ -1472,19 +1457,10 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
   </section>
 
   <!-- HELP -->
-  <!-- BETA: new tools under test; everything else on the site keeps working as before -->
+  <!-- CHARTS («Графики»; the id stays «beta» from its closed test): live order books, trades, liquidations and candles; beta.js -->
   <section id="beta" class="hidden">
-    <div id="betaLock" class="betalock">
-      <div class="panel">
-        <div class="bl-ic"><svg class="i"><use href="#i-lock"/></svg></div>
-        <h2>Бета</h2>
-        <p>Новые инструменты, которые мы сейчас тестируем: биржевой стакан, тепловая карта ликвидности, крупные сделки, дельта объёма. Вход — по паролю или по временному коду, который выдаёт владелец.</p>
-        <form id="betaForm" autocomplete="off"><input id="betaPass" type="password" placeholder="Пароль или код SR-XXXX-XXXX" aria-label="Пароль или временный код" autocomplete="off"><button class="primary" type="submit">Войти</button></form>
-        <div class="bl-err" id="betaErr" role="alert"></div>
-      </div>
-    </div>
-    <div id="betaApp" class="hidden">
-      <div class="phead"><div><h2>Бета <span class="tag sq">тест</span></h2><p>Binance вживую — спот и фьючерсы: стакан, крупные сделки, ликвидации и свечи. История тепловой карты — с нашего сервера.</p></div><div class="bhead-r"><div id="bLive"></div><span id="betaUntil" class="faint"></span><button class="pick-btn hidden" id="betaAccessBtn" title="Создать временный код доступа к бете"><svg class="i"><use href="#i-lock"/></svg>Выдать доступ</button></div></div>
+    <div>
+      <div class="phead"><div><h2>Графики</h2><p>Binance вживую — спот и фьючерсы: стакан, крупные сделки, ликвидации и свечи. История тепловой карты — с нашего сервера.</p></div><div class="bhead-r"><div id="bLive"></div></div></div>
       <div class="bgrid">
         <div class="panel bmain">
           <div class="bbar">
@@ -1512,20 +1488,6 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         </div>
       </div>
     </div>
-    <!-- temporary access codes (owner only) -->
-    <div id="bAccess" class="cmdk hidden"><div class="cmdbox accbox" role="dialog" aria-modal="true" aria-label="Временный доступ к бете">
-      <div class="ind-h"><b>Временный доступ к «Бете»</b><button class="icon" id="bAccClose" aria-label="Закрыть"><svg class="i"><use href="#i-x"/></svg></button></div>
-      <div class="acc-body">
-        <p class="phint" style="margin-top:0">Код открывает «Бету» на выбранное время. Отозвать можно в любой момент — человек потеряет доступ при следующей проверке (обычно сразу).</p>
-        <label class="acc-f">Пароль владельца<input id="bAccPass" type="password" autocomplete="off" placeholder="тот же, что для входа в бету"></label>
-        <div class="acc-f">Срок<div class="pseg" id="bAccHours"><button data-h="1">1 час</button><button data-h="6">6 часов</button><button data-h="24" class="on">сутки</button><button data-h="72">3 дня</button><button data-h="168">неделя</button><button data-h="720">30 дней</button></div></div>
-        <label class="acc-f">Для кого (заметка)<input id="bAccNote" maxlength="80" placeholder="Например: Саша, тест стакана"></label>
-        <button class="primary" id="bAccIssue">Создать код</button>
-        <div id="bAccOut"></div>
-        <div class="acc-lh"><b>Выданные коды</b><button id="bAccRefresh">Обновить</button></div>
-        <div id="bAccList" class="acc-list"><div class="faint">Введите пароль владельца и нажмите «Обновить».</div></div>
-      </div>
-    </div></div>
     <!-- indicator picker, modelled on the "Индикаторы" window of order-flow terminals -->
     <div id="bInd" class="cmdk hidden"><div class="cmdbox indbox" role="dialog" aria-modal="true" aria-label="Индикаторы">
       <div class="ind-h"><b>Индикаторы <span class="ind-n" id="bIndN2">0</span></b><button class="icon" id="bIndClose" aria-label="Закрыть"><svg class="i"><use href="#i-x"/></svg></button></div>
@@ -1654,10 +1616,10 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <p>Вход — через Telegram: сервис не запрашивает почту, телефон и пароль. Cookie, аналитика, реклама и счётчики посещений не используются.</p>
       <ul>
         <li><b>В вашем браузере</b> (на устройстве, на сервер не отправляется): журнал бота в режиме «В браузере» — у каждого устройства свой, профили, избранное, свои уровни, настройки и тема, номер серверного бота вашего профиля, а также история свечей для бэктеста (её очищает кнопка «Очистить кэш истории» в его дополнительных настройках).</li>
-        <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, свои уровни, вид «Беты» и доступ к ней по коду. Журнал бота «В браузере» в профиль не передаётся.</li>
+        <li><b>В профиле, если вы вошли через Telegram</b>: номер пользователя Telegram, имя и @username из профиля Telegram, время последнего входа, а также настройки, избранное, профили бота, свои уровни и вид вкладки «Графики». Журнал бота «В браузере» в профиль не передаётся.</li>
         <li><b>На сервере, если бот работает «На сервере 24/7»</b>: профили, позиции, сделки, баланс и время последнего захода на сайт. Серверный бот закреплён за вашим профилем — один на все ваши устройства, и доступ к нему есть только у вашего профиля.</li>
         <li><b>На сервере, если вы включили Telegram</b>: номер чата, имя из профиля Telegram, выбранные уведомления и состояние доставки последнего сообщения. Сообщения присылает только бот вашего профиля и только в Telegram, через который вы вошли.</li>
-        <li><b>IP-адрес</b> — только для ограничения частоты запросов: создание серверных ботов, вход через Telegram и попытки входа в «Бету». Удаляется автоматически в течение двух суток.</li>
+        <li><b>IP-адрес</b> — только для ограничения частоты запросов: создание серверных ботов и вход через Telegram. Удаляется автоматически в течение двух суток.</li>
       </ul>
       <h3>Кому передаются данные</h3>
       <ul>
@@ -1799,10 +1761,10 @@ const KEYS = {
   // how this screen looks: a phone wants other than a computer (the number of Beta charts, hidden panels, open sections)
   sr_theme:'device', sr_glass:'device', sr_wide:'device', sr_more:'device', sr_bmore:'device', sr_btadv:'device',
   sr_bprof:'device', sr_jmode:'device', sr_blay:'device', sr_bhide:'device', sr_bact:'device', sr_bactph:'device',
-  // this browser's notification permission and sound, the intro, caches, the Beta's access check and server override
-  sr_ntf:'device', sr_sound:'device', sr_intro:'device', sr_pool:'device', sr_beta:'device', sr_bsrv:'device',
-  // old keys, read once to move to newer ones
-  sr_bsym:'device', sr_btf:'device', sr_delisted:'device',
+  // this browser's notification permission and sound, the intro, caches, the charts' server override
+  sr_ntf:'device', sr_sound:'device', sr_intro:'device', sr_pool:'device', sr_bsrv:'device',
+  // old keys, read once to move to newer ones or removed on start (sr_delisted, sr_beta)
+  sr_bsym:'device', sr_btf:'device', sr_delisted:'device', sr_beta:'device',
 };
 const SYNC = new Set(Object.keys(KEYS).filter(k => KEYS[k] === 'profile'));
 // a value from the profile is taken only in a shape this code reads: a wrong one (an older or newer page, a broken write) would
@@ -2782,7 +2744,7 @@ function refreshSession(due) {
 async function loadMe() {
   if (!AUTH) return renderAcct();
   try {
-    const r = await authedFetch(SB_URL + 'profiles?select=tg_name,tg_username,beta,is_owner&limit=1');
+    const r = await authedFetch(SB_URL + 'profiles?select=tg_name,tg_username&limit=1');
     if (r.ok) ME = (await r.json())[0] || null;
   } catch { /* offline: the button still says signed in; the name comes with the next try */ }
   renderAcct();
@@ -4287,6 +4249,11 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.88', date:'9 ноября 2026', title:'Графики для всех', items:[
+    'Вкладка «Бета» стала «Графиками» и открыта всем, кто вошёл на сайт.',
+    'Пароль и временный код для этой вкладки больше не нужны.',
+    'Прежние ссылки на «Бету» открывают «Графики».',
+  ]},
   {v:'2.87', date:'9 ноября 2026', title:'Порядок в данных', items:[
     'Удалены служебные данные прежних версий, которые больше не используются.',
     'Серверный бот создаётся только для профиля.',
@@ -4344,12 +4311,6 @@ const CHANGELOG = [
     'Работа ботов в шапке стала маленькой точкой, а при проблеме показывает текст, в том числе на телефоне.',
     'Подробности о работе ботов переписаны понятным языком.',
     'Значки в шапке и переключатели получили новое аккуратное выделение.',
-  ]},
-  {v:'2.76', date:'3 ноября 2026', title:'Режимы стекла и шапка', items:[
-    'Добавлены пять режимов жидкого стекла: от полного отключения до самого яркого.',
-    'По умолчанию стекло стало мягче, режим запоминается на каждом устройстве отдельно.',
-    'Кнопки шапки собраны в одну панель, тема и звук перенесены в новое меню «Вид».',
-    'В шапке одновременно открывается только одно меню.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4515,7 +4476,7 @@ document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const 
 // sortable headers work from the keyboard too: Tab to a header, Enter or Space sorts by it
 document.querySelectorAll('#mhead th[data-s], #jhead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
-// ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes ----------
+// ---------- routing: #market[/SYMBOL] · #journal · #backtest · #charts (page «beta») · #help · #changes ----------
 const PAGES = ['market', 'journal', 'backtest', 'beta', 'help', 'changes', 'legal', 'gate'];   // legal has no tab: the footer links to it
 let page = 'market';
 function go(t, push = true) {
@@ -4535,13 +4496,15 @@ function go(t, push = true) {
   window.scrollTo({top:0, behavior:'instant'});
 }
 // the browser tab says where it is — «PLUME · Sigma Radar», «Журнал · Sigma Radar» — so several open tabs can be told apart
-const PAGE_TITLE = {journal:'Журнал', backtest:'Бэктест', beta:'Бета', help:'Как это работает', changes:'Что нового', legal:'Правовая информация', gate:'Вход'};
+const PAGE_TITLE = {journal:'Журнал', backtest:'Бэктест', beta:'Графики', help:'Как это работает', changes:'Что нового', legal:'Правовая информация', gate:'Вход'};
 function setTitle() {
   const sub = page === 'market' ? base(chartSym) : PAGE_TITLE[page];
   document.title = sub ? sub + ' · Sigma Radar' : 'Sigma Radar';
 }
+// a page whose address differs from its id: «Графики» kept the id «beta» from its closed test; #beta still opens it (readHash)
+const PAGE_HASH = {beta:'charts'};
 function setHash() {
-  const h = '#' + page + (page === 'market' && chartSym ? '/' + base(chartSym) : '');
+  const h = '#' + (PAGE_HASH[page] || page) + (page === 'market' && chartSym ? '/' + base(chartSym) : '');
   if (location.hash !== h) history.replaceState(null, '', h);
   setTitle();
 }
@@ -4591,6 +4554,7 @@ function readHash() {
   const [t, sym] = location.hash.replace(/^#/, '').split('/');
   if (sym) { let d = sym; try { d = decodeURIComponent(sym); } catch {} const s = d.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (s) chartSym = s.endsWith('USDT') ? s : s + 'USDT'; }
   if (t === 'coin') { openCoinSheet = true; return 'market'; }
+  if (t === 'charts') return 'beta';
   return t || 'market';
 }
 const coinLink = () => { if (openCoinSheet) { openCoinSheet = false; setHash(); if (isPhone()) openSheet(); } };
@@ -5215,46 +5179,16 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyK') { e.preventDefault(); $('#cmdk').classList.contains('hidden') ? cmdOpen() : cmdClose(); }
 });
 
-// ---------- Beta: a password-gated tab for tools under test; its code (beta.js) loads only after unlocking ----------
-// Two ways in: the owner's password (permanent) or a temporary code SR-XXXX-XXXX issued by the owner. Both are checked by
-// Supabase (beta_owner, beta_redeem); the page holds no hash of the password. Codes expire on their own and can be revoked;
-// the page re-checks a code on every open. The tab's data is public market data, so the lock keeps visitors out of a tool
-// under test rather than guarding a secret.
-let betaMod = null, betaPause = null, betaOwnerPass = '', betaTimer = null;   // the owner password stays in memory only
-const betaState = () => { const s = load('sr_beta', false); return s === true ? {owner:true} : s && s.exp > Date.now() ? s : null; };
-const normCode = v => { const s = v.toUpperCase().replace(/[\s_]/g, ''); const m = s.match(/^SR-?([A-Z0-9]{4})-?([A-Z0-9]{4})$/); return m ? `SR-${m[1]}-${m[2]}` : s; };
-function betaExpire(msg) {
-  clearTimeout(betaTimer); save('sr_beta', false); betaPause?.();
-  $('#betaErr').textContent = msg || 'Срок доступа истёк — попросите у владельца новый код';
-  if (location.hash.startsWith('#beta')) betaOpen();
-}
-// signed in: the profile's access counts on every device — the owner's, or a code redeemed while signed in (until it ends or is revoked)
-async function betaProfile() {
-  let r; try { r = await rpc('beta_me', {}); } catch { return; }
-  const cur = load('sr_beta', false);
-  if (r?.owner) { if (cur !== true) save('sr_beta', true); }
-  else if (r?.exp) { const exp = Date.parse(r.exp); if (cur !== true && !(cur?.exp > exp)) save('sr_beta', {profile:true, exp}); }
-  else if (cur?.profile) save('sr_beta', false);
-}
-function betaWatch(st) {   // a temporary code: close the tab when it runs out, and ask the server whether it is still valid
-  clearTimeout(betaTimer); betaTimer = setTimeout(() => betaExpire(), Math.min(st.exp - Date.now(), 2 ** 31 - 1));
-  if (st.profile) return;   // betaProfile has just asked the server
-  rpc('beta_redeem', {p_code:st.code}).then(r => {
-    if (r && !r.ok) betaExpire(r.error);
-    else if (r?.expires_at) { st.exp = Date.parse(r.expires_at); save('sr_beta', st); $('#betaUntil').textContent = `доступ до ${dt(st.exp)}`; }
-  }).catch(() => {});
-}
+// ---------- «Графики» (page id «beta»): live order books, trades and candles; their code (beta.js) loads on the first open ----------
+// Open to everyone signed in since 2.88. The closed test's access codes stay in the database (beta_* functions and tables) for
+// a future closed check; the site no longer calls them. sr_beta, this device's old access check, is dropped.
+let betaMod = null, betaPause = null;
+try { localStorage.removeItem('sr_beta'); } catch {}
 async function betaOpen() {
-  if (AUTH) await betaProfile();
-  const raw = load('sr_beta', false), st = betaState();
-  if (raw && raw !== true && !st) { save('sr_beta', false); $('#betaErr').textContent = 'Срок доступа истёк — попросите у владельца новый код'; }
-  $('#betaLock').classList.toggle('hidden', !!st); $('#betaApp').classList.toggle('hidden', !st);
-  $('#betaAccessBtn').classList.toggle('hidden', !st?.owner);
-  $('#betaUntil').textContent = st && !st.owner ? `доступ до ${dt(st.exp)}` : '';
-  if (!st) { setTimeout(() => $('#betaPass').focus(), 60); return; }
-  if (!st.owner) betaWatch(st);
-  try { betaMod ||= await import('./beta.js'); betaPause = betaMod.pause; betaMod.open(window.__sr.kit); }
-  catch (e) { toast('Бета не загрузилась', String(e.message || e), 'bad'); }
+  try {
+    betaMod ||= await import('./beta.js'); betaPause = betaMod.pause;
+    if (page === 'beta') betaMod.open(window.__sr.kit);   // left the tab while beta.js was loading: start no streams behind another tab
+  } catch (e) { toast('Графики не загрузились', String(e.message || e), 'bad'); }
 }
 // a forgotten background tab must not keep the Beta's live streams (10 book updates a second per chart) busy:
 // after a minute out of sight they close, and come back — with a fresh book — when the tab is looked at again
@@ -5264,84 +5198,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (page === 'beta') betaBgTimer = setTimeout(() => { if (document.hidden && page === 'beta' && betaPause) { betaPause(); betaBgPaused = true; } }, 60000); }
   else if (betaBgPaused) { betaBgPaused = false; if (page === 'beta') betaOpen(); }
 });
-$('#betaForm').onsubmit = async e => {
-  e.preventDefault();
-  const v = $('#betaPass').value.trim(), err = t => { $('#betaErr').textContent = t; $('#betaPass').select(); };
-  if (!v) return err('Введите пароль или код');
-  const code = normCode(v), btn = e.submitter || $('#betaForm button'); btn.disabled = true;
-  try {
-    // anything not shaped like a code is the owner's password
-    if (!/^SR-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) {
-      const o = await rpc('beta_owner', {p_admin:v});
-      if (!o?.ok) return err('Неверный пароль или код (после 5 ошибок — пауза 15 минут)');
-      betaOwnerPass = v; $('#betaErr').textContent = ''; $('#betaPass').value = ''; save('sr_beta', true);
-      if (AUTH) loadMe();   // signed in, the right password also made the profile the owner's
-      return betaOpen();
-    }
-    const r = await rpc('beta_redeem', {p_code:code});
-    if (!r?.ok) return err(r?.error || 'Неверный пароль или код');
-    const exp = Date.parse(r.expires_at); save('sr_beta', {code, exp}); $('#betaErr').textContent = ''; $('#betaPass').value = '';
-    toast('Доступ к бете открыт', `до ${dt(exp)}`, 'ok'); betaOpen();
-  } catch (e) {
-    // a reply with an error is not "no connection": it used to read so, and a broken server function was taken for a VPN
-    const net = e instanceof TypeError || e?.name === 'TimeoutError' || e?.name === 'AbortError';
-    err(net ? 'Не удалось проверить код — нет связи с сервером, попробуйте ещё раз' : `Сервер не смог проверить код: ${String(e?.message || e).slice(0, 140)}`);
-  }
-  finally { btn.disabled = false; }
-};
-
-// owner: issue / list / revoke temporary codes
-let accHours = 24;
-const accErr = t => { $('#bAccOut').innerHTML = `<div class="acc-err">${t}</div>`; };
-const accEsc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;'}[c]));
-const ownerByProfile = () => !!(AUTH && ME?.is_owner);   // the owner's profile needs no password for codes
-async function accList() {
-  const pass = $('#bAccPass').value.trim();
-  if (!pass && !ownerByProfile()) { $('#bAccList').innerHTML = '<div class="faint">Введите пароль владельца.</div>'; return; }
-  let r; try { r = await rpc('beta_list', {p_admin:pass}); } catch { return accErr('Нет связи с сервером'); }
-  if (!r?.ok) return accErr(r?.error || 'Не получилось');
-  const now = Date.now();
-  $('#bAccList').innerHTML = r.keys.length ? r.keys.map(k => {
-    const exp = Date.parse(k.expires_at), st = k.revoked ? 'отозван' : exp <= now ? 'истёк' : 'активен';
-    return `<div class="acc-row${st === 'активен' ? '' : ' dim'}"><span><b>${k.note ? accEsc(k.note) : 'без заметки'}</b><span class="faint">${st} · до ${dt(exp)} · входов ${k.uses}</span></span>`
-      + (st === 'активен' ? `<button data-revoke="${k.id}">Отозвать</button>` : '') + '</div>';
-  }).join('') : '<div class="faint">Кодов пока нет.</div>';
-}
-$('#betaAccessBtn').onclick = () => {
-  $('#bAccess').classList.remove('hidden'); $('#bAccPass').value ||= betaOwnerPass; $('#bAccOut').innerHTML = '';
-  const prof = ownerByProfile(); $('#bAccPass').closest('label').classList.toggle('hidden', prof);
-  (betaOwnerPass || prof ? $('#bAccNote') : $('#bAccPass')).focus(); if ($('#bAccPass').value || prof) accList();
-};
-$('#bAccClose').onclick = () => $('#bAccess').classList.add('hidden');
-$('#bAccess').onclick = e => { if (e.target.id === 'bAccess') $('#bAccess').classList.add('hidden'); };
-$('#bAccHours').onclick = e => { const b = e.target.closest('[data-h]'); if (!b) return; accHours = +b.dataset.h; $('#bAccHours').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); };
-$('#bAccRefresh').onclick = accList;
-$('#bAccList').onclick = async e => {
-  const b = e.target.closest('[data-revoke]'); if (!b) return;
-  if (!await ask({title:'Отозвать код?', text:'Человек потеряет доступ к бете при следующей проверке.', ok:'Отозвать', danger:true})) return;
-  const r = await rpc('beta_revoke', {p_admin:$('#bAccPass').value.trim(), p_id:b.dataset.revoke}).catch(() => null);
-  if (!r?.ok) return accErr(r?.error || 'Не получилось');
-  toast('Код отозван', '', 'ok'); accList();
-};
-$('#bAccIssue').onclick = async () => {
-  const pass = $('#bAccPass').value.trim(); if (!pass && !ownerByProfile()) { $('#bAccPass').focus(); return accErr('Введите пароль владельца'); }
-  $('#bAccIssue').disabled = true;
-  try {
-    const r = await rpc('beta_issue', {p_admin:pass, p_hours:accHours, p_note:$('#bAccNote').value.trim() || null});
-    if (!r?.ok) return accErr(r?.error || 'Не получилось');
-    betaOwnerPass = pass; const exp = Date.parse(r.expires_at), link = location.origin + location.pathname + '#beta';
-    const msg = `Доступ к «Бете» Sigma Radar до ${dt(exp)}: откройте ${link} и введите код ${r.code}`;
-    $('#bAccOut').innerHTML = `<div class="acc-code"><code>${r.code}</code><span class="faint">действует до ${dt(exp)}</span>`
-      + `<div class="acc-act"><button data-copy="${r.code}">Скопировать код</button><button data-copy="${accEsc(msg)}">Скопировать сообщение</button></div></div>`;
-    $('#bAccNote').value = ''; accList();
-  } catch { accErr('Нет связи с сервером'); }
-  finally { $('#bAccIssue').disabled = false; }
-};
-$('#bAccOut').onclick = e => {
-  const b = e.target.closest('[data-copy]'); if (!b) return;
-  navigator.clipboard.writeText(b.dataset.copy).then(() => toast('Скопировано', '', 'ok'), () => toast('Не удалось скопировать', 'Выделите код вручную.', 'bad'));
-};
-
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
 let sharedIn = null;
 if (LOCKED) {   // signed out: only the sign-in screen and the legal page; nothing is scanned, no bot runs; signing in reloads
@@ -5440,7 +5296,7 @@ async function checkUpdate() {
   let h; try { h = await fetchVersion(); } finally { updBusy = false; }
   if (reloading || h == null || h === selfHash) return;
   if (btBusy) return;   // a backtest downloading a year of history is not cut off: the next check (3 min) reloads after it
-  // never reload over unsaved edits, an open dialog, an open trade card or «Бета» (live order books: a reload re-syncs them) —
+  // never reload over unsaved edits, an open dialog, an open trade card or «Графики» (live order books: a reload re-syncs them) —
   // ask once instead (the next check after they close or the page changes reloads by itself)
   const dirty = formDirty();
   if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || page === 'beta') {

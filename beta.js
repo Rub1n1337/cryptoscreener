@@ -1,4 +1,5 @@
-// Beta: order book and order flow on top of the usual chart. Loaded only after the Beta password (see index.html).
+// «Графики» (the tab was «Бета» during its closed test; the file, page id and storage keys keep that name): order book and
+// order flow on top of the usual chart. Loaded when the tab is first opened (betaOpen in index.html).
 // Everything comes straight from Binance spot in the browser: candles over REST + the kline stream, the order book as a
 // REST snapshot kept current by the depth diff stream, trades from the aggTrade stream. Nothing is stored on a server yet,
 // so the liquidity heatmap accumulates from the moment the tab is opened.

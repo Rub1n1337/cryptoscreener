@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.75 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.76 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.76', date:'3 ноября 2026', title:'Режимы стекла и шапка', items:[
+    'Добавлены пять режимов жидкого стекла: от полного отключения до самого яркого.',
+    'По умолчанию стекло стало мягче, режим запоминается на каждом устройстве отдельно.',
+    'Кнопки шапки собраны в одну панель, тема и звук перенесены в новое меню «Вид».',
+    'В шапке одновременно открывается только одно меню.',
+  ]},
   {v:'2.75', date:'2 ноября 2026', title:'Один бот профиля', items:[
     'Серверный бот закреплён за профилем и одинаков на всех ваших устройствах; прежний бот устройства сайт предложит удалить.',
     'Кнопка Telegram стала переключателем: сообщения присылает только бот профиля и только в ваш Telegram.',
