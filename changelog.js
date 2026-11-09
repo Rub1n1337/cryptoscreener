@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.72 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.73 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.73', date:'2 ноября 2026', title:'Единое стекло', items:[
+    'Все карточки, раскрывающиеся блоки, предупреждения и форма бэктеста выглядят одинаковым стеклом.',
+    'Обычные кнопки стали стеклянными, как кнопки шапки, а поля ввода и списки получили мягкую глубину.',
+    'Свет везде падает сверху слева, у сводки и панелей одна световая кромка и тень.',
+    'Экран входа стал стеклянной карточкой поверх золотого света.',
+    'Ссылка «сменить» в карточке бота стала удобнее для пальца.',
+  ]},
   {v:'2.72', date:'2 ноября 2026', title:'Подсказки и расстояния', items:[
     'В разборе сигнала под шкалой показано, сколько цене пройти до границ и до центра канала.',
     'В поле поиска монеты на компьютере видна клавиша «/», которая его открывает.',
