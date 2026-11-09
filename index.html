@@ -1734,6 +1734,119 @@ let saveWarned = false, onSaved = null;   // onSaved: the profile sync (accounts
 const save = (k, v) => { try { const s = JSON.stringify(v); if (localStorage.getItem(k) === s) return; localStorage.setItem(k, s); onSaved?.(k); } catch (e) {
   if (!saveWarned && /quota/i.test(e?.name + e?.message)) { saveWarned = true; setTimeout(() => toast('Браузер не сохраняет данные сайта', 'Хранилище переполнено: новые сделки журнала и настройки не запомнятся после перезагрузки. Освободите место (сбросьте журнал или очистите данные сайта).', 'bad'), 0); }
 } };
+
+// ---------- the session and the first look at the profile (accounts; docs/PLAN-UNTANGLE-accounts.md, fixes 3 and 4) ----------
+// Both run before anything below reads its settings: a signed-in page puts the profile's newer values into storage first.
+const SB_URL = 'https://aumldylzccbmddavtrqe.supabase.co/rest/v1/', SB_KEY = 'sb_publishable_dJ7vC-wBDBUNT9W1VgwPEg_M0WpHxXB';
+const SB_BASE = SB_URL.replace('/rest/v1/', ''), AUTH_URL = SB_BASE + '/auth/v1/', FN_URL = SB_BASE + '/functions/v1/';
+let AUTH = load('sr_auth', null), ME = null, authRun = 0, authTimer = 0, authBack = null, refreshing = null;
+async function gotrue(path, body, token) {
+  const r = await fetch(AUTH_URL + path, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json', ...(token ? {Authorization:'Bearer ' + token} : {})},
+    body:JSON.stringify(body || {}), signal:AbortSignal.timeout(15000)});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.msg || j.error_description || j.error || 'HTTP ' + r.status); e.status = r.status; throw e; }
+  return j;
+}
+// A refresh token works once. The tabs of this browser take turns (Web Locks), and a tab that waited takes the tokens the one
+// before it got instead of refreshing again — before 2.83 a random moment and a second look made a clash rare, not impossible.
+// 'ok' — AUTH is good; 'dead' — the refresh token was refused (signed out elsewhere, too old); 'later' — no connection, or the
+// server busy (429, 5xx): the tokens are kept (a 429 used to sign the person out). What follows is the caller's
+async function renewTokens() {
+  const run = async () => {
+    const cur = load('sr_auth', null);
+    if (!cur?.rt) return 'dead';   // signed out in another tab
+    if (cur.rt !== AUTH?.rt) { AUTH = cur; if (cur.exp - Date.now() > 120e3) return 'ok'; }   // another tab has just renewed them
+    try {
+      const s = await gotrue('token?grant_type=refresh_token', {refresh_token:cur.rt});
+      AUTH = {at:s.access_token, rt:s.refresh_token, exp:Date.now() + (s.expires_in || 3600) * 1000}; save('sr_auth', AUTH);
+      return 'ok';
+    } catch (e) {
+      const now = load('sr_auth', null);   // a browser without Web Locks: another tab renewed with the same token a moment earlier
+      if (now?.rt && now.rt !== cur.rt) { AUTH = now; return 'ok'; }
+      return [400, 401, 403].includes(e.status) ? 'dead' : 'later';
+    }
+  };
+  try { return navigator.locks?.request ? await navigator.locks.request('sr_auth', run) : await run(); } catch { return 'later'; }
+}
+// PostgREST as the signed-in person (anonymously when signed out), one way for loadMe, the sync and rpc: a token about to run
+// out is renewed first, and a 401 renews it once more and repeats the call
+async function authedFetch(url, init = {}) {
+  if (AUTH && AUTH.exp - Date.now() < 60e3) await refreshSession();
+  const call = () => fetch(url, {...init, headers:{apikey:SB_KEY, 'Content-Type':'application/json', ...(AUTH ? {Authorization:'Bearer ' + AUTH.at} : {})}, signal:AbortSignal.timeout(15000)});
+  let r = await call();
+  if (r.status === 401 && AUTH) { await refreshSession(); r = await call(); }
+  return r;
+}
+const authUid = () => { try { return JSON.parse(atob(AUTH.at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch { return null; } };
+
+// Every browser-storage key, in one place: 'profile' — kept in the profile (user_state), the same on all the person's devices;
+// 'device' — stays on this device. A new key goes here with its reason: tests/smoke.js reports a key in storage that isn't
+// listed.
+const KEYS = {
+  // settings, favourites, bot profiles, chart levels, the table's filters and sorting, the Beta's charts, indicators and drawings
+  sr_settings:'profile', sr_favs:'profile', sr_bot:'profile', sr_lv:'profile', sr_tfilt:'profile', sr_msort:'profile',
+  sr_jsort:'profile', sr_bcfg:'profile', sr_bdraw:'profile', sr_bind:'profile', sr_bpanes:'profile', sr_bchips:'profile',
+  sr_blabels:'profile', sr_bvol:'profile', sr_bnotec:'profile', sr_blink:'profile',
+  // the session and the sync's own bookkeeping
+  sr_auth:'device', sr_sync:'device',
+  // the browser bot's journal: two open devices would both trade one journal; the bot for several devices is the server one,
+  // and the server knows which is the profile's (see profileBot)
+  sr_journal:'device', sr_ubot:'device', sr_ubot_old:'device',
+  // change on every open: another device would get a notice each time
+  sr_recent:'device', sr_chart:'device', sr_seen:'device', sr_seenv:'device', sr_events:'device', sr_evread:'device',
+  // how this screen looks: a phone wants other than a computer (the number of Beta charts, hidden panels, open sections)
+  sr_theme:'device', sr_glass:'device', sr_wide:'device', sr_more:'device', sr_bmore:'device', sr_btadv:'device',
+  sr_bprof:'device', sr_jmode:'device', sr_blay:'device', sr_bhide:'device', sr_bact:'device', sr_bactph:'device',
+  // this browser's notification permission and sound, the intro, caches, the Beta's access check and server override
+  sr_ntf:'device', sr_sound:'device', sr_intro:'device', sr_pool:'device', sr_beta:'device', sr_bsrv:'device',
+  // old keys, read once to move to newer ones
+  sr_bsym:'device', sr_btf:'device', sr_delisted:'device',
+};
+const SYNC = new Set(Object.keys(KEYS).filter(k => KEYS[k] === 'profile'));
+// a value from the profile is taken only in a shape this code reads: a wrong one (an older or newer page, a broken write) would
+// stop the page from starting on every device of the profile (sr_bot without profiles did, in a test). Left out, it stays in
+// the profile until this device's own value replaces it
+const isObj = v => v != null && typeof v === 'object' && !Array.isArray(v);
+const SHAPE = {sr_settings:isObj, sr_bot:v => isObj(v) && Array.isArray(v.profiles) && v.profiles.length > 0 && v.profiles.every(isObj),
+  sr_favs:Array.isArray, sr_lv:isObj, sr_tfilt:isObj, sr_msort:Array.isArray, sr_jsort:Array.isArray, sr_bcfg:isObj, sr_bdraw:isObj,
+  sr_bind:Array.isArray, sr_bpanes:Array.isArray};
+const fits = (k, v) => v != null && (SHAPE[k] ? SHAPE[k](v) : true);
+// sr_sync: {uid, v: {key: version this device has}, h: {key: fingerprint of that version's value}, t: {key: when this device
+// last changed it}}. With the fingerprint a change is told by the value, not by the moment it was saved: one made while the
+// sync couldn't run (no connection at start) still goes to the profile, and a save of the same value never does (2.74)
+let SYNCV = load('sr_sync', null), syncReady = false, syncTimer2 = 0, syncStarting = null, syncPostponed = false;
+const syncDirty = new Set();
+// the same fingerprint whichever device wrote the value: the profile's jsonb comes back with its keys in another order
+const canon = v => JSON.stringify(v, (_, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x);
+const valFp = v => { const s = canon(v); let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36) + '.' + s.length; };
+// values from the profile → this device's storage, with their versions and fingerprints
+function storeRows(rows) {
+  syncMeta(m => {
+    for (const r of rows) {
+      if (!fits(r.key, r.value)) continue;
+      try { localStorage.setItem(r.key, JSON.stringify(r.value)); m.h[r.key] = valFp(r.value); delete m.t[r.key]; }
+      catch { /* full storage: the old value stays, and its fingerprint with it, so it isn't sent back as a change */ }
+      m.v[r.key] = r.version;
+    }
+  });
+}
+// Signed in, the profile's newer values go into storage before anything below reads them: a change made on another device
+// needs no reload. Before 2.83 the page started on this device's values, reloaded when the profile's answer came, and in
+// between sent its old bot profiles to the server bot. One request, waited for at most 2 s; without an answer the page starts
+// on this device's values and syncStart does what it did before. EARLY keeps the answer for syncStart (no second request)
+let EARLY = null;
+async function syncEarly() {
+  const got = await Promise.race([(async () => {
+    if (AUTH.exp - Date.now() < 60e3 && await renewTokens() !== 'ok') return null;
+    const r = await fetch(SB_URL + 'user_state?select=key,version,updated_at,value', {headers:{apikey:SB_KEY, Authorization:'Bearer ' + AUTH.at}, signal:AbortSignal.timeout(2500)});
+    return r.ok ? {rows:(await r.json()).filter(x => SYNC.has(x.key))} : null;
+  })().catch(() => null), new Promise(r => setTimeout(r, 2000, null))]);
+  SYNCV = load('sr_sync', null);
+  if (got && SYNCV?.uid && SYNCV.uid === authUid()) storeRows(syncPlan(got.rows, syncMeta()).take);
+  return got;
+}
+if (AUTH?.rt) EARLY = await syncEarly();
+
 let S = Object.assign({}, DEF, load('sr_settings', {}));
 if (!TFMS[S.tf]) S.tf = DEF.tf;
 if ((S.v || 1) < 2) { S.method = DEF.method; S.v = 2; }
@@ -1747,7 +1860,6 @@ const METHOD_HINT = {
 const METHOD_NAME = {log:'лог-канал', classic:'классика', robust:'робастная', ewma:'EWMA'};
 let favs = new Set(load('sr_favs', []));
 let J = load('sr_journal', null) || {balance:10000, start:10000, open:[], closed:[], on:true};
-const SB_URL = 'https://aumldylzccbmddavtrqe.supabase.co/rest/v1/', SB_KEY = 'sb_publishable_dJ7vC-wBDBUNT9W1VgwPEg_M0WpHxXB';
 let SJ = null, jMode = load('sr_jmode', 'shared');
 // «Пока вас не было» (see renderAway): declared here, before any journal can arrive and draw it
 const AWAY_MS = 2 * 36e5;
@@ -2624,9 +2736,8 @@ function activeProfile() {
 }
 // ---------- account: sign-in through the Telegram bot (docs/PLAN-ACCOUNTS.md) ----------
 // The tab keeps a secret and shows the code the auth function gave it; the person picks that code in the bot; the tab then
-// trades a one-time token for a Supabase session (/auth/v1/verify). Stage 1: signing in is optional, nothing else uses it yet.
-const SB_BASE = SB_URL.replace('/rest/v1/', ''), AUTH_URL = SB_BASE + '/auth/v1/', FN_URL = SB_BASE + '/functions/v1/';
-let AUTH = load('sr_auth', null), ME = null, authRun = 0, authTimer = 0, authBack = null, refreshing = null;
+// trades a one-time token for a Supabase session (/auth/v1/verify). The tokens, their renewal and the early sync with the profile
+// are at the top of the module (they run before the settings are read).
 // the site opens only signed in (stage 4): without a session the page starts locked — the sign-in screen and the legal page,
 // nothing scanned, no bot; signing in or out reloads the page, so everything starts (or stops) cleanly
 const LOCKED = !AUTH;
@@ -2639,13 +2750,6 @@ async function authFn(body, token) {
   if (!r.ok) throw new Error(r.status === 429 ? 'Слишком много попыток входа — попробуйте через 10 минут' : j.error || 'HTTP ' + r.status);
   return j;
 }
-async function gotrue(path, body, token) {
-  const r = await fetch(AUTH_URL + path, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json', ...(token ? {Authorization:'Bearer ' + token} : {})},
-    body:JSON.stringify(body || {}), signal:AbortSignal.timeout(15000)});
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(j.msg || j.error_description || j.error || 'HTTP ' + r.status); e.status = r.status; throw e; }
-  return j;
-}
 function setSession(s) {   // a GoTrue session → the tokens and when the access token runs out
   AUTH = s ? {at:s.access_token, rt:s.refresh_token, exp:Date.now() + (s.expires_in || 3600) * 1000} : null;
   save('sr_auth', AUTH); scheduleRefresh();
@@ -2655,34 +2759,27 @@ function signedOut() {   // this device keeps its copy of the settings; the prof
   syncReady = false; syncDirty.clear(); clearTimeout(syncTimer2);
   if (!LOCKED) setTimeout(() => location.reload(), 1200);   // back to the sign-in screen, after the toast has been seen
 }
-function scheduleRefresh() {
+function scheduleRefresh() {   // 1.5 minutes before the end; the tabs take turns in renewTokens
   clearTimeout(authTimer);
-  // 1.5-2 minutes before the end, at a random moment: two tabs rarely refresh together
-  if (AUTH?.rt) authTimer = setTimeout(refreshSession, Math.max(5e3, AUTH.exp - Date.now() - 90e3 - Math.random() * 30e3));
+  if (AUTH?.rt) authTimer = setTimeout(refreshSession, Math.max(5e3, AUTH.exp - Date.now() - 90e3));
 }
-function refreshSession() {   // one at a time; a refresh token works once, so another tab's fresh tokens are taken, not refreshed again
+// one at a time in this tab (see renewTokens for the other tabs). Offline or the server busy (429, 5xx): the tokens are kept and
+// the next try is in a minute — not at every request in between, each of which would otherwise ask again
+let renewAfter = 0;
+function refreshSession(due) {
   if (refreshing || !AUTH) return refreshing;
-  refreshing = (async () => {
-    const cur = load('sr_auth', null);
-    if (cur?.rt && cur.rt !== AUTH.rt) { AUTH = cur; if (cur.exp - Date.now() > 120e3) return scheduleRefresh(); }
-    const used = AUTH.rt;
-    try { setSession(await gotrue('token?grant_type=refresh_token', {refresh_token:used})); }
-    catch (e) {
-      const now = load('sr_auth', null);   // another tab refreshed with the same token a moment earlier: its tokens are good
-      if (now?.rt && now.rt !== used) { AUTH = now; scheduleRefresh(); }
-      else if (e.status >= 400 && e.status < 500) signedOut();
-      else authTimer = setTimeout(refreshSession, 60e3);   // offline: keep the tokens, try later
-    }
-  })().finally(() => { refreshing = null; });
+  if (!due && Date.now() < renewAfter) return Promise.resolve();
+  refreshing = renewTokens().then(r => {
+    if (r === 'ok') { renewAfter = 0; scheduleRefresh(); }
+    else if (r === 'dead') signedOut();
+    else { renewAfter = Date.now() + 60e3; clearTimeout(authTimer); authTimer = setTimeout(() => refreshSession(true), 60e3); }
+  }).finally(() => { refreshing = null; });
   return refreshing;
 }
-async function loadMe(again = true) {
+async function loadMe() {
   if (!AUTH) return renderAcct();
-  if (AUTH.exp - Date.now() < 60e3) await refreshSession();
-  if (!AUTH) return;
   try {
-    const r = await fetch(SB_URL + 'profiles?select=tg_name,tg_username,beta,is_owner&limit=1', {headers:{apikey:SB_KEY, Authorization:'Bearer ' + AUTH.at}, signal:AbortSignal.timeout(15000)});
-    if (r.status === 401 && again) { await refreshSession(); return loadMe(false); }
+    const r = await authedFetch(SB_URL + 'profiles?select=tg_name,tg_username,beta,is_owner&limit=1');
     if (r.ok) ME = (await r.json())[0] || null;
   } catch { /* offline: the button still says signed in; the name comes with the next try */ }
   renderAcct();
@@ -2804,44 +2901,11 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('online', () => { if (AUTH) syncCheck(); });   // a start without a connection syncs now, a hidden tab too
 
 // ---------- profile sync (accounts stage 2): what follows the person between devices ----------
-// Every browser-storage key, in one place: 'profile' — kept in the profile (user_state), the same on all the person's devices;
-// 'device' — stays on this device. A new key goes here with its reason: tests/smoke.js reports a key in storage that isn't
-// listed. Everything is read once at start-up, so values that came from another device are written to storage and the page
-// reloads (at most once in 15 s).
-const KEYS = {
-  // settings, favourites, bot profiles, chart levels, the table's filters and sorting, the Beta's charts, indicators and drawings
-  sr_settings:'profile', sr_favs:'profile', sr_bot:'profile', sr_lv:'profile', sr_tfilt:'profile', sr_msort:'profile',
-  sr_jsort:'profile', sr_bcfg:'profile', sr_bdraw:'profile', sr_bind:'profile', sr_bpanes:'profile', sr_bchips:'profile',
-  sr_blabels:'profile', sr_bvol:'profile', sr_bnotec:'profile', sr_blink:'profile',
-  // the session and the sync's own bookkeeping
-  sr_auth:'device', sr_sync:'device',
-  // the browser bot's journal: two open devices would both trade one journal; the bot for several devices is the server one,
-  // and the server knows which is the profile's (see profileBot)
-  sr_journal:'device', sr_ubot:'device', sr_ubot_old:'device',
-  // change on every open: another device would get a notice each time
-  sr_recent:'device', sr_chart:'device', sr_seen:'device', sr_seenv:'device', sr_events:'device', sr_evread:'device',
-  // how this screen looks: a phone wants other than a computer (the number of Beta charts, hidden panels, open sections)
-  sr_theme:'device', sr_glass:'device', sr_wide:'device', sr_more:'device', sr_bmore:'device', sr_btadv:'device',
-  sr_bprof:'device', sr_jmode:'device', sr_blay:'device', sr_bhide:'device', sr_bact:'device', sr_bactph:'device',
-  // this browser's notification permission and sound, the intro, caches, the Beta's access check and server override
-  sr_ntf:'device', sr_sound:'device', sr_intro:'device', sr_pool:'device', sr_beta:'device', sr_bsrv:'device',
-  // old keys, read once to move to newer ones
-  sr_bsym:'device', sr_btf:'device', sr_delisted:'device',
-};
-const SYNC = new Set(Object.keys(KEYS).filter(k => KEYS[k] === 'profile'));
-// sr_sync: {uid, v: {key: version this device has}, h: {key: fingerprint of that version's value}, t: {key: when this device
-// last changed it}}. With the fingerprint a change is told by the value, not by the moment it was saved: one made while the
-// sync couldn't run (no connection at start) still goes to the profile, and a save of the same value never does (2.74)
-let SYNCV = load('sr_sync', null), syncReady = false, syncTimer2 = 0, syncStarting = null, syncPostponed = false;
-const syncDirty = new Set();
-// the same fingerprint whichever device wrote the value: the profile's jsonb comes back with its keys in another order
-const canon = v => JSON.stringify(v, (_, x) => x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x);
-const valFp = v => { const s = canon(v); let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36) + '.' + s.length; };
-const authUid = () => { try { return JSON.parse(atob(AUTH.at.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub; } catch { return null; } };
+// Which keys follow the person (KEYS, SYNC), the bookkeeping (sr_sync) and the first look at the profile, before the settings
+// are read, are at the top of the module. Here: the rest — sending this device's changes, the first sign-in, return to the tab.
 async function authFetch(path, init = {}) {   // PostgREST as the signed-in person
-  if (AUTH && AUTH.exp - Date.now() < 60e3) await refreshSession();
   if (!AUTH) throw new Error('signed out');
-  const r = await fetch(SB_URL + path, {...init, headers:{apikey:SB_KEY, Authorization:'Bearer ' + AUTH.at, 'Content-Type':'application/json'}, signal:AbortSignal.timeout(15000)});
+  const r = await authedFetch(SB_URL + path, init);
   if (!r.ok) throw new Error((await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
@@ -2876,13 +2940,7 @@ async function syncPush() {
   }
 }
 function syncApply(rows, asked) {   // values from the profile → this device's storage, then a reload so everything reads them
-  syncMeta(m => {
-    for (const r of rows) {
-      try { localStorage.setItem(r.key, JSON.stringify(r.value)); m.h[r.key] = valFp(r.value); delete m.t[r.key]; }
-      catch { /* full storage: the old value stays, and its fingerprint with it, so it isn't sent back as a change */ }
-      m.v[r.key] = r.version;
-    }
-  });
+  storeRows(rows);
   const last = +sessionStorage.getItem('sr_syncreload') || 0;
   if (!asked && Date.now() - last < 15e3) return;   // never a reload loop; the values are stored and apply at the next start
   sessionStorage.setItem('sr_syncreload', Date.now()); location.reload();
@@ -2909,7 +2967,7 @@ function syncPlan(rows, m) {
     let local = null; try { local = raw == null ? null : JSON.parse(raw); } catch { /* unreadable: as if absent */ }
     const here = local != null && (m.h[k] ? valFp(local) !== m.h[k] : r ? r.version === known && valFp(local) !== valFp(r.value) : true);
     if (!r) { if (local != null) send.push(k); }   // the profile doesn't have this key yet
-    else if (r.version > known) { if (here && m.t[k] > Date.parse(r.updated_at)) send.push(k); else take.push(r); }
+    else if (r.version > known) { if (here && m.t[k] > Date.parse(r.updated_at)) send.push(k); else if (fits(k, r.value)) take.push(r); }
     else if (here) send.push(k);
     else if (local != null && !m.h[k]) learn[k] = valFp(local);   // the same value as the profile's: its fingerprint, from now on
   }
@@ -2921,7 +2979,8 @@ function syncStart(atStart = true) { return syncStarting ||= syncStartNow(atStar
 async function syncStartNow(atStart) {
   if (!AUTH) return;
   const uid = authUid(); if (!uid) return;
-  let rows; try { rows = (await stateRows(true)).filter(r => SYNC.has(r.key)); } catch { return; }   // offline: syncCheck tries again
+  let rows = atStart ? EARLY?.rows : null; EARLY = null;   // the answer the page started with, already in storage
+  if (!rows) try { rows = (await stateRows(true)).filter(r => SYNC.has(r.key)); } catch { return; }   // offline: syncCheck tries again
   SYNCV = load('sr_sync', null);   // as this device's tabs keep it now
   if (SYNCV?.uid === uid) {
     const {take, send, learn} = syncPlan(rows, syncMeta());
@@ -2946,7 +3005,7 @@ async function syncStartNow(atStart) {
   syncReady = true;
   if (take) return syncApply(rows, true);
   // «Оставить эти»: this device's values win; what it doesn't have comes from the profile
-  for (const r of rows) if (localStorage.getItem(r.key) == null) try { localStorage.setItem(r.key, JSON.stringify(r.value)); } catch { /* full storage */ }
+  for (const r of rows) if (localStorage.getItem(r.key) == null && fits(r.key, r.value)) try { localStorage.setItem(r.key, JSON.stringify(r.value)); } catch { /* full storage */ }
   local.forEach(k => syncDirty.add(k));
   await syncPush();   // at once: a locked page reloads right after this
 }
@@ -2967,11 +3026,7 @@ renderAcct(); scheduleRefresh(); loadMe().then(() => syncStart()).then(() => pro
 // ---------- my bot on the server: the profile's bot (accounts stage 5), one for all its devices ----------
 // signed in, calls go as the person (the profile's Telegram, the Beta, owner rights); a stale token is refreshed once
 async function rpc(fn, args) {
-  if (AUTH && AUTH.exp - Date.now() < 60e3) await refreshSession();
-  const call = () => fetch(SB_URL + 'rpc/' + fn, {method:'POST', headers:{apikey:SB_KEY, 'Content-Type':'application/json', ...(AUTH ? {Authorization:'Bearer ' + AUTH.at} : {})},
-    body:JSON.stringify(args), signal:AbortSignal.timeout(15000)});
-  let r = await call();
-  if (r.status === 401 && AUTH) { await refreshSession(); r = await call(); }
+  const r = await authedFetch(SB_URL + 'rpc/' + fn, {method:'POST', body:JSON.stringify(args)});
   if (!r.ok) throw new Error((await r.text()).slice(0, 200));
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
@@ -4202,6 +4257,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.83', date:'9 ноября 2026', title:'Без перезагрузки при открытии', items:[
+    'Настройки, изменённые на другом устройстве, применяются сразу при открытии сайта, без перезагрузки страницы.',
+    'Исправлено: открытие сайта на другом устройстве больше не возвращает серверному боту прежние профили.',
+    'Исправлено: при перегрузке сервера входа сайт больше не выходит из профиля.',
+    'Исправлено: несколько открытых вкладок больше не мешают друг другу оставаться в профиле.',
+  ]},
   {v:'2.82', date:'9 ноября 2026', title:'Надёжнее синхронизация настроек', items:[
     'Исправлено: настройки, изменённые без интернета, теперь доходят до других устройств профиля.',
     'Исправлено: графики «Беты» на компьютере больше не сбрасываются после открытия «Беты» на телефоне.',
@@ -4266,12 +4327,6 @@ const CHANGELOG = [
     'В поле поиска монеты на компьютере видна клавиша «/», которая его открывает.',
     'Сводка рынка при загрузке показывает заглушки, как таблица, вместо прочерков.',
     'Касание значения в R на телефоне объясняет, что такое R.',
-  ]},
-  {v:'2.71', date:'2 ноября 2026', title:'Стекло на компьютере', items:[
-    'Стекло стало заметнее на большом экране: у панелей появились отблеск и светлая верхняя кромка.',
-    'Переключатели таймфрейма и фильтров, а также кнопки-иконки стали стеклянными.',
-    'Заголовок таблицы стал матовым, под ним размываются прокручиваемые строки.',
-    'На телефоне матовыми стали панель поиска над таблицей и шапка карточки сделки.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

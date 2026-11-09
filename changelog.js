@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.70 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.71 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.71', date:'2 ноября 2026', title:'Стекло на компьютере', items:[
+    'Стекло стало заметнее на большом экране: у панелей появились отблеск и светлая верхняя кромка.',
+    'Переключатели таймфрейма и фильтров, а также кнопки-иконки стали стеклянными.',
+    'Заголовок таблицы стал матовым, под ним размываются прокручиваемые строки.',
+    'На телефоне матовыми стали панель поиска над таблицей и шапка карточки сделки.',
+  ]},
   {v:'2.70', date:'2 ноября 2026', title:'Новый логотип и стекло', items:[
     'Логотип получил новую форму Σ и более благородные цвета канала: рубиновый, золотой и изумрудный.',
     'Шапка, меню и окна стали матовым стеклом, а цифры, таблицы и графики остались чёткими.',
