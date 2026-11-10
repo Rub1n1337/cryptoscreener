@@ -384,7 +384,10 @@ class Pane {
   // (a wall put at +8% is reported by Binance's stream, the server keeps it, the browser's snapshot doesn't reach it)
   walls() {
     const rng = C('domRange') / 100, bk = this.buckets(rng, this.step, !!this.far); if (!bk) return [];
-    const med = M.binMedian(bk);   // typical bin: dense local book only
+    // typical bin: the dense snapshot only. Beyond it the browser knows just the levels that changed since it connected:
+    // those bins are thin, and with them in the median every bin near the price counted as a wall (futures: the snapshot
+    // is ±0.2 %, the search ±8 %). They still take part as candidates: a big order put there is known exactly
+    const med = M.binMedian(this.far ? bk : this.buckets(rng, this.step, true) || bk);
     if (this.far && this.book) {
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
       for (const [p, usd, side] of this.far) {
