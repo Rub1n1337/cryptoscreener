@@ -104,7 +104,7 @@ const PARAMS = {
     {k:'mkTop', name:'Отмечать самые крупные уровни', min:0.5, max:10, step:0.5, def:2, u:v => v + '% от видимых'},
     {k:'mkLines', name:'Линии вправо, пока цена не вернётся к уровню', def:1, opts:[[0, 'выкл'], [1, 'вкл']]}],
   fp:[{k:'fpImb', name:'Подсвечивать перевес (покупки к продажам уровнем ниже и наоборот)', def:3, opts:[[0, 'выкл'], [2, '2×'], [3, '3×'], [4, '4×']]},
-    {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * DOM_STEPS[v - 1]) : DOM_STEPS[v - 1] + '×') : 'авто'; }}],
+    {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],   // the steps fpStepFor uses
   vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
     {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
   vwap:[{k:'vwapPer', name:'С начала', def:0, opts:[[0, 'дня'], [1, 'недели'], [2, 'месяца']]},
