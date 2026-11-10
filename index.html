@@ -1222,6 +1222,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <div class="cact">
             <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="csym" autocapitalize="characters" autocorrect="off" spellcheck="false" list="symlist" placeholder="Монета" title="Введите тикер, например SOL, и нажмите Enter" style="width:130px"><datalist id="symlist"></datalist></div>
             <div class="seg mini" id="tfseg"><button class="tab" data-tf="5m">5м</button><button class="tab" data-tf="15m">15м</button><button class="tab" data-tf="1h">1ч</button><button class="tab" data-tf="4h">4ч</button><button class="tab" data-tf="1d" title="Дневные свечи">1д</button><button class="tab" data-tf="1w" title="Недельные свечи">1н</button></div>
+            <button class="icon" id="coinShare" title="Поделиться монетой" aria-label="Поделиться монетой">↗</button>
             <button class="icon" id="cset" title="Настройки канала" aria-label="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
           </div>
         </div>
@@ -1252,6 +1253,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <span id="lgTrade"><i style="border-color:var(--c-trade);border-top-style:dashed"></i>сделка бота</span>
           <span class="faint hint-mouse">нажмите на график и крутите колёсико (или − +) — масштаб · перетаскивание, Shift + колёсико или ← → — время · F — во всю ширину · двойной клик — сброс</span><span class="faint hint-touch">два пальца — масштаб · свайп — время · двойное касание — сброс</span>
         </div>
+        <div class="filters hidden" id="chartError" role="status"><span class="mute" id="chartNote"></span><button id="chartRetry">Повторить</button><button id="chartList">К монетам</button></div>
         <div class="detail" id="detail"></div>
       </div>
 
@@ -1271,6 +1273,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
           <select id="top" title="Сколько самых ликвидных монет проверять"><option value="100">100 монет</option><option value="150">150 монет</option><option value="250">250 монет</option><option value="400">400 монет</option></select>
         </div>
         <div class="fchips hidden" id="fchips" aria-live="polite"></div>
+        <div class="filters hidden" id="scanStatus" role="status"><span class="mute" id="scanNote"></span><button id="scanRetry">Повторить</button></div>
         <div class="tablewrap" id="mtable"><table>
           <thead><tr id="mhead">
             <th data-s="fav" title="Избранное — всегда наверху">★</th>
@@ -1517,7 +1520,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
     <div class="phead"><div><h2>Как это работает</h2><p>Коротко о том, что делает сервис и как им пользоваться.</p></div></div>
     <div class="steps">
       <div class="step"><div class="n">1</div><b>Ищем перекосы</b><p>У каждой монеты есть обычный диапазон цены. Сервис каждую минуту проверяет 150 самых популярных монет Binance и замечает, когда цена ушла за его границу.</p></div>
-      <div class="step"><div class="n">2</div><b>Ждём разворот</b><p>Сигнал появляется, только когда цена вернулась в диапазон и это подтвердил объём торгов. Сила сигнала от 0 до 100 показывает, насколько он убедителен.</p></div>
+      <div class="step"><div class="n">2</div><b>Ждём разворот</b><p>Сигнал появляется, только когда цена вернулась в диапазон и это подтвердил объём торгов. Сила сигнала от 0 до 100 — оценка условий, не вероятность прибыльной сделки.</p></div>
       <div class="step"><div class="n">3</div><b>Бот торгует</b><p>По сильным сигналам бот открывает сделку с заранее заданными тейком и стопом. Деньги виртуальные — это учебный режим, без риска.</p></div>
       <div class="step"><div class="n">4</div><b>Честный итог</b><p>В журнале видно каждую сделку с комиссиями. В «Бэктесте» — как правила сработали бы в прошлом.</p></div>
     </div>
@@ -1538,7 +1541,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <li><b>Закрыть вручную</b> — в «Моём боте» у каждой открытой позиции есть кнопка «Закрыть» (и «Закрыть все»): по цене рынка с обычной комиссией. На сервере позиция закрывается в течение минуты.</li>
       </ul>
       <h3>Уведомления</h3>
-      <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они придут, даже когда вкладка свёрнута. Рядом — кнопка звука.</p>
+      <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они работают, пока сайт открыт, в том числе в свёрнутой вкладке. Telegram-доставка настраивается отдельно. Рядом — кнопка звука.</p>
       <h3>Telegram</h3>
       <p>В журнале общего бота нажмите «Получать в Telegram», в боте — «Start»: будут приходить сделки общего бота. Чтобы получать своё, переведите «Мой бот» на сервер и нажмите «Включить Telegram»: сообщения присылает только бот вашего профиля и только в Telegram, через который вы вошли. Тогда придут:</p>
       <ul>
@@ -1814,6 +1817,15 @@ function savedSort(k, head, def) {
   return Array.isArray(m) && [...document.querySelectorAll(head + ' th')].some(th => th.dataset.s === m[0]) ? [m[0], m[1] > 0 ? 1 : -1] : def;
 }
 let rows = [], cache = {}, scanning = false, scanQueued = false, lastScan = 0, footBase = '', prevScanDone = false;
+let scanQuality = null, lastAttempt = 0, scanContext = '';
+function mergeScan(previous, results, failed, sameContext) {
+  return sameContext ? results.concat(previous.filter(r => failed.has(r.sym))) : results;
+}
+function renderScanStatus() {
+  const note = scanErr ? 'Не удалось обновить рынок. Показаны последние доступные данные.' : scanQuality ? `Загружено ${scanQuality.done} из ${scanQuality.total} пар. ${scanQuality.kept ? 'Для части монет сохранены предыдущие данные.' : 'Часть данных недоступна.'}` : '';
+  $('#scanStatus').classList.toggle('hidden', !note); $('#scanNote').textContent = note;
+  const live = $('#mlive .live'); if (live) live.dataset.issue = note ? '1' : '';
+}
 let [sortKey, sortDir] = savedSort('sr_msort', '#mhead', ['ext', -1]);
 async function scan() {
   if (scanning) { scanQueued = true; return; }
@@ -1825,10 +1837,10 @@ async function scan() {
     foot.textContent = 'загружаю список пар…';
     const now = Date.now();
     const list = M.pickSymbols(await api('/api/v3/ticker/24hr'), S.top, myOpen().map(p => p.sym), now);
-    const limit = barsFor(set), res = [], fresh = {}; let done = 0, fails = 0;
+    const limit = barsFor(set), res = [], fresh = {}, failed = new Set(), context = JSON.stringify(set); let done = 0, fails = 0;
     await pool(list, 10, async sym => {
       try { const K = await klines(sym, tf, limit); fresh[sym] = K; const r = M.analyze(sym, K, {...set, N:effN(K.length, set)}); if (r) res.push(r); }
-      catch { fails++; }
+      catch { fails++; failed.add(sym); }
       if (++done % 10 === 0) foot.textContent = `сканирую ${done}/${list.length}…`;
     });
     if (!scanQueued) { // settings changed during the scan → results are stale, the queued scan replaces them
@@ -1837,7 +1849,12 @@ async function scan() {
       const conf = r => { const c = M.tradeRow(r); return c?.rev ? c : null; };
       const prevSig = new Set(rows.filter(r => conf(r) || r.wasRev).map(r => r.sym));   // a weakened signal coming back is not new
       const prevPx = new Map(rows.map(r => [r.sym, r.price]));   // for the user's level-crossing alerts
-      rows = res; cache = fresh; lastScan = Date.now();
+      const sameContext = scanContext === context;
+      const combined = mergeScan(rows, res, failed, sameContext);
+      const retained = sameContext ? Object.fromEntries([...failed].filter(sym => cache[sym]).map(sym => [sym, cache[sym]])) : {};
+      rows = res; cache = fresh; lastAttempt = Date.now();
+      if (!fails) lastScan = lastAttempt;
+      scanQuality = fails ? {done:list.length - fails, total:list.length, kept:combined.length - res.length} : null;
       const newSig = prevScanDone ? rows.filter(r => conf(r)?.score >= S.minScore && !prevSig.has(r.sym)) : [];
       flashSyms = new Set(newSig.map(r => r.sym)); setTimeout(() => { flashSyms = new Set(); }, 3000);   // new signals glow once in the table
       if (newSig.length) {
@@ -1847,16 +1864,17 @@ async function scan() {
       }
       for (const r of rows) if (ULV[r.sym]) checkLevels(r.sym, prevPx.get(r.sym), r.price);
       prevScanDone = true; scanErr = null;
-      runBot();
+      runBot(); // only successfully refreshed analyses reach the trading engine
+      rows = combined; cache = {...retained, ...fresh}; scanContext = context;
       renderCards(); renderTable(); renderDetail();
       if (!$('#journal').classList.contains('hidden')) renderJournal();   // a hidden journal is redrawn when it is opened (go)
       $('#symlist').innerHTML = rows.map(r => `<option value="${base(r.sym)}">`).join('');
-      footBase = `${rows.length} пар${fails ? ` (${fails} не загрузились)` : ''} · биржа Binance · ТФ ${tf} · обновлено ${new Date().toLocaleTimeString('ru')}`;
-      $('#mlive').innerHTML = liveTag(lastScan, 3 * SCAN_MS); tickLive();
+      footBase = `${list.length - fails}/${list.length} пар · биржа Binance · ТФ ${tf} · ${fails ? 'неполное обновление' : 'обновлено ' + new Date(lastScan).toLocaleTimeString('ru')}`;
+      $('#mlive').innerHTML = liveTag(lastScan, 3 * SCAN_MS); renderScanStatus(); tickLive();
     }
   } catch (e) {
     footBase = 'ошибка загрузки данных: ' + e.message + ' — повторю через минуту';
-    scanErr = e.message || 'нет связи'; renderTable();
+    lastAttempt = Date.now(); scanErr = e.message || 'нет связи'; renderTable(); renderScanStatus(); tickLive();
   }
   scanning = false;
   $('#refresh').classList.remove('busy'); $('#refresh').removeAttribute('aria-busy');
@@ -1868,14 +1886,14 @@ const ago = ms => ms < 60e3 ? Math.max(0, Math.round(ms / 1000)) + ' с' : ms < 
 const liveTag = (ts, staleMs, label = 'обновлено') => `<span class="live" data-ts="${ts || 0}" data-stale="${staleMs}" data-l="${label}"><i></i><span></span></span>`;
 function tickLive() {
   document.querySelectorAll('.live[data-ts]').forEach(el => {
-    const ts = +el.dataset.ts, age = Date.now() - ts, st = !ts ? 'wait' : age > +el.dataset.stale ? 'stale' : '';
+    const ts = +el.dataset.ts, age = Date.now() - ts, st = el.dataset.issue ? 'stale' : !ts ? 'wait' : age > +el.dataset.stale ? 'stale' : '';
     el.className = 'live ' + st;
-    el.lastChild.textContent = !ts ? 'ждём данные…' : `${el.dataset.l} ${ago(age)} назад${st ? ' · данные устарели' : ''}`;
+    el.lastChild.textContent = el.dataset.issue ? 'неполные данные · требуется обновление' : !ts ? 'ждём данные…' : `${el.dataset.l} ${ago(age)} назад${st ? ' · данные устарели' : ''}`;
   });
 }
 function tickFoot() {
   if (scanning) return;
-  const left = Math.max(0, Math.round((lastScan + SCAN_MS - Date.now()) / 1000));
+  const left = Math.max(0, Math.round((lastAttempt + SCAN_MS - Date.now()) / 1000));
   $('#foot').textContent = footBase + (lastScan ? ` · следующее обновление через ${left} с` : '');
 }
 
@@ -1971,7 +1989,8 @@ const tickCls = (key, p) => { const was = shownPx.get(key); shownPx.set(key, p);
 function renderTable() { return keepFocus(renderTableNow); }   // the star or row in focus stays focused after a rescan
 function renderTableNow() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
-  if (!rows.length) { $('#cards').classList.toggle('wait', !scanErr); if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
+  renderScanStatus();
+  if (!rows.length) { $('#cards').classList.toggle('wait', !scanErr); if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${esc(scanErr)}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
   save('sr_tfilt', Object.fromEntries(TF_FILTERS.map(s => [s, $(s).value])));
   const fz = $('#fz').value, fl = $('#fl').value, pass = baseFilter();
   // segment counts follow the other filters: «Сигналы 2» means two rows will show, not two in the whole market
@@ -2376,6 +2395,7 @@ async function loadChart(sym) {
   chartSym = sym || chartSym; save('sr_chart', chartSym);
   if (page === 'market') setHash();
   const req = ++chartReq, want = chartSym, wrap = $('#cv').parentElement;
+  $('#chartError').classList.add('hidden');
   // another coin: until its candles come, the previous coin's chart must not pass for this one (on a phone network that
   // takes seconds): the title says what is loading, the old chart fades under «Загружаю график…» (.cvwrap[data-wait])
   if (!chart || chart.sym !== want) $('#ctitle').textContent = pair(want) + ' — загрузка…';
@@ -2387,7 +2407,10 @@ async function loadChart(sym) {
   } catch (e) {
     if (req !== chartReq) return;
     if (wrap.dataset.wait) wrap.dataset.wait = 'Не удалось загрузить график';
-    $('#ctitle').textContent = /HTTP 400/.test(e.message) ? `${pair(want)} — такой пары нет на Binance. Нужна монета к USDT, например BTC или SOL.` : `${pair(want)} — не удалось загрузить график (${e.message || 'нет связи'}). Попробуем снова через минуту.`;
+    const kept = chart?.sym === want;
+    if (!kept) { $('#ctitle').textContent = pair(want) + ' — график недоступен'; $('#cstats').textContent = ''; $('#detail').textContent = ''; }
+    $('#chartNote').textContent = /HTTP 400/.test(e.message) ? 'Такой пары нет на Binance. Введите BTC или SOL.' : kept ? 'Не удалось обновить график. Показаны предыдущие данные.' : 'Не удалось загрузить график. Проверьте соединение и повторите.';
+    $('#chartError').classList.remove('hidden');
   }
   document.querySelectorAll('tr.row[data-sym]').forEach(tr => tr.classList.toggle('sel', tr.dataset.sym === chartSym));
   renderLv(); loadTf2();
@@ -2407,9 +2430,9 @@ function computeChart() {
   $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button> <span class="cprice ${tickCls('c:' + chartSym, d.c[i])}">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
   // the coin's numbers as named pairs (a small name over each value), not one line joined by dots
   const st = (name, v, cls = '', tip = '') => `<span class="st"${tip ? ` title="${tip}"` : ''}><i>${name}</i><b class="${cls}">${v}</b></span>`;
-  $('#cstats').innerHTML = st('Диапазон', (pB*100).toFixed(0) + '%') + st('Границы', `${fp(B.lo[i])} — ${fp(B.up[i])}`) + st('RSI', chart.R[i].toFixed(0))
+  $('#cstats').innerHTML = st('Диапазон', (pB*100).toFixed(0) + '%', '', 'Положение в канале: 0% — нижняя граница, 100% — верхняя. Это не диапазон за 24 часа.') + st('Границы', `${fp(B.lo[i])} — ${fp(B.up[i])}`) + st('RSI', chart.R[i].toFixed(0), '', 'RSI(14) — относительная сила движения, 0–100. Не самостоятельный сигнал к сделке.')
     + st('T½', isFinite(hl) && hl * TFMS[S.tf] < 30 * 864e5 ? dur(hl * TFMS[S.tf]) : 'тренд', hlCls(hl), hlTip(hl))
-    + st('Канал', `${METHOD_NAME[S.method]} ${S.N}/${S.k}`, 'faint');
+    + st('Канал', `${METHOD_NAME[S.method]} ${S.N}/${S.k}`, 'faint', 'N — окно в свечах, k — ширина канала в единицах выбранной модели. σ — стандартное отклонение.');
   drawChart(); renderDetail();
 }
 // my bot's positions live in the browser or, in server mode, in the server journal
@@ -2458,7 +2481,7 @@ function compsHtml(x, side) {
     ['Скорость возврата', x.comps.M, 15, hl != null ? `монета обычно возвращается наполовину за ${hl.toFixed(0)} свечей` : 'монета в тренде'],
   ];
   const ck = (ok, txt) => `<span class="${ok ? 'pos' : 'faint'}">${ok ? '✓' : '✗'} ${txt}</span>`;
-  return `<div class="faint" style="font-size:12px;margin:2px 0 6px">Из чего сложилась сила сигнала</div>`
+  return `<div class="faint" style="font-size:12px;margin:2px 0 6px">Оценка условий, не вероятность прибыльной сделки</div>`
     + list.map(([nm, v, w, tip]) => `<div class="comp" title="${tip}"><span class="cn">${nm}</span><span class="cb"><i style="width:${v*100}%"></i></span><span class="cv">${Math.round(v*w)} / ${w}</span></div>`).join('')
     + (x.checks ? `<div class="checks">${ck(x.checks.closed, 'свеча закрылась')}${ck(x.checks.candle, 'цена развернулась')}${ck(x.checks.inside, 'вернулась в диапазон')}${ck(x.checks.volume, 'объём выше обычного')}</div>` : '');
 }
@@ -2703,13 +2726,15 @@ async function authStart() {
   authBody(`<p>1. Откройте нашего бота в Telegram.<br>2. Нажмите в нём этот код:</p>
     <div class="authcode" aria-label="Код для входа">${esc(s.code)}</div>
     <a class="authgo" href="https://t.me/${encodeURIComponent(s.bot)}?start=login_${s.nonce}" target="_blank" rel="noopener">Открыть Telegram</a>
-    <p class="faint" role="status">Ждём подтверждения в Telegram. Код действует 5 минут.</p>`);
+    <p class="faint" role="status">Ждём подтверждения в Telegram. Осталось <span id="authCountdown"></span>.</p>`);
   if (!$('#authDlg').classList.contains('hidden')) $('#authBody .authgo').focus();
+  const updateWait = (offline = false) => { const left = Math.max(0, Math.ceil((until - Date.now()) / 1000)); const node = $('#authCountdown'); if (node) node.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}${offline ? ' · нет связи, пробуем снова' : ''}`; };
+  updateWait();
   while (run === authRun) {
-    await sleep(2000);
+    await sleep(2000); updateWait();
     if (run !== authRun) return;
     if (Date.now() > until) return authFail('Время на вход вышло.', true);
-    let p; try { p = await authFn({op:'poll', nonce:s.nonce, secret}); } catch { continue; }   // a dropped request: ask again
+    let p; try { p = await authFn({op:'poll', nonce:s.nonce, secret}); } catch { if (run !== authRun) return; updateWait(true); continue; }   // keep waiting within the existing expiry
     if (run !== authRun) return;
     if (p.state === 'denied') return authFail('Вход отменён в Telegram.', true);
     if (p.state === 'expired') return authFail('Время на вход вышло.', true);
@@ -2745,11 +2770,12 @@ async function deleteProfile() {
   if (BP.where === 'server') { BP.where = 'browser'; saveBP(); }
   toast('Профиль удалён', 'Настройки остались только в этом браузере', 'ok');
 }
-function signOut(all) {
+async function signOut(all) {
+  if (all) { closeAuth(); if (!await ask({title:'Выйти на всех устройствах?', text:'Будет отправлен запрос на завершение всех сеансов. Для нового входа понадобится Telegram.', ok:'Выйти везде'})) return; }
   const t = AUTH?.at;
   signedOut(); closeAuth();
   if (t) gotrue('logout' + (all ? '?scope=global' : ''), null, t).catch(() => {});
-  toast(all ? 'Вы вышли на всех устройствах' : 'Вы вышли из профиля', '', 'ok');
+  toast('Вы вышли из аккаунта на этом устройстве', all ? 'Запрос выхода на остальных устройствах отправлен; результат не подтверждён.' : '', 'ok');
 }
 $('#acct').onclick = openAuth;
 $('#authClose').onclick = closeAuth;
@@ -3062,10 +3088,13 @@ $('#pimp').onclick = e => {
   }
   pendingImport = null; $('#pimp').classList.add('hidden');
 };
+async function shareUrl(url, title, copied) {
+  if (navigator.share) { try { await navigator.share({url, title}); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(url); toast(copied, '', 'ok'); }
+  catch { await ask({title, text:'Скопируйте ссылку, чтобы отправить её.', ok:'Готово', input:{value:url}}); }
+}
 async function shareProfile(p) {
-  const url = shareLink(p);
-  try { await navigator.clipboard.writeText(url); toast('Ссылка на профиль скопирована', 'отправьте её — у получателя профиль добавится в «Мой бот» одним нажатием', 'ok'); }
-  catch { await ask({title:'Ссылка на профиль', text:'Браузер не дал скопировать автоматически — выделите ссылку и скопируйте её сами.', ok:'Готово', input:{value:url}}); }
+  return shareUrl(shareLink(p), 'Профиль стратегии: ' + p.name, 'Ссылка на профиль стратегии скопирована');
 }
 async function importByLink() {
   const t = await ask({title:'Добавить профиль по ссылке', text:'Вставьте ссылку, которой с вами поделились.', ok:'Продолжить', input:{placeholder:'https://…#p=…'}});
@@ -4220,6 +4249,11 @@ $('#csym').oninput = e => { // picking from the datalist loads immediately
   const v = e.target.value.trim().toUpperCase();
   if (rows.some(r => base(r.sym) === v) && e.inputType !== 'insertText' && e.inputType !== 'deleteContentBackward') { loadChart(v + 'USDT'); e.target.value = ''; }
 };
+$('#chartRetry').onclick = () => loadChart();
+$('#chartList').onclick = () => { if (document.body.classList.contains('sheet')) $('#sheetBack').click(); else $('.tpanel').scrollIntoView({block:'start', behavior:'smooth'}); };
+$('#scanRetry').onclick = () => { clearTimeout(scanTimer); scan(); };
+$('#coinShare').onclick = () => shareUrl(location.href.split('#')[0] + '#coin/' + base(chartSym), pair(chartSym) + ' · Sigma Radar', 'Ссылка на монету скопирована');
+$('#cstats').onclick = e => { const metric = e.target.closest('[title]'); if (metric?.title) toast(metric.querySelector('i')?.textContent || 'Показатель', metric.title); };
 $('#refresh').onclick = () => { clearTimeout(scanTimer); scan(); };
 $('#ctitle').onclick = e => {   // favourite toggle in the chart header (the table's star column hides on narrow screens)
   if (!e.target.closest('[data-cfav]')) return;
@@ -4326,7 +4360,7 @@ function go(t, push = true) {
   document.querySelectorAll('.tab[data-t]').forEach(x => { x.classList.toggle('on', x.dataset.t === t); x.dataset.t === t ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'); });
   PAGES.forEach(id => $('#' + id).classList.toggle('hidden', id !== t));
   $('#foot').classList.toggle('hidden', t !== 'market');   // the scanner status belongs to the market tab
-  if (push) setHash();
+  if (push) setHash(true);
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
   if (t === 'beta') betaOpen(); else betaPause?.();
   if (t === 'backtest' && btRes) drawEquity();
@@ -4341,9 +4375,9 @@ function setTitle() {
   const sub = page === 'market' ? base(chartSym) : PAGE_TITLE[page];
   document.title = sub ? sub + ' · Sigma Radar' : 'Sigma Radar';
 }
-function setHash() {
+function setHash(push = false) {
   const h = '#' + page + (page === 'market' && chartSym ? '/' + base(chartSym) : '');
-  if (location.hash !== h) history.replaceState(null, '', h);
+  if (location.hash !== h) history[push ? 'pushState' : 'replaceState'](history.state, '', h);
   setTitle();
 }
 // ---------- phone: the list comes first, a coin's chart opens as a full-screen sheet over it ----------
@@ -4372,7 +4406,10 @@ function openCoin(sym) {
   if (isPhone()) openSheet();
 }
 $('#sheetBack').onclick = () => history.state?.sheet ? history.back() : closeSheet();
-window.addEventListener('popstate', () => { if (document.body.classList.contains('sheet')) closeSheet(); });
+window.addEventListener('popstate', () => {
+  if (document.body.classList.contains('sheet') && !history.state?.sheet) closeSheet();
+  else if (history.state?.sheet && isPhone()) { document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden'; requestAnimationFrame(drawChart); }
+});
 matchMedia('(max-width:700px)').addEventListener('change', e => { if (!e.matches && document.body.classList.contains('sheet')) { closeSheet(true); drawChart(); } });   // rotated to a wide screen
 // summary cards are shortcuts to the matching filter; a second tap clears it
 document.querySelectorAll('.card[data-cf]').forEach(c => {
@@ -4417,7 +4454,7 @@ function syncProfileNtf() {   // the same switch as in the bell's list, with the
   b.setAttribute('aria-pressed', String(on)); b.disabled = !can || blocked;
   b.textContent = !can ? 'Недоступно' : blocked ? 'Запрещено' : on ? 'Выключить' : 'Включить';
   $('#profileNtfNote').textContent = !can ? 'Этот браузер не поддерживает уведомления.' : blocked ? 'Разрешите уведомления в настройках сайта в браузере.'
-    : on ? 'Сигналы и сделки придут, даже когда вкладка свёрнута.' : 'При включении браузер запросит разрешение.';
+    : on ? 'Сигналы и сделки — пока сайт открыт, в том числе в свёрнутой вкладке. Telegram настраивается отдельно.' : 'При включении браузер запросит разрешение.';
 }
 const syncNtf = () => { $('#ntf').classList.toggle('on', ntfOn()); syncProfileNtf(); };
 $('#profileNtf').onclick = async e => { const b = e.currentTarget; b.disabled = true; await toggleNtf(); syncProfileNtf(); b.focus(); };   // a double click would ask and toast twice
@@ -4496,7 +4533,7 @@ function renderEvents() {
     <div class="evl">${EV.length ? EV.map(e => `<button class="evi${evRead.has(e.id) ? '' : ' new'}" data-ev="${e.id}"><i class="${e.kind}"></i>
       <span class="evt"><b>${e.title}</b>${e.body ? `<span>${e.body}</span>` : ''}<span class="faint">${ago(Date.now() - e.t)} назад</span></span></button>`).join('')
       : '<div class="evempty">Пока тихо. Новые сигналы и сделки ботов появятся здесь.</div>'}</div>
-    <div class="evf"><span>${on ? 'Уведомления браузера включены — придут, даже когда вкладка свёрнута' : 'Получать уведомления, даже когда вкладка свёрнута'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>
+    <div class="evf"><span>${on ? 'Уведомления браузера включены — пока сайт открыт' : 'Получать уведомления, пока сайт открыт'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>
     <div class="evf"><span>Звук при новом сигнале</span><button data-ev="snd" aria-pressed="${sound}">${sound ? 'Выключить' : 'Включить'}</button></div>`;
 }
 const openLink = l => {
