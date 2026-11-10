@@ -359,7 +359,7 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 .banner.bad{border-color:var(--bad-line);background:linear-gradient(0deg,rgba(240,82,95,.08),rgba(240,82,95,.08)),var(--s1)}.banner.bad svg{color:var(--up)}
 .banner.info svg{color:var(--blue)}
 .banner b{color:var(--text)}.banner .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.away{position:relative;margin-top:14px;padding-right:48px}.away-x{position:absolute;top:6px;right:6px;width:36px;height:36px;padding:0;border:0;background:none;font-size:20px;line-height:1;color:var(--mute)}
+.banner.away{position:relative;margin-top:14px;padding-right:48px}.away-x{position:absolute;top:6px;right:6px;width:36px;height:36px;padding:0;border:0;background:none;font-size:20px;line-height:1;color:var(--mute)}
 .intro{display:flex;gap:16px;align-items:flex-start;background:var(--intro);border:1px solid var(--intro-line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;font-size:13.5px}
 .intro ol{margin:6px 0 0;padding-left:18px;line-height:1.7}.intro .h{font-weight:700;font-size:15px}.intro button{margin-left:auto;flex:0 0 auto}
 /* touch screens: a tooltip shown by a tap (or a long press on a button), see "tooltips on touch screens" */
@@ -494,6 +494,24 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .cbeta{margin-top:12px}.cbeta .bmain{padding:0;border:0;border-radius:0;background:none;box-shadow:none}
 .cbeta .bsym,.cbeta .bbar-r{display:none}.cbeta .bcv{height:clamp(440px,60vh,700px)}body.wide .cbeta .bcv{height:min(74vh,820px)}
 .cbeta #bLive{margin-top:8px;font-size:12.5px}
+/* the card's «Стакан» on a computer: one bar — the view switch, market, timeframe, history, indicators, «Рисование» (the nine
+   drawing buttons as one list) and «Развернуть»; the card's own switch and «Развернуть» above hide. In a narrow card the
+   buttons keep their icons only. The chart's line (OHLC…) shares a row with the folded indicator chips; open chips take a
+   row of their own. A phone keeps its rows (the sheet scrolls) */
+.bcm,#bDrawBtn,#bExpBtn{display:none}
+.cbeta{container:cbar/inline-size}.cbeta .bph b{display:none}   /* the coin is in the card's header */
+#bDrawBtn.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
+@media(min-width:701px){
+  .cbeta .bcm,.cbeta #bDrawBtn,.cbeta #bExpBtn{display:inline-flex}.cbeta #bExpBtn{margin-left:auto}
+  .cbeta #bTools,#cpanel.ob .cact #cmode,#cpanel.ob .cact #cExp{display:none}
+  .cbeta .bpane{display:flex;flex-wrap:wrap;align-items:center;column-gap:6px}
+  .cbeta .bpane>.bchips{order:-1;flex:0 0 auto}.cbeta .bpane>.bchips.open{order:0;flex:1 1 100%}
+  .cbeta .bpane>.bph{flex:1 1 0;min-width:0;padding-bottom:6px}.cbeta .bpane>.cvwrap{flex:1 1 100%}
+}
+@container cbar (max-width:900px){.cbeta .bbar .ib-t{display:none}}
+.bpop.draw{width:min(340px,calc(100vw - 32px))}.bpop.draw .pact button{flex:1;white-space:nowrap;padding:0 8px}.bpop .pdraw{display:grid;gap:4px}
+.bpop .pdraw button{justify-content:flex-start;gap:10px;height:38px;padding:0 10px;font-weight:600}.bpop .pdraw kbd{margin-left:auto}
+.bpop .pdraw button.on{background:var(--blue);border-color:var(--blue);color:#fff}.bpop.draw .pact button{gap:6px;font-size:12.5px}
 /* phone: the tool hint covers the chart's header (legend, chips), not the plot, and doesn't push the chart down — a chart that
    moved under the finger between choosing a tool and drawing, and jumped back after it */
 @media(max-width:700px){#bLay [data-lay="4"]{display:none}.bhint{top:0;bottom:auto;left:0;right:0;transform:none;justify-content:space-between;white-space:normal;border-radius:12px;line-height:1.35}}
@@ -1284,16 +1302,19 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <div class="cbeta" id="cBeta">
         <div class="panel bmain">
           <div class="bbar">
+            <div class="seg mini bcm" role="group" aria-label="Вид графика"><button class="tab" data-cm="ch" aria-pressed="false" title="Канал: границы обычного диапазона, сигналы, свои уровни, второй таймфрейм">Канал</button><button class="tab on" data-cm="ob" aria-pressed="true" title="Стакан: заявки, сделки и ликвидации Binance вживую на графике этой монеты">Стакан</button></div>
             <div class="search bsym"><svg class="i"><use href="#i-search"/></svg><input id="bSym" autocapitalize="characters" autocorrect="off" list="bSymList" placeholder="Монета" aria-label="Монета: тикер и Enter" autocomplete="off" spellcheck="false"><datalist id="bSymList"></datalist></div>
             <button class="pick-btn" id="bMktBtn" title="Рынок выделенного графика: спот или фьючерсы USDⓈ-M"><span id="bMktL">Спот</span></button>
             <button class="pick-btn" id="bTfBtn" aria-haspopup="dialog" title="Таймфрейм"><span id="bTfL">5м</span><svg class="i"><use href="#i-chev"/></svg></button>
             <button class="pick-btn" id="bRangeBtn" aria-haspopup="dialog" title="Сколько истории на графике"><svg class="i"><use href="#i-clock"/></svg><span id="bRangeL">авто</span></button>
             <button class="ind-btn" id="bIndBtn" aria-label="Индикаторы"><svg class="i"><use href="#i-sliders"/></svg><span class="ib-t">Индикаторы</span> <span class="ind-n" id="bIndN">0</span></button>
+            <button class="pick-btn" id="bDrawBtn" aria-haspopup="dialog" aria-label="Рисование" title="Рисование: линейка, VWAP от свечи, заметка, профиль участка, Фибоначчи, канал Раффа"><svg class="i"><use href="#i-ruler"/></svg><span class="ib-t">Рисование</span><svg class="i"><use href="#i-chev"/></svg></button>
             <div class="seg mini btools" id="bTools" role="toolbar" aria-label="Инструменты"><button class="tab" data-tool="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка"><svg class="i"><use href="#i-ruler"/></svg></button><button class="tab" data-tool="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи"><svg class="i"><use href="#i-anchor"/></svg></button><button class="tab" data-tool="note" title="Заметка на графике (T)" aria-label="Заметка"><svg class="i"><use href="#i-note"/></svg></button><button class="tab" data-tool="frvp" title="Профиль объёма участка: протяните по свечам (P)" aria-label="Профиль объёма участка"><svg class="i"><use href="#i-range"/></svg></button><button class="tab" data-tool="fib" title="Уровни Фибоначчи: протяните от минимума к максимуму или наоборот (F)" aria-label="Уровни Фибоначчи"><svg class="i"><use href="#i-fib"/></svg></button><button class="tab" data-tool="raff" title="Канал Раффа: протяните по свечам (K)" aria-label="Канал Раффа"><svg class="i"><use href="#i-raff"/></svg></button><i></i><button class="tab" data-act="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить"><svg class="i"><use href="#i-undo"/></svg></button><button class="tab" data-act="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить"><svg class="i"><use href="#i-redo"/></svg></button><button class="tab" data-act="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения"><svg class="i"><use href="#i-erase"/></svg></button></div>
             <div class="bbar-r">
               <div class="seg mini" id="bLay" role="group" aria-label="Сколько графиков"><button class="tab on" data-lay="1" title="Один график" aria-label="Один график"><svg class="i"><use href="#i-lay1"/></svg></button><button class="tab" data-lay="2" title="Два графика" aria-label="Два графика"><svg class="i"><use href="#i-lay2"/></svg></button><button class="tab" data-lay="4" title="Четыре графика" aria-label="Четыре графика"><svg class="i"><use href="#i-lay4"/></svg></button></div>
               <button class="pick-btn" id="bLink" aria-pressed="true" title="Двигать графики вместе: масштаб, прокрутка и перекрестие по времени"><svg class="i"><use href="#i-link"/></svg><span class="ib-t">вместе</span></button>
             </div>
+            <button class="pick-btn" id="bExpBtn" data-bexp aria-label="Развернуть" title="Развернуть во всю ширину: 1, 2 или 4 графика со стаканом и список монет"><svg class="i"><use href="#i-lay4"/></svg><span class="ib-t">Развернуть</span></button>
           </div>
           <div class="bchart">
             <div class="bhint hidden" id="bToolHint" role="status"></div>
@@ -4377,6 +4398,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.95', date:'10 ноября 2026', title:'Компактный стакан в карточке', items:[
+    'Режим «Стакан» в карточке монеты стал компактнее: все кнопки в одной строке, график выше.',
+    'Инструменты рисования собраны в кнопку «Рисование» с названиями и горячими клавишами.',
+    'Список индикаторов над графиком в карточке свёрнут и раскрывается по нажатию.',
+    'Исправлено: кнопки масштаба уходили под график, если пролистать его в прошлое.',
+  ]},
   {v:'2.94', date:'9 ноября 2026', title:'Монеты моего бота', items:[
     'Добавлен фильтр «Бот» в списке монет на «Рынке»: монеты, которыми сейчас торгует «Мой бот».',
     'Монеты из своего списка в профиле бота видны в таблице, даже если их нет среди самых популярных.',
@@ -4429,12 +4456,6 @@ const CHANGELOG = [
   {v:'2.84', date:'9 ноября 2026', title:'Бот в браузере', items:[
     'Когда бот переведён в браузер, серверный бот профиля встаёт на паузу и не пишет в Telegram.',
     'Кнопка «На сервере 24/7» возвращает серверного бота в прежнее состояние.',
-  ]},
-  {v:'2.83', date:'9 ноября 2026', title:'Без перезагрузки при открытии', items:[
-    'Настройки, изменённые на другом устройстве, применяются сразу при открытии сайта, без перезагрузки страницы.',
-    'Исправлено: открытие сайта на другом устройстве больше не возвращает серверному боту прежние профили.',
-    'Исправлено: при перегрузке сервера входа сайт больше не выходит из профиля.',
-    'Исправлено: несколько открытых вкладок больше не мешают друг другу оставаться в профиле.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5340,14 +5361,15 @@ function setCmode(m) {
   cmode = m; save('sr_cmode', m);
   if (m === 'ch' && bexp) { bexp = false; $('#market').classList.remove('bx'); }   // «Развернуть» belongs to «Стакан»
   $('#cpanel').classList.toggle('ob', m === 'ob');
-  document.querySelectorAll('#cmode .tab').forEach(b => { b.classList.toggle('on', b.dataset.cm === m); b.setAttribute('aria-pressed', String(b.dataset.cm === m)); });
+  document.querySelectorAll('[data-cm]').forEach(b => { b.classList.toggle('on', b.dataset.cm === m); b.setAttribute('aria-pressed', String(b.dataset.cm === m)); });
   if (m === 'ob' && levelMode) setLevelMode(false);
   if (m === 'ch') requestAnimationFrame(drawChart);   // the canvas had no size while hidden
   betaSync();
 }
-$('#cmode').onclick = e => { const b = e.target.closest('[data-cm]'); if (b && b.dataset.cm !== cmode) setCmode(b.dataset.cm); };
+// two switches: in the card's header (phones, «Канал») and in the charts' bar (a computer's «Стакан», 2.95)
+$('#cpanel').addEventListener('click', e => { const b = e.target.closest('[data-cm]'); if (b && b.dataset.cm !== cmode) setCmode(b.dataset.cm); });
 $('#cpanel').classList.toggle('ob', cmode === 'ob');
-document.querySelectorAll('#cmode .tab').forEach(b => { b.classList.toggle('on', b.dataset.cm === cmode); b.setAttribute('aria-pressed', String(b.dataset.cm === cmode)); });
+document.querySelectorAll('[data-cm]').forEach(b => { b.classList.toggle('on', b.dataset.cm === cmode); b.setAttribute('aria-pressed', String(b.dataset.cm === cmode)); });
 // the walls block's link (and the search's «Стакан»): the card in «Стакан», scrolled to its chart
 function showOb() {
   if (cmode !== 'ob') setCmode('ob');

@@ -1352,6 +1352,7 @@ function setTool(t) {
   document.querySelectorAll('#bTools [data-tool]').forEach(b => { b.classList.toggle('on', b.dataset.tool === t); b.setAttribute('aria-pressed', b.dataset.tool === t); });
   if (ruler?.kind && ruler.kind !== 'ruler' && ruler.kind !== t) ruler = null;
   panes.forEach(p => p.el.classList.toggle('tool', !!t));
+  $('#bDrawBtn').classList.toggle('on', !!t);   // the card's «Рисование» shows that a tool is chosen
   const h = $('#bToolHint'); h.classList.toggle('hidden', !t);
   if (t) h.innerHTML = `<span>${TOOL_HINT[t]}</span><button data-tcancel>Отмена · Esc</button>`;
   redrawAll();
@@ -1398,6 +1399,13 @@ function tfPop() {
   const p = act();
   openPop($('#bTfBtn'), head('Таймфрейм') + `<div class="pgrid">${Object.keys(TFMS).map(tf => `<button data-tf="${tf}" class="${tf === p.tf ? 'on' : ''}">${TFL[tf]}</button>`).join('')}</div>`
     + `<p class="phint">${layout > 1 ? 'Для выделенного графика. ' : ''}Тепловая карта копится заново для каждой пары «монета + таймфрейм».</p>`);
+}
+// the coin card has no room for nine drawing buttons: «Рисование» lists them with names and keys
+const DRAW = [['ruler', 'ruler', 'Линейка', 'R'], ['avwap', 'anchor', 'VWAP от свечи', 'V'], ['note', 'note', 'Заметка', 'T'],
+  ['frvp', 'range', 'Профиль участка', 'P'], ['fib', 'fib', 'Уровни Фибоначчи', 'F'], ['raff', 'raff', 'Канал Раффа', 'K']];
+function drawPop() {
+  openPop($('#bDrawBtn'), head('Рисование') + `<div class="pdraw">${DRAW.map(([t, i, l, k]) => `<button data-tool="${t}" class="${tool === t ? 'on' : ''}" aria-pressed="${tool === t}">${ic(i)}<span>${l}</span><kbd>${k}</kbd></button>`).join('')}</div>`
+    + `<div class="pact"><button data-act="undo" title="Отменить (Ctrl+Z)">${ic('undo')}Отменить</button><button data-act="redo" title="Повторить (Ctrl+Shift+Z)">${ic('redo')}Повторить</button><button data-act="clear" title="Убрать все построения этой монеты">${ic('erase')}Убрать всё</button></div>`, 'draw');
 }
 function rangePop() {
   const p = act(), mx = maxDays(p.tf);
@@ -1454,6 +1462,8 @@ function wirePop() {
     const b = e.target.closest('button'); if (!b) return;
     const p = act(), ds = b.dataset;
     if ('close' in ds) closePop();
+    if (ds.tool) { closePop(); setTool(tool === ds.tool ? null : ds.tool); }   // «Рисование»: the hint above the chart says what to do next
+    if (ds.act) toolAct(ds.act);
     if (ds.tf) { p.tf = ds.tf; if (p.range > maxDays(p.tf)) p.range = 0; savePanes(); syncBar(); closePop(); p.restart(); }
     if (ds.range != null && ds.range !== '') { p.range = +ds.range; savePanes(); syncBar(); closePop(); p.restart(); }
     if ('back' in ds) { closePop(); openInd(); }
@@ -1522,22 +1532,23 @@ function chipSum(id) {
     walls:() => `±${C('domRange')}% · ×${C('wallX')}${C('wallAlert') ? ' · увед. от $' + fmtUsd(C('wallAlert')) : ''}`, bubbles:() => `топ ${C('bubPct')}%`,
     vwap:() => `с начала ${['дня', 'недели', 'месяца'][C('vwapPer')]}${C('vwapBand') ? ' · ±' + C('vwapBand') + 'σ' : ''}`,     mk:() => `${['покупки/продажи', 'перевес', 'объём'][C('mkMode')]} · топ ${C('mkTop')}%`,     vp:() => `${C('vpPx')}px · ${C('vpW')}%`, fp:() => C('fpStep') ? 'шаг $' + niceNum((p?.base || 0) * BOOK_STEPS[C('fpStep') - 1]) : 'шаг авто', bb:() => `${C('bbN')} / ${C('bbK')}σ`}[id]?.() || '';
 }
-let chipsOpen = true;
+// chipsOpen: the full view's choice (kept, sr_bchips); chipsCard: the coin card's — folded after a reload, its chart is short
+let chipsOpen = true, chipsCard = false;
 function renderChips() {
-  const ids = [...sel].filter(id => SHORT[id]);
-  const html = `<button class="bchip-t" data-chips aria-expanded="${chipsOpen}" title="${chipsOpen ? 'Свернуть' : 'Показать'} индикаторы">${ic('layers')}<span>${ids.length}</span></button>`
-    + (chipsOpen ? ids.map(id => { const off = hidden.has(id), s = chipSum(id);
+  const ids = [...sel].filter(id => SHORT[id]), open = card ? chipsCard : chipsOpen;
+  const html = `<button class="bchip-t" data-chips aria-expanded="${open}" title="${open ? 'Свернуть' : 'Показать'} индикаторы">${ic('layers')}<span>${ids.length}</span></button>`
+    + (open ? ids.map(id => { const off = hidden.has(id), s = chipSum(id);
       return `<span class="bchip${off ? ' off' : ''}" title="${esc(ITEMS.find(x => x.id === id).hint)}"><b>${SHORT[id]}</b>${s ? `<span class="s">${esc(s)}</span>` : ''}`
         + `<button data-eye="${id}" aria-label="${off ? 'Показать' : 'Скрыть'}" title="${off ? 'Показать' : 'Скрыть'}">${ic(off ? 'eyeoff' : 'eye')}</button>`
         + (PARAMS[id] ? `<button data-cfgc="${id}" aria-label="Настройки" title="Настройки">${ic('gear')}</button>` : '')
         + `<button data-tog="${id}" aria-label="Убрать" title="Убрать">${ic('x')}</button></span>`; }).join('') : '');
-  for (const p of pool) { const box = p.el.querySelector('.bchips'); if (box.innerHTML !== html) box.innerHTML = html; }
+  for (const p of pool) { const box = p.el.querySelector('.bchips'); box.classList.toggle('open', open); if (box.innerHTML !== html) box.innerHTML = html; }
 }
 function wireChips() {
   $('#bPanes').addEventListener('click', e => {
     const b = e.target.closest('.bchips button'); if (!b) return;
     const ds = b.dataset;
-    if ('chips' in ds) { chipsOpen = !chipsOpen; K.save('sr_bchips', chipsOpen); renderChips(); return; }
+    if ('chips' in ds) { if (card) chipsCard = !chipsCard; else { chipsOpen = !chipsOpen; K.save('sr_bchips', chipsOpen); } renderChips(); return; }
     if (ds.eye) { hidden.has(ds.eye) ? hidden.delete(ds.eye) : hidden.add(ds.eye); saveInd(); }
     if (ds.tog) { sel.delete(ds.tog); hidden.delete(ds.tog); saveInd(); }
     if (ds.cfgc) { const id = ds.cfgc; setTimeout(() => cfgPop(id, b)); }
@@ -1593,6 +1604,7 @@ function wire() {
   $('#bMktBtn').onclick = () => { const p = act(); if (!p) return; p.autoSpot = false; p.prevMkt = p.mkt; p.mkt = p.mkt === 'fut' ? 'spot' : 'fut'; savePanes(); syncBar(); p.restart(); K.toast(p.mkt === 'fut' ? 'Фьючерсы USDⓈ-M' : 'Спот', p.mkt === 'fut' ? 'Видны ликвидации, открытый интерес и фандинг — включите их в «Индикаторах».' : '', 'info'); };
   $('#bTfBtn').onclick = () => popFor === $('#bTfBtn') ? closePop() : tfPop();
   $('#bRangeBtn').onclick = () => popFor === $('#bRangeBtn') ? closePop() : rangePop();
+  $('#bDrawBtn').onclick = () => popFor === $('#bDrawBtn') ? closePop() : drawPop();
   document.querySelectorAll('#bLay .tab').forEach(b => b.onclick = () => setLayout(+b.dataset.lay));
   $('#bLink').onclick = () => { link = !link; K.save('sr_blink', link); syncBar(); hoverT = null; if (link) act().setView(act().view, true); redrawAll(); };
   document.querySelectorAll('#bListTabs .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bListTabs .tab').forEach(x => x.classList.toggle('on', x === b)); listMode = b.dataset.bl; renderList(); });
