@@ -647,8 +647,41 @@ h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
 }
 /* five quick filters on a narrow phone: «Бот» without its count (the line «Показано N из …» has it while the filter is on),
    and at 320 tighter tabs that still keep 36 px for the finger */
-@media(max-width:400px){#cntBot{display:none}}
-@media(max-width:359px){#flseg .tab{flex:1 0 auto;padding:0 5px;min-width:36px}}
+@container (max-width:620px){#cntBot{display:none}}   /* a narrow list (a phone, a computer with the card beside it): the refresh button stays on the row */
+@media(max-width:359px){#flseg .tab{flex:1 0 auto;padding:0 5px;min-width:36px}#flseg .cnt{display:none}}   /* at 320 the counts are in the summary cards above */
+/* the list's filter row: on a computer the quick filters and buttons keep their size; a phone puts the filter button next to
+   the search and gives the quick filters a row of their own, evenly (2.96) */
+.tpanel>.filters:first-child>#flseg,.tpanel>.filters:first-child>.icon{flex:0 0 auto}
+@media(max-width:700px){.tpanel>.filters:first-child>#more{order:1}.tpanel>.filters:first-child>#flseg{order:2;flex:1 1 100%}
+  .tpanel>.filters:first-child>.search{flex:1 1 0!important}}   /* beats the phones' «every search on its own row» */
+/* the coin table on one background: the pinned coin column and the header are opaque, and the panel's sheen under the
+   other cells made them look like dark blocks at «Ярко» */
+.tpanel .tablewrap{background:var(--s1)}
+/* a coin that didn't load this minute keeps its previous numbers, dimmed (scan); the chart's load error with «Повторить» */
+tr.row.stale{opacity:.55}
+#chartErr{margin:10px 0 0;align-items:center;flex-wrap:wrap;gap:8px 12px}#chartErr .bnact{margin-left:auto;display:flex;gap:8px}
+@media(min-width:701px){#chartList{display:none}}   /* the list is beside the card */
+.ctitle .shbtn{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:0;background:none;color:var(--mute);vertical-align:middle}.ctitle .shbtn:hover{color:var(--text)}.ctitle .shbtn .i{width:18px;height:18px}
+@media(pointer:coarse){.ctitle .shbtn{width:40px;height:40px}}
+.chead .st[title]{cursor:help}
+/* a phone's live charts: «к последней свече» is an arrow (the full text pushed the toolbar over the indicator button), and
+   open indicator chips take the chart's width */
+@media(max-width:700px){
+  .bpane .ctools .ctl-t{display:none}.bpane .ctools.away .ct-latest{width:40px;padding:0;justify-content:center}
+  .bpane.chips-open>.bchips{grid-column:1/-1;grid-row:3;flex-wrap:wrap}.bpane.chips-open .bcv{grid-row:4}
+}
+/* the indicator window on a phone: the whole screen, «Все | Выбрано» instead of two lists squeezed one over the other,
+   quick picks in one row that scrolls sideways */
+.ind-tabs{display:none}
+@media(max-width:700px){
+  #bInd{padding:0}
+  #bInd .indbox{width:100%;height:100%;max-height:none;border-radius:0;display:flex;flex-direction:column}
+  #bInd .ind-tabs{display:flex;margin:2px 16px 10px}#bInd .ind-tabs .tab{flex:1}
+  #bInd .ind-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}#bInd .ind-chips::-webkit-scrollbar{display:none}#bInd .ind-chip{flex:0 0 auto}
+  #bInd .ind-body{display:flex;flex-direction:column;flex:1;min-height:0}
+  #bInd .ind-cats,#bInd .ind-sel{flex:1;min-height:0;max-height:none;border:0;overscroll-behavior:contain}
+  #bInd .indbox:not(.sel-tab) .ind-sel,#bInd .indbox.sel-tab :is(.ind-cats,.ind-quick,.cmdin){display:none}
+}
 /* ---------- phone: trade tables become cards (coin, side and result first; details under them) ---------- */
 @media(max-width:700px){
   .phead p{display:none}
@@ -1163,7 +1196,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
   <symbol id="i-vwapv" viewBox="0 0 24 24"><path d="M6 4H3v16h3M18 4h3v16h-3"/><path d="M6 15c2-3 4-5 6-5s4 2 6 5" stroke-dasharray="3 2"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
-  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol><symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></symbol>
@@ -1241,6 +1274,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
     <!-- indicator picker, modelled on the "Индикаторы" window of order-flow terminals -->
     <div id="bInd" class="cmdk hidden"><div class="cmdbox indbox" role="dialog" aria-modal="true" aria-label="Индикаторы">
       <div class="ind-h"><b>Индикаторы <span class="ind-n" id="bIndN2">0</span></b><button class="icon" id="bIndClose" aria-label="Закрыть"><svg class="i"><use href="#i-x"/></svg></button></div>
+      <div class="seg mini ind-tabs" role="tablist" aria-label="Что показать"><button class="tab on" data-indtab="all" role="tab" aria-selected="true">Все</button><button class="tab" data-indtab="sel" role="tab" aria-selected="false">Выбрано <span class="ind-n">0</span></button></div>
       <div class="ind-quick"><div class="cmdg">Быстрый выбор</div><div id="bQuick" class="ind-chips"></div></div>
       <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="bIndQ" placeholder="Найти индикатор…" autocomplete="off"></div>
       <div class="ind-body"><div id="bCats" class="ind-cats"></div><div class="ind-sel"><div class="ind-selh"><b>Выбрано · <span id="bIndN3">0</span></b><button id="bIndClear">Очистить</button></div><label class="ind-lbl" title="Текст у стен, VWAP, POC и подсказки на графике"><input type="checkbox" id="bLabels" checked> подписи на графике</label><div id="bSel"></div></div></div>
@@ -1283,6 +1317,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
             <button class="icon" id="cset" title="Настройки канала" aria-label="Настройки канала"><svg class="i"><use href="#i-gear"/></svg></button>
           </div>
         </div>
+        <div class="banner warn hidden" id="chartErr" role="status"><span id="chartNote"></span><span class="bnact"><button id="chartRetry">Повторить</button><button id="chartList">К монетам</button></span></div>
         <div class="ctrl hidden" id="sheet">
           <select id="tf" class="hidden"><option>5m</option><option>15m</option><option>1h</option><option>4h</option><option>1d</option><option>1w</option></select>
           <label title="Как считается центр и ширина канала. Подробности — во вкладке «Инструкция»">Модель канала <select id="method">
@@ -1345,9 +1380,9 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <div class="panel tpanel">
         <div class="filters">
           <div class="search" style="flex:1 1 110px"><svg class="i"><use href="#i-search"/></svg><input id="fs" type="search" enterkeyhint="search" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Поиск монеты" title="Горячая клавиша: /"><kbd class="skey" aria-hidden="true">/</kbd></div>
-          <div class="seg mini" id="flseg" style="flex:0 0 auto"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="bot" title="Монеты, которыми торгует «Мой бот»: свой список его профиля или топ монет из профиля">Бот <span class="cnt" id="cntBot"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
-          <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров" style="flex:0 0 auto"><svg class="i"><use href="#i-sliders"/></svg></button>
-          <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас" style="flex:0 0 auto"><svg class="i"><use href="#i-refresh"/></svg></button>
+          <div class="seg mini" id="flseg"><button class="tab on" data-fl="">Все</button><button class="tab" data-fl="sig">Сигналы <span class="cnt" id="cntSig"></span></button><button class="tab" data-fl="sq">Затишье <span class="cnt" id="cntSq"></span></button><button class="tab" data-fl="bot" title="Монеты, которыми торгует «Мой бот»: свой список его профиля или топ монет из профиля">Бот <span class="cnt" id="cntBot"></span></button><button class="tab" data-fl="fav" title="Избранное" aria-label="Избранное">★ <span class="cnt" id="cntFav"></span></button></div>
+          <button id="more" class="icon" title="Больше колонок и фильтров" aria-label="Больше колонок и фильтров"><svg class="i"><use href="#i-sliders"/></svg></button>
+          <button id="refresh" class="icon" title="Обновить сейчас" aria-label="Обновить сейчас"><svg class="i"><use href="#i-refresh"/></svg></button>
         </div>
         <div class="filters hidden" id="morebar">
           <select id="fz" title="Где сейчас цена относительно канала"><option value="">Любая зона</option><option value="lo">У нижней границы</option><option value="hi">У верхней границы</option><option value="out">За границей</option><option value="in">Внутри диапазона</option></select>
@@ -1554,7 +1589,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
     <div class="phead"><div><h2>Как это работает</h2><p>Коротко о том, что делает сервис и как им пользоваться.</p></div></div>
     <div class="steps">
       <div class="step"><div class="n">1</div><b>Ищем перекосы</b><p>У каждой монеты есть обычный диапазон цены. Сервис каждую минуту проверяет 150 самых популярных монет Binance и замечает, когда цена ушла за его границу.</p></div>
-      <div class="step"><div class="n">2</div><b>Ждём разворот</b><p>Сигнал появляется, только когда цена вернулась в диапазон и это подтвердил объём торгов. Сила сигнала от 0 до 100 показывает, насколько он убедителен.</p></div>
+      <div class="step"><div class="n">2</div><b>Ждём разворот</b><p>Сигнал появляется, только когда цена вернулась в диапазон и это подтвердил объём торгов. Сила сигнала от 0 до 100 показывает, насколько он убедителен: это оценка условий, а не вероятность прибыльной сделки.</p></div>
       <div class="step"><div class="n">3</div><b>Бот торгует</b><p>По сильным сигналам бот открывает сделку с заранее заданными тейком и стопом. Деньги виртуальные — это учебный режим, без риска.</p></div>
       <div class="step"><div class="n">4</div><b>Честный итог</b><p>В журнале видно каждую сделку с комиссиями. В «Бэктесте» — как правила сработали бы в прошлом.</p></div>
     </div>
@@ -1575,7 +1610,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <li><b>Закрыть вручную</b> — в «Моём боте» у каждой открытой позиции есть кнопка «Закрыть» (и «Закрыть все»): по цене рынка с обычной комиссией. На сервере позиция закрывается в течение минуты.</li>
       </ul>
       <h3>Уведомления</h3>
-      <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они придут, даже когда вкладка свёрнута. Рядом — кнопка звука.</p>
+      <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они приходят, пока сайт открыт, в том числе в свёрнутой вкладке. Когда сайт закрыт, сообщения приходят только в Telegram, если он подключён (ниже). Рядом — кнопка звука.</p>
       <h3>Telegram</h3>
       <p>В журнале общего бота нажмите «Получать в Telegram», в боте — «Start»: будут приходить сделки общего бота. Чтобы получать своё, переведите «Мой бот» на сервер и нажмите «Включить Telegram»: сообщения присылает только бот вашего профиля и только в Telegram, через который вы вошли. Тогда придут:</p>
       <ul>
@@ -2002,10 +2037,10 @@ async function scan() {
     // besides the top: my bot's open positions and its profile's own coins (the «Бот» filter shows them even outside the top)
     const list = M.pickSymbols(tk, S.top, [...myOpen().map(p => p.sym), ...(P?.coins.mode === 'list' ? P.coins.list : [])], now);
     scanAsked = new Set(list);
-    const limit = barsFor(set), res = [], fresh = {}; let done = 0, fails = 0;
+    const limit = barsFor(set), res = [], fresh = {}, failed = new Set(), ctx = JSON.stringify(set); let done = 0, fails = 0;
     await pool(list, 10, async sym => {
       try { const K = await klines(sym, tf, limit); fresh[sym] = K; const r = M.analyze(sym, K, {...set, N:effN(K.length, set)}); if (r) res.push(r); }
-      catch { fails++; }
+      catch { fails++; failed.add(sym); }
       if (++done % 10 === 0) foot.textContent = `сканирую ${done}/${list.length}…`;
     });
     if (!scanQueued) { // settings changed during the scan → results are stale, the queued scan replaces them
@@ -2014,6 +2049,7 @@ async function scan() {
       const conf = r => { const c = M.tradeRow(r); return c?.rev ? c : null; };
       const prevSig = new Set(rows.filter(r => conf(r) || r.wasRev).map(r => r.sym));   // a weakened signal coming back is not new
       const prevPx = new Map(rows.map(r => [r.sym, r.price]));   // for the user's level-crossing alerts
+      const prevRows = rows;
       rows = res; cache = fresh; lastScan = Date.now();
       const newSig = prevScanDone ? rows.filter(r => conf(r)?.score >= S.minScore && !prevSig.has(r.sym)) : [];
       flashSyms = new Set(newSig.map(r => r.sym)); setTimeout(() => { flashSyms = new Set(); }, 3000);   // new signals glow once in the table
@@ -2025,10 +2061,16 @@ async function scan() {
       for (const r of rows) if (ULV[r.sym]) checkLevels(r.sym, prevPx.get(r.sym), r.price);
       prevScanDone = true; scanErr = null;
       runBot();
+      // a coin that didn't load this minute stays in the list with its previous numbers, dimmed (tr.stale), for up to
+      // 5 minutes — instead of vanishing for a minute. Not after a change of settings: those numbers were for others. The bot
+      // never sees them: it trades from this minute's candles (cache), which hold only the coins that loaded
+      const kept = scanCtx === ctx ? prevRows.filter(r => failed.has(r.sym) && now - (r.staleAt || now) < 5 * 6e4).map(r => ({...r, staleAt:r.staleAt || now})) : [];
+      if (kept.length) rows = res.concat(kept);
+      scanCtx = ctx;
       renderCards(); renderTable(); renderDetail();
       if (!$('#journal').classList.contains('hidden')) renderJournal();   // a hidden journal is redrawn when it is opened (go)
       $('#symlist').innerHTML = rows.map(r => `<option value="${base(r.sym)}">`).join('');
-      footBase = `${rows.length} пар${fails ? ` (${fails} не загрузились)` : ''} · биржа Binance · ТФ ${tf} · обновлено ${new Date().toLocaleTimeString('ru')}`;
+      footBase = `${list.length - fails} из ${list.length} пар${fails ? ` (${fails} не загрузились${kept.length ? `, ${kept.length} показаны с прошлыми данными` : ''})` : ''} · биржа Binance · ТФ ${tf} · обновлено ${new Date().toLocaleTimeString('ru')}`;
       $('#mlive').innerHTML = liveTag(lastScan, 3 * SCAN_MS); tickLive();
     }
   } catch (e) {
@@ -2110,7 +2152,7 @@ const normQ = v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/USDT$/, ''
 const QUICK = {sig:r => r.rev || r.wasRev, touch:r => r.touch || r.kind === 'out', sq:r => r.squeeze, bot:r => botSet().has(r.sym), fav:r => favs.has(r.sym)};
 // «Бот»: the coins «Мой бот» trades now — the active profile's own list, or its top-N by volume picked as the bot picks it
 // (math.js pickSymbols, from the scan's ticker). In «Авто» the profile follows the market, and the filter follows the profile
-let scanTk = null, scanAsked = new Set(), botMemo = null;
+let scanTk = null, scanAsked = new Set(), botMemo = null, scanCtx = '';   // scanCtx: the settings of the last scan (kept rows)
 // back on the market after the bot's profile changed («Журнал» → «Мой бот»): «Бот» shows the new coins at once; a list's
 // coins the last scan didn't ask for come with a scan now (a coin Binance doesn't have is asked once, not on every return)
 function botRefresh() {
@@ -2172,7 +2214,7 @@ const tickCls = (key, p) => { const was = shownPx.get(key); shownPx.set(key, p);
 function renderTable() { return keepFocus(renderTableNow); }   // the star or row in focus stays focused after a rescan
 function renderTableNow() {
   // before the first scan: keep the skeleton; if it failed: say so and offer a retry, never an empty table
-  if (!rows.length) { $('#cards').classList.toggle('wait', !scanErr); if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${scanErr}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
+  if (!rows.length) { $('#cards').classList.toggle('wait', !scanErr); if (scanErr) $('#tb').innerHTML = `<tr><td colspan="9"><div class="tbl-err"><b>Не удалось загрузить монеты с Binance</b><span class="mute">${esc(scanErr)}. Повторим сами через минуту — или сейчас:</span><button data-retry>Повторить</button></div></td></tr>`; return; }
   const fz = $('#fz').value, fl = $('#fl').value, pass = baseFilter();
   // segment counts follow the other filters: «Сигналы 2» means two rows will show, not two in the whole market
   const base0 = rows.filter(pass);
@@ -2199,7 +2241,7 @@ function renderTableNow() {
       : `<b style="color:${r.rev ? (r.score >= S.minScore ? 'var(--acc)' : 'var(--text)') : 'var(--faint)'}" title="${r.rev ? 'разворот подтверждён' : r.wasRev ? 'подтверждение ослабло: последняя свеча против разворота, сила без него. Бот по ослабшему сигналу не войдёт' : 'разворот не подтверждён — бот не войдёт'}">${r.score}</b>`;
     const weak = r.rev && r.score < S.minScore, tip = weak ? `Сила ${r.score} ниже порога ${S.minScore} — бот по такому сигналу не войдёт. ` : '';
     const vc = r.volZ >= 1 ? 'var(--acc)' : r.volZ <= -1 ? 'var(--faint)' : 'inherit';
-    return `<tr tabindex="0" class="row${r.sym === chartSym ? ' sel' : ''}${flashSyms.has(r.sym) ? ' newsig' : ''}" data-sym="${r.sym}">
+    return `<tr tabindex="0" class="row${r.sym === chartSym ? ' sel' : ''}${flashSyms.has(r.sym) ? ' newsig' : ''}${r.staleAt ? ' stale' : ''}" data-sym="${r.sym}"${r.staleAt ? ' title="Не обновилась в эту минуту — показаны прошлые данные"' : ''}>
       <td><button class="star${favs.has(r.sym) ? ' on' : ''}" data-fav="${r.sym}" aria-pressed="${favs.has(r.sym)}" aria-label="${favs.has(r.sym) ? 'Убрать из избранного' : 'В избранное'}: ${pair(r.sym)}">${favs.has(r.sym) ? '★' : '☆'}</button></td>
       <td>${coin(r.sym)}</td><td class="${tickCls(r.sym, r.price)}">${fp(r.price)}</td><td>${gauge(r.pB)}</td>
       <td class="hm hx ${r.z > 0 ? 'neg' : 'pos'}">${(r.z > 0 ? '+' : '') + r.z.toFixed(1)}σ</td>
@@ -2544,7 +2586,7 @@ function attachZoom(cv, api) {
   bar.innerHTML = `<button data-z="out" title="Отдалить (−)" aria-label="Отдалить">−</button><button data-z="in" title="Приблизить (+)" aria-label="Приблизить">+</button>`
     + `<button data-z="reset" title="Обычный вид (0 или двойной клик)" aria-label="Обычный вид">⟲</button>`
     + (api.tools || '') + (api.expand ? `<button data-z="expand" title="Развернуть график на всю ширину (F)" aria-label="Развернуть график">⤢</button>` : '')
-    + `<button data-z="latest" class="ct-latest" title="К последней свече (End)">к последней свече →</button>`;
+    + `<button data-z="latest" class="ct-latest" title="К последней свече (End)" aria-label="К последней свече"><span class="ctl-t">к последней свече </span>→</button>`;   // a phone's charts keep the arrow only
   cv.parentElement.appendChild(bar);
   // "to the latest candle" shows up only when the view has been scrolled into the past
   const sync = () => { const st = api.state(); bar.classList.toggle('away', !!st?.geo && range(st).endOff > 2); };
@@ -2580,6 +2622,7 @@ async function loadChart(sym) {
   loadWalls();
   if (cmode === 'ob') betaSync();   // «Стакан»: the same coin on its chart
   const req = ++chartReq, want = chartSym, wrap = $('#cv').parentElement;
+  $('#chartErr').classList.add('hidden');
   // another coin: until its candles come, the previous coin's chart must not pass for this one (on a phone network that
   // takes seconds): the title says what is loading, the old chart fades under «Загружаю график…» (.cvwrap[data-wait])
   if (!chart || chart.sym !== want) $('#ctitle').textContent = pair(want) + ' — загрузка…';
@@ -2591,7 +2634,13 @@ async function loadChart(sym) {
   } catch (e) {
     if (req !== chartReq) return;
     if (wrap.dataset.wait) wrap.dataset.wait = 'Не удалось загрузить график';
-    $('#ctitle').textContent = /HTTP 400/.test(e.message) ? `${pair(want)} — такой пары нет на Binance. Нужна монета к USDT, например BTC или SOL.` : `${pair(want)} — не удалось загрузить график (${e.message || 'нет связи'}). Попробуем снова через минуту.`;
+    // a minute's refresh that failed keeps the chart and its numbers (a note says they are old); another coin that failed
+    // clears the previous coin's numbers. Either way «Повторить» is right there, and the next minute tries again
+    const kept = chart?.sym === want;
+    if (!kept) { $('#ctitle').textContent = pair(want) + ' — график недоступен'; $('#cstats').textContent = ''; }
+    $('#chartNote').textContent = /HTTP 400/.test(e.message) ? `Пары ${pair(want)} нет на Binance. Нужна монета к USDT, например BTC или SOL.`
+      : kept ? 'Не удалось обновить график — показаны данные прошлого обновления.' : `Не удалось загрузить график (${e.message || 'нет связи'}). Попробую снова через минуту.`;
+    $('#chartErr').classList.remove('hidden');
   }
   document.querySelectorAll('tr.row[data-sym]').forEach(tr => tr.classList.toggle('sel', tr.dataset.sym === chartSym));
   renderLv(); loadTf2();
@@ -2608,12 +2657,15 @@ function computeChart() {
   const pB = (d.c[i] - B.lo[i]) / (B.up[i] - B.lo[i]), hl = halfLife(d.c, B.mid);
   const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
   const fav = favs.has(chartSym);
-  $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button> <span class="cprice ${tickCls('c:' + chartSym, d.c[i])}">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
+  $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button><button class="shbtn" data-cshare title="Поделиться монетой: ссылка открывает её график" aria-label="Поделиться монетой"><svg class="i"><use href="#i-share"/></svg></button> <span class="cprice ${tickCls('c:' + chartSym, d.c[i])}">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
   // the coin's numbers as named pairs (a small name over each value), not one line joined by dots
   const st = (name, v, cls = '', tip = '') => `<span class="st"${tip ? ` title="${tip}"` : ''}><i>${name}</i><b class="${cls}">${v}</b></span>`;
-  $('#cstats').innerHTML = st('Диапазон', (pB*100).toFixed(0) + '%') + st('Границы', `${fp(B.lo[i])} — ${fp(B.up[i])}`) + st('RSI', chart.R[i].toFixed(0))
+  // each number explains itself on hover, and on a tap (a phone has no hover): #cstats.onclick shows the title as a toast
+  $('#cstats').innerHTML = st('Диапазон', (pB*100).toFixed(0) + '%', '', 'Где цена внутри своего обычного диапазона: 0% — у нижней границы, 100% — у верхней. Это не изменение за 24 часа.')
+    + st('Границы', `${fp(B.lo[i])} — ${fp(B.up[i])}`, '', 'Нижняя и верхняя граница обычного диапазона цены (канала).')
+    + st('RSI', chart.R[i].toFixed(0), '', 'RSI(14) — сила последних движений от 0 до 100: выше 70 — перекупленность, ниже 30 — перепроданность. Сам по себе не сигнал к сделке.')
     + st('T½', isFinite(hl) && hl * TFMS[S.tf] < 30 * 864e5 ? dur(hl * TFMS[S.tf]) : 'тренд', hlCls(hl), hlTip(hl))
-    + st('Канал', `${METHOD_NAME[S.method]} ${S.N}/${S.k}`, 'faint');
+    + st('Канал', `${METHOD_NAME[S.method]} ${S.N}/${S.k}`, 'faint', `Как считается диапазон: модель «${METHOD_NAME[S.method]}», окно ${S.N} свечей, ширина ${S.k}σ (σ — обычный разброс цены). Меняется в настройках канала.`);
   drawChart(); renderDetail();
 }
 // my bot's positions live in the browser or, in server mode, in the server journal
@@ -2662,7 +2714,7 @@ function compsHtml(x, side) {
     ['Скорость возврата', x.comps.M, 15, hl != null ? `монета обычно возвращается наполовину за ${hl.toFixed(0)} свечей` : 'монета в тренде'],
   ];
   const ck = (ok, txt) => `<span class="${ok ? 'pos' : 'faint'}">${ok ? '✓' : '✗'} ${txt}</span>`;
-  return `<div class="faint" style="font-size:12px;margin:2px 0 6px">Из чего сложилась сила сигнала</div>`
+  return `<div class="faint" style="font-size:12px;margin:2px 0 6px">Из чего сложилась сила сигнала — это оценка условий, не вероятность прибыли</div>`
     + list.map(([nm, v, w, tip]) => `<div class="comp" title="${tip}"><span class="cn">${nm}</span><span class="cb"><i style="width:${v*100}%"></i></span><span class="cv">${Math.round(v*w)} / ${w}</span></div>`).join('')
     + (x.checks ? `<div class="checks">${ck(x.checks.closed, 'свеча закрылась')}${ck(x.checks.candle, 'цена развернулась')}${ck(x.checks.inside, 'вернулась в диапазон')}${ck(x.checks.volume, 'объём выше обычного')}</div>` : '');
 }
@@ -2937,14 +2989,19 @@ async function authStart() {
   authBody(`<p>1. Откройте нашего бота в Telegram.<br>2. Нажмите в нём этот код:</p>
     <div class="authcode" aria-label="Код для входа">${esc(s.code)}</div>
     <a class="authgo" href="https://t.me/${encodeURIComponent(s.bot)}?start=login_${s.nonce}" target="_blank" rel="noopener">Открыть Telegram</a>
-    <p class="faint" role="status">Ждём подтверждения в Telegram. Код действует 5 минут.</p>`);
+    <p class="faint">Ждём подтверждения в Telegram. Код действует ещё <b id="authLeft"></b>.</p><p class="faint" id="authNet" role="status"></p>`);
   if (!$('#authDlg').classList.contains('hidden')) $('#authBody .authgo').focus();
+  // how long the code still works, and a word when the network drops (the code keeps working, the page asks again)
+  const left = () => { const s = Math.max(0, Math.ceil((until - Date.now()) / 1000)), n = $('#authLeft'); if (n) n.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const net = t => { const n = $('#authNet'); if (n && n.textContent !== t) n.textContent = t; };
+  left();
   while (run === authRun) {
-    await sleep(2000);
+    await sleep(2000); left();
     if (run !== authRun) return;
     if (Date.now() > until) return authFail('Время на вход вышло.', true);
-    let p; try { p = await authFn({op:'poll', nonce:s.nonce, secret}); } catch { continue; }   // a dropped request: ask again
+    let p; try { p = await authFn({op:'poll', nonce:s.nonce, secret}); } catch { net('Нет связи с сервером — пробую снова. Код продолжает действовать.'); continue; }   // a dropped request: ask again
     if (run !== authRun) return;
+    net('');
     if (p.state === 'denied') return authFail('Вход отменён в Telegram.', true);
     if (p.state === 'expired') return authFail('Время на вход вышло.', true);
     if (p.state === 'ok') {
@@ -2978,11 +3035,16 @@ async function deleteProfile() {
   botGone();   // the profile's bot went with it
   toast('Профиль удалён', 'Настройки остались только в этом браузере', 'ok');
 }
-function signOut(all) {
+// «Выйти на всех устройствах» asks first, and says what is true: this device is out at once; the others are told by the
+// server (it ends every session) and drop out at their next token renewal — unless that request didn't get through
+async function signOut(all) {
+  if (all) { closeAuth(); if (!await ask({title:'Выйти на всех устройствах?', text:'Профиль закроется здесь сразу, а на остальных устройствах — в течение часа. Для нового входа понадобится Telegram.', ok:'Выйти везде', danger:true})) return; }
   const t = AUTH?.at;
+  const sent = t ? gotrue('logout' + (all ? '?scope=global' : ''), null, t).then(() => true, () => false) : Promise.resolve(false);
+  const ok = all ? await Promise.race([sent, sleep(4000).then(() => false)]) : true;
   signedOut(); closeAuth();
-  if (t) gotrue('logout' + (all ? '?scope=global' : ''), null, t).catch(() => {});
-  toast(all ? 'Вы вышли на всех устройствах' : 'Вы вышли из профиля', '', 'ok');
+  toast(all ? (ok ? 'Вы вышли на всех устройствах' : 'Вы вышли на этом устройстве') : 'Вы вышли из профиля',
+    all ? (ok ? 'Остальные устройства закроют профиль в течение часа — те, что без сети, когда подключатся.' : 'Сервер не ответил — на остальных устройствах выйдите сами.') : '', ok ? 'ok' : 'warn');
 }
 $('#acct').onclick = openAuth;
 $('#authClose').onclick = closeAuth;
@@ -3346,8 +3408,15 @@ $('#pimp').onclick = e => {
   }
   pendingImport = null; $('#pimp').classList.add('hidden');
 };
+// a link to send: a phone's own share sheet (messengers, mail), else the clipboard, else a field to copy it from
+async function shareUrl(url, title, copied) {
+  if (navigator.share && matchMedia('(pointer:coarse)').matches) { try { await navigator.share({url, title}); return; } catch (e) { if (e.name === 'AbortError') return; } }
+  try { await navigator.clipboard.writeText(url); toast(copied, '', 'ok'); }
+  catch { await ask({title, text:'Браузер не дал скопировать автоматически — выделите ссылку и скопируйте её сами.', ok:'Готово', input:{value:url}}); }
+}
 async function shareProfile(p) {
   const url = shareLink(p);
+  if (navigator.share && matchMedia('(pointer:coarse)').matches) { try { await navigator.share({url, title:'Профиль бота: ' + p.name}); return; } catch (e) { if (e.name === 'AbortError') return; } }
   try { await navigator.clipboard.writeText(url); toast('Ссылка на профиль скопирована', 'отправьте её — у получателя профиль добавится в «Мой бот» одним нажатием', 'ok'); }
   catch { await ask({title:'Ссылка на профиль', text:'Браузер не дал скопировать автоматически — выделите ссылку и скопируйте её сами.', ok:'Готово', input:{value:url}}); }
 }
@@ -4398,6 +4467,20 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.97', date:'10 ноября 2026', title:'Понятнее ошибки и навигация', items:[
+    'Кнопка «Назад» в браузере возвращает в предыдущий раздел сайта.',
+    'Добавлена кнопка «Поделиться монетой» рядом с названием монеты.',
+    'Если график не загрузился, рядом появляется кнопка «Повторить».',
+    'Показатели над графиком объясняют себя по нажатию.',
+    '«Выйти на всех устройствах» сначала спрашивает подтверждение.',
+  ]},
+  {v:'2.96', date:'10 ноября 2026', title:'Удобнее на телефоне', items:[
+    'Окно индикаторов на телефоне открывается на весь экран с разделами «Все» и «Выбрано».',
+    'Кнопка фильтров стоит рядом с поиском, быстрые фильтры занимают строку целиком.',
+    'Исправлено: колонка монет выделялась тёмным прямоугольником при ярком стекле.',
+    'Исправлено: кнопка «к последней свече» наезжала на кнопку индикаторов.',
+    'Открытый список индикаторов над графиком занимает всю ширину.',
+  ]},
   {v:'2.95', date:'10 ноября 2026', title:'Компактный стакан в карточке', items:[
     'Режим «Стакан» в карточке монеты стал компактнее: все кнопки в одной строке, график выше.',
     'Инструменты рисования собраны в кнопку «Рисование» с названиями и горячими клавишами.',
@@ -4447,15 +4530,6 @@ const CHANGELOG = [
     'Исправлено: изменение уведомлений в меню Telegram больше не отменяется следующей правкой на сайте.',
     'Исправлено: две быстрые правки уведомлений подряд теперь сохраняются обе.',
     'Поля настроек уведомлений на телефоне стали крупнее.',
-  ]},
-  {v:'2.85', date:'9 ноября 2026', title:'Telegram и срок бота', items:[
-    'Исправлено: если заблокировать бота в Telegram, сообщения бота профиля больше не отправляются, а сайт показывает, что Telegram выключен.',
-    'Команды и кнопки в меню бота в Telegram продлевают работу серверного бота так же, как заход на сайт.',
-    'Исправлено: вопрос об удалении прежнего серверного бота больше не продлевает его работу.',
-  ]},
-  {v:'2.84', date:'9 ноября 2026', title:'Бот в браузере', items:[
-    'Когда бот переведён в браузер, серверный бот профиля встаёт на паузу и не пишет в Telegram.',
-    'Кнопка «На сервере 24/7» возвращает серверного бота в прежнее состояние.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4523,11 +4597,16 @@ $('#csym').oninput = e => { // picking from the datalist loads immediately
   if (rows.some(r => base(r.sym) === v) && e.inputType !== 'insertText' && e.inputType !== 'deleteContentBackward') { loadChart(v + 'USDT'); e.target.value = ''; }
 };
 $('#refresh').onclick = () => { clearTimeout(scanTimer); scan(); };
-$('#ctitle').onclick = e => {   // favourite toggle in the chart header (the table's star column hides on narrow screens)
+// the chart header: the favourite star (the table's star column hides on narrow screens) and «Поделиться монетой» — a #coin/
+// link, which on a phone opens the coin's chart at once
+$('#ctitle').onclick = e => {
+  if (e.target.closest('[data-cshare]')) return shareUrl(location.origin + location.pathname + '#coin/' + base(chartSym), pair(chartSym) + ' · Sigma Radar', 'Ссылка на монету скопирована');
   if (!e.target.closest('[data-cfav]')) return;
   favs.has(chartSym) ? favs.delete(chartSym) : favs.add(chartSym); save('sr_favs', [...favs]); computeChart(); renderTable();
 };
-$('#ctitle').onclick = e => { if (!e.target.closest('[data-cfav]')) return; favs.has(chartSym) ? favs.delete(chartSym) : favs.add(chartSym); save('sr_favs', [...favs]); computeChart(); renderTable(); };
+$('#cstats').onclick = e => { const m = e.target.closest('.st[title]'); if (m) toast(m.querySelector('i')?.textContent || 'Показатель', m.title, 'info', null, 8000); };
+$('#chartRetry').onclick = () => loadChart();
+$('#chartList').onclick = () => document.body.classList.contains('sheet') ? $('#sheetBack').click() : $('.tpanel').scrollIntoView({block:'start', behavior:'smooth'});
 // the table filters combine (search + quick filter + position + strength + T½ + side); all but the search are remembered
 { const f = load('sr_tfilt', {}); for (const s of TF_FILTERS) if (f[s] != null && [...$(s).options].some(o => o.value === f[s])) $(s).value = f[s];
   document.querySelectorAll('#flseg .tab').forEach(x => x.classList.toggle('on', x.dataset.fl === $('#fl').value)); }
@@ -4631,7 +4710,7 @@ function go(t, push = true) {
   document.querySelectorAll('.tab[data-t]').forEach(x => { x.classList.toggle('on', x.dataset.t === t); x.dataset.t === t ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'); });
   PAGES.forEach(id => $('#' + id).classList.toggle('hidden', id !== t));
   $('#foot').classList.toggle('hidden', t !== 'market');   // the scanner status belongs to the market tab
-  if (push) setHash();
+  if (push) setHash(true);
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
   betaSync();   // the live charts: in the card's «Стакан» or the market's «Развернуть», paused elsewhere
   if (t === 'backtest' && btRes) drawEquity();
@@ -4646,9 +4725,11 @@ function setTitle() {
   const sub = page === 'market' ? base(chartSym) : PAGE_TITLE[page];
   document.title = sub ? sub + ' · Sigma Radar' : 'Sigma Radar';
 }
-function setHash() {
+// push: a change of section is a step «Назад» returns from (before 2.96 «Назад» left the site); a new coin and the rest
+// replace the address. The sheet and «Развернуть» add their own steps (openSheet, expandOb)
+function setHash(push = false) {
   const h = '#' + page + (page === 'market' && chartSym ? '/' + base(chartSym) : '');
-  if (location.hash !== h) history.replaceState(null, '', h);
+  if (location.hash !== h) history[push ? 'pushState' : 'replaceState'](null, '', h);
   setTitle();
 }
 // ---------- phone: the list comes first, a coin's chart opens as a full-screen sheet over it ----------
@@ -4734,7 +4815,7 @@ function syncProfileNtf() {   // the same switch as in the bell's list, with the
   b.setAttribute('aria-pressed', String(on)); b.disabled = !can || blocked;
   b.textContent = !can ? 'Недоступно' : blocked ? 'Запрещено' : on ? 'Выключить' : 'Включить';
   $('#profileNtfNote').textContent = !can ? 'Этот браузер не поддерживает уведомления.' : blocked ? 'Разрешите уведомления в настройках сайта в браузере.'
-    : on ? 'Сигналы и сделки придут, даже когда вкладка свёрнута.' : 'При включении браузер запросит разрешение.';
+    : on ? 'Сигналы и сделки придут, пока сайт открыт, в том числе в свёрнутой вкладке. При закрытом сайте — только Telegram, если он подключён.' : 'При включении браузер запросит разрешение.';
 }
 const syncNtf = () => { $('#ntf').classList.toggle('on', ntfOn()); syncProfileNtf(); };
 $('#profileNtf').onclick = async e => { const b = e.currentTarget; b.disabled = true; await toggleNtf(); syncProfileNtf(); b.focus(); };   // a double click would ask and toast twice
@@ -4742,7 +4823,7 @@ async function toggleNtf() {
   if (!('Notification' in window)) { toast('Браузер не поддерживает уведомления', '', 'warn'); return; }
   if (ntfOn()) { save('sr_ntf', false); syncNtf(); toast('Уведомления выключены', '', 'info'); return; }
   const p = await Notification.requestPermission();
-  if (p === 'granted') { save('sr_ntf', true); toast('Уведомления включены', 'Пришлём сигналы и сделки, даже когда вкладка свёрнута.', 'ok'); }
+  if (p === 'granted') { save('sr_ntf', true); toast('Уведомления включены', 'Пришлём сигналы и сделки, пока сайт открыт, в том числе в свёрнутой вкладке.', 'ok'); }
   else toast('Уведомления запрещены', 'Разрешите их в настройках сайта в браузере.', 'warn');
   syncNtf();
 }
@@ -4814,7 +4895,7 @@ function renderEvents() {
     <div class="evl">${EV.length ? EV.map(e => `<button class="evi${evRead.has(e.id) ? '' : ' new'}" data-ev="${e.id}"><i class="${e.kind}"></i>
       <span class="evt"><b>${e.title}</b>${e.body ? `<span>${e.body}</span>` : ''}<span class="faint">${ago(Date.now() - e.t)} назад</span></span></button>`).join('')
       : '<div class="evempty">Пока тихо. Новые сигналы и сделки ботов появятся здесь.</div>'}</div>
-    <div class="evf"><span>${on ? 'Уведомления браузера включены — придут, даже когда вкладка свёрнута' : 'Получать уведомления, даже когда вкладка свёрнута'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>
+    <div class="evf"><span>${on ? 'Уведомления браузера включены — приходят, пока сайт открыт' : 'Получать уведомления, пока сайт открыт (и в свёрнутой вкладке)'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>
     <div class="evf"><span>Звук при новом сигнале</span><button data-ev="snd" aria-pressed="${sound}">${sound ? 'Выключить' : 'Включить'}</button></div>`;
 }
 const openLink = l => {

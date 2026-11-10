@@ -1542,7 +1542,7 @@ function renderChips() {
         + `<button data-eye="${id}" aria-label="${off ? 'Показать' : 'Скрыть'}" title="${off ? 'Показать' : 'Скрыть'}">${ic(off ? 'eyeoff' : 'eye')}</button>`
         + (PARAMS[id] ? `<button data-cfgc="${id}" aria-label="Настройки" title="Настройки">${ic('gear')}</button>` : '')
         + `<button data-tog="${id}" aria-label="Убрать" title="Убрать">${ic('x')}</button></span>`; }).join('') : '');
-  for (const p of pool) { const box = p.el.querySelector('.bchips'); box.classList.toggle('open', open); if (box.innerHTML !== html) box.innerHTML = html; }
+  for (const p of pool) { const box = p.el.querySelector('.bchips'); box.classList.toggle('open', open); p.el.classList.toggle('chips-open', open); if (box.innerHTML !== html) box.innerHTML = html; }
 }
 function wireChips() {
   $('#bPanes').addEventListener('click', e => {
@@ -1565,7 +1565,7 @@ const ic = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
 const ICONS = {dom:'book', imb:'imb', act:'act', tape:'tape', obsum:'sigma', heat:'heat', walls:'wall', bubbles:'bubble', vol:'volbars', delta:'delta', cvd:'cvd', trades:'trades', dtint:'tint',
   liq:'liq', liqheat:'liqheat', oi:'oi', fp:'fp', mk:'mk', vp:'vp', poc:'poc', dpoc:'dpoc', frvp:'range', vwap:'vwap', vwapv:'vwapv', bb:'channel', rsi:'gauge', fibt:'fib', rafft:'raff'};
 function renderInd() {
-  const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3'].forEach(s => $(s).textContent = n);
+  const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3', '.ind-tabs .ind-n'].forEach(s => $(s).textContent = n);
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
   const q = $('#bIndQ').value.trim().toLowerCase();
   $('#bCats').innerHTML = CATS.map(c => {
@@ -1598,6 +1598,8 @@ function wire() {
     if (eye) { hidden.has(eye) ? hidden.delete(eye) : hidden.add(eye); saveInd(); }
     if (cf) { closeInd(); setTimeout(() => cfgPop(cf)); }
     const ut = e.target.closest('[data-usetool]')?.dataset.usetool; if (ut) { closeInd(); setTool(ut); }
+    const tab = e.target.closest('[data-indtab]')?.dataset.indtab;   // a phone: «Все» or «Выбрано»
+    if (tab) { $('#bInd .indbox').classList.toggle('sel-tab', tab === 'sel'); document.querySelectorAll('[data-indtab]').forEach(b => { b.classList.toggle('on', b.dataset.indtab === tab); b.setAttribute('aria-selected', b.dataset.indtab === tab); }); }
   });
   $('#bTools').onclick = e => { const b = e.target.closest('button'); if (!b) return; if (b.dataset.tool) setTool(tool === b.dataset.tool ? null : b.dataset.tool); if (b.dataset.act) toolAct(b.dataset.act); };
   $('#bToolHint').onclick = e => { if (e.target.closest('[data-tcancel]')) setTool(null); };
