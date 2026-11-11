@@ -683,10 +683,19 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
   const regAt = (s, T) => { const Q = P[s], i = Q ? Q.idx.get(T) : null; return i != null ? regS[s][i] : null; };
   const tradable = only ? Object.keys(P).filter(s => only.includes(s)) : Object.keys(P);
   const times = [...new Set(Object.values(P).flatMap(Q => Q.t))].filter(t => t >= from).sort((a, b) => a - b);
-  // running sums of quote turnover (volume × close) per coin, for the 24 h window ending with the bar being decided on
+  // running sums of quote turnover (volume × close) per coin, for the 24 h window ending with the bar being decided on.
+  // The top is ranked over every loaded coin, also one with fewer than N + 20 candles in all: a coin listed shortly before the
+  // end of the period is in the live bot's top from its first candles, and leaving it out made the top depend on how many
+  // candles came after (a run cut earlier ranked another coin in its place, 2.107). It is traded only from its bar N + 19
+  // (below), so whether it trades never depends on later candles either
   const day = Math.max(1, Math.round(864e5 / tfms)), QV = {};
-  if (top) for (const s of tradable) { const Q = P[s], q = new Float64Array(Q.n + 1); for (let i = 0; i < Q.n; i++) q[i + 1] = q[i] + Q.v[i] * Q.c[i]; QV[s] = q; }
-  const turnover = (s, T) => { const i = P[s].idx.get(T); return i == null ? 0 : QV[s][i + 1] - QV[s][Math.max(0, i + 1 - day)]; };
+  const ranked = (only ? Object.keys(hist).filter(s => only.includes(s)) : Object.keys(hist)).filter(s => hist[s]?.length);
+  if (top) for (const s of ranked) {
+    const K = hist[s], n = K.length, q = new Float64Array(n + 1), ix = P[s]?.idx || new Map(K.map((k, i) => [k[0], i]));
+    for (let i = 0; i < n; i++) q[i + 1] = q[i] + +K[i][5] * +K[i][4];
+    QV[s] = { q, ix };
+  }
+  const turnover = (s, T) => { const R = QV[s], i = R.ix.get(T); return i == null ? 0 : R.q[i + 1] - R.q[Math.max(0, i + 1 - day)]; };
   let active = tradable, activeHour = -1;
   let balance = start;
   const open = [], trades = [], equity = [], lastClose = {};
@@ -710,18 +719,17 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
     }
     if (top && Math.floor(T / 36e5) !== activeHour) {   // the ranking is refreshed hourly, like a ticker read now and then
       activeHour = Math.floor(T / 36e5);
-      active = tradable.map(s => [s, turnover(s, T)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, top).map(x => x[0]);
+      active = ranked.map(s => [s, turnover(s, T)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, top).map(x => x[0]);
     }
     if (open.length < slots) {
       const cands = [], mkt = BTC ? marketOf(s => regAt(s, T)) : null;
       for (const sym of active) {
-        const Q = P[sym], i = Q.idx.get(T);
-        if (i == null || open.some(p => p.sym === sym)) continue;
+        const Q = P[sym], i = Q?.idx.get(T);   // a coin of the top too short to trade in all (not in P) only holds its place
+        // not before the coin's bar N + 19: a coin is traded only with N + 20 candles in all (above), so an entry on a younger bar
+        // would depend on the coin still trading later — a cut at that bar drops it (backtest-audit cut(), 2.106 / 2.107)
+        if (i == null || i < S.N + 19 || open.some(p => p.sym === sym)) continue;
         if (lastClose[sym] != null && T - lastClose[sym] < COOLDOWN * tfms) continue;
         if (Q.ev) {   // a study idea with entries of its own: no strength, in the order of the top (by turnover)
-          // not before the coin's bar N + 19: a coin is loaded only with N + 20 candles in all (above), so an entry on a younger
-          // bar would depend on the coin still trading later — a cut at that bar drops the coin (backtest-audit cut(), 2.106)
-          if (i < S.N + 19) continue;
           for (const ev of Q.ev.get(i) || []) if (studyWants(ev.side, S, mkt)) { cands.push({ sym, i, ev, score: 0 }); break; }
           continue;
         }
@@ -769,13 +777,14 @@ export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, s
   const C = {};
   let t0 = Infinity, t1 = -Infinity;
   for (const [sym, K] of Object.entries(hist)) {
-    if (K.length < S.N + 20 || (only && !only.includes(sym))) continue;   // as backtest(): too short for the channel — never traded
-    const n = K.length, t = new Float64Array(n), h = new Float64Array(n), l = new Float64Array(n), c = new Float64Array(n), q = new Float64Array(n + 1);
+    if (!K.length || (only && !only.includes(sym))) continue;
+    // as backtest(): every coin holds its place in the top, one with fewer than N + 20 candles in all is never traded (ok)
+    const n = K.length, ok = n >= S.N + 20, t = new Float64Array(n), h = new Float64Array(n), l = new Float64Array(n), c = new Float64Array(n), q = new Float64Array(n + 1);
     for (let i = 0; i < n; i++) { const k = K[i]; t[i] = +k[0]; h[i] = +k[2]; l[i] = +k[3]; c[i] = +k[4]; q[i + 1] = q[i] + k[5] * k[4]; }
-    C[sym] = { n, t, h, l, c, q, A: atrSeries(h, l, c) };
-    if (t[n - 1] >= from) { t1 = Math.max(t1, t[n - 1]); for (let i = 0; i < n; i++) if (t[i] >= from) { t0 = Math.min(t0, t[i]); break; } }
+    C[sym] = { n, ok, t, h, l, c, q, A: atrSeries(h, l, c) };
+    if (ok && t[n - 1] >= from) { t1 = Math.max(t1, t[n - 1]); for (let i = 0; i < n; i++) if (t[i] >= from) { t0 = Math.min(t0, t[i]); break; } }
   }
-  const syms = Object.keys(C);
+  const syms = Object.keys(C), okSyms = syms.filter(s => C[s].ok);
   if (!(t1 >= t0)) return null;
   const at = (Q, T) => {
     let i = Math.round((T - Q.t[0]) / tfms);
@@ -789,7 +798,7 @@ export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, s
   const turnover = (Q, T) => { const i = at(Q, T); return i < 0 ? 0 : Q.q[i + 1] - Q.q[Math.max(0, i + 1 - day)]; };
   // the coins open to trading at T: the top of the hour, ranked at its first bar that has candles, as backtest() ranks it
   const activeAt = T => {
-    if (!top) return syms;
+    if (!top) return okSyms;
     const hr = Math.floor(T / 36e5);
     let a = hours.get(hr);
     if (!a) {
@@ -806,7 +815,7 @@ export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, s
       T = t0 + Math.floor(R() * steps) * tfms;
       const a = activeAt(T);
       if (!a.length) continue;
-      for (let k = 0; k < 20; k++) { const s = a[Math.floor(R() * a.length)], q = C[s], j = at(q, T); if (j > 0 && isFinite(q.A[j])) { Q = q; i = j; sym = s; break; } }
+      for (let k = 0; k < 20; k++) { const s = a[Math.floor(R() * a.length)], q = C[s], j = at(q, T); if (q.ok && j >= S.N + 19 && isFinite(q.A[j])) { Q = q; i = j; sym = s; break; } }
     }
     if (i == null) return null;
     const sg = R() < 0.5 ? 1 : -1, e = Q.c[i] * (1 + sg * SLIP), o = own?.length ? own[Math.floor(R() * own.length)] : null;

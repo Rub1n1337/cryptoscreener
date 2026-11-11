@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.94 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.95 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.95', date:'10 ноября 2026', title:'Компактный стакан в карточке', items:[
+    'Режим «Стакан» в карточке монеты стал компактнее: все кнопки в одной строке, график выше.',
+    'Инструменты рисования собраны в кнопку «Рисование» с названиями и горячими клавишами.',
+    'Список индикаторов над графиком в карточке свёрнут и раскрывается по нажатию.',
+    'Исправлено: кнопки масштаба уходили под график, если пролистать его в прошлое.',
+  ]},
   {v:'2.94', date:'9 ноября 2026', title:'Монеты моего бота', items:[
     'Добавлен фильтр «Бот» в списке монет на «Рынке»: монеты, которыми сейчас торгует «Мой бот».',
     'Монеты из своего списка в профиле бота видны в таблице, даже если их нет среди самых популярных.',

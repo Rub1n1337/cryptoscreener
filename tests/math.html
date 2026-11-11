@@ -204,6 +204,26 @@ for (const [name, S] of Object.entries(VARIANTS)) {
     return M.obNear(bl, i, x.side, x.side === 'LONG' ? x.snap.lo : x.snap.up); }));
 }
 
+// ---------- 2f. a coin listed during the period: it holds its place in the top from its first candles, trades from its bar N + 19 ----------
+{
+  // NEW: listed at bar 800 with a turnover far above every other coin; with the top of 3 it pushes one coin out of the top.
+  // Before 2.107 the run cut at NEW's bar 115 (fewer than N + 20 candles) left NEW out and traded the pushed-out coin: 8 entries, not 6
+  const L = 800, NEW = series(4242).slice(0, BARS - L).map((k, j) => { const t = T0 + (L + j) * TFMS; return [t, k[1], k[2], k[3], k[4], k[5] * 1e6, t + TFMS - 1]; });
+  const H = {...hist, NEWUSDT:NEW}, S = {...BASE, maxOpen:10}, o = {start:10000, from, top:3};
+  const full = M.backtest(H, S, o), cutT = T0 + (L + 115) * TFMS;
+  const Hc = Object.fromEntries(Object.entries(H).map(([s, K]) => [s, K.filter(k => k[0] < cutT)])), part = M.backtest(Hc, S, o);
+  const ent = x => [x.sym, x.side, x.time, x.entry, x.sl, x.tp, x.qty].join('|');
+  const a = full.trades.filter(x => x.time < cutT).map(ent).sort(), b = part.trades.map(ent).sort();
+  check('новая монета: на обрезанных свечах те же входы (топ не зависит от того, сколько у неё свечей впереди)', a.length > 0 && JSON.stringify(a) === JSON.stringify(b), `${a.length}`);
+  const nt = full.trades.filter(x => x.sym === 'NEWUSDT');
+  check('новая монета: торгуется не раньше своей свечи N + 19', nt.every(x => x.time - TFMS + 1 >= NEW[S.N + 19][0]), `${nt.length} сделок`);
+  // while NEW is the top-1 and too young to trade, nothing is traded at all
+  const one = M.backtest(H, S, {...o, top:1}).trades.filter(x => x.time - TFMS + 1 >= NEW[0][0] && x.time - TFMS + 1 < NEW[S.N + 19][0]);
+  check('новая монета: занимает место в топе, пока ей рано торговать', one.length === 0, `${one.length}`);
+  const R = M.randomSetup(H, S, full.trades, {...o, seed:5}).run(0, true).trades;
+  check('случайный вход: новая монета — не раньше свечи N + 19', R.filter(x => x.sym === 'NEWUSDT').every(x => x.time - TFMS + 1 >= NEW[S.N + 19][0]));
+}
+
 // ---------- 3. against the previous copy: nothing else changed ----------
 const refPath = new URLSearchParams(location.search).get('ref');
 if (refPath) {

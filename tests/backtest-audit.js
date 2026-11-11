@@ -37,13 +37,16 @@ export async function recount(which = 'cur', opt = {}) {
   const bad = [], sample = [], tr = res.trades, lastT = res.to;
   const idx = {}; for (const [s, K] of Object.entries(H.hist)) idx[s] = new Map(K.map((k, i) => [k[0], i]));
   // 24 h turnover (volume × close) of every pool coin at bar T, from candles up to T only
-  const pool = Object.keys(H.hist).filter(s => H.only.includes(s) && H.hist[s].length >= S.N + 20), day = Math.round(DAY / tfms);
+  // (since 2.107 every loaded coin holds its place in the top, also one too short to trade: fewer than N + 20 candles in all)
+  const pool = Object.keys(H.hist).filter(s => H.only.includes(s) && H.hist[s].length), day = Math.round(DAY / tfms);
   const turn = (s, T) => { const i = idx[s].get(T); if (i == null) return 0; let v = 0; for (let j = Math.max(0, i + 1 - day); j <= i; j++) v += H.hist[s][j][5] * H.hist[s][j][4]; return v; };
   const byClose = [...tr].sort((a, b) => a.tclose - b.tclose);
   for (const t of tr) {
     const K = H.hist[t.sym], T = t.time - tfms + 1, i = idx[t.sym].get(T), sg = t.side === 'LONG' ? 1 : -1, e = [], c = K.map(k => k[4]);
     const say = (what, got, want) => e.push(`${what}: ${got} ≠ ${want}`);
     if (i == null) { bad.push({ id: t.id, e: ['нет свечи входа'] }); continue; }
+    // a coin trades only with N + 20 candles in all and from its bar N + 19 (an entry on a younger bar would depend on later candles)
+    if (K.length < S.N + 20 || i < S.N + 19) say('молодая монета', `свеча ${i} из ${K.length}`, `≥ ${S.N + 19}`);
     // levels
     const B = log || S.method === 'classic' ? ownBands(c, i, S.N, S.k, log) : null, atr = ownAtr(K, i);
     const entry = K[i][4] * (1 + sg * SLIP), slD = clamp(1.5 * atr / entry, 0.008, 0.025), sl = entry * (1 - sg * slD);
