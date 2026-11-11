@@ -4366,7 +4366,7 @@ async function runBacktest() {
     if (!traded.some(x => hist[x]?.length)) throw new Error(failed.length ? 'история не загрузилась ни по одной монете. Проверьте интернет' + (s.custom ? ' и названия монет' : '') + ' и нажмите «Запустить» ещё раз.' : 'у выбранных монет нет свечей за этот период.');
     st.textContent = 'Считаю…'; $('#btRun').disabled = true; await sleep(30);   // the calculation can't be stopped: no «Прервать» during it
     const t0 = performance.now();
-    btHist = {hist, from, endT, only:traded, top:s.pit ? s.top : 0};   // window.__sr.btHist: to check a run by hand
+    btHist = {hist, from, endT, only:traded, top:s.pit ? s.top : 0, S:s};   // window.__sr.btHist: to check a run by hand (tests/backtest-audit.js)
     btRes = M.backtest(hist, s, {start:s.start, from, only:traded, top:s.pit ? s.top : 0});
     btRes.settings = s; btRes.days = days; btRes.period = per.key; btRes.periodLabel = per.label;
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
