@@ -127,6 +127,8 @@ const durTxt = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + ' м�
 // price buckets of a "nice" size ≈ share of the price, fixed per coin so heatmap columns line up over time
 const {niceStep} = M;
 const maxDays = tf => Math.floor((MAXBARS - C('bbN') - 30) * TFMS[tf] / 864e5 * 10) / 10;
+// when the session a candle belongs to began (UTC): 0 — its day, 1 — its week (from Monday), 2 — its month
+const sessStart = (t, per) => per === 1 ? (Math.floor((t / 864e5 + 3) / 7) * 7 - 3) * 864e5 : per === 2 ? Date.UTC(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth()) : Math.floor(t / 864e5) * 864e5;
 
 // ---------- drawings (Smart VWAP anchors, text notes): per coin, saved, with undo / redo ----------
 let drawings = {}, undoS = [], redoS = [];
@@ -562,7 +564,7 @@ class Pane {
     this.prevSym = null; this.prevMkt = null; this.toSpot = false;
     if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = M.bookStep(p); this.fine = niceStep(p, 0.00025); renderChips(); }   // chips show steps in $
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
-    this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.rows = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp();
+    this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.rows = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp(); this.loadPre();
   }
   // futures: forced liquidations from the stream (Binance sends the largest per second), drawn as diamonds
   onLiq(o) {
@@ -590,6 +592,23 @@ class Pane {
     const pts = r.map(x => [+x.timestamp, +x.sumOpenInterestValue]).sort((a, b) => a[0] - b[0]);
     let j = 0, cur = NaN; d.oi = d.t.map((t, i) => { const end = t + TFMS[this.tf]; while (j < pts.length && pts[j][0] <= end) cur = pts[j++][1]; return pts[0][0] <= end ? cur : NaN; });
     this.dirty = true;
+  }
+  // VWAP and the developing POC count from the start of a session (day, week, month), and the chart may hold fewer candles
+  // than that (1m: 500 candles are 8 hours). The candles between the earliest session start in use and the first loaded
+  // candle come coarser — 5m, 15m or 1h, whichever fits one request — plus the chart's own up to the first candle;
+  // calc() runs them before the chart's. Until they are here the unfinished first session is not drawn
+  async loadPre() {
+    const d = this.d; if (!d || this.preBusy || !(sel.has('vwap') || sel.has('dpoc'))) return;
+    const t0 = d.t[0], from = Math.min(sel.has('vwap') ? sessStart(t0, C('vwapPer')) : t0, sel.has('dpoc') ? sessStart(t0, TFMS[this.tf] >= 144e5 ? 1 : 0) : t0);
+    if (from >= t0 || d.pre?.from <= from) return;
+    this.preBusy = true;
+    try {
+      const iv = ['5m', '15m', '1h'].find(x => (t0 - from) / TFMS[x] <= 1000), cut = Math.floor(t0 / TFMS[iv]) * TFMS[iv];
+      const q = (i, a, b) => rest(this, `/api/v3/klines?symbol=${this.sym}&interval=${i}&startTime=${a}&endTime=${b - 1}&limit=1000`);
+      const rows = [...(cut > from ? await q(iv, from, cut) : []), ...(cut < t0 ? await q(this.tf, cut, t0) : [])];
+      if (d === this.d) { d.pre = {from, rows:rows.filter(x => x[0] >= from && x[0] < t0).map(x => [x[0], +x[2], +x[3], +x[4], +x[5]])}; calc(d); this.dirty = true; }
+    } catch { return; } finally { this.preBusy = false; }   // no answer: asked again within a minute (the sampler)
+    this.loadPre();   // the settings may have changed meanwhile (a longer session): nothing to do otherwise
   }
   // a server answer belongs to this chart only while coin, timeframe and market are the same; futures are asked with &mkt=fut
   key() { return this.sym + this.tf + this.mkt; }
@@ -1256,23 +1275,28 @@ function calc(d) {
   d.delta = d.qv.map((v, i) => 2 * d.tbq[i] - v);   // market buys − market sells, in $
   let cum = 0; d.cvd = d.delta.map(x => cum += x);
   // VWAP from the start of each day / week (from Monday, UTC) / month, with volume-weighted σ bands (like ZeroSynapse's RMS bands)
-  const per = C('vwapPer'), vsess = t => per === 1 ? Math.floor((t / 864e5 + 3) / 7) : per === 2 ? new Date(t).getUTCFullYear() * 12 + new Date(t).getUTCMonth() : Math.floor(t / 864e5);
-  let day = -1, pv = 0, vv = 0, p2 = 0; d.vwapSd = []; d.vwapNew = [];
+  // The chart's first session usually began before its first candle: the candles from there (d.pre, Pane.loadPre) are
+  // counted first. Without them that session is left out — a line "from the start of the day" that starts at the first
+  // loaded candle shows another number (BTC 1m: 0.5 % off the day's VWAP)
+  const per = C('vwapPer'), pre = d.pre?.rows || [], whole = s => s >= d.t[0] || d.pre?.from <= s;
+  let day = -1, pv = 0, vv = 0, p2 = 0, ok = whole(sessStart(d.t[0], per)); d.vwapSd = []; d.vwapNew = [];
+  const add = (t, h, l, c, v) => { const dd = sessStart(t, per), nw = dd !== day; if (nw) { day = dd; pv = 0; vv = 0; p2 = 0; } const tp = (h + l + c) / 3; pv += tp * v; vv += v; p2 += tp * tp * v; return nw; };
+  for (const x of pre) add(...x);
   d.vwap = d.c.map((c, i) => {
-    const dd = vsess(d.t[i]); d.vwapNew[i] = dd !== day; if (dd !== day) { day = dd; pv = 0; vv = 0; p2 = 0; }
-    const tp = (d.h[i] + d.l[i] + c) / 3; pv += tp * d.v[i]; vv += d.v[i]; p2 += tp * tp * d.v[i];
-    const m = vv ? pv / vv : NaN; d.vwapSd[i] = vv ? Math.sqrt(Math.max(0, p2 / vv - m * m)) : NaN; return m;
+    if ((d.vwapNew[i] = add(d.t[i], d.h[i], d.l[i], c, d.v[i])) && i) ok = true;
+    const m = ok && vv ? pv / vv : NaN; d.vwapSd[i] = ok && vv ? Math.sqrt(Math.max(0, p2 / vv - m * m)) : NaN; return m;
   });
-  // developing POC: the price with the most volume since the session start (day; a week on 4h / 1d candles)
-  const tfms = d.t.length > 1 ? d.t[1] - d.t[0] : 864e5, sess = tfms >= 144e5 ? 7 * 864e5 : 864e5, bin = niceStep(d.c[d.c.length - 1], 0.001);
-  let sk = null, hist = new Map(), best = null, bestV = 0;
-  d.dpoc = d.c.map((c, i) => {
-    const s = Math.floor((d.t[i] + (sess > 864e5 ? 3 * 864e5 : 0)) / sess);   // weeks start on Monday
-    if (s !== sk) { sk = s; hist = new Map(); best = null; bestV = 0; }
-    const a = Math.round(d.l[i] / bin), b = Math.round(d.h[i] / bin), share = d.v[i] / (b - a + 1);
-    for (let k = a; k <= b; k++) { const v = (hist.get(k) || 0) + share; hist.set(k, v); if (v > bestV) { bestV = v; best = k; } }
-    return best == null ? NaN : best * bin;
-  });
+  // developing POC: the price with the most volume since the session start (day; a week, from Monday, on 4h / 1d candles)
+  const tfms = d.t.length > 1 ? d.t[1] - d.t[0] : 864e5, sp = tfms >= 144e5 ? 1 : 0, bin = niceStep(d.c[d.c.length - 1], 0.001);
+  let sk = null, hist = new Map(), best = null, bestV = 0, okP = whole(sessStart(d.t[0], sp));
+  const addP = (t, h, l, v) => {
+    const s = sessStart(t, sp), nw = s !== sk; if (nw) { sk = s; hist = new Map(); best = null; bestV = 0; }
+    const a = Math.round(l / bin), b = Math.round(h / bin), share = v / (b - a + 1);
+    for (let k = a; k <= b; k++) { const x = (hist.get(k) || 0) + share; hist.set(k, x); if (x > bestV) { bestV = x; best = k; } }
+    return nw;
+  };
+  for (const [t, h, l, , v] of pre) addP(t, h, l, v);
+  d.dpoc = d.c.map((c, i) => { if (addP(d.t[i], d.h[i], d.l[i], d.v[i]) && i) okP = true; return okP && best != null ? best * bin : NaN; });
 }
 // heatmap scale comes from the CSS tokens --heat-0..3 (cold → hot)
 let HEAT = null;
@@ -1585,8 +1609,8 @@ function renderInd() {
       + `<button data-tog="${id}" aria-label="Убрать ${it.name}" title="Убрать">${ic('x')}</button></div>`; }).join('')
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
 }
-function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); renderChips(); }
-function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); if (on('fp') || on('mk')) panes.forEach(p => p.fpHist || p.loadFp()); redrawAll(); requestAnimationFrame(redrawAll); }
+function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => { if (p.d) calc(p.d); p.loadPre(); }); redrawAll(); renderChips(); }   // loadPre: VWAP may now count from a week or a month
+function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); if (on('fp') || on('mk')) panes.forEach(p => p.fpHist || p.loadFp()); panes.forEach(p => p.loadPre()); redrawAll(); requestAnimationFrame(redrawAll); }
 const openInd = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
 const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
@@ -1722,7 +1746,7 @@ export function open(kit, sym, where = 'full') {
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0, tickAt = Date.now();
-  sampler = setInterval(() => { tick++; const slept = Date.now() - tickAt > 3000; tickAt = Date.now(); panes.forEach(p => { p.watch(slept); if (!slept) p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); p.loadFp(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
+  sampler = setInterval(() => { tick++; const slept = Date.now() - tickAt > 3000; tickAt = Date.now(); panes.forEach(p => { p.watch(slept); if (!slept) p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); p.loadFp(); p.loadPre(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
