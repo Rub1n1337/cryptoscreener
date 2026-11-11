@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.88 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.89 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.89', date:'9 ноября 2026', title:'Стены в карточке монеты', items:[
+    'Добавлены стены в стакане в карточке монеты на «Рынке»: крупные заявки рядом с ценой.',
+    'Монету из карточки можно открыть на «Графиках» одной кнопкой.',
+    'Монета, которой нет на фьючерсах, открывается на «Графиках» на споте.',
+  ]},
   {v:'2.88', date:'9 ноября 2026', title:'Графики для всех', items:[
     'Вкладка «Бета» стала «Графиками» и открыта всем, кто вошёл на сайт.',
     'Пароль и временный код для этой вкладки больше не нужны.',

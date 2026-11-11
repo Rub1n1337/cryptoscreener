@@ -532,12 +532,17 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
   };
   for (const T of times) {
     for (const p of [...open]) {
-      const Q = P[p.sym], j = Q.idx.get(T);
-      if (j == null || j <= p.ei) continue;
-      const sg = p.side === 'LONG' ? 1 : -1;
+      const Q = P[p.sym], j = Q.idx.get(T), sg = p.side === 'LONG' ? 1 : -1;
+      // the time stop counts time, as the bot's does (checkExit), not the coin's own candles. A coin that stops trading (delisted,
+      // halted) has no candle at T: its position used to stay open and hold a slot until the end of the test, however long
+      // that was. Now it is closed at the coin's last price once its time is up, as the bot closes it
+      const late = p.ts > 0 && T - Q.t[p.ei] >= p.ts * tfms;
+      if (j == null) { if (late) close(p, Q.c[p.lj ?? p.ei] * (1 - sg * SLIP), 'тайм-стоп', T); continue; }
+      if (j <= p.ei) continue;
+      p.lj = j;
       if (p.side === 'LONG' ? Q.l[j] <= p.sl : Q.h[j] >= p.sl) close(p, p.sl * (1 - sg * SLIP), 'стоп', T);
       else if (p.side === 'LONG' ? Q.h[j] >= p.tp : Q.l[j] <= p.tp) close(p, p.tp, 'тейк', T);
-      else if (p.ts > 0 && j - p.ei >= p.ts) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
+      else if (late) close(p, Q.c[j] * (1 - sg * SLIP), 'тайм-стоп', T);
     }
     if (top && Math.floor(T / 36e5) !== activeHour) {   // the ranking is refreshed hourly, like a ticker read now and then
       activeHour = Math.floor(T / 36e5);
