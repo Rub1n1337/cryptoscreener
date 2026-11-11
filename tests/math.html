@@ -136,6 +136,35 @@ for (const [name, S] of Object.entries(VARIANTS)) {
   }
 }
 
+// ---------- 2d. random entries (randomSetup / randomTest): repeatable, as many trades, the same exits, ~50 % for luck ----------
+{
+  const S = BASE, base = bt(M, S, 10000), opts = {from, start:10000, seed:7};
+  const nR = base.trades.filter(x => x.r != null && isFinite(x.r)).length;
+  const a = M.randomTest(hist, S, base.trades, {...opts, runs:100}), b = M.randomTest(hist, S, base.trades, {...opts, runs:100});
+  check('случайный вход: тот же результат с тем же зерном', !!a && a.pct === b.pct && a.mean === b.mean, a && `лучше ${a.pct.toFixed(1)} % · случайные ${a.mean.toFixed(3)}R`);
+  const c = M.randomTest(hist, S, base.trades, {...opts, seed:8, runs:100});
+  check('случайный вход: другое зерно — другие прогоны', !!c && c.mean !== a.mean);
+  const X = M.randomSetup(hist, S, base.trades, opts), r5 = X.run(5, true);
+  check('случайный вход: сделок столько же, сколько у стратегии', X.n === nR && r5.trades.length === nR && r5.n === nR, `${nR}`);
+  check('случайный вход: прогон k не зависит от порядка', (() => { const Y = M.randomSetup(hist, S, base.trades, opts); for (let k = 0; k < 5; k++) Y.run(k); return JSON.stringify(Y.run(5, true).trades) === JSON.stringify(r5.trades); })());
+  check('случайный вход: стоп 0.8–2.5 %, выходы стратегии, вход в периоде', r5.trades.every(x => { const d = Math.abs(x.entry - x.sl) / x.entry; return d >= 0.008 - 1e-12 && d <= 0.025 + 1e-12 && ['стоп', 'тейк', 'тайм-стоп', 'конец теста'].includes(x.reason) && x.time >= from && x.tclose >= x.time; }));
+  check('случайный вход: тайм-стоп не дольше заданного', r5.trades.filter(x => x.reason === 'тайм-стоп').every(x => x.tclose - x.time <= S.timeStop * TFMS + 1));
+  const ratios = new Set(base.trades.map(x => (Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl)).toFixed(6)));
+  check('случайный вход: тейк : стоп — как у сделок стратегии', r5.trades.every(x => ratios.has((Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl)).toFixed(6))));
+  const rr2 = M.randomSetup(hist, {...S, rr:2}, base.trades, opts).run(0, true).trades;
+  check('случайный вход: при RR 1:2 тейк ровно в 2 стопа', rr2.every(x => near(Math.abs(x.tp - x.entry), 2 * Math.abs(x.entry - x.sl), 1e-9)));
+  check('случайный вход: R посчитан с комиссией (стоп хуже −1R)', r5.trades.filter(x => x.reason === 'стоп').every(x => x.r < -1));
+  // a strategy that is luck itself: runs of another seed ranked among 300 runs — on average about half of them are beaten
+  const means = Array.from({length:300}, (_, k) => X.run(k).mean), Z = M.randomSetup(hist, S, base.trades, {...opts, seed:99});
+  const avgPct = Array.from({length:60}, (_, k) => M.randomRank(Z.run(k).mean, means).pct).reduce((s, x) => s + x, 0) / 60;
+  check('случайный вход: случайная «стратегия» лучше ~50 % прогонов', avgPct > 40 && avgPct < 60, avgPct.toFixed(1) + ' %');
+  check('randomRank: ничья — половина', M.randomRank(0, [-1, 0, 1, 2]).pct === 37.5);
+  // top 1: every random trade is on the coin with the largest 24 h turnover at the first bar of its hour
+  const T1 = M.randomSetup(hist, S, base.trades, {...opts, top:1}).run(0, true).trades, day = 24;
+  const turn = (s, T) => { const K = hist[s], i = K.findIndex(k => k[0] === T); let v = 0; for (let j = Math.max(0, i - day + 1); j <= i; j++) v += K[j][5] * K[j][4]; return v; };
+  check('случайный вход: топ на каждый момент, как у бэктеста', T1.every(x => { const T = Math.floor((x.time - TFMS + 1) / 36e5) * 36e5; return Object.keys(hist).sort((p, q) => turn(q, T) - turn(p, T))[0] === x.sym; }));
+}
+
 // ---------- 3. against the previous copy: nothing else changed ----------
 const refPath = new URLSearchParams(location.search).get('ref');
 if (refPath) {

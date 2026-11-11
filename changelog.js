@@ -1,6 +1,12 @@
-// Older «Что нового» entries (2.91 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.92 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.92', date:'9 ноября 2026', title:'Стакан в карточке монеты', items:[
+    'Добавлен переключатель «Канал | Стакан» над графиком в карточке монеты на «Рынке».',
+    'В режиме «Стакан» — живой график со стаканом, сделками и ликвидациями той же монеты, со своими индикаторами и таймфреймом.',
+    'Выбор монеты в списке меняет и график стакана.',
+    'Поток данных идёт, только пока график стакана на экране.',
+  ]},
   {v:'2.91', date:'9 ноября 2026', title:'Справка о стакане', items:[
     'Добавлен раздел справки о стакане и потоке сделок, а в словарь — новые термины.',
     'В правовой информации описаны данные стаканов, сделок и ликвидаций.',

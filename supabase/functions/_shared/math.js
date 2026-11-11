@@ -571,6 +571,114 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
   return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: top || tradable.length, pool: tradable.length };
 }
 
+// ---------- random entries: can a backtest result be told apart from luck? ----------
+// The same coins (at each moment the same top by 24 h turnover as backtest(), refreshed hourly), the same period, as many trades
+// as the strategy made and its exits — stop 1.5 ATR within 0.8–2.5 %, the take at the strategy's own take : stop (S.rr, or else
+// the ratio of one of its trades drawn at random), the time stop, size by risk and leverage, fee, slippage and borrowing
+// (closeTrade) — but the moment, the coin and the side are drawn at random. Random trades are independent: no slots, cooldown or
+// compounding (the stake is the start; R does not depend on the balance). run(k) is repeatable: run k of a seed draws the same
+// trades whatever order the runs go in, so a caller may count them in chunks. backtest(), botTick and the analysis are untouched.
+// Returns null when there is nothing to compare (no trades with R, no coin with candles in the period)
+const rngOf = seed => () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+export const RANDOM_RUNS = 300;
+export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, start = 10000, seed = 1 } = {}) {
+  const rs = trades.map(x => x.r).filter(r => r != null && isFinite(r));
+  if (!rs.length) return null;
+  const tfms = TFMS[S.tf], slots = slotsOf(S), risk = S.risk ?? RISK, lev = S.lev ?? 1, ts = S.timeStop ?? TIME_STOP;
+  const ratios = trades.map(x => Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl)).filter(x => x > 0 && isFinite(x));
+  // per coin: plain arrays of the candles and running sums of quote turnover (volume × close, as backtest()); a year of a wide
+  // pool is millions of candles, so no Map or Set over them — a bar is found by its distance from the first one (candles come
+  // one interval apart; a gap falls back to a binary search)
+  const C = {};
+  let t0 = Infinity, t1 = -Infinity;
+  for (const [sym, K] of Object.entries(hist)) {
+    if (K.length < S.N + 20 || (only && !only.includes(sym))) continue;   // as backtest(): too short for the channel — never traded
+    const n = K.length, t = new Float64Array(n), h = new Float64Array(n), l = new Float64Array(n), c = new Float64Array(n), q = new Float64Array(n + 1);
+    for (let i = 0; i < n; i++) { const k = K[i]; t[i] = +k[0]; h[i] = +k[2]; l[i] = +k[3]; c[i] = +k[4]; q[i + 1] = q[i] + k[5] * k[4]; }
+    C[sym] = { n, t, h, l, c, q, A: atrSeries(h, l, c) };
+    if (t[n - 1] >= from) { t1 = Math.max(t1, t[n - 1]); for (let i = 0; i < n; i++) if (t[i] >= from) { t0 = Math.min(t0, t[i]); break; } }
+  }
+  const syms = Object.keys(C);
+  if (!(t1 >= t0)) return null;
+  const at = (Q, T) => {
+    let i = Math.round((T - Q.t[0]) / tfms);
+    if (i >= 0 && i < Q.n && Q.t[i] === T) return i;
+    let lo = 0, hi = Q.n - 1;
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (Q.t[m] === T) return m; if (Q.t[m] < T) lo = m + 1; else hi = m - 1; }
+    return -1;
+  };
+  // the period's bars: one interval apart from the first to the last (a moment no coin has a candle at is drawn again)
+  const steps = Math.round((t1 - t0) / tfms) + 1, day = Math.max(1, Math.round(864e5 / tfms)), hours = new Map();
+  const turnover = (Q, T) => { const i = at(Q, T); return i < 0 ? 0 : Q.q[i + 1] - Q.q[Math.max(0, i + 1 - day)]; };
+  // the coins open to trading at T: the top of the hour, ranked at its first bar that has candles, as backtest() ranks it
+  const activeAt = T => {
+    if (!top) return syms;
+    const hr = Math.floor(T / 36e5);
+    let a = hours.get(hr);
+    if (!a) {
+      a = [];
+      for (let T0 = Math.max(t0, t0 + Math.ceil((hr * 36e5 - t0) / tfms) * tfms); !a.length && T0 < (hr + 1) * 36e5 && T0 <= t1; T0 += tfms)
+        a = syms.map(s => [s, turnover(C[s], T0)]).filter(x => x[1] > 0).sort((x, y) => y[1] - x[1]).slice(0, top).map(x => x[0]);
+      hours.set(hr, a);
+    }
+    return a;
+  };
+  const one = R => {
+    let Q = null, i = null, T = 0, sym = '';
+    for (let tries = 0; tries < 200 && i == null; tries++) {
+      T = t0 + Math.floor(R() * steps) * tfms;
+      const a = activeAt(T);
+      if (!a.length) continue;
+      for (let k = 0; k < 20; k++) { const s = a[Math.floor(R() * a.length)], q = C[s], j = at(q, T); if (j > 0 && isFinite(q.A[j])) { Q = q; i = j; sym = s; break; } }
+    }
+    if (i == null) return null;
+    const sg = R() < 0.5 ? 1 : -1, e = Q.c[i] * (1 + sg * SLIP), slD = clamp(1.5 * Q.A[i] / e, 0.008, 0.025);
+    const tpD = (S.rr > 0 ? S.rr : ratios.length ? ratios[Math.floor(R() * ratios.length)] : 1) * slD;
+    const sl = e * (1 - sg * slD), tp = e * (1 + sg * tpD), qty = Math.min(start * risk / (e * slD), start * lev / slots / e);
+    const p = { id: `${T}${sym}`, sym, side: sg > 0 ? 'LONG' : 'SHORT', entry: e, sl, tp, qty, time: T + tfms - 1, risk: Math.abs(e - sl) * qty,
+                snap: { lev: e * qty / start, settings: { maxOpen: slots } } };
+    let exit = null, reason = '', Tc = 0;
+    for (let j = i + 1; j < Q.n && exit == null; j++) {   // stop first if one bar hits both, then the take, then the time
+      Tc = Q.t[j];
+      if (sg > 0 ? Q.l[j] <= sl : Q.h[j] >= sl) { exit = sl * (1 - sg * SLIP); reason = 'стоп'; }
+      else if (sg > 0 ? Q.h[j] >= tp : Q.l[j] <= tp) { exit = tp; reason = 'тейк'; }
+      else if (ts > 0 && Q.t[j] - Q.t[i] >= ts * tfms) { exit = Q.c[j] * (1 - sg * SLIP); reason = 'тайм-стоп'; }
+    }
+    if (exit == null) {   // the coin's candles ran out: its time stop by time (delisted), or else the end of the test
+      const due = Q.t[i] + ts * tfms;
+      if (ts > 0 && due <= t1) { Tc = t0 + Math.ceil((due - t0) / tfms) * tfms; reason = 'тайм-стоп'; } else { Tc = Q.t[Q.n - 1]; reason = 'конец теста'; }
+      exit = Q.c[Q.n - 1] * (1 - sg * SLIP);
+    }
+    return closeTrade(p, exit, reason, Tc + tfms - 1);
+  };
+  const n = rs.length;
+  return {
+    n, ref: rs.reduce((a, b) => a + b, 0) / n,
+    // run k: n random trades; their mean R (and the trades themselves with keep)
+    run(k, keep = false) {
+      const R = rngOf(Math.imul(seed | 0, 0x9E3779B1) ^ Math.imul(k + 1, 0x85EBCA77)), out = keep ? [] : null;
+      let s = 0, m = 0;
+      for (let j = 0; j < n; j++) { const x = one(R); if (!x) continue; s += x.r; m++; if (out) out.push(x); }
+      return { mean: m ? s / m : null, n: m, trades: out };
+    },
+  };
+}
+// where the strategy's mean R stands among the random runs: pct — the share of runs it beat (a tie counts half), mean — their mean
+export function randomRank(ref, means) {
+  const ms = means.filter(x => x != null && isFinite(x));
+  if (!ms.length) return null;
+  let below = 0; for (const m of ms) below += m < ref ? 1 : m === ref ? 0.5 : 0;
+  return { pct: below / ms.length * 100, mean: ms.reduce((a, b) => a + b, 0) / ms.length, runs: ms.length };
+}
+// all at once (tests, scripts); the site counts the runs in chunks between frames
+export function randomTest(hist, S, trades, opts = {}) {
+  const X = randomSetup(hist, S, trades, opts);
+  if (!X) return null;
+  const means = [];
+  for (let k = 0; k < (opts.runs ?? RANDOM_RUNS); k++) means.push(X.run(k).mean);
+  return { ...randomRank(X.ref, means), ref: X.ref, n: X.n };
+}
+
 // ---------- order book: walls — one definition for the coin card, «Графики» (beta.js) and the bot (docs/PLAN-WALLS.md) ----------
 // A wall is a price bin holding WALL.x times the typical bin's dollars and at least WALL.min, the WALL.n biggest per side,
 // within ±WALL.range % of the middle. «Графики» lets each be changed (sr_bcfg: wallX, wallMin, wallN, domRange).

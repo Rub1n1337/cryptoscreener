@@ -358,6 +358,7 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 .banner.warn{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}.banner.warn svg{color:var(--acc)}
 .banner.bad{border-color:var(--bad-line);background:linear-gradient(0deg,rgba(240,82,95,.08),rgba(240,82,95,.08)),var(--s1)}.banner.bad svg{color:var(--up)}
 .banner.info svg{color:var(--blue)}
+.banner .btrand{margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.banner .btrand button{margin-left:4px;vertical-align:middle}
 .banner b{color:var(--text)}.banner .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .banner.away{position:relative;margin-top:14px;padding-right:48px}.away-x{position:absolute;top:6px;right:6px;width:36px;height:36px;padding:0;border:0;background:none;font-size:20px;line-height:1;color:var(--mute)}
 .intro{display:flex;gap:16px;align-items:flex-start;background:var(--intro);border:1px solid var(--intro-line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;font-size:13.5px}
@@ -1526,6 +1527,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option><option value="custom">Свои даты…</option></select></label>
       <label id="btFromL" class="hidden" title="Первый день периода, по UTC">С <input type="date" id="btFrom" min="2020-01-01"></label>
       <label id="btToL" class="hidden" title="Последний день периода включительно, по UTC">По <input type="date" id="btTo" min="2020-01-01"></label>
+      <label title="Конец периода показывается отдельно: подбирайте настройки по первой части, а отложенную считайте проверкой. Если на ней итог намного хуже — настройки подогнаны под историю">Отложить для проверки <select id="btHold"><option value="0.2">последние 20%</option><option value="0.3" selected>последние 30%</option><option value="0.5">вторую половину</option></select></label>
       <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
       <label id="btPitL" title="Живой бот каждую минуту берёт топ по обороту за последние сутки. «На каждый момент» делает в прошлом так же: монета торгуется, только пока она в топе. «По сегодняшнему» берёт сегодняшний топ на весь период — быстрее, но завышает результат: сегодняшний топ знает, какие монеты потом выросли">Топ считать <select id="btPit"><option value="pit">на каждый момент — честно</option><option value="now">по сегодняшнему — быстрее, завышает</option></select></label>
       <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
@@ -1570,7 +1572,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <div id="btCards"></div>
       <div class="grid" style="margin-top:12px">
         <div class="panel"><div class="ptitle">По силе сигнала <span>· работает ли «сила»: у сильных сигналов результат должен быть лучше</span></div><div class="tablewrap"><table id="btScore"></table></div></div>
-        <div class="panel"><div class="ptitle">По стороне, причине выхода и половинам периода <span>· стабильность</span></div><div class="tablewrap"><table id="btSplit"></table></div></div>
+        <div class="panel"><div class="ptitle">По стороне, причине выхода и частям периода <span>· стабильность</span></div><div class="tablewrap"><table id="btSplit"></table></div></div>
       </div>
       <div class="panel" style="margin-top:12px"><div class="ptitle">Сделки бэктеста <span>· клик — карточка сделки</span></div>
         <div class="tablewrap"><table><thead><tr>
@@ -1612,6 +1614,14 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <li><b>Бот ждёт</b> — если рынок не подходит правилам (например, профиль торгует только в боковике, а сейчас импульс), в журнале написано, чего бот ждёт. Это не поломка: так правила и задуманы.</li>
         <li><b>Закрыть вручную</b> — в «Моём боте» у каждой открытой позиции есть кнопка «Закрыть» (и «Закрыть все»): по цене рынка с обычной комиссией. На сервере позиция закрывается в течение минуты.</li>
       </ul>
+      <h3>Бэктест: почему это должно приносить деньги</h3>
+      <p>Бэктест показывает, как правила сработали бы на истории Binance: с комиссиями, проскальзыванием и процентами за заём, на топе монет, каким он был в каждый момент. Плюс в бэктесте сам по себе ничего не доказывает: если перебрать много настроек, какая-нибудь окажется в плюсе просто по совпадению.</p>
+      <ul>
+        <li><b>Кто отдаёт деньги.</b> Прибыль сделки — чей-то убыток. У идеи входа должно быть объяснение, кто и почему ей проигрывает: например, кого-то вынудили продать после ликвидаций, и он продал дешевле обычной цены. Если такого объяснения нет, плюс на истории чаще всего — подгонка под прошлое.</li>
+        <li><b>Сравнение со случайным входом.</b> После каждого прогона бэктест повторяет его 300 раз со случайными моментами, монетами и сторонами входа — на тех же монетах, за тот же период, с тем же числом сделок, стопами, тейками и комиссиями. Если правила лучше меньше чем 95% таких прогонов, результат не отличить от случая.</li>
+        <li><b>Отложенный период.</b> Конец периода (по умолчанию последние 30%) показывается отдельно. Подбирайте настройки по первой части, а отложенную считайте проверкой: если там итог намного хуже, настройки подогнаны под историю.</li>
+      </ul>
+      <p>Бэктест без объяснения, кто платит, и без проверки на случайность — не доказательство преимущества. Даже если всё сошлось, проверьте правила на другом периоде.</p>
       <h3>Уведомления</h3>
       <p>Колокольчик в верхней панели — список последних событий: новые сигналы, сделки ботов, смена профиля. Внизу списка можно включить уведомления браузера — они приходят, пока сайт открыт, в том числе в свёрнутой вкладке. Когда сайт закрыт, сообщения приходят только в Telegram, если он подключён (ниже). Рядом — кнопка звука.</p>
       <h3>Telegram</h3>
@@ -4368,7 +4378,7 @@ async function runBacktest() {
     const t0 = performance.now();
     btHist = {hist, from, endT, only:traded, top:s.pit ? s.top : 0, S:s};   // window.__sr.btHist: to check a run by hand (tests/backtest-audit.js)
     btRes = M.backtest(hist, s, {start:s.start, from, only:traded, top:s.pit ? s.top : 0});
-    btRes.settings = s; btRes.days = days; btRes.period = per.key; btRes.periodLabel = per.label;
+    btRes.settings = s; btRes.days = days; btRes.period = per.key; btRes.periodLabel = per.label; btRes.H = btHist;   // H: the candles, for btRandom
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
     const goneN = gone.filter(x => hist[x]?.length).length;
     st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${per.custom ? per.label + ' (UTC)' : `${dt(btRes.from)} → ${dt(btRes.to + tfms)}`}, расчёт ${Math.round(performance.now() - t0)} мс.`
@@ -4376,7 +4386,7 @@ async function runBacktest() {
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '')
       + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} ${coinsGen(failed.length)} (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '')
       + (HS.isOff() ? ' История загружена только с Binance (?history=off).' : '');
-    btRes.status = st.textContent; btAll = false; renderBacktest(); ok = true;
+    btRes.status = st.textContent; btAll = false; renderBacktest(); ok = true; btRandom();
     if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
     st.textContent = e === STOPPED ? 'Остановлено. Загруженная история сохранилась — следующий запуск продолжит с неё.' : 'Ошибка: ' + btErr(e);
@@ -4392,18 +4402,30 @@ function groupRow(name, list) {
   return `<tr><td>${name}</td><td>${g.n}</td><td>${g.wr == null ? '—' : g.wr.toFixed(0) + '%'}</td><td class="${cl(g.expR)}">${rr(g.expR)}</td><td>${g.pf == null ? '—' : g.pf.toFixed(2)}</td><td class="${cl(g.net)}">${usd(g.net)}</td></tr>`;
 }
 const groupHead = '<thead><tr><th>Группа</th><th>Сделок</th><th>Winrate</th><th title="Средний результат на сделку в R после комиссий">Ср. результат</th><th>PF</th><th>PnL</th></tr></thead>';
-function renderBacktest() {
-  const r = btRes, tr = r.trades, st = M.journalStats(r.start, tr), s = r.settings;
-  // a redraw (the theme switch calls it too) keeps the fading of a result whose settings are no longer in the form
-  $('#btOut').classList.remove('hidden'); btStale(); $('#btEmpty').classList.add('hidden');
-  const mid = (r.from + r.to) / 2, h1 = tr.filter(x => x.tclose < mid), h2 = tr.filter(x => x.tclose >= mid);
-  const s1 = M.journalStats(r.start, h1), s2 = M.journalStats(r.start, h2);
-  let v;
-  if (st.n < 30) v = `Сделок всего <b>${st.n}</b> — слишком мало для выводов. Увеличьте период или число пар, или снизьте мин. силу.`;
-  else if (st.expR > 0 && s1.expR > 0 && s2.expR > 0) v = `<b class="pos">У настроек есть преимущество:</b> средний результат ${rr(st.expR)} на сделку после комиссий, и он положительный в обеих половинах периода (${rr(s1.expR)} и ${rr(s2.expR)}). Хороший знак, но проверьте и на другом периоде.`;
-  else if (st.expR > 0) v = `<b style="color:var(--acc)">В плюсе, но нестабильно:</b> в целом ${rr(st.expR)} на сделку, а по половинам периода ${rr(s1.expR)} и ${rr(s2.expR)}. Похоже на удачный отрезок, а не на устойчивое преимущество.`;
-  else v = `<b class="neg">На этих настройках стратегия убыточна:</b> ${rr(st.expR)} на сделку после комиссий.${st.gross > 0 ? ` До комиссий она была в плюсе (${usd(st.gross)}), но комиссии (${usd(-st.fees)}) съели всё — нужны более крупные ходы на сделку.` : ''}`;
-  let vk = st.n < 30 ? 'info' : st.expR > 0 && s1.expR > 0 && s2.expR > 0 ? 'ok' : st.expR > 0 ? 'warn' : 'bad';
+// the held-out part (#btHold): the last share of the period by entry time, shown apart from the part the settings were picked on.
+// It took the place of the two halves the verdict compared before. Only the view: the same trades, no new run
+function btParts(r) {
+  const hold = +$('#btHold').value || 0.3, end = r.to + TFMS[r.settings.tf], cut = end - hold * (end - r.from);
+  const fit = r.trades.filter(x => x.time < cut), out = r.trades.filter(x => x.time >= cut);
+  const pc = Math.round(hold * 100), name = hold === 0.5 ? ['1-я половина', '2-я половина'] : [`первые ${100 - pc}%`, `последние ${pc}%`];
+  return {fit, out, sf:M.journalStats(r.start, fit), so:M.journalStats(r.start, out), name};
+}
+// the verdict: the result as a whole, the held-out part (btParts) and the comparison with random entries (btRandom, r.rand).
+// Green only when all three agree; redrawn on its own when the comparison moves on
+function btVerdictShow() {
+  const r = btRes, st = M.journalStats(r.start, r.trades), s = r.settings, {sf, so, name} = btParts(r);
+  const rk = r.rand?.rank, luck = rk && rk.pct < RAND_BAR, beat = rk && rk.pct >= RAND_BAR;
+  const parts = `на подборе (${name[0]} периода) ${rr(sf.expR)}, на проверке (${name[1]}) ${rr(so.expR)}`;
+  // held out much worse than picked: in the minus, or under half of the picked part's result
+  const overfit = sf.expR > 0 && so.n > 0 && (so.expR <= 0 || so.expR < sf.expR / 2);
+  let v, vk;
+  if (st.n < 30) { v = `Сделок всего <b>${st.n}</b> — слишком мало для выводов. Увеличьте период или число пар, или снизьте мин. силу.`; vk = 'info'; }
+  else if (!(st.expR > 0)) { v = `<b class="neg">На этих настройках стратегия убыточна:</b> ${rr(st.expR)} на сделку после комиссий.${st.gross > 0 ? ` До комиссий она была в плюсе (${usd(st.gross)}), но комиссии (${usd(-st.fees)}) съели всё — нужны более крупные ходы на сделку.` : ''}`; vk = 'bad'; }
+  else if (overfit) { v = `<b style="color:var(--acc)">Похоже на подгонку под историю:</b> в целом ${rr(st.expR)} на сделку, но ${parts}. На проверке настройки работают намного хуже, чем там, где их подбирали.${so.n < 30 ? ` На отложенной части всего ${so.n} ${plural(so.n, ['сделка', 'сделки', 'сделок'])} — выводы предварительные.` : ''}`; vk = 'warn'; }
+  else if (!(sf.expR > 0 && so.expR > 0)) { v = `<b style="color:var(--acc)">В плюсе, но нестабильно:</b> в целом ${rr(st.expR)} на сделку, а ${parts}. Похоже на удачный отрезок, а не на устойчивое преимущество.`; vk = 'warn'; }
+  else if (luck) { v = `<b style="color:var(--acc)">В плюсе, но не отличить от случая:</b> ${rr(st.expR)} на сделку, ${parts}. Случайные входы с теми же выходами дают такой же результат слишком часто.`; vk = 'warn'; }
+  else if (beat) { v = `<b class="pos">У настроек есть преимущество:</b> ${rr(st.expR)} на сделку после комиссий, ${parts}, и это лучше случайного входа. Хороший знак, но проверьте и на другом периоде.`; vk = 'ok'; }
+  else { v = `<b style="color:var(--acc)">В плюсе:</b> ${rr(st.expR)} на сделку, ${parts}. Отличается ли это от случая, покажет сравнение ниже.`; vk = 'warn'; }
   // "today's top" over the whole past knows which coins later grew: its verdict is never green, and the honest run is one click
   // away (Oct 2026: a profile showed +0.67R here and +0.11R honestly, and was taken for a sure thing)
   if (!s.pit && !s.custom) {
@@ -4421,7 +4443,52 @@ function renderBacktest() {
     if (vk === 'ok' || vk === 'info') vk = 'warn';
   }
   $('#btVerdict').className = 'banner ' + vk;
-  $('#btVerdict').innerHTML = `<svg class="i"><use href="#i-${vk === 'info' ? 'info' : vk}"/></svg><div>${v}</div>`;
+  $('#btVerdict').innerHTML = `<svg class="i"><use href="#i-${vk === 'info' ? 'info' : vk}"/></svg><div>${v}${btRandLine(r)}</div>`;
+}
+// random entries (M.randomSetup in math.js): the same coins, period, number of trades and exits as the result on screen, the
+// moments, coins and sides at random, RAND_RUNS runs with a fixed seed — the same result gives the same line. Counted in slices
+// of ~40 ms between timers, so the page keeps answering; «Прервать» stops it, «Сравнить» starts it again. The state lives on
+// the result (r.rand): a redraw (the theme, #btHold) keeps it, a new result stops the old job
+const RAND_BAR = 95, RAND_RUNS = M.RANDOM_RUNS;   // %: below it a result is not told apart from luck; runs (300)
+let btRnd = null;   // the job counting now: {r, stop}
+function btRandLine(r) {
+  const x = r.rand;
+  if (!x) return '';
+  const pre = '<div class="btrand">';
+  if (x.rank) return pre + `Лучше <b>${Math.floor(x.rank.pct)}%</b> случайных прогонов (средний R случайных — ${rr(x.rank.mean)}).`
+    + (x.rank.pct < RAND_BAR ? ' <b>Результат не отличить от случая.</b>' : ' Случайно так получается редко.')
+    + ` <span class="mute">Те же монеты, период, число сделок и выходы, но моменты и стороны входа случайные; ${x.rank.runs} прогонов.</span></div>`;
+  if (x.stopped) return pre + `Сравнение со случайным входом прервано. <button data-rgo>Сравнить</button></div>`;
+  return pre + `Сравниваю со случайным входом: <span id="btRandN">${x.done}</span> из ${x.runs}… <button data-rstop>Прервать</button></div>`;
+}
+function btRandom(r = btRes) {
+  if (btRnd) btRnd.stop = true;
+  const H = r?.H;
+  if (!H) return;
+  let X = null;
+  try { X = M.randomSetup(H.hist, r.settings, r.trades, {from:H.from, only:H.only, top:H.top, start:r.start, seed:1}); } catch (e) { console.warn('randomSetup', e); }
+  if (!X) { r.rand = null; if (r === btRes) btVerdictShow(); return; }
+  const job = btRnd = {r, stop:false, t:performance.now()}, runs = RAND_RUNS, means = [];
+  r.rand = {done:0, runs};
+  if (r === btRes) btVerdictShow();
+  const slice = () => {
+    if (job.stop) { if (!r.rand?.rank) { r.rand = {...r.rand, stopped:true}; if (r === btRes) btVerdictShow(); } if (btRnd === job) btRnd = null; return; }
+    const t0 = performance.now();
+    // a hidden tab gets a timer about once a second: longer slices there, nobody is waiting for the page to answer
+    while (means.length < runs && performance.now() - t0 < (document.hidden ? 400 : 40)) means.push(X.run(means.length).mean);
+    r.rand.done = means.length;
+    if (means.length < runs) { const n = $('#btRandN'); if (n && r === btRes) n.textContent = means.length; setTimeout(slice, 0); return; }
+    r.rand = {done:runs, runs, rank:M.randomRank(X.ref, means)}; btRnd = null;
+    if (r === btRes) btVerdictShow();
+  };
+  setTimeout(slice, 0);
+}
+function renderBacktest() {
+  const r = btRes, tr = r.trades, st = M.journalStats(r.start, tr), s = r.settings;
+  // a redraw (the theme switch calls it too) keeps the fading of a result whose settings are no longer in the form
+  $('#btOut').classList.remove('hidden'); btStale(); $('#btEmpty').classList.add('hidden');
+  btVerdictShow();
+  const {fit, out, name} = btParts(r);
   const card = (t, val, sub, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${val}</div><div class="s">${sub}</div></div>`;
   const D = {start:r.start, balance:r.balance, closed:tr}, chg = r.balance / r.start - 1;
   $('#btCards').innerHTML =
@@ -4455,7 +4522,7 @@ function renderBacktest() {
     + groupRow('LONG', by(x => x.side, 'LONG')) + groupRow('SHORT', by(x => x.side, 'SHORT'))
     + ['тейк', 'стоп', 'тайм-стоп', 'конец теста'].filter(z => tr.some(x => x.reason === z)).map(z => groupRow('выход: ' + z, by(x => x.reason, z))).join('')
     + (s.regimeSrc === 'majors' ? [['flat', 'Рынок в боковике'], ['up', 'Рынок растёт'], ['down', 'Рынок падает']] : [['flat', 'BTC во флэте'], ['up', 'BTC в росте'], ['down', 'BTC в падении']]).filter(([k]) => tr.some(x => x.snap?.regime === k)).map(([k, nm]) => groupRow(nm, by(x => x.snap?.regime, k))).join('')
-    + groupRow('1-я половина периода', h1) + groupRow('2-я половина периода', h2) + '</tbody>';
+    + groupRow(name[0] + ' периода · подбор', fit) + groupRow(name[1] + ' · проверка', out) + '</tbody>';
   btList = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
   // the newest BT_ROWS first, the rest on request: a long 15m run drew thousands of rows at once and froze a phone for a moment
   $('#btTrades').innerHTML = btRowsHtml(btAll ? btList : btList.slice(0, BT_ROWS))
@@ -4494,6 +4561,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.104', date:'11 ноября 2026', title:'Проверка бэктеста на случайность', items:[
+    'Добавлено сравнение результата бэктеста со случайными входами с теми же выходами.',
+    'Добавлен отложенный период: конец периода показывается отдельно как проверка.',
+    'Бэктест предупреждает, если на отложенной части итог намного хуже.',
+    'В справку добавлен раздел о том, когда результату бэктеста можно верить.',
+  ]},
   {v:'2.103', date:'11 ноября 2026', title:'Все монеты рядом с графиком', items:[
     'Добавлена вкладка «Все» с поиском в списке монет развёрнутого вида.',
     'Под монетой в списке показано её расстояние от центра канала.',
@@ -4554,12 +4627,6 @@ const CHANGELOG = [
     'Вкладки «Графики» больше нет: всё, что в ней было, теперь на «Рынке».',
     'Прежние ссылки на «Графики» открывают карточку монеты в режиме «Стакан».',
     'Справка и правовая информация описывают новое место графиков со стаканом.',
-  ]},
-  {v:'2.92', date:'9 ноября 2026', title:'Стакан в карточке монеты', items:[
-    'Добавлен переключатель «Канал | Стакан» над графиком в карточке монеты на «Рынке».',
-    'В режиме «Стакан» — живой график со стаканом, сделками и ликвидациями той же монеты, со своими индикаторами и таймфреймом.',
-    'Выбор монеты в списке меняет и график стакана.',
-    'Поток данных идёт, только пока график стакана на экране.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5276,8 +5343,14 @@ if (tf2On) setTf2(true);
 zmT = attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCardSoon(); }});
 
 $('#btRun').onclick = runBacktest;
+// the held-out share is only a view of the same trades: the result on screen is redrawn, not rerun, and stays fresh
+$('#btHold').onchange = () => { if (btRes) renderBacktest(); };
 // "Проверить честно" under an inflated (today's top) result
 $('#btVerdict').addEventListener('click', e => {
+  // the comparison with random entries: stop it, or count it again after a stop (the same seed — the same line)
+  // «Прервать» takes the place of «Сравнить»: the second click of a double click within half a second is not a stop (as #btRun)
+  if (e.target.closest('[data-rstop]')) { if (btRnd && performance.now() - btRnd.t > 500) btRnd.stop = true; return; }
+  if (e.target.closest('[data-rgo]')) { if (btRes) btRandom(btRes); return; }
   const b = e.target.closest('[data-honest]');
   if (!b || btBusy) return;
   // from a hand-made list: the honest top of about its size (the list stays in its field, to go back to)
