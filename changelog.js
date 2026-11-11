@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.85 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.86 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.86', date:'9 ноября 2026', title:'Уведомления без потерь', items:[
+    'Исправлено: изменение уведомлений в меню Telegram больше не отменяется следующей правкой на сайте.',
+    'Исправлено: две быстрые правки уведомлений подряд теперь сохраняются обе.',
+    'Поля настроек уведомлений на телефоне стали крупнее.',
+  ]},
   {v:'2.85', date:'9 ноября 2026', title:'Telegram и срок бота', items:[
     'Исправлено: если заблокировать бота в Telegram, сообщения бота профиля больше не отправляются, а сайт показывает, что Telegram выключен.',
     'Команды и кнопки в меню бота в Telegram продлевают работу серверного бота так же, как заход на сайт.',
