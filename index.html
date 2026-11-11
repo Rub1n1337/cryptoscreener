@@ -4063,7 +4063,10 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   $('#mmeta').innerHTML = `<span class="dchip ${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</span> ${who} · ${isOpen ? 'открыта ' + dt(x.time) : dt(x.time) + ' → ' + dt(x.tclose)} · ${tf}`;
   // aside: the result first (PnL and R), where the price stands between the stop and the take, then the numbers in groups
   const last = isOpen ? (x.last ?? x.entry) : x.exit, risk = x.risk || Math.abs(x.entry - x.sl) * x.qty;
-  const gross = sg * (last - x.entry) * x.qty, fee = (x.entry + last) * x.qty * M.FEE, net = gross - fee;
+  // a closed trade shows what was recorded (normTrade fills old records): its fee holds the interest on the loan (fin) too.
+  // Counted here anew, the card of a short or a leveraged long left the loan out — its PnL and R were above the table's row
+  // while the line under them said «комиссия и заём»
+  const gross = isOpen ? sg * (last - x.entry) * x.qty : x.gross, fee = isOpen ? (x.entry + last) * x.qty * M.FEE : x.fee, net = isOpen ? gross - fee : x.pnl;
   const pct = v => { const p = (v / x.entry - 1) * 100; return (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(2) + '%'; };
   const tile = (k, v, c = '', sub = '') => `<div><span>${k}</span><b class="${c}">${v}</b>${sub ? `<i>${sub}</i>` : ''}</div>`;
   const group = (h, tiles) => `<h4>${h}</h4><div class="ttiles">${tiles}</div>`;
@@ -4072,7 +4075,7 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   const nowW = isOpen ? 'сейчас' : 'выход';
   let html = `<div class="thero">
     <div class="thero-k">${isOpen ? 'PnL сейчас' : 'PnL после комиссий'}</div>
-    <div class="thero-v"><b class="${cl(net)}">${usd(net)}</b><span class="${cl(net)}">${rr(risk ? net / risk : null)}</span></div>
+    <div class="thero-v"><b class="${cl(net)}">${usd(net)}</b><span class="${cl(net)}">${rr(!isOpen && x.r != null ? x.r : risk ? net / risk : null)}</span></div>
     <div class="thero-s">до комиссий ${usd(gross)} · ${x.fin ? 'комиссия и заём' : 'комиссия'} ${usd(-fee)}${x.fin ? ` (заём ${usd(-x.fin)})` : ''}</div>
     <div class="tpath" role="img" aria-label="Цена между стопом и тейком: вход ${fp(x.entry)}, ${nowW} ${fp(last)} (${pct(last)}), стоп ${fp(x.sl)}, тейк ${fp(x.tp)}">
       <div class="tpath-bar"><i class="${cl(mv)}" style="left:${Math.min(pe, pc)}%;width:${Math.abs(pc - pe).toFixed(1)}%"></i><b class="te" style="left:${pe}%"></b><b class="tc ${cl(mv)}" style="left:${pc}%"></b></div>
@@ -4219,7 +4222,8 @@ async function periodPool(tk, from, endT, top, say) {
 }
 // the daily turnover of delisted pairs that the pool of 2.45–2.78 kept for the day (up to ~0.5 MB): nothing reads it now
 try { localStorage.removeItem('sr_delisted'); } catch {}
-const coinsLabel = r =>r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} монет)` : `${r.pairs} монет`;
+const coinsGen = n => plural(n, ['монеты', 'монет', 'монет']);   // «история 1 монеты», «из 21 монеты», «5 монет»
+const coinsLabel = r =>r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} ${coinsGen(r.pool)})` : `${r.pairs} ${plural(r.pairs, ['монета', 'монеты', 'монет'])}`;
 function btSettings() {
   const custom = $('#btTop').value === 'custom' ? parseCoins($('#btCustom').value) : null;
   return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
@@ -4251,18 +4255,26 @@ function btPeriod(now = Date.now()) {
   if (!isFinite(a) || !isFinite(b)) return {err:'Выберите первый и последний день периода.'};
   if (a < Date.UTC(2020, 0, 1)) return {err:'Период может начинаться не раньше 1 января 2020 года.'};
   const endT = Math.min(b + 864e5, hour);
-  if (endT - a < 864e5) return {err:'Последний день периода должен быть не раньше первого и не позже сегодняшнего.'};
+  if (b < a) return {err:'Последний день периода не может быть раньше первого.'};
+  // today – today (or a first day still ahead) passed the old check's wording and was refused by it all the same
+  if (endT - a < 864e5) return {err:'В периоде меньше суток истории: первый день должен быть не позже вчерашнего.'};
   return {from:a, endT, days:(endT - a) / 864e5, key:$('#btFrom').value + '|' + $('#btTo').value, label:`${fmtDay(a)} – ${fmtDay(endT - 1)}`, custom:true};
 }
+// a result left on screen after the form changed belongs to the old settings: it fades and says so,
+// otherwise a screenshot shows one set of settings next to the numbers of another
+function btStale() {
+  const stale = !!btRes && (JSON.stringify(btSettings()) !== JSON.stringify(btRes.settings) || btPeriod().key !== btRes.period);
+  $('#btOut').classList.toggle('stale', stale);
+  return stale;
+}
 function btEstimate() {
-  if (btBusy) return;
+  // the fields that depend on a select and the fading follow the form during a run too: «Свои даты…» picked while the history
+  // loaded used to leave the dates hidden, and a result that came for the settings before the change looked fresh
   $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom'); $('#btPitL').classList.toggle('hidden', $('#btTop').value === 'custom');
   for (const id of ['#btFromL', '#btToL']) $(id).classList.toggle('hidden', $('#btDays').value !== 'custom');
+  const stale = btStale();
+  if (btBusy) return;   // the status line is the run's
   const s = btSettings(), per = btPeriod(), days = per.days || 0, bars = days * 864e5 / TFMS[s.tf] + 450;
-  // a result left on screen after the form changed belongs to the old settings: it fades and says so,
-  // otherwise a screenshot shows one set of settings next to the numbers of another
-  const stale = !!btRes && (JSON.stringify(s) !== JSON.stringify(btRes.settings) || per.key !== btRes.period);
-  $('#btOut').classList.toggle('stale', stale);
   if (stale) { $('#btStatus').innerHTML = '<b style="color:var(--acc-t)">Настройки изменены — результат ниже ещё для прежних.</b> Нажмите «Запустить», чтобы пересчитать.'; return; }
   if (btRes) { $('#btStatus').textContent = btRes.status || ''; return; }   // back to the settings of the result on screen
   if (s.custom && !s.custom.length) { $('#btStatus').textContent = 'Впишите монеты через запятую, например: BTC, ETH, SOL.'; return; }
@@ -4276,7 +4288,7 @@ function btEstimate() {
   const K = periodK(s.top), coins = !s.pit ? s.top : Math.round(Math.min(K * 9, K + 400) * Math.min(1, 0.3 + 0.7 * days / 365));
   const stored = !!histIdx?.s?.BTCUSDT?.[s.tf] && per.from - 450 * TFMS[s.tf] >= HS.monthStart(histIdx.from);
   const sec = Math.max(5, Math.round((stored ? coins * ((days / 30 + 1) * 0.03 + 0.03) : Math.ceil(bars / 1000) * coins * 0.09) / 5) * 5);
-  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${coins} монет. Повторные — мгновенно.`
+  $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${coins} ${coinsGen(coins)}. Повторные — мгновенно.`
     + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '');
 }
 // while the history loads, «Запустить» is «Прервать»: a year on a wide pool takes minutes. Each run has its own stop flag,
@@ -4285,12 +4297,17 @@ function btEstimate() {
 const STOPPED = new Error('остановлено');
 let btCtl = null;
 const btButton = busy => { $('#btRun').classList.toggle('primary', !busy); $('#btRun').innerHTML = `<svg class="i"><use href="#i-${busy ? 'x' : 'play'}"/></svg>${busy ? 'Прервать' : 'Запустить'}`; };
+// what went wrong, in the user's words: the browser's own «Failed to fetch» says nothing
+const btErr = e => /Failed to fetch|NetworkError|Load failed/i.test(e?.message) || ['TimeoutError', 'AbortError'].includes(e?.name) ? 'нет связи с Binance. Проверьте интернет и нажмите «Запустить» ещё раз — загруженная история сохранилась.'
+  : /^HTTP (429|418)/.test(e?.message) ? 'Binance просит подождать — слишком много запросов. Нажмите «Запустить» через минуту: загруженная история сохранилась.'
+  : e?.message || String(e);
 async function runBacktest() {
-  if (btBusy) { if (btCtl) { btCtl.stop = true; $('#btRun').disabled = true; $('#btStatus').textContent = 'Останавливаю…'; } return; }
-  const ctl = btCtl = {stop:false}, stop = () => { if (ctl.stop) throw STOPPED; };
+  // the second click of a double click on «Запустить» lands on «Прервать»: within half a second of the start it is not a stop
+  if (btBusy) { if (btCtl && performance.now() - btCtl.t > 500) { btCtl.stop = true; $('#btRun').disabled = true; $('#btStatus').textContent = 'Останавливаю…'; } return; }
+  const ctl = btCtl = {stop:false, t:performance.now()}, stop = () => { if (ctl.stop) throw STOPPED; };
   btBusy = true; btButton(true); $('#btStatus').classList.add('busy');   // a turning mark while it loads and counts
   const s = btSettings(), per = btPeriod(), days = per.days, tfms = TFMS[s.tf];
-  const st = $('#btStatus');
+  const st = $('#btStatus'); let ok = false;
   try {
     st.textContent = 'Беру список пар…';
     if (per.err) throw new Error(per.err);
@@ -4336,11 +4353,14 @@ async function runBacktest() {
     // change the result; it gets two more tries, and whatever still fails is named next to the result
     let failed = syms.filter(x => !hist[x]);
     for (let round = 1; round <= 2 && failed.length; round++) {
-      st.textContent = `Догружаю ${failed.length} пар (попытка ${round + 1})…`; await sleep(1500 * round);
+      st.textContent = `Догружаю ${failed.length} ${plural(failed.length, ['пару', 'пары', 'пар'])} (попытка ${round + 1})…`; await sleep(1500 * round);
       for (const sym of failed) { stop(); try { hist[sym] = (await fetchHistory(sym, s.tf, startOf(sym), endT, stop)).filter(k => k[6] < now); } catch {} }
       stop();
       failed = failed.filter(x => !hist[x]);
     }
+    // nothing to trade on is not a result: with the network gone the run used to end as «Готово: 0 монет, Invalid Date →
+    // Invalid Date» with an untouched balance in place of the previous result
+    if (!traded.some(x => hist[x]?.length)) throw new Error(failed.length ? 'история не загрузилась ни по одной монете. Проверьте интернет' + (s.custom ? ' и названия монет' : '') + ' и нажмите «Запустить» ещё раз.' : 'у выбранных монет нет свечей за этот период.');
     st.textContent = 'Считаю…'; $('#btRun').disabled = true; await sleep(30);   // the calculation can't be stopped: no «Прервать» during it
     const t0 = performance.now();
     btHist = {hist, from, endT, only:traded, top:s.pit ? s.top : 0};   // window.__sr.btHist: to check a run by hand
@@ -4351,14 +4371,17 @@ async function runBacktest() {
     st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${per.custom ? per.label + ' (UTC)' : `${dt(btRes.from)} → ${dt(btRes.to + tfms)}`}, расчёт ${Math.round(performance.now() - t0)} мс.`
       + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · старт $${money(s.start)} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ` от старта ($${money(s.start * s.risk)} со сделки)` : ' от баланса (сложный процент)'} · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
       + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '')
-      + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} монет (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '')
+      + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} ${coinsGen(failed.length)} (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '')
       + (HS.isOff() ? ' История загружена только с Binance (?history=off).' : '');
-    btRes.status = st.textContent; renderBacktest();
+    btRes.status = st.textContent; btAll = false; renderBacktest(); ok = true;
     if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
-    st.textContent = e === STOPPED ? 'Остановлено. Загруженная история сохранилась — следующий запуск продолжит с неё.' : 'Ошибка: ' + (e.message || e);
+    st.textContent = e === STOPPED ? 'Остановлено. Загруженная история сохранилась — следующий запуск продолжит с неё.' : 'Ошибка: ' + btErr(e);
   }
   btBusy = false; btCtl = null; btButton(false); $('#btRun').disabled = false; $('#btStatus').classList.remove('busy');
+  // the form may have changed while the run was on: then the result is for the settings before the change, and says so;
+  // after a stop or an error the line keeps its message, only the fading follows the form
+  if (ok) btEstimate(); else btStale();
   if ($('#btAdv').open) setTimeout(btCacheShow, 1500);   // the files of this run are still being written to the cache
 }
 function groupRow(name, list) {
@@ -4368,7 +4391,8 @@ function groupRow(name, list) {
 const groupHead = '<thead><tr><th>Группа</th><th>Сделок</th><th>Winrate</th><th title="Средний результат на сделку в R после комиссий">Ср. результат</th><th>PF</th><th>PnL</th></tr></thead>';
 function renderBacktest() {
   const r = btRes, tr = r.trades, st = M.journalStats(r.start, tr), s = r.settings;
-  $('#btOut').classList.remove('hidden', 'stale'); $('#btEmpty').classList.add('hidden');
+  // a redraw (the theme switch calls it too) keeps the fading of a result whose settings are no longer in the form
+  $('#btOut').classList.remove('hidden'); btStale(); $('#btEmpty').classList.add('hidden');
   const mid = (r.from + r.to) / 2, h1 = tr.filter(x => x.tclose < mid), h2 = tr.filter(x => x.tclose >= mid);
   const s1 = M.journalStats(r.start, h1), s2 = M.journalStats(r.start, h2);
   let v;
@@ -4431,13 +4455,13 @@ function renderBacktest() {
     + groupRow('1-я половина периода', h1) + groupRow('2-я половина периода', h2) + '</tbody>';
   btList = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
   // the newest BT_ROWS first, the rest on request: a long 15m run drew thousands of rows at once and froze a phone for a moment
-  $('#btTrades').innerHTML = btRowsHtml(btList.slice(0, BT_ROWS))
-    + (btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
+  $('#btTrades').innerHTML = btRowsHtml(btAll ? btList : btList.slice(0, BT_ROWS))
+    + (!btAll && btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
     || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
   drawEquity(); eqRestore('bt');
 }
 const BT_ROWS = 300;
-let btList = [];
+let btList = [], btAll = false;   // btAll: «Показать все» was pressed for this result — a redraw (the theme) keeps the list open
 const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
@@ -5242,7 +5266,11 @@ $('#btVerdict').addEventListener('click', e => {
   $('#btPit').value = 'pit'; $('#btPit').dispatchEvent(new Event('change', {bubbles:true}));
   runBacktest();
 });
-$('#btMine').onclick = () => { btFill(S); $('#btTop').value = '50'; btEstimate(); toast('Подставлены настройки «Рынка»', `${S.tf}, канал ${S.N}/${S.k}, топ-50 монет. Нажмите «Запустить».`, 'ok'); };
+$('#btMine').onclick = () => {
+  btFill(S); $('#btTop').value = '50'; btEstimate();
+  const tf = $('#btTf').value;   // the backtest has no 5m, 1d and 1w: the note names the timeframe it took, not the market's
+  toast('Подставлены настройки «Рынка»', `${tf}, канал ${S.N}/${S.k}, топ-50 монет.${tf !== S.tf ? ` Таймфрейм ${S.tf} в бэктесте недоступен — взят ${tf}.` : ''} Нажмите «Запустить».`, 'ok');
+};
 // the shared bot's rules as a profile, for showing them and for the backtest
 const sharedProf = () => ({name:'Общий бот', coins:{mode:'top', top:SJ.settings.top || 150}, set:{...SJ.settings, erMax:SJ.settings.erMax ?? 0.15}});
 // a profile (or the shared bot's rules) → the backtest form, then the backtest page: check it on history in one click
@@ -5284,7 +5312,7 @@ hlOpts('#btHL', $('#btTf').value);
 $('#btCustom').oninput = btEstimate;
 $('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });
 $('#btTrades').onclick = e => {
-  if (e.target.closest('[data-btmore]')) { e.target.closest('tr').outerHTML = btRowsHtml(btList.slice(BT_ROWS)); return; }
+  if (e.target.closest('[data-btmore]')) { btAll = true; e.target.closest('tr').outerHTML = btRowsHtml(btList.slice(BT_ROWS)); return; }
   const tr = e.target.closest('tr.row'); if (!tr || !btRes) return;
   const x = btRes.trades.find(t => String(t.id) === tr.dataset.id);
   if (x) showTrade(x, {isOpen:false, who:'бэктест', set:btRes.settings});
