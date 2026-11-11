@@ -119,6 +119,23 @@ for (const [name, S] of Object.entries(VARIANTS)) {
     JSON.stringify({bid:sm.bid.map(Math.round), ask:sm.ask.map(Math.round)}));
 }
 
+// ---------- 2c. a coin whose candles stop (delisted, trading halted): the time stop counts time, not the coin's candles ----------
+{
+  const S = {...BASE, timeStop:12}, t = bt(M, S, 10000).trades.find(x => x.reason === 'тайм-стоп');
+  check('тайм-стоп: есть сделка, закрытая по времени', !!t);
+  if (t) {
+    const bar = t.time - TFMS + 1, cutAt = bar + 3 * TFMS, sg = t.side === 'LONG' ? 1 : -1;   // the entry bar; the coin's last candle
+    const run = K => M.backtest({...hist, [t.sym]:K}, S, {start:10000, from}).trades.find(x => x.id === t.id);
+    const gone = run(hist[t.sym].filter(k => k[0] <= cutAt));
+    check('монета без свечей: позиция закрыта по тайм-стопу, а не в конце теста', gone?.reason === 'тайм-стоп', gone?.reason);
+    check('монета без свечей: закрыта, когда вышло время', gone?.tclose === bar + 13 * TFMS - 1);
+    check('монета без свечей: по последней цене монеты', near(gone?.exit, hist[t.sym].find(k => k[0] === cutAt)[4] * (1 - sg * M.SLIP)));
+    // trading halted inside the trade and resumed after its time was up: the same moment and price
+    const hole = run(hist[t.sym].filter(k => k[0] <= cutAt || k[0] > bar + 20 * TFMS));
+    check('пауза торгов внутри сделки: тайм-стоп по времени, не по числу свечей', hole?.reason === 'тайм-стоп' && hole.tclose === gone?.tclose && hole.exit === gone?.exit);
+  }
+}
+
 // ---------- 3. against the previous copy: nothing else changed ----------
 const refPath = new URLSearchParams(location.search).get('ref');
 if (refPath) {
