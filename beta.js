@@ -1657,6 +1657,9 @@ function wire() {
     setLive(); redrawAll();
   });
   window.addEventListener('offline', () => { if (loopOn) { setLive(); redrawAll(); } });
+  // another tab of the site drew or removed something: take its drawings, or the next one drawn here would save this
+  // tab's older copy over them (the steps to undo were made on that older copy, so they go)
+  window.addEventListener('storage', e => { if (e.key === 'sr_bdraw') { drawings = K.load('sr_bdraw', {}) || {}; undoS = []; redoS = []; redrawAll(); } });
   wirePop();
 }
 function setSym(sym) { const p = act(); if (!p || sym === p.sym) return; p.autoSpot = false; p.prevSym = p.sym; p.sym = sym; savePanes(); p.restart(); renderList(); }
