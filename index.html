@@ -526,7 +526,8 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bpop.cfg{width:min(360px,calc(100vw - 32px))}.bpop.cfg .sel-cfg{border-top:0;padding:0}
 
 .bnote{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:13px;color:var(--mute)}.bnote b{color:var(--text)}
-.bside .seg{margin-bottom:10px;display:flex}.bside .seg .tab{flex:1}
+.bside .seg{margin-bottom:10px;display:flex}.bside .seg .tab{flex:1 1 auto;min-width:0;padding-inline:6px}
+.bls{margin-bottom:8px}.bls input{width:100%;height:36px;border:1px solid var(--line2);border-radius:10px;background:var(--s1);color:var(--text);font:inherit;font-size:13px}
 .blist{display:flex;flex-direction:column;gap:2px;max-height:calc(64vh + 60px);overflow:auto}
 .bli{display:grid;grid-template-columns:minmax(0,1fr) 64px auto;gap:8px;align-items:center;width:100%;height:auto;padding:8px 10px;border:0;border-radius:10px;background:transparent;text-align:left;justify-content:stretch;font-weight:500}
 .bli:hover{background:var(--s2);border:0}.bli.on{background:var(--s3)}
@@ -1427,7 +1428,8 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <div class="bwh"><button id="bCollapse" title="Вернуть карточку монеты и список монет"><svg class="i"><use href="#i-back"/></svg>Свернуть</button></div>
       <div class="bgrid">
         <div class="panel bside">
-          <div class="seg mini" id="bListTabs"><button class="tab on" data-bl="fav">Избранное</button><button class="tab" data-bl="lead">Лидеры</button><button class="tab" data-bl="sig">Сигналы</button></div>
+          <div class="seg mini" id="bListTabs"><button class="tab on" data-bl="all">Все</button><button class="tab" data-bl="fav">Избранное</button><button class="tab" data-bl="lead">Лидеры</button><button class="tab" data-bl="sig">Сигналы</button></div>
+          <div class="search bls"><svg class="i"><use href="#i-search"/></svg><input id="bListQ" type="search" autocapitalize="characters" autocorrect="off" placeholder="Поиск монеты" aria-label="Поиск монеты в списке"></div>
           <div class="blist" id="bList"></div>
         </div>
       </div>
@@ -4492,6 +4494,10 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.103', date:'11 ноября 2026', title:'Все монеты рядом с графиком', items:[
+    'Добавлена вкладка «Все» с поиском в списке монет развёрнутого вида.',
+    'Под монетой в списке показано её расстояние от центра канала.',
+  ]},
   {v:'2.102', date:'11 ноября 2026', title:'Длинная история графиков', items:[
     'Добавлено: когда листаете график влево, более старые свечи догружаются сами.',
   ]},
@@ -4554,11 +4560,6 @@ const CHANGELOG = [
     'В режиме «Стакан» — живой график со стаканом, сделками и ликвидациями той же монеты, со своими индикаторами и таймфреймом.',
     'Выбор монеты в списке меняет и график стакана.',
     'Поток данных идёт, только пока график стакана на экране.',
-  ]},
-  {v:'2.91', date:'9 ноября 2026', title:'Справка о стакане', items:[
-    'Добавлен раздел справки о стакане и потоке сделок, а в словарь — новые термины.',
-    'В правовой информации описаны данные стаканов, сделок и ликвидаций.',
-    'Блок в карточке монеты называется так же, как индикатор: «Стены в стакане».',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

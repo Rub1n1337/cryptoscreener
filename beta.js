@@ -1550,7 +1550,7 @@ function spark(cl) {
   const pts = cl.map((v, i) => `${(i / (cl.length - 1) * 64).toFixed(1)},${(24 - (mx === mn ? 12 : (v - mn) / (mx - mn) * 22) - 1).toFixed(1)}`).join(' ');
   return `<svg viewBox="0 0 64 26" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${up ? K.PC.lo : K.PC.up}" stroke-width="1.5"/></svg>`;
 }
-let listMode = 'fav';
+let listMode = 'all', listQ = '';   // «Все» first: every coin of the market scan; listQ — the list's search
 // the list is rebuilt every second; the DOM is touched only when something changed (keeps hover and scroll calm)
 let lastList = '', suggestN = 0;
 const setList = html => { if (html !== lastList) { lastList = html; $('#bList').innerHTML = html; } };
@@ -1559,14 +1559,16 @@ function fillSuggest(rows) {   // the coin search suggests the coins of the mark
   $('#bSymList').innerHTML = rows.map(r => `<option value="${K.base(r.sym)}">`).join('');
 }
 function renderList() {
-  const rows = K.rows; if (!rows.length) { setList('<div class="mute" style="padding:12px;font-size:13px">Загружаю монеты…</div>'); return; }
-  fillSuggest(rows);
+  if (!K.rows.length) { setList('<div class="mute" style="padding:12px;font-size:13px">Загружаю монеты…</div>'); return; }
+  fillSuggest(K.rows);
+  const q = listQ.trim().toUpperCase(), rows = q ? K.rows.filter(r => K.base(r.sym).includes(q)) : K.rows;
+  if (!rows.length) { setList(`<div class="mute" style="padding:12px;font-size:13px">Монеты «${q.replace(/[<>&"]/g, '')}» нет в списке «Рынка».</div>`); return; }
   const cur = act()?.sym, shown = new Map(panes.map((p, i) => [p.sym, i + 1]));
   // change over the last 24 h of the market scan's candles (whatever its timeframe is)
   const bars = k => k.length > 1 ? Math.max(1, Math.round(864e5 / (k[1][0] - k[0][0]))) : 1;
   const ch = r => { const k = K.cache[r.sym]; if (!k) return 0; const b = Math.min(bars(k), k.length - 1); return b > 0 ? +k[k.length - 1][4] / +k[k.length - 1 - b][4] - 1 : 0; };
   const item = r => { const c = ch(r), k = K.cache[r.sym];
-    return `<button class="bli${r.sym === cur ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : 'спот'}${layout > 1 && shown.has(r.sym) ? ` · график ${shown.get(r.sym)}` : ''}</span></span>${spark(k?.slice(-bars(k) - 1).map(x => +x[4]))}
+    return `<button class="bli${r.sym === cur ? ' on' : ''}" data-sym="${r.sym}"><span class="bn"><b>${K.base(r.sym)}</b><span>${r.rev ? (r.side === 'low' ? '▲ сигнал LONG' : '▼ сигнал SHORT') : isFinite(r.z) ? `${r.z > 0 ? '+' : r.z < 0 ? '−' : ''}${Math.abs(r.z).toFixed(1)}σ от центра` : ''}${layout > 1 && shown.has(r.sym) ? ` · график ${shown.get(r.sym)}` : ''}</span></span>${spark(k?.slice(-bars(k) - 1).map(x => +x[4]))}
       <span class="bp">${K.fp(r.price)}<span class="${c > 0 ? 'pos' : c < 0 ? 'neg' : ''}">${c > 0 ? '+' : c < 0 ? '−' : ''}${Math.abs(c * 100).toFixed(2)}%</span></span></button>`; };
   if (listMode === 'lead') {
     const s = [...rows].map(r => [r, ch(r)]).sort((a, b) => b[1] - a[1]);
@@ -1576,7 +1578,8 @@ function renderList() {
     return;
   }
   let list;
-  if (listMode === 'fav') { list = rows.filter(r => K.favs.has(r.sym)); if (!list.length) list = rows.filter(r => M.MAJORS.includes(r.sym)); }
+  if (listMode === 'all') list = rows.slice(0, 300);   // in the market's order
+  else if (listMode === 'fav') { list = rows.filter(r => K.favs.has(r.sym)); if (!list.length) list = rows.filter(r => M.MAJORS.includes(r.sym)); }
   else list = rows.filter(r => r.rev).sort((a, b) => b.score - a.score);
   setList((listMode === 'fav' && !rows.some(r => K.favs.has(r.sym)) ? '<div class="faint" style="padding:4px 10px 8px;font-size:12px">Избранного пока нет — звёздочка у монеты на «Рынке». Пока BTC, ETH, SOL.</div>' : '')
     + (list.map(item).join('') || '<div class="mute" style="padding:12px;font-size:13px">Сейчас подтверждённых сигналов нет.</div>'));
@@ -1670,6 +1673,8 @@ function wire() {
   document.querySelectorAll('#bLay .tab').forEach(b => b.onclick = () => setLayout(+b.dataset.lay));
   $('#bLink').onclick = () => { link = !link; K.save('sr_blink', link); syncBar(); hoverT = null; if (link) act().setView(act().view, true); redrawAll(); };
   document.querySelectorAll('#bListTabs .tab').forEach(b => b.onclick = () => { document.querySelectorAll('#bListTabs .tab').forEach(x => x.classList.toggle('on', x === b)); listMode = b.dataset.bl; renderList(); });
+  $('#bListQ').oninput = e => { listQ = e.target.value; renderList(); };
+  $('#bListQ').onkeydown = e => { if (e.key === 'Enter') { const b = $('#bList [data-sym]'); if (b) setSym(b.dataset.sym); } };   // Enter opens the first match
   $('#bList').onclick = e => { const b = e.target.closest('[data-sym]'); if (b) setSym(b.dataset.sym); };
   const goSym = el => { let v = el.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!v) return; if (!v.endsWith('USDT')) v += 'USDT'; el.value = ''; el.blur(); setSym(v); };
   $('#bSym').onkeydown = e => { if (e.key === 'Enter') goSym(e.target); if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); } };

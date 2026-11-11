@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.90 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.91 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.91', date:'9 ноября 2026', title:'Справка о стакане', items:[
+    'Добавлен раздел справки о стакане и потоке сделок, а в словарь — новые термины.',
+    'В правовой информации описаны данные стаканов, сделок и ликвидаций.',
+    'Блок в карточке монеты называется так же, как индикатор: «Стены в стакане».',
+  ]},
   {v:'2.90', date:'9 ноября 2026', title:'Стакан в моменты сигналов', items:[
     'Общий бот сохраняет стакан Binance в моменты своих сигналов — для проверки стратегии.',
     'В правовой информации указано, какие рыночные данные хранятся на сервере.',
