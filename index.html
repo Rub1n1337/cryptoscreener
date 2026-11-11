@@ -4706,6 +4706,9 @@ let page = 'market';
 function go(t, push = true) {
   if (!PAGES.includes(t)) t = 'market';
   if (LOCKED && t !== 'legal') { t = 'gate'; push = false; }   // signed out: the sign-in screen; the address keeps where a link led
+  // a phone's open sheet belongs to the market: a notification that leads to another section closes it (it would stay
+  // «open» out of sight and keep the page from scrolling)
+  if (t !== 'market' && document.body.classList.contains('sheet')) closeSheet(true);
   page = t;
   document.querySelectorAll('.tab[data-t]').forEach(x => { x.classList.toggle('on', x.dataset.t === t); x.dataset.t === t ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'); });
   PAGES.forEach(id => $('#' + id).classList.toggle('hidden', id !== t));
@@ -4726,21 +4729,26 @@ function setTitle() {
   document.title = sub ? sub + ' · Sigma Radar' : 'Sigma Radar';
 }
 // push: a change of section is a step «Назад» returns from (before 2.96 «Назад» left the site); a new coin and the rest
-// replace the address. The sheet and «Развернуть» add their own steps (openSheet, expandOb)
+// replace the address. The sheet and «Развернуть» add their own steps (openSheet, expandOb); a replaced address keeps the
+// step's mark (history.state): without it «Монеты» and «Свернуть» stop going back and leave their step behind
 function setHash(push = false) {
   const h = '#' + page + (page === 'market' && chartSym ? '/' + base(chartSym) : '');
-  if (location.hash !== h) history[push ? 'pushState' : 'replaceState'](null, '', h);
+  if (location.hash !== h) push ? history.pushState(null, '', h) : history.replaceState(history.state, '', h);
   setTitle();
 }
 // ---------- phone: the list comes first, a coin's chart opens as a full-screen sheet over it ----------
 // The sheet pushes a history entry, so the system back gesture closes it instead of leaving the site.
 const isPhone = () => matchMedia('(max-width:700px)').matches;
 let sheetY = 0, sheetOut = 0;
+// the sheet's step in the history: a new one, or the current one when it is a sheet's already (left by a reload or reached
+// by «Вперёд») or the step of a «Развернуть» that is folded (it took the sheet's place)
+const sheetStep = () => { const s = history.state; if (s?.sheet) return; s?.bexp ? history.replaceState({sheet:1}, '') : history.pushState({sheet:1}, ''); };
 function openSheet() {
-  if (sheetOut) { clearTimeout(sheetOut); sheetOut = 0; document.body.classList.remove('sheet-out'); history.pushState({sheet:1}, ''); return; }   // a coin tapped while the sheet was leaving: it stays
+  if (bexp) return setExp(false);   // the card is hidden under «Развернуть»: fold it first (setExp opens the sheet itself)
+  if (sheetOut) { clearTimeout(sheetOut); sheetOut = 0; document.body.classList.remove('sheet-out'); sheetStep(); return; }   // a coin tapped while the sheet was leaving: it stays
   if (document.body.classList.contains('sheet')) return;
   sheetY = scrollY; document.body.classList.add('sheet'); document.documentElement.style.overflow = 'hidden';
-  history.pushState({sheet:1}, ''); $('#cpanel').scrollTop = 0;
+  sheetStep(); $('#cpanel').scrollTop = 0;
   requestAnimationFrame(drawChart);   // the canvas had no size while hidden
   loadWalls(); betaSync();
 }
@@ -4755,6 +4763,7 @@ function closeSheet(now) {
 }
 function openCoin(sym) {
   if (page !== 'market') go('market');   // staying on the market keeps the list's scroll position
+  if (bexp) setExp(false, true);   // «Развернуть» hides the card: fold it, the card takes this coin (not the active chart's)
   loadChart(sym);
   if (isPhone()) openSheet();
 }
@@ -4786,10 +4795,12 @@ function readHash() {
     let d = sym; try { d = decodeURIComponent(sym); } catch {} const s = d.toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (s) chartSym = s.endsWith('USDT') ? s : s + 'USDT';
   }
-  if (t === 'coin') { openCoinSheet = true; return 'market'; }
+  // a link to a coin's card folds «Развернуть» (the card is hidden under it); the card takes the link's coin, not the active
+  // chart's, and coinLink opens the phone's sheet once the address is set
+  if (t === 'coin') { if (bexp) setExp(false, true); openCoinSheet = true; return 'market'; }
   // the addresses of the former «Графики» tab (#charts[/SOL], #beta from its test days): the coin's card in «Стакан»,
   // on a phone opened; the address becomes #market/SOL
-  if (charts) { if (bexp) setExp(false); setCmode('ob'); openCoinSheet = true; return 'market'; }
+  if (charts) { if (bexp) setExp(false, true); setCmode('ob'); openCoinSheet = true; return 'market'; }
   return t || 'market';
 }
 const coinLink = () => { if (openCoinSheet) { openCoinSheet = false; setHash(); if (isPhone()) openSheet(); } };
@@ -5311,6 +5322,9 @@ const focusEl = sel => setTimeout(() => {
   el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
 }, 150);
 const openMine = () => { jMode = 'mine'; save('sr_jmode', jMode); go('journal'); };
+// the channel chart's commands (its settings, a level, the second timeframe): the card in «Канал», on a phone opened —
+// in «Стакан» and under «Развернуть» the channel chart is hidden
+const showCh = () => { go('market'); if (cmode !== 'ch') setCmode('ch'); if (isPhone()) openSheet(); };
 const openMore = sel => { openMine(); $('.bmore').open = true; focusEl(sel); };
 const editActive = sel => { openMine(); openForm(activeProfile()); focusEl(sel); };
 const CMD_PAGES = [
@@ -5338,14 +5352,14 @@ const CMD_SETTINGS = [
   {label:'Удалить моего бота с сервера', kw:['удалить', 'delete', 'сервер', 'данные'], run:() => UB ? openMore('#ubdel') : go('legal')},
   {label:'Новый профиль', kw:['новый', 'создать', 'new', 'профиль', 'profile'], run:() => { openMine(); openForm(null); focusEl('#pfName'); }},
   {label:'Добавить профиль по ссылке', kw:['импорт', 'import', 'ссылк', 'добавить', 'поделить', 'share'], run:() => { openMine(); importByLink(); }},
-  {label:'Настройки канала: модель, N, k', kw:['модель', 'канал', 'боллинджер', 'bollinger', 'сигма', 'sigma', 'ширина'], run:() => { go('market'); $('#cset').click(); focusEl('#method'); }},
+  {label:'Настройки канала: модель, N, k', kw:['модель', 'канал', 'боллинджер', 'bollinger', 'сигма', 'sigma', 'ширина'], run:() => { showCh(); if ($('#sheet').classList.contains('hidden')) $('#cset').click(); focusEl('#method'); }},
   {label:'Бэктест за год', kw:['бэктест', 'backtest', 'история', 'год', '365'], run:() => { go('backtest'); $('#btDays').value = '365'; btEstimate(); focusEl('#btRun'); }},
   {label:'Уведомления браузера', kw:['уведомлен', 'notification', 'колокол', 'push'], run:() => focusEl('#ntf')},
   {label:'Звук сигнала', kw:['звук', 'sound', 'beep'], run:() => $('#snd').click()},
   {label:'Светлая или тёмная тема', kw:['тема', 'theme', 'светл', 'тёмн', 'темн', 'dark', 'light'], run:() => setTheme(themeNow() === 'light' ? 'dark' : 'light', {clientX:0, clientY:0})},
   {label:'Профиль: тема, стекло и уведомления', kw:['вид', 'стекло', 'жидкое', 'прозрачн', 'glass', 'настройк', 'уведомл'], run:() => openAuth()},
-  {label:'Провести свой уровень на графике', kw:['уровень', 'level', 'линия', 'line', 'алерт', 'alert', 'оповещ'], run:() => { go('market'); if (isPhone()) openSheet(); setLevelMode(true); }},
-  {label:'Второй таймфрейм рядом', kw:['второй', 'таймфрейм', 'два', '2 тф', 'mtf', 'старш'], run:() => { go('market'); if (isPhone()) openSheet(); if (!tf2On) setTf2(true); focusEl('#cv2'); }},
+  {label:'Провести свой уровень на графике', kw:['уровень', 'level', 'линия', 'line', 'алерт', 'alert', 'оповещ'], run:() => { showCh(); setLevelMode(true); }},
+  {label:'Второй таймфрейм рядом', kw:['второй', 'таймфрейм', 'два', '2 тф', 'mtf', 'старш'], run:() => { showCh(); if (!tf2On) setTf2(true); focusEl('#cv2'); }},
   {label:'Развернуть график на всю ширину', kw:['развернуть', 'шире', 'весь экран', 'fullscreen', 'wide', 'график'], run:() => { go('market'); setWide(true); focusEl('#cv'); }},
 ];
 let cmdItems = [], cmdIdx = 0, cmdBack = null;
@@ -5459,8 +5473,10 @@ function showOb() {
 }
 // «Развернуть»: the market at full width is the live charts' workspace — 1 / 2 / 4 charts (a phone: up to 2) and their coin
 // list; the card's chart is its active chart. It has its own history entry (on a phone it takes the sheet's), so Back folds it.
-// «Свернуть» brings the card (on a phone — its sheet) and the list back, with the coin of the chart that was active
-function setExp(on) {
+// «Свернуть» brings the card (on a phone — its sheet) and the list back, with the coin of the chart that was active.
+// own: the caller folds to show the card itself (a link, the search, a notification) — it loads its coin and, on a phone,
+// opens the sheet after the address is set
+function setExp(on, own) {
   folding = false;
   if (on === bexp) return;
   betaHold = true;
@@ -5468,9 +5484,9 @@ function setExp(on) {
     bexp = on; $('#market').classList.toggle('bx', on);
     if (on) { if (document.body.classList.contains('sheet')) closeSheet(true); }
     else {
-      const a = betaMod?.activeSym();   // a spot coin, or one the market scans, can be the card's coin; a futures-only one can't
+      const a = !own && betaMod?.activeSym();   // a spot coin, or one the market scans, can be the card's coin; a futures-only one can't
       if (a && a.sym !== chartSym && (a.mkt === 'spot' || rows.some(r => r.sym === a.sym))) loadChart(a.sym);
-      if (isPhone()) openSheet();
+      if (isPhone() && !own) openSheet();
     }
   } finally { betaHold = false; }
   betaSync();
@@ -5499,10 +5515,12 @@ async function betaOpen(w) {
   } catch (e) { toast('Графики не загрузились', String(e.message || e), 'bad'); if (cmode === 'ob') setCmode('ch'); }
 }
 // a forgotten background tab must not keep the live streams (10 book updates a second per chart) busy:
-// after a minute out of sight they close, and come back — with a fresh book — when the tab is looked at again
-let betaBgTimer = null, betaBgPaused = false;
+// after a minute out of sight they close, and come back — with a fresh book — when the tab is looked at again.
+// A tab that starts in the background (opened by a middle click, restored with the browser's session) gets no
+// «hidden» event to count the minute from: it starts paused and opens the streams when it is first looked at
+let betaBgTimer = null, betaBgPaused = document.hidden;
 document.addEventListener('visibilitychange', () => {   // armed once: a repeated «hidden» doesn't restart the minute
-  if (document.hidden) { if (betaWhere() && !betaBgTimer) betaBgTimer = setTimeout(() => { betaBgTimer = null; if (document.hidden && betaPause) { betaPause(); betaBgPaused = true; } }, 60000); }
+  if (document.hidden) { if (betaWhere() && !betaBgTimer) betaBgTimer = setTimeout(() => { betaBgTimer = null; if (document.hidden) { betaPause?.(); betaBgPaused = true; } }, 60000); }
   else { clearTimeout(betaBgTimer); betaBgTimer = null; if (betaBgPaused) { betaBgPaused = false; betaSync(); } }
 });
 // a shared profile link (#p=…) opens "Мой бот" with an offer to add it
@@ -5610,7 +5628,7 @@ async function checkUpdate() {
   if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || betaWhere()) {
     if (!updWarned) toast('Вышла новая версия сайта', dirty ? 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.'
       : 'Обновите страницу, когда закончите — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
-    updWarned = true; return;
+    updWarned = !document.hidden; return;   // a notice shown in a background tab is gone unread in 15 s: it comes again on the return
   }
   reloading = true;
   const el = $('#guard'); el.className = 'guard idle';
