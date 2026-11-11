@@ -502,6 +502,167 @@ export function journalStats(start, closed) {
 const now = () => Date.now();
 
 // ---------- backtest ----------
+// ---------- study ideas: popular rules shown in the backtest only (docs/PLAN-UNTANGLE-backtest.md) ----------
+// They are not in STRATEGIES on purpose: profiles and the bot (cleanProfile on the site, oneOf in bot/index.ts) accept only
+// STRATEGIES, so a study idea can never be traded. wants / planEntry / botTick / checkExit don't know them; backtest() and
+// randomSetup() do. Every level is known at the close of the bar it is used on — tests/backtest-audit.js cut() checks it.
+export const STUDY = { fib: 'Откат по Фибоначчи', smc_ob: 'SMC: ордер-блок', smc_fvg: 'SMC: разрыв (FVG)' };
+export const isStudy = S => !!STUDY[S?.strategy];
+export const FIB_ZONES = { '0.382': [0.382, 0.5], '0.5': [0.5, 0.618], '0.618': [0.618, 0.705] };
+// the study settings with their defaults (the ones the research checked: docs/RESEARCH-2026-10.md 29.10, docs/RESEARCH-SMC.md)
+export function studyOf(S) {
+  const st = S.strategy;
+  if (st === 'fib') return { fibK: [2, 3, 4, 5].includes(+S.fibK) ? +S.fibK : 3, fibZone: FIB_ZONES[S.fibZone] ? S.fibZone : '0.5',
+    fibStop: [0.786, 0.886, 1].includes(+S.fibStop) ? +S.fibStop : 0.786, fibTarget: +S.fibTarget === 1.272 ? 1.272 : 0 };
+  if (st === 'smc_ob') return { obEntry: S.obEntry === 'zone' ? 'zone' : 'bounce', obSwing: [5, 10, 20].includes(+S.obSwing) ? +S.obSwing : 10 };
+  if (st === 'smc_fvg') return { fvgMin: [0, 0.5, 1].includes(+S.fvgMin) ? +S.fvgMin : 0.5, fvgLife: [24, 48, 96].includes(+S.fvgLife) ? +S.fvgLife : 48 };
+  return {};
+}
+// ZigZag swing points with a threshold of k × ATR at the bar (research/fib.js): {dir: 1 a high / −1 a low, p: its price,
+// i: its bar, c: the bar whose close confirms it, x: the furthest price reached away from it by then}
+export function zigzag(h, l, a, k) {
+  const n = h.length, sw = [];
+  let dir = 1, ext = h[0], ei = 0, opp = Infinity, oi = 0;
+  for (let i = 1; i < n; i++) {
+    if (dir > 0) {
+      if (h[i] > ext) { ext = h[i]; ei = i; opp = Infinity; continue; }   // inside one bar the order of high and low is unknown
+      if (l[i] < opp) { opp = l[i]; oi = i; }
+      if (ext - opp >= k * a[i]) {
+        sw.push({ dir: 1, p: ext, i: ei, c: i, x: opp });
+        dir = -1; ext = opp; ei = oi; opp = -Infinity;
+        for (let j = ei + 1; j <= i; j++) if (h[j] > opp) { opp = h[j]; oi = j; }
+      }
+    } else {
+      if (l[i] < ext) { ext = l[i]; ei = i; opp = -Infinity; continue; }
+      if (h[i] > opp) { opp = h[i]; oi = i; }
+      if (opp - ext >= k * a[i]) {
+        sw.push({ dir: -1, p: ext, i: ei, c: i, x: opp });
+        dir = 1; ext = opp; ei = oi; opp = Infinity;
+        for (let j = ei + 1; j <= i; j++) if (l[j] < opp) { opp = l[j]; oi = j; }
+      }
+    }
+  }
+  return sw;
+}
+// Fibonacci pullbacks (research/fib.js): after an impulse (a swing low then a swing high for a long, known when the high is
+// confirmed), the close of the first bar that meets the zone; none if the price reached the stop level first or in that bar,
+// went past the impulse's end, or the next swing was confirmed. Stop at the stop level, target the impulse's end (or 1.272)
+export function fibEvents(Q, S) {
+  const { fibK, fibZone, fibStop, fibTarget } = studyOf(S), [z0, z1] = FIB_ZONES[fibZone], tr = fibTarget ? 1 - fibTarget : 0;
+  const { h, l, c, A } = Q, n = c.length, sw = zigzag(h, l, A, fibK), out = [];
+  for (let q = 1; q < sw.length; q++) {
+    const a = sw[q - 1], b = sw[q], sg = b.dir, E = b.p, D = sg * (E - a.p), until = q + 1 < sw.length ? sw[q + 1].c : n - 1;
+    if (!(D > 0)) continue;
+    const rr = p => sg * (E - p) / D, px = r => E - sg * r * D;
+    if (rr(b.x) >= fibStop) continue;   // past the stop level before the impulse was known
+    for (let j = b.c; j <= until; j++) {
+      const deep = rr(sg > 0 ? l[j] : h[j]), near = rr(sg > 0 ? h[j] : l[j]);
+      if (deep >= fibStop || near < 0) break;
+      if (near <= z1 && deep >= z0) {
+        out.push({ i: j, side: sg > 0 ? 'LONG' : 'SHORT', sl: px(fibStop), tp: px(tr), info: { kind: 'fib', from: a.p, to: E, known: b.c },
+                   note: `откат ${fibZone}–${z1} импульса` });
+        break;
+      }
+    }
+  }
+  return out;
+}
+// SMC order blocks (research/smc_check.js): swing points are the extreme of L bars on each side, known L bars later; a close
+// beyond the last swing against the trend is a break of structure; the block is the extreme candle before the break. It exists
+// from the break bar on (made) — counting it from its own candle was the look-ahead of the first round (docs/RESEARCH-SMC.md) —
+// and lives until a close beyond its far edge (end, −1 while alive)
+export function obBlocks(Q, L = 10) {
+  const { h, l, c } = Q, n = c.length, obs = [], live = [];
+  let ph = { p: -Infinity, i: -1 }, pl = { p: Infinity, i: -1 }, trend = 0;
+  for (let i = 2 * L; i < n; i++) {
+    const m = i - L;
+    let hi = true, lo = true;
+    for (let j = m - L; j <= i; j++) { if (h[j] > h[m]) hi = false; if (l[j] < l[m]) lo = false; }
+    if (hi) ph = { p: h[m], i: m };
+    if (lo) pl = { p: l[m], i: m };
+    for (let q = live.length - 1; q >= 0; q--) {   // a block made before this bar dies on a close beyond its far edge
+      const ob = live[q];
+      if (ob.side === 'LONG' ? c[i] < ob.bot : c[i] > ob.top) { ob.end = i; live.splice(q, 1); }
+    }
+    if (ph.i !== -1 && pl.i !== -1) {
+      let ob = null;
+      if (c[i] > ph.p && trend !== 1) { trend = 1; let o = pl.i; for (let j = pl.i; j <= i; j++) if (l[j] < l[o]) o = j; ob = { top: h[o], bot: l[o], side: 'LONG', src: o, made: i, end: -1 }; }
+      else if (c[i] < pl.p && trend !== -1) { trend = -1; let o = ph.i; for (let j = ph.i; j <= i; j++) if (h[j] > h[o]) o = j; ob = { top: h[o], bot: l[o], side: 'SHORT', src: o, made: i, end: -1 }; }
+      if (ob) { obs.push(ob); live.push(ob); }
+    }
+  }
+  return obs;
+}
+// a live block of this side at bar i within 1 % of the price z (the band the bounce starts from), as smc_check.js «honest»
+export const obNear = (obs, i, side, z) => obs.some(ob => ob.made <= i && (ob.end === -1 || ob.end > i) && ob.side === side && ob.top >= z * 0.99 && ob.bot <= z * 1.01);
+// the first return into a zone [bot, top] after bar i0 (up to bar i1): a long when the low comes down into it without going
+// through its bottom (stop at the bottom), a short mirrored; a bar through the far edge ends the zone without a trade
+function zoneEntry(Q, i0, i1, side, bot, top, rr, info, note) {
+  const { h, l } = Q, L = side === 'LONG';
+  for (let j = i0 + 1; j <= Math.min(i1, Q.c.length - 1); j++) {
+    if (!(L ? l[j] <= top : h[j] >= bot)) continue;
+    if (L ? l[j] <= bot : h[j] >= top) return null;
+    const sl = L ? bot : top, e = Q.c[j], d = Math.abs(e - sl);
+    return { i: j, side, sl, tp: e + (L ? 1 : -1) * rr * d, info, note };
+  }
+  return null;
+}
+// entries at the return into a block, from the bar after its break on, while it lives; stop beyond the block, take rr × the stop
+export function obEvents(Q, S, obs = obBlocks(Q, studyOf(S).obSwing)) {
+  const rr = S.rr > 0 ? S.rr : 2, out = [];
+  for (const ob of obs) {
+    const x = zoneEntry(Q, ob.made, ob.end === -1 ? Infinity : ob.end, ob.side, ob.bot, ob.top, rr, { kind: 'ob', top: ob.top, bot: ob.bot, known: ob.made }, 'возврат в ордер-блок');
+    if (x) out.push(x);
+  }
+  return out;
+}
+// fair value gaps: the gap between the high of bar i−2 and the low of bar i (a bullish one), known at the close of bar i, at
+// least fvgMin × ATR; a long at the first return into it within fvgLife bars, stop beyond its far edge; a bearish one mirrored
+export function fvgEvents(Q, S) {
+  const { fvgMin, fvgLife } = studyOf(S), rr = S.rr > 0 ? S.rr : 2, { h, l, A } = Q, out = [];
+  for (let i = 2; i < Q.c.length; i++) {
+    const min = fvgMin * (A[i] || 0);
+    if (l[i] > h[i - 2] && l[i] - h[i - 2] >= min && l[i] - h[i - 2] > 0) {
+      const x = zoneEntry(Q, i, i + fvgLife, 'LONG', h[i - 2], l[i], rr, { kind: 'fvg', top: l[i], bot: h[i - 2], known: i }, 'возврат в разрыв');
+      if (x) out.push(x);
+    } else if (h[i] < l[i - 2] && l[i - 2] - h[i] >= min && l[i - 2] - h[i] > 0) {
+      const x = zoneEntry(Q, i, i + fvgLife, 'SHORT', h[i], l[i - 2], rr, { kind: 'fvg', top: l[i - 2], bot: h[i], known: i }, 'возврат в разрыв');
+      if (x) out.push(x);
+    }
+  }
+  return out;
+}
+// the entries of a study idea on one coin, by bar: Map bar → [{side, sl, tp, info, note}]; null for the order-block filter of
+// the band bounce (its entries are the bounce's, see backtest)
+export function studyEvents(Q, S) {
+  const st = S.strategy, list = st === 'fib' ? fibEvents(Q, S) : st === 'smc_fvg' ? fvgEvents(Q, S) : st === 'smc_ob' && studyOf(S).obEntry === 'zone' ? obEvents(Q, S) : null;
+  if (!list) return null;
+  const m = new Map();
+  for (const x of list) { const a = m.get(x.i); if (a) a.push(x); else m.set(x.i, [x]); }
+  return m;
+}
+// a study entry at the close of its bar: market in (+ slippage), sized as planEntry sizes (risk of the stake at the stop, the
+// leverage cap shared by the slots); null when the stop or the target is not on the right side of the entry
+function studyEntry(ev, Q, sym, balance, S, now, start, mkt) {
+  const sg = ev.side === 'LONG' ? 1 : -1, e = Q.c[ev.i] * (1 + sg * SLIP), sl = ev.sl, tp = ev.tp;
+  if (!(sg * (e - sl) > 0 && sg * (tp - e) > 0)) return null;
+  const slD = Math.abs(e - sl) / e, risk = S.risk ?? RISK, lev = S.lev ?? 1, stake = S.fixedRisk && start > 0 ? start : balance;
+  const qty = Math.min(stake * risk / (e * slD), balance * lev / slotsOf(S) / e);
+  if (!(qty > 0)) return null;
+  const snap = snapshot({ mkt }, S);
+  snap.score = null; snap.atr = Q.A[ev.i]; snap.study = { ...ev.info, knownT: Q.t[ev.info.known] }; Object.assign(snap.settings, studyOf(S));
+  return { id: now + sym, sym, side: ev.side, entry: e, last: e, tp, sl, qty, time: now, tfms: TFMS[S.tf], ts: S.timeStop ?? TIME_STOP,
+           risk: Math.abs(e - sl) * qty, snap: { ...snap, lev: e * qty / balance, riskPct: Math.abs(e - sl) * qty / balance * 100 }, note: ev.note };
+}
+// the filters that apply to a study entry: only LONG and the market regime (as wants)
+function studyWants(side, S, mkt) {
+  if (side === 'SHORT' && S.longOnly) return false;
+  const reg = regimeOf(mkt, S), only = S.regimeOnly || 'any';
+  if (only === 'flat' && reg !== 'flat') return false;
+  if (only === 'impulse' && (reg == null || reg === 'flat')) return false;
+  return true;
+}
+
 // hist: {sym: klines[]} (closed bars, same tf, warm-up of at least N+100 bars before `from`).
 // Steps bar by bar through time over all pairs with the live rules: a signal is evaluated at the close of a bar,
 // entry at that close (+slippage), exits checked on the following bars (stop first if both are hit), time stop, cooldown, slot limit.
@@ -509,9 +670,12 @@ const now = () => Date.now();
 // what the live bot does with Binance's 24 h ticker. Today's top applied to the whole past would know which coins later grew.
 export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 0 } = {}) {
   const tfms = TFMS[S.tf], P = {}, slots = slotsOf(S);
+  // a study idea: its own entries by bar (ev), or for the order-block filter of the bounce the coin's blocks (ob)
+  const study = isStudy(S), obFilter = S.strategy === 'smc_ob' && studyOf(S).obEntry === 'bounce';
   for (const [sym, K] of Object.entries(hist)) {
     if (K.length < S.N + 20) continue;
     const Q = prepare(K, S); Q.idx = new Map(Q.t.map((t, i) => [t, i])); P[sym] = Q;
+    if (study) { if (obFilter) Q.ob = obBlocks(Q, studyOf(S).obSwing); else Q.ev = studyEvents(Q, S); }
   }
   // BTC/ETH/SOL drive the market regime; they may be loaded only for that (`only` = coins that are actually traded)
   const BTC = P.BTCUSDT, regS = {};
@@ -552,17 +716,27 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
       const cands = [], mkt = BTC ? marketOf(s => regAt(s, T)) : null;
       for (const sym of active) {
         const Q = P[sym], i = Q.idx.get(T);
-        if (i == null || !touchedAt(Q, i) || open.some(p => p.sym === sym)) continue;
+        if (i == null || open.some(p => p.sym === sym)) continue;
         if (lastClose[sym] != null && T - lastClose[sym] < COOLDOWN * tfms) continue;
+        if (Q.ev) {   // a study idea with entries of its own: no strength, in the order of the top (by turnover)
+          // not before the coin's bar N + 19: a coin is loaded only with N + 20 candles in all (above), so an entry on a younger
+          // bar would depend on the coin still trading later — a cut at that bar drops the coin (backtest-audit cut(), 2.106)
+          if (i < S.N + 19) continue;
+          for (const ev of Q.ev.get(i) || []) if (studyWants(ev.side, S, mkt)) { cands.push({ sym, i, ev, score: 0 }); break; }
+          continue;
+        }
+        if (study && !Q.ob) continue;
+        if (!touchedAt(Q, i)) continue;
         const r = signalAt(Q, i, sym, T + tfms, true);   // bar fully elapsed
         if (r) r.mkt = mkt;
-        if (wants(r, S)) { r.i = i; cands.push(r); }
+        // the order-block filter: the bounce's own rules, and a live block of the trade's side at the band it bounces from
+        if (wants(r, S) && (!Q.ob || obNear(Q.ob, i, r.side === 'low' ? 'LONG' : 'SHORT', r.side === 'low' ? r.lo : r.up))) { r.i = i; cands.push(r); }
       }
       cands.sort((a, b) => b.score - a.score);
       for (const r of cands) {
         if (open.length >= slots) break;
-        const p = planEntry(r, balance, S, T + tfms - 1, start);
-        if (p) { p.ei = r.i; p.id = `${T}${r.sym}`; open.push(p); }
+        const p = r.ev ? studyEntry(r.ev, P[r.sym], r.sym, balance, S, T + tfms - 1, start, mkt) : planEntry(r, balance, S, T + tfms - 1, start);
+        if (p) { p.ei = r.i; p.id = `${T}${r.sym}`; if (study && !r.ev) Object.assign(p.snap.settings, studyOf(S)); open.push(p); }
       }
     }
     equity.push([T, balance]);
@@ -586,6 +760,9 @@ export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, s
   if (!rs.length) return null;
   const tfms = TFMS[S.tf], slots = slotsOf(S), risk = S.risk ?? RISK, lev = S.lev ?? 1, ts = S.timeStop ?? TIME_STOP;
   const ratios = trades.map(x => Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl)).filter(x => x > 0 && isFinite(x));
+  // a study idea's stops are its levels (0.786 of an impulse, the edge of a block or a gap), not 1.5 ATR: its random trades take
+  // the stop distance and the take : stop of one of its own trades, drawn at random. The ideas of STRATEGIES draw as before
+  const own = isStudy(S) ? trades.map(x => [Math.abs(x.entry - x.sl) / x.entry, Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl)]).filter(([d, k]) => d > 0 && k > 0 && isFinite(d) && isFinite(k)) : null;
   // per coin: plain arrays of the candles and running sums of quote turnover (volume × close, as backtest()); a year of a wide
   // pool is millions of candles, so no Map or Set over them — a bar is found by its distance from the first one (candles come
   // one interval apart; a gap falls back to a binary search)
@@ -632,8 +809,9 @@ export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, s
       for (let k = 0; k < 20; k++) { const s = a[Math.floor(R() * a.length)], q = C[s], j = at(q, T); if (j > 0 && isFinite(q.A[j])) { Q = q; i = j; sym = s; break; } }
     }
     if (i == null) return null;
-    const sg = R() < 0.5 ? 1 : -1, e = Q.c[i] * (1 + sg * SLIP), slD = clamp(1.5 * Q.A[i] / e, 0.008, 0.025);
-    const tpD = (S.rr > 0 ? S.rr : ratios.length ? ratios[Math.floor(R() * ratios.length)] : 1) * slD;
+    const sg = R() < 0.5 ? 1 : -1, e = Q.c[i] * (1 + sg * SLIP), o = own?.length ? own[Math.floor(R() * own.length)] : null;
+    const slD = o ? o[0] : clamp(1.5 * Q.A[i] / e, 0.008, 0.025);
+    const tpD = (o ? o[1] : S.rr > 0 ? S.rr : ratios.length ? ratios[Math.floor(R() * ratios.length)] : 1) * slD;
     const sl = e * (1 - sg * slD), tp = e * (1 + sg * tpD), qty = Math.min(start * risk / (e * slD), start * lev / slots / e);
     const p = { id: `${T}${sym}`, sym, side: sg > 0 ? 'LONG' : 'SHORT', entry: e, sl, tp, qty, time: T + tfms - 1, risk: Math.abs(e - sl) * qty,
                 snap: { lev: e * qty / start, settings: { maxOpen: slots } } };

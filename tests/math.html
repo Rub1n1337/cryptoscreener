@@ -165,6 +165,45 @@ for (const [name, S] of Object.entries(VARIANTS)) {
   check('случайный вход: топ на каждый момент, как у бэктеста', T1.every(x => { const T = Math.floor((x.time - TFMS + 1) / 36e5) * 36e5; return Object.keys(hist).sort((p, q) => turn(q, T) - turn(p, T))[0] === x.sym; }));
 }
 
+// ---------- 2e. study ideas (STUDY): backtest only, every level known at the bar it is used on ----------
+{
+  // the order-block filter of the bounce is rare on these candles (a block within 1 % of the band): a narrow channel, short
+  // swings and ten slots give it enough trades to check
+  const OBF = {...BASE, strategy:'smc_ob', k:1.5, obSwing:5, maxOpen:10};
+  check('учебные идеи не в STRATEGIES (профили и бот их не примут)', Object.keys(M.STUDY).every(k => !(k in M.STRATEGIES)));
+  const K = hist.AAAUSDT, CUT = 900, Kc = K.slice(0, CUT), S0 = {...BASE};
+  const Q = M.prepare(K, S0), Qc = M.prepare(Kc, S0), key = x => JSON.stringify(x);
+  const sw = M.zigzag(Q.h, Q.l, Q.A, 3), swc = M.zigzag(Qc.h, Qc.l, Qc.A, 3);
+  check('ZigZag: вершина подтверждается позже своей свечи, на пороге k × ATR', sw.length > 10 && sw.every(s => s.c > s.i && Math.abs(s.p - s.x) >= 3 * Q.A[s.c] - 1e-9), `${sw.length} вершин`);
+  check('ZigZag: на обрезанных свечах те же вершины (не заглядывает вперёд)', key(swc) === key(sw.filter(s => s.c < CUT)));
+  const same = (name, f) => { const a = f(Q).filter(x => x.i < CUT), b = f(Qc); check(`${name}: на обрезанных свечах те же входы`, a.length > 0 && key(a) === key(b), `${a.length}`); };
+  for (const [name, S] of [['Фибоначчи', {...S0, strategy:'fib'}], ['Фибоначчи, k 2, зона 0.382, стоп 1, цель 1.272', {...S0, strategy:'fib', fibK:2, fibZone:'0.382', fibStop:1, fibTarget:1.272}],
+    ['ордер-блок, вход в блок', {...S0, strategy:'smc_ob', obEntry:'zone', obSwing:5}], ['FVG', {...S0, strategy:'smc_fvg', fvgMin:0}]])
+    same(name, q => [...(M.studyEvents(q, S)?.values() || [])].flat());
+  const fe = M.fibEvents(Q, {strategy:'fib'});
+  check('Фибоначчи: вход не раньше, чем известен импульс; в зоне 0.5–0.618; стоп 0.786, цель — вершина', fe.length > 0 && fe.every(x => {
+    const sg = x.side === 'LONG' ? 1 : -1, D = sg * (x.info.to - x.info.from), rr = p => sg * (x.info.to - p) / D;
+    return x.i >= x.info.known && rr(sg > 0 ? Q.l[x.i] : Q.h[x.i]) >= 0.5 - 1e-9 && rr(sg > 0 ? Q.h[x.i] : Q.l[x.i]) <= 0.618 + 1e-9 && Math.abs(rr(x.sl) - 0.786) < 1e-9 && Math.abs(x.tp - x.info.to) < 1e-9; }), `${fe.length}`);
+  const obs = M.obBlocks(Q, 10), obc = M.obBlocks(Qc, 10);
+  check('ордер-блок: существует только с бара слома, после своей свечи', obs.length > 0 && obs.every(o => o.made > o.src && (o.end === -1 || o.end > o.made)), `${obs.length}`);
+  check('ордер-блок: на обрезанных свечах те же блоки', key(obc.map(o => ({...o, end: o.end}))) === key(obs.filter(o => o.made < CUT).map(o => ({...o, end: o.end !== -1 && o.end < CUT ? o.end : -1}))));
+  for (const [name, S] of [['Фибоначчи', {...BASE, strategy:'fib'}], ['ордер-блок у границы', OBF], ['ордер-блок, вход в блок', {...BASE, strategy:'smc_ob', obEntry:'zone'}], ['FVG', {...BASE, strategy:'smc_fvg'}]]) {
+    const r = bt(M, S, 10000), tr = r.trades;
+    check(`бэктест, ${name}: есть сделки, стоп хуже −1R, тейк по ту сторону входа`, tr.length > 5 && tr.filter(x => x.reason === 'стоп').every(x => x.r < -1) && tr.every(x => (x.side === 'LONG' ? 1 : -1) * (x.tp - x.entry) > 0), `${tr.length} · ${(tr.reduce((s, x) => s + x.r, 0) / tr.length).toFixed(3)}R`);
+    // the candles cut at bar 1100: the trades opened before the cut are the same (none looks ahead)
+    const cutT = T0 + 1100 * TFMS, H = Object.fromEntries(Object.entries(hist).map(([s, k]) => [s, k.filter(x => x[0] < cutT)]));
+    const rc = M.backtest(H, S, {start:10000, from}), ent = x => [x.sym, x.side, x.time, x.entry, x.sl, x.tp].join('|');
+    const before = tr.filter(x => x.tclose < cutT - TFMS);
+    check(`бэктест, ${name}: на обрезанных свечах те же сделки до обреза`, key(rc.trades.filter(x => x.tclose < cutT - TFMS).map(ent)) === key(before.map(ent)), `${before.length}`);
+    const X = M.randomSetup(hist, S, tr, {from, start:10000, seed:3}), stops = new Set(tr.map(x => (Math.abs(x.entry - x.sl) / x.entry).toFixed(9)));
+    check(`случайный вход, ${name}: стоп — как у сделок самой идеи`, X.run(0, true).trades.every(x => stops.has((Math.abs(x.entry - x.sl) / x.entry).toFixed(9))));
+  }
+  const ob = bt(M, OBF, 10000).trades, P = {};
+  check('ордер-блок у границы: у каждой сделки на баре входа живой блок своей стороны', ob.length > 5 && ob.every(x => {
+    const q = P[x.sym] ||= M.prepare(hist[x.sym], OBF), i = q.t.indexOf(x.time - TFMS + 1), bl = q.ob ||= M.obBlocks(q, OBF.obSwing);
+    return M.obNear(bl, i, x.side, x.side === 'LONG' ? x.snap.lo : x.snap.up); }));
+}
+
 // ---------- 3. against the previous copy: nothing else changed ----------
 const refPath = new URLSearchParams(location.search).get('ref');
 if (refPath) {

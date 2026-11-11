@@ -1,6 +1,10 @@
-// Older «Что нового» entries (2.93 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.94 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.94', date:'9 ноября 2026', title:'Монеты моего бота', items:[
+    'Добавлен фильтр «Бот» в списке монет на «Рынке»: монеты, которыми сейчас торгует «Мой бот».',
+    'Монеты из своего списка в профиле бота видны в таблице, даже если их нет среди самых популярных.',
+  ]},
   {v:'2.93', date:'9 ноября 2026', title:'Стакан внутри «Рынка»', items:[
     'Добавлена кнопка «Развернуть» в режиме «Стакан»: «Рынок» во всю ширину — до четырёх графиков и свой список монет.',
     'Вкладки «Графики» больше нет: всё, что в ней было, теперь на «Рынке».',

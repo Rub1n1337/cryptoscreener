@@ -457,6 +457,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .pick-btn{gap:6px;font-weight:600}.pick-btn .i{width:15px;height:15px}.pick-btn[aria-pressed=true]{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 /* backtest form: one card, a titled section per kind of setting (docs/PLAN-UNTANGLE-backtest.md) */
 .btform{margin-bottom:12px}.btsec{padding:12px 0;border-top:1px solid var(--line)}.btsec:first-child{padding-top:0;border-top:0}.btsec .fields{align-items:flex-end}
+.btrrfib{align-self:center;font-size:12.5px;max-width:40ch;text-wrap:pretty}
 .bthint{margin:8px 0 0;font-size:12.5px;color:var(--mute);max-width:72ch;text-wrap:pretty}.bthint:empty{display:none}
 #btAdv>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;min-height:36px;padding:8px 28px 0 0;position:relative}
 #btAdv>summary::-webkit-details-marker{display:none}#btAdv>summary h4{margin:0}#btAdv>summary .mute{font-size:12px;text-wrap:pretty}
@@ -1534,7 +1535,16 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <div class="btsec"><h4>Что проверяем</h4><div class="fields">
         <label id="btStratL" title="Правило, по которому бот решает войти в сделку">Идея входа <select id="btStrat">
           <optgroup label="Рабочие стратегии"><option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму рынка</option></optgroup>
+          <optgroup label="Учебные — проверить популярные идеи"><option value="fib">Откат по Фибоначчи</option><option value="smc_ob">SMC: ордер-блок</option><option value="smc_fvg">SMC: разрыв (FVG)</option></optgroup>
         </select></label>
+        <label class="btfib" title="Импульс — движение, после которого цена отошла от вершины на столько ATR(14). Чем больше порог, тем крупнее и реже импульсы">Импульс от <select id="btFibK"><option value="2">2 × ATR</option><option value="3" selected>3 × ATR</option><option value="4">4 × ATR</option><option value="5">5 × ATR</option></select></label>
+        <label class="btfib" title="Насколько цена откатилась от вершины импульса: 0 — вершина, 1 — начало. 0.5–0.618 — «золотая зона»">Зона отката <select id="btFibZone"><option value="0.382">0.382–0.5</option><option value="0.5" selected>0.5–0.618</option><option value="0.618">0.618–0.705</option></select></label>
+        <label class="btfib" title="Уровень отката, на котором стоит стоп; 1 — начало импульса">Стоп на <select id="btFibStop"><option value="0.786" selected>0.786</option><option value="0.886">0.886</option><option value="1">1 (начало)</option></select></label>
+        <label class="btfib" title="Где цель: вершина импульса или расширение 1.272 за ней">Цель <select id="btFibTarget"><option value="0" selected>вершина</option><option value="1.272">1.272</option></select></label>
+        <label class="btob" title="«У границы канала» — отскок от границы, только если рядом ордер-блок своей стороны. «Возврат в блок» — вход, когда цена вернулась в блок; стоп за блоком">Как входить <select id="btObEntry"><option value="bounce" selected>отскок у границы канала</option><option value="zone">возврат цены в блок</option></select></label>
+        <label class="btob" title="Вершина или дно считается свингом, если это экстремум стольких свечей с каждой стороны; известна она через столько же свечей">Свинг <select id="btObSwing"><option value="5">5 свечей</option><option value="10" selected>10 свечей</option><option value="20">20 свечей</option></select></label>
+        <label class="btfvg" title="Минимальный размер разрыва между свечами, в ATR(14)">Мин. разрыв <select id="btFvgMin"><option value="0">любой</option><option value="0.5" selected>0.5 × ATR</option><option value="1">1 × ATR</option></select></label>
+        <label class="btfvg" title="Сколько свечей разрыв ждёт возврата цены; потом он не торгуется">Ждать возврата <select id="btFvgLife"><option value="24">24 свечи</option><option value="48" selected>48 свечей</option><option value="96">96 свечей</option></select></label>
         <label class="btch" title="Модель канала: как считаются центр и границы">Канал <select id="btMethod">
           <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
         </select></label>
@@ -1559,13 +1569,14 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       </div></div>
       <div class="btsec"><h4>Выход</h4><div class="fields">
         <label id="btRRL" title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">Тейк (RR, тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
+        <span class="btrrfib mute">Стоп и цель задаёт сама идея: уровни Фибоначчи выше.</span>
         <label title="Закрыть сделку по рынку, если за это число свечей не сработали ни тейк, ни стоп">Тайм-стоп <select id="btTS"><option value="0">выкл</option><option value="24">24 свечи</option><option value="48">48 свечей</option><option value="96">96 свечей</option></select></label>
       </div></div>
       <details class="btsec" id="btAdv"><summary><h4>Фильтры входа</h4><span class="mute">сила сигнала, T½, ширина канала, тренд монеты, режим рынка</span></summary><div class="fields">
-        <label title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" inputmode="numeric" enterkeyhint="done" min="0" max="100" style="width:80px"></label>
-        <label title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
-        <label title="Входить, только если ширина канала (от нижней до верхней границы) не меньше заданного процента от цены. Чем шире канал, тем больше ход к центру">Мин. ширина канала <select id="btW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option><option value="12">≥ 12%</option></select></label>
-        <label title="Не ловить отскок на монете, которая сама в сильном тренде (ER монеты за ~7 дней выше порога)">Тренд монеты <select id="btCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
+        <label class="btsig" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" inputmode="numeric" enterkeyhint="done" min="0" max="100" style="width:80px"></label>
+        <label class="btsig" title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
+        <label class="btsig" title="Входить, только если ширина канала (от нижней до верхней границы) не меньше заданного процента от цены. Чем шире канал, тем больше ход к центру">Мин. ширина канала <select id="btW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option><option value="12">≥ 12%</option></select></label>
+        <label class="btsig" title="Не ловить отскок на монете, которая сама в сильном тренде (ER монеты за ~7 дней выше порога)">Тренд монеты <select id="btCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
         <label title="Когда разрешено входить: в любом рынке, только в боковике (флэт) или только в импульсе (сильное движение)">Режим рынка <select id="btReg"><option value="any">любой</option><option value="flat">только флэт</option><option value="impulse">только импульс</option></select></label>
         <label title="По каким монетам определять режим. «BTC+ETH+SOL» — флэт, только когда все три стоят в боковике">Режим по <select id="btSrc"><option value="btc">BTC</option><option value="majors">BTC+ETH+SOL</option></select></label>
         <label title="ER = чистое движение за ~7 дней / весь пройденный путь. Ниже порога — флэт (боковик), выше — импульс">Флэт, если ER <select id="btER"><option value="0.1">&lt; 0.10</option><option value="0.15">&lt; 0.15</option><option value="0.25">&lt; 0.25</option></select></label>
@@ -4125,7 +4136,14 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   // «why the bot entered» goes under the chart on a wide screen (it was empty there, and the numbers above it now fit the
   // screen) and after the numbers on a narrow one (#mwhy's grid area): the signal's parts on the left, the reading on the right
   let why = `<h4>Почему бот вошёл</h4>`;
-  if (x.snap) {
+  const sd = x.snap?.study;
+  if (sd) {   // a study idea of the backtest (M.STUDY): its levels and the bar they became known on, no signal strength
+    const st = x.snap.settings || {};
+    why = `<h4>Почему вошли</h4><div class="mute" style="font-size:13px;line-height:1.55">` + (sd.kind === 'fib'
+      ? `Импульс ${sg > 0 ? 'вверх' : 'вниз'} от ${fp(sd.from)} до ${fp(sd.to)} (порог ${st.fibK} × ATR) стал известен ${dt(sd.knownT)}. Вход — на откате в зону ${st.fibZone}–${M.FIB_ZONES[st.fibZone]?.[1]}, стоп — на уровне ${st.fibStop}, цель — ${st.fibTarget ? 'расширение ' + st.fibTarget : 'вершина импульса'}.`
+      : `${sd.kind === 'ob' ? 'Ордер-блок' : 'Разрыв (FVG)'} ${fp(sd.bot)} – ${fp(sd.top)} появился ${dt(sd.knownT)}${sd.kind === 'ob' ? ' — на сломе структуры' : ''}. Вход — когда цена вернулась в него, стоп — за его дальним краем, тейк — ${st.rr > 0 ? st.rr : 2} стопа.`)
+      + `<div class="faint" style="font-size:12px;margin-top:8px">Учебная стратегия бэктеста: бот по ней не торгует.</div></div>`;
+  } else if (x.snap) {
     const s = x.snap;
     why += `<div class="twhy"><div><div style="font-size:13px;margin-bottom:6px">Сила сигнала <b style="color:var(--acc)">${s.score}</b> из 100 · объём <b>×${s.volX?.toFixed(1)}</b> к обычному</div>` + compsHtml(s, x.side) + '</div><div>';
     // for a bounce: how much of the way back to the centre was still ahead at the entry — the whole idea of the trade
@@ -4152,6 +4170,8 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
       {v:x.tp, col:PC.lo, tag:'TP', i0:ei, i1:xi},
       {v:x.sl, col:PC.up, tag:'SL', i0:ei, i1:xi},
     ];
+    // a study idea: the impulse, or the block / gap, from the bar it became known on
+    if (sd) { const ki = barAt(d.t, sd.knownT); for (const [v, tag] of sd.kind === 'fib' ? [[sd.from, 'начало импульса'], [sd.to, 'вершина']] : [[sd.top, sd.kind === 'ob' ? 'блок' : 'FVG'], [sd.bot, '']]) levels.push({v, col:PC.mute, tag, i0:ki, i1:xi}); }
     const marks = [{i:ei, price:x.entry, col:PC.trade, label:'вход', below:sg < 0}];
     if (!isOpen) marks.push({i:xi, price:x.exit, col:x.pnl > 0 ? PC.lo : PC.up, label:`выход · ${x.reason}`, below:sg > 0});
     const from0 = Math.max(set.N - 1, ei - 120);
@@ -4265,6 +4285,9 @@ function btSettings() {
           strategy:$('#btStrat').value, longOnly:$('#btLong').checked,
           rr:+$('#btRR').value || 0, risk:(+$('#btRisk').value || 2) / 100, lev:+$('#btLev').value || 1,
           erMax:+$('#btER').value || 0.15, regimeOnly:$('#btReg').value, regimeSrc:$('#btSrc').value, coinErMax:+$('#btCoinER').value || 0, timeStop:+$('#btTS').value, maxOpen:+$('#btSlots').value || 3,
+          // a study idea's own settings (M.studyOf: only those of the chosen idea, so the others don't mark a result stale)
+          ...M.studyOf({strategy:$('#btStrat').value, fibK:$('#btFibK').value, fibZone:$('#btFibZone').value, fibStop:$('#btFibStop').value, fibTarget:$('#btFibTarget').value,
+            obEntry:$('#btObEntry').value, obSwing:$('#btObSwing').value, fvgMin:$('#btFvgMin').value, fvgLife:$('#btFvgLife').value}),
           // the starting balance, and the stake of the risk: the balance (compounding, as the bots trade) or the start (fixedRisk)
           start:clamp(Math.round(+$('#btStart').value) || 10000, 100, 1e7), ...($('#btComp').checked ? {} : {fixedRisk:true})};
 }
@@ -4304,9 +4327,37 @@ function btStale() {
 const BT_HINT = {revert:'Цена коснулась границы канала и развернулась — входим в сторону центра канала.',
   revert_trend:'Тот же отскок от границы, но только по направлению наклона канала.',
   breakout:'Свеча закрылась за границей канала на повышенном объёме — входим в ту же сторону.',
-  switch:'Рынок в боковике — отскок от границы; рынок растёт — пробой, только LONG; рынок падает — без сделок.'};
+  switch:'Рынок в боковике — отскок от границы; рынок растёт — пробой, только LONG; рынок падает — без сделок.',
+  // study ideas (M.STUDY): the research checked the defaults only (docs/RESEARCH-2026-10.md, docs/RESEARCH-SMC.md); FVG — never
+  fib:'Учебная стратегия. После импульса цена откатывается назад на долю его длины; вход в зоне отката, стоп — на более глубоком уровне, цель — вершина. С настройками по умолчанию на нескольких годах нашей истории она убыточна и не лучше отката к случайному уровню — запустите, чтобы увидеть, как выглядит идея без преимущества. Бот по учебным стратегиям не торгует.',
+  smc_ob:'Учебная стратегия. Ордер-блок — последняя свеча перед сломом структуры; он существует только с момента слома. «Отскок у границы канала» с настройками по умолчанию на нескольких годах нашей истории хуже обычного отскока; «возврат цены в блок» не исследовался. Бот по учебным стратегиям не торгует.',
+  smc_fvg:'Учебная стратегия. Разрыв (FVG) — цены, через которые рынок проскочил: между максимумом свечи и минимумом свечи через одну. Вход при возврате цены в разрыв, стоп за его дальним краем. Эту идею мы не исследовали — смотрите на сравнение со случайным входом. Бот по учебным стратегиям не торгует.'};
+// the idea of a run's settings in words, with a study idea's own settings
+const btOwn = s => s.strategy === 'fib' || s.strategy === 'smc_fvg' || (s.strategy === 'smc_ob' && s.obEntry === 'zone');
+const btIdea = s => s.strategy === 'fib' ? `${M.STUDY.fib} (импульс ${s.fibK} × ATR, зона ${s.fibZone}–${M.FIB_ZONES[s.fibZone][1]}, стоп ${s.fibStop}, цель — ${s.fibTarget ? 'расширение ' + s.fibTarget : 'вершина'})`
+  : s.strategy === 'smc_ob' ? `${M.STUDY.smc_ob} (${s.obEntry === 'zone' ? 'возврат в блок' : 'отскок у границы канала'}, свинг ${s.obSwing})`
+  : s.strategy === 'smc_fvg' ? `${M.STUDY.smc_fvg} (разрыв ≥ ${s.fvgMin} × ATR, ждать ${s.fvgLife} свечей)` : M.STRATEGIES[s.strategy];
+// which fields the chosen idea uses: own — a study idea with entries and levels of its own (no channel signal, no strength)
+function btMode() {
+  const st = $('#btStrat').value, study = !!M.STUDY[st];
+  return {st, study, own:st === 'fib' || st === 'smc_fvg' || (st === 'smc_ob' && $('#btObEntry').value === 'zone')};
+}
+function btModeShow() {
+  const {st, study, own} = btMode(), hide = (sel, h) => document.querySelectorAll(sel).forEach(e => e.classList.toggle('hidden', h));
+  hide('#backtest .btch', own); hide('#backtest .btsig', own);
+  hide('#backtest .btfib', st !== 'fib'); hide('#backtest .btob', st !== 'smc_ob'); hide('#backtest .btfvg', st !== 'smc_fvg');
+  hide('#btRRL', st === 'fib'); hide('#backtest .btrrfib', st !== 'fib');
+  // a stop beyond a block or a gap has no channel centre to aim at: the take is a multiple of the stop (2 when «к центру» was set)
+  // and back to «к центру» when the idea changes back, unless the user picked another take meanwhile
+  const o0 = $('#btRR').options[0], rr = $('#btRR'); o0.disabled = own;
+  if (own && rr.value === '0') { rr.value = '2'; rr.dataset.auto = '1'; }
+  else if (!own && rr.dataset.auto) { if (rr.value === '2') rr.value = '0'; delete rr.dataset.auto; }
+  else if (own && rr.value !== '2') delete rr.dataset.auto;
+  $('#btSave').disabled = study; $('#btSave').title = study ? 'Учебные стратегии бот не торгует — их нельзя сохранить как профиль' : 'Сохранить текущие настройки бэктеста как профиль «Моего бота»';
+  $('#btStratHint').textContent = BT_HINT[st] || '';
+}
 function btEstimate() {
-  $('#btStratHint').textContent = BT_HINT[$('#btStrat').value] || '';
+  btModeShow();
   // the fields that depend on a select and the fading follow the form during a run too: «Свои даты…» picked while the history
   // loaded used to leave the dates hidden, and a result that came for the settings before the change looked fresh
   $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom'); $('#btPitL').classList.toggle('hidden', $('#btTop').value === 'custom');
@@ -4408,9 +4459,11 @@ async function runBacktest() {
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
     const goneN = gone.filter(x => hist[x]?.length).length;
     st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${per.custom ? per.label + ' (UTC)' : `${dt(btRes.from)} → ${dt(btRes.to + tfms)}`}, расчёт ${Math.round(performance.now() - t0)} мс.`
-      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · старт $${money(s.start)} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ` от старта ($${money(s.start * s.risk)} со сделки)` : ' от баланса (сложный процент)'} · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`;
+      + ` ${btIdea(s)}${s.longOnly ? ', только LONG' : ''} · ${s.strategy === 'fib' ? '' : `RR ${s.rr ? '1:' + s.rr : 'к центру'} · `}старт $${money(s.start)} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ` от старта ($${money(s.start * s.risk)} со сделки)` : ' от баланса (сложный процент)'} · плечо до ${s.lev}× · `
+      + (btOwn(s) ? s.tf : `${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}`) + `, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`;
     // what makes the result incomplete goes to «Можно ли верить» (btWarnShow), the status line keeps the run's summary
     btRes.warn = [
+      ...(M.isStudy(s) ? [['info', 'Учебная стратегия: бот по ней не торгует. Она здесь, чтобы проверить популярную идею на истории.']] : []),
       ...(failed.length ? [['warn', `Не загрузилась история ${failed.length} ${coinsGen(failed.length)} (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.`]] : []),
       ...(miss.length ? [['info', `Не найдены на Binance: ${miss.map(base).join(', ')}.`]] : []),
       ...(HS.isOff() ? [['info', 'История загружена только с Binance (?history=off).']] : [])];
@@ -4542,6 +4595,8 @@ function renderBacktest() {
        ${card('Сделок в день', (st.n / r.days).toFixed(1), `в сделке в среднем ${dur(st.avgHold)}`, '', 'Как часто за период находились сигналы, на которых бот вошёл бы, и сколько в среднем длилась сделка')}
      </div>` : ''}`;
   // by score bucket
+  // a study idea with entries of its own has no signal strength: the table by strength would be one empty row
+  $('#btScoreP').classList.toggle('hidden', !tr.some(x => x.snap?.score != null));
   const buckets = {};
   for (const x of tr) { const b = Math.min(90, Math.floor((x.snap?.score ?? 0) / 10) * 10); (buckets[b] ||= []).push(x); }
   $('#btScore').innerHTML = groupHead + '<tbody>' + (Object.keys(buckets).sort((a, b) => a - b).map(b => groupRow(`сила ${b}–${+b + 9}`, buckets[b])).join('') || '<tr><td colspan="6" class="mute">нет сделок</td></tr>') + '</tbody>';
@@ -4591,6 +4646,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.106', date:'11 ноября 2026', title:'Учебные стратегии в бэктесте', items:[
+    'Добавлены учебные стратегии: откат по Фибоначчи, ордер-блок SMC и разрыв FVG.',
+    'У каждой учебной стратегии свои настройки, а их сделки сравниваются со случайным входом.',
+    'Карточка учебной сделки показывает импульс, блок или разрыв, по которым был вход.',
+    'Бот по учебным стратегиям не торгует, их нельзя сохранить как профиль.',
+  ]},
   {v:'2.105', date:'11 ноября 2026', title:'Понятнее страница бэктеста', items:[
     'Настройки бэктеста разложены по разделам: что проверяем, на чём, деньги и риск, выход, фильтры входа.',
     'Под выбором идеи входа появилось короткое описание её правил.',
@@ -4653,10 +4714,6 @@ const CHANGELOG = [
     'Инструменты рисования собраны в кнопку «Рисование» с названиями и горячими клавишами.',
     'Список индикаторов над графиком в карточке свёрнут и раскрывается по нажатию.',
     'Исправлено: кнопки масштаба уходили под график, если пролистать его в прошлое.',
-  ]},
-  {v:'2.94', date:'9 ноября 2026', title:'Монеты моего бота', items:[
-    'Добавлен фильтр «Бот» в списке монет на «Рынке»: монеты, которыми сейчас торгует «Мой бот».',
-    'Монеты из своего списка в профиле бота видны в таблице, даже если их нет среди самых популярных.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5151,6 +5208,8 @@ $('#btCache').onclick = async () => {
 // backtest → bot: keep the tested settings as a profile
 $('#btSave').onclick = async () => {
   const s = btSettings(), usesReg = s.regimeOnly !== 'any' || s.strategy === 'switch';
+  // a study idea is not in M.STRATEGIES: a profile would fall back to the default strategy (cleanProfile, the bot's oneOf)
+  if (M.isStudy(s)) return toast('Учебные стратегии бот не торгует', 'Сохранить можно настройки рабочей стратегии.', 'info');
   // the profile keeps how the market regime was tested — the flat / impulse border and BTC alone or BTC+ETH+SOL — and the bot
   // reads it the same way, on the profile's timeframe
   const name = await ask({title:'Сохранить как профиль бота', text:'Под этим названием профиль появится в «Мой бот» — там его можно выбрать для торговли.',
@@ -5423,7 +5482,8 @@ $('#btProf').onclick = () => {
   const tfNote = $('#btTf').value !== p.set.tf ? ` Таймфрейм ${p.set.tf} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
   toast(`Подставлен профиль «${p.name}»`, `Нажмите «Запустить».${tfNote}`, 'ok');
 };
-['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp', '#btFrom', '#btTo'].forEach(s => $(s).onchange = btEstimate);
+['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp', '#btFrom', '#btTo',
+  '#btFibK', '#btFibZone', '#btFibStop', '#btFibTarget', '#btObEntry', '#btObSwing', '#btFvgMin', '#btFvgLife'].forEach(s => $(s).onchange = btEstimate);
 // «Свои даты…» start on the previous calendar year (UTC); the dates can't run past today
 $('#btDays').addEventListener('change', () => {
   if ($('#btDays').value !== 'custom') return;
