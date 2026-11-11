@@ -4,3 +4,5 @@
 !.claude/settings.json
 tests/_ref/
 research/data/
+research/kronos/.ext/
+research/kronos/__pycache__/
