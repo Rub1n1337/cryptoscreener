@@ -667,7 +667,8 @@ class Pane {
   fpStepFor(G) {
     const d = this.d; let rs = 0, cnt = 0;
     for (let i = G.s; i <= G.e; i++) { rs += d.h[i] - d.l[i]; cnt++; }
-    return Math.max(this.base, C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : niceStep(rs / Math.max(1, cnt) / 10, 1));
+    // a whole number of the trades' bins: with $2 bins a "nice" $5 row took two bins, the next three, and every second row looked bigger
+    return C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : this.base * Math.max(1, Math.round(niceStep(rs / Math.max(1, cnt) / 10, 1) / this.base));
   }
   // like ZeroSynapse's markers: circles on the in-candle levels that stand out — big buys / sells, one side outweighing the other, or total volume;
   // the threshold is the top N% of the visible levels, so it adapts to the coin and the zoom
