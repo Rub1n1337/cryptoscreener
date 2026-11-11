@@ -905,7 +905,8 @@ class Pane {
     const step = Math.max(L.base, this.step), cols = [];
     for (let i = G.s; i <= G.e; i++) {
       const col = L.cols.get(d.t[i]); if (!col) continue;
-      const agg = new Map(); for (const [k, [s, l]] of col) { const kk = Math.round(k * L.base / step), a = agg.get(kk) || [0, 0]; a[0] += s; a[1] += l; agg.set(kk, a); }
+      // the server's bins are [k·base, (k+1)·base): the rows here are [kk·step, (kk+1)·step) too (drawn around k·step they sat half a bin low)
+      const agg = new Map(); for (const [k, [s, l]] of col) { const kk = fl((k + 0.5) * L.base / step), a = agg.get(kk) || [0, 0]; a[0] += s; a[1] += l; agg.set(kk, a); }
       cols.push([i, agg]);
     }
     const vals = cols.flatMap(([, a]) => [...a.values()].map(([s, l]) => s + l)).sort((a, b) => a - b); if (!vals.length) return;
@@ -915,7 +916,7 @@ class Pane {
     const len = Math.max(G.bw * 2, 30, Math.min(160, G.bw * 8)), parts = [1, 0.55, 0.3, 0.12];
     g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     for (const [i, agg] of cols) for (const [k, [s, l]] of agg) {
-      const y = G.Y(k * step); if (y < G.T0 - h || y > G.pH + h) continue;
+      const y = G.Y((k + 0.5) * step); if (y < G.T0 - h || y > G.pH + h) continue;
       const f = Math.min(1, Math.sqrt((s + l) / top)); if (f < 0.12) continue;   // single small liquidations would only be noise
       const x0 = G.X(i) - G.bw / 2, a = 0.3 + 0.6 * f;
       g.fillStyle = l >= s ? PC.up : PC.lo;
