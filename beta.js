@@ -364,12 +364,13 @@ class Pane {
   }
   get step() { return this.base * C('stepX'); }
   // {key: usd} for bids and asks within ±range of the middle; noFar: beyond the snapshot leave the levels to the server's far book
-  buckets(range, step = this.step, noFar = false) {
+  // The keys: bins centred on k·step (walls, as math.js bookBins), or with fromEdge bins [k·step, (k+1)·step) — the heatmap's fine bins
+  buckets(range, step = this.step, noFar = false, fromEdge = false) {
     const m = this.mid(); if (!this.book || !m || !step) return null;
-    const bid = new Map(), ask = new Map();
+    const bid = new Map(), ask = new Map(), key = fromEdge ? p => fl(p / step) : p => Math.round(p / step);
     const bLo = noFar ? this.book.minB || 0 : 0, aHi = noFar ? this.book.maxA || Infinity : Infinity;
-    for (const [p, q] of this.book.bids) if (p >= m * (1 - range) && p >= bLo) { const k = Math.round(p / step); bid.set(k, (bid.get(k) || 0) + p * q); }
-    for (const [p, q] of this.book.asks) if (p <= m * (1 + range) && p <= aHi) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); }
+    for (const [p, q] of this.book.bids) if (p >= m * (1 - range) && p >= bLo) { const k = key(p); bid.set(k, (bid.get(k) || 0) + p * q); }
+    for (const [p, q] of this.book.asks) if (p <= m * (1 + range) && p <= aHi) { const k = key(p); ask.set(k, (ask.get(k) || 0) + p * q); }
     return {m, bid, ask, step};
   }
   // every second the current book is folded into the bar it belongs to (max per fine bucket), building the heatmap
@@ -379,7 +380,7 @@ class Pane {
     // a stopped or silent book stream leaves a frozen book: it must not go into the map as if it were live
     if (!this.book?.ok || !this.d || this.ws?.readyState !== 1 || Date.now() - this.msgAt > QUIET_SHOW) return;
     this.heatMs += 1000;
-    const bk = this.buckets(0.04, this.fine); if (!bk) return;
+    const bk = this.buckets(0.04, this.fine, false, true); if (!bk) return;
     const tf = TFMS[this.tf], bar = Math.floor(Date.now() / tf) * tf;
     let col = this.heat.get(bar); if (!col) this.heat.set(bar, col = new Map());
     for (const src of [bk.bid, bk.ask]) for (const [k, v] of src) if (v > (col.get(k) || 0)) col.set(k, v);
@@ -565,7 +566,7 @@ class Pane {
       return;
     }
     this.prevSym = null; this.prevMkt = null; this.toSpot = false;
-    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = M.bookStep(p); this.fine = niceStep(p, 0.00025); renderChips(); }   // chips show steps in $
+    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = M.bookStep(p); this.fine = this.base / 2; renderChips(); }   // chips show steps in $; fine: see drawHeat
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
     this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.rows = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp(); this.loadPre();
   }
@@ -743,10 +744,12 @@ class Pane {
     // minutes and dollars — folded here the same way)
     const key = this.key(), tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}${this.sq()}&tf=${this.tf}&since=${this.d.t[0]}`);
     if (!r?.cols?.length || key !== this.key()) return;
-    this.fine = r.base; const heat = new Map(), u = r.u || 1;   // server bins become our fine bins, so live samples line up with the history
+    // the server's bins [k·base, (k+1)·base) become two fine bins each, half the dollars in either, so live samples line up
+    // with the history and a row centred on a round price takes half of the server bin below it and half of the one above
+    this.fine = r.base / 2; const heat = new Map(), u = (r.u || 1) / 2;
     for (const [t, k0, v] of r.cols) {
       const bar = Math.floor(t / tf) * tf; let col = heat.get(bar); if (!col) heat.set(bar, col = new Map());
-      v.forEach((x, i) => { if (x && x * u > (col.get(k0 + i) || 0)) col.set(k0 + i, x * u); });
+      v.forEach((x, i) => { if (x) for (const k of [2 * (k0 + i), 2 * (k0 + i) + 1]) if (x * u > (col.get(k) || 0)) col.set(k, x * u); });
     }
     this.heat = heat; this.heatMs = Math.max(this.heatMs, (r.mins ?? r.cols.length) * 6e4); this.hc = null; this.srv = true; this.dirty = true;
   }
@@ -838,7 +841,11 @@ class Pane {
     const s = Math.floor(left / 1000), dd = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
     return dd ? `${dd}д ${hh}ч` : (hh ? hh + ':' + String(mm).padStart(2, '0') : mm) + ':' + String(ss).padStart(2, '0');
   }
-  drawHeat(g, G) {   // fine buckets are summed into the display step; the result is cached (mouse moves redraw often)
+  // Fine bins [k·fine, (k+1)·fine), fine = half the coin's base step, are summed into rows centred on k·step (as the walls'
+  // bins are): a row is a whole number of fine bins at every whole «шаг цены». The fine bin used to be a "nice" number of its
+  // own ($20 under $50 rows on BTC): rows took two and three bins in turn, and every second row came out brighter.
+  // The result is cached (mouse moves redraw often)
+  drawHeat(g, G) {
     const d = this.d, step = this.step; if (!step || !this.fine) return;
     const key = `${G.s}|${G.e}|${step}|${C('heatCut')}|${d.t[G.e]}`, now = performance.now(), hc = this.hc;
     let cols, top;
@@ -847,7 +854,7 @@ class Pane {
       cols = [];
       for (let i = G.s; i <= G.e; i++) {
         const col = this.heat.get(d.t[i]); if (!col) continue;
-        const agg = new Map(); for (const [k, v] of col) { const kk = Math.round(k * this.fine / step); agg.set(kk, (agg.get(kk) || 0) + v); }
+        const agg = new Map(); for (const [k, v] of col) { const kk = fl((k + 0.5) * this.fine / step + 0.5); agg.set(kk, (agg.get(kk) || 0) + v); }   // the row its middle is in
         cols.push([i, agg]);
       }
       // one or two collected candles would only be a coloured stripe on the last bar: wait for a few
