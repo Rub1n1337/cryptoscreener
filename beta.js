@@ -18,6 +18,7 @@ const TFMS = {'1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 1
 const TFL = {'1m': '1м', '5m': '5м', '15m': '15м', '30m': '30м', '1h': '1ч', '4h': '4ч', '1d': '1д'};
 const RANGES = [[0, 'авто', 'авто'], [1, '1 день', '1д'], [3, '3 дня', '3д'], [7, '7 дней', '7д'], [30, '30 дней', '30д'], [90, '90 дней', '90д'], [180, '180 дней', '180д'], [365, '1 год', '1г']];
 const MAXBARS = 5000;               // candles loaded per chart at most (5 requests)
+const MAXOLD = 15000;               // with the older ones paged in by panning to the left (Pane.loadOlder)
 const WS = 'wss://stream.binance.com:9443/stream?streams=', WSF_PUB = 'wss://fstream.binance.com/public/stream?streams=', WSF_MKT = 'wss://fstream.binance.com/market/stream?streams=';
 // USDⓈ-M futures: the same endpoints under /fapi/v1 on fapi.binance.com (answers the browser directly)
 async function fapi(path) { const r = await fetch('https://fapi.binance.com' + path, {signal:AbortSignal.timeout(10000)}); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }
@@ -309,7 +310,26 @@ class Pane {
     }
     if (!rows.length) throw new Error('нет свечей');
     const d = M.parse(rows); d.qv = rows.map(x => +x[7]); d.tbq = rows.map(x => +x[10]); d.nt = rows.map(x => +x[8]);   // quote volume, taker-buy quote volume, number of trades
-    this.d = d; this.kFin = false; calc(d); this.dirty = true; return true;
+    this.d = d; this.kFin = false; this.oldEnd = false; this.oldWait = 0; calc(d); this.dirty = true; return true;
+  }
+  // older candles when the view reaches the first one shown (panned or zoomed out to the left): a request of up to 1000 at a
+  // time, MAXOLD in all. The view counts from the right edge (endOff), so the candles put in front move nothing on screen
+  async loadOlder() {
+    const d = this.d; if (!d || this.oldBusy || this.oldEnd || Date.now() < this.oldWait || d.c.length >= MAXOLD) return;
+    this.oldBusy = true; const req = this.req;
+    try {
+      const lim = Math.min(1000, MAXOLD - d.c.length);
+      const k = await rest(this, `/api/v3/klines?symbol=${this.sym}&interval=${this.tf}&limit=${lim}&endTime=${d.t[0] - 1}`);
+      if (req !== this.req || d !== this.d) return;
+      if (k.length < lim) this.oldEnd = true;   // the coin's first candle is here
+      if (!k.length) return;
+      const at = {t:0, o:1, h:2, l:3, c:4, v:5, qv:7, tbq:10, nt:8};   // the series and their Binance kline fields
+      for (const [f, n] of Object.entries(at)) d[f].unshift(...k.map(x => +x[n]));
+      if (d.oi) d.oi.unshift(...k.map(() => NaN));   // open interest has 500 points at most: none for these
+      if (d.pre) d.pre = d.pre.from < d.t[0] ? {from:d.pre.from, rows:d.pre.rows.filter(x => x[0] < d.t[0])} : null;
+      this.hoverI = null; calc(d); this.dirty = true;
+    } catch { this.oldWait = Date.now() + 10e3; }   // no answer: asked again when the view is at the edge 10 s later
+    finally { this.oldBusy = false; }
   }
   onKline(k) {   // live candle from the stream: update the forming bar or start a new one
     const d = this.d; if (!d) return;
@@ -767,6 +787,7 @@ class Pane {
   draw() {
     const d = this.d; if (!d) return;
     const n = d.c.length, r = K.viewRange(n, d.N - 1, this.view, this.defSpan()), PC = K.PC;
+    if (this.view && r.from - (d.N - 1) < r.span * 0.25) this.loadOlder();   // moved close to the first candle shown: page back
     let lo = Infinity, hi = -Infinity;
     for (let i = r.s; i <= r.e; i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }   // r.from / r.to may be fractional: r.s…r.e are whole bars
     if (this.yr) { lo = this.yr.mn; hi = this.yr.mx; }   // a manual price scale decides what is visible
@@ -1449,7 +1470,7 @@ function drawPop() {
 function rangePop() {
   const p = act(), mx = maxDays(p.tf);
   openPop($('#bRangeBtn'), head('Сколько истории показать') + `<div class="pgrid">${RANGES.map(([k, l]) => `<button data-range="${k}" class="${k === p.range ? 'on' : ''}"${k > mx ? ` disabled title="На ${TFL[p.tf]} — не больше ${mx} дн."` : ''}>${l}</button>`).join('')}</div>`
-    + `<p class="phint">«Авто» — по ширине экрана. На мелких таймфреймах длинная история недоступна: грузим до ${MAXBARS} свечей (на ${TFL[p.tf]} это ~${mx} дн.).</p>`);
+    + `<p class="phint">«Авто» — по ширине экрана. Период сразу грузит до ${MAXBARS} свечей (на ${TFL[p.tf]} это ~${mx} дн.); более старые догружаются, когда листаете график влево.</p>`);
 }
 // settings of one indicator, next to the chart (like order-flow terminals): choices as segmented buttons, numbers as
 // sliders with the value on the right; changes apply at once
