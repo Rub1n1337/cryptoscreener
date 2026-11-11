@@ -1026,7 +1026,7 @@ class Pane {
     const i0 = K.barAt(d.t, Math.max(x.t0, d.t[0])), i1 = K.barAt(d.t, x.t1); if (i1 < G.s || i0 > G.e || i1 <= i0) return;
     let lo = Infinity, hi = -Infinity, vol = 0; for (let i = i0; i <= i1; i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); vol += d.qv[i]; }
     const rows = 40, sz = (hi - lo) / rows || 1, vp = Array(rows).fill(0);
-    for (let i = i0; i <= i1; i++) { const a = clamp(Math.floor((d.l[i] - lo) / sz), 0, rows - 1), b = clamp(Math.floor((d.h[i] - lo) / sz), 0, rows - 1), sh = d.v[i] / (b - a + 1); for (let k = a; k <= b; k++) vp[k] += sh; }
+    for (let i = i0; i <= i1; i++) { const a = clamp(Math.floor((d.l[i] - lo) / sz), 0, rows - 1), b = clamp(Math.floor((d.h[i] - lo) / sz), 0, rows - 1), sh = d.qv[i] / (b - a + 1); for (let k = a; k <= b; k++) vp[k] += sh; }   // in $, as the label and the visible-range profile
     const max = Math.max(...vp), poc = vp.indexOf(max), xa = G.X(i0) - G.bw / 2, xb = G.X(i1) + G.bw / 2, wMax = (xb - xa) * 0.6;
     g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     g.fillStyle = PC.rsi + '10'; g.fillRect(xa, G.Y(hi), xb - xa, G.Y(lo) - G.Y(hi)); g.strokeStyle = PC.rsi + '66'; g.lineWidth = 1; g.strokeRect(xa, G.Y(hi), xb - xa, G.Y(lo) - G.Y(hi));
