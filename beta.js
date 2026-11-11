@@ -11,6 +11,9 @@ import * as M from './supabase/functions/_shared/math.js';
 let K = null;                       // toolkit from index.html (renderChart, attachZoom, api, fp, …)
 const $ = s => document.querySelector(s);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+// the price bin of a price: a price right on a bin's edge divides to 1150.9999999999998 as often as to 1151 (115.1 / 0.1),
+// and plain floor then puts it a row lower
+const fl = x => Math.floor(x + 1e-9);
 const TFMS = {'1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 144e5, '1d': 864e5};
 const TFL = {'1m': '1м', '5m': '5м', '15m': '15м', '30m': '30м', '1h': '1ч', '4h': '4ч', '1d': '1д'};
 const RANGES = [[0, 'авто', 'авто'], [1, '1 день', '1д'], [3, '3 дня', '3д'], [7, '7 дней', '7д'], [30, '30 дней', '30д'], [90, '90 дней', '90д'], [180, '180 дней', '180д'], [365, '1 год', '1г']];
@@ -446,7 +449,7 @@ class Pane {
   onTrade(x) {   // big market buys / sells: the top N% of recent trades
     const usd = +x.p * +x.q;
     if (this.base && this.d) {   // footprint: every trade into its candle and fine price bin (the server has the history, this keeps the live edge)
-      const tf = TFMS[this.tf], bar = Math.floor(x.T / tf) * tf, k = Math.floor(+x.p / this.base);
+      const tf = TFMS[this.tf], bar = Math.floor(x.T / tf) * tf, k = fl(+x.p / this.base);
       this.fpLive ||= new Map(); let col = this.fpLive.get(bar);
       if (!col) { this.fpLive.set(bar, col = new Map()); if (this.fpLive.size > 600) this.fpLive.delete(this.fpLive.keys().next().value); }
       const r = col.get(k) || [0, 0]; r[x.m ? 1 : 0] += usd; col.set(k, r);   // m = the buyer was the maker: a market sell
@@ -640,7 +643,7 @@ class Pane {
   }
   // one candle's clusters at a given row step: Map row -> [buy $, sell $]; server history first, live trades for the rest
   fpBar(bar, step) {
-    const out = new Map(), addCol = (col, base) => { for (const [k, [b, s]] of col) { const kk = Math.floor(k * base / step), a = out.get(kk) || [0, 0]; a[0] += b; a[1] += s; out.set(kk, a); } };
+    const out = new Map(), addCol = (col, base) => { for (const [k, [b, s]] of col) { const kk = fl(k * base / step), a = out.get(kk) || [0, 0]; a[0] += b; a[1] += s; out.set(kk, a); } };
     const H = this.fpHist, h = H?.cols.get(bar), live = this.fpLive?.get(bar), tf = TFMS[this.tf];
     if (h) {   // the server sends its minutes once a minute: the live trades after its last minute keep the forming candle current
       addCol(h, H.base);
@@ -920,7 +923,7 @@ class Pane {
     if (!this.fine) return;
     const s = Math.floor(Date.now() / 1000); this.act ||= new Map(); let m = this.act.get(s);
     if (!m) { this.act.set(s, m = new Map()); for (const k of this.act.keys()) { if (k < s - 120) this.act.delete(k); else break; } }
-    const k = Math.floor(p / this.fine); m.set(k, (m.get(k) || 0) + d);
+    const k = fl(p / this.fine); m.set(k, (m.get(k) || 0) + d);
   }
   actRows(keyOf) {   // the last N seconds (setting), folded into the book column's rows
     const out = new Map(), from = Math.floor(Date.now() / 1000) - C('actWin'); if (!this.act) return out;
@@ -1126,7 +1129,7 @@ class Pane {
       // how deep the loaded book reaches: rows beyond it are unknown, not empty
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
       // rows: from the current price (like ZeroSynapse: 83 222–84 222–85 222…) or on round levels (like ATAS: 83 000–84 000…)
-      const A = C('domAnchor') ? 0 : Math.round(m / this.base) * this.base, keyOf = p => Math.floor((p - A) / step);
+      const A = C('domAnchor') ? 0 : Math.round(m / this.base) * this.base, keyOf = p => fl((p - A) / step);
       // each row keeps both sides in $ and the volume-weighted price of what is in it
       const byK = new Map(), add = (p, usd, side) => { if (p < G.mn - step || p > G.mx + step) return; const k = keyOf(p), r = byK.get(k) || {a:0, b:0, pw:0}; r[side] += usd; r.pw += p * usd; byK.set(k, r); };
       let totA = 0, totB = 0;   // the whole known book, for the Σ strip
