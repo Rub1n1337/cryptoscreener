@@ -455,7 +455,19 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bpane.tool .bcv{cursor:copy;touch-action:none}   /* with a drawing tool a finger draws, it doesn't scroll the page */
 .bbar-r{margin-left:auto;display:flex;gap:8px;align-items:center}
 .pick-btn{gap:6px;font-weight:600}.pick-btn .i{width:15px;height:15px}.pick-btn[aria-pressed=true]{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
-.btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12.5px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre button{flex:1}}
+/* backtest form: one card, a titled section per kind of setting (docs/PLAN-UNTANGLE-backtest.md) */
+.btform{margin-bottom:12px}.btsec{padding:12px 0;border-top:1px solid var(--line)}.btsec:first-child{padding-top:0;border-top:0}.btsec .fields{align-items:flex-end}
+.bthint{margin:8px 0 0;font-size:12.5px;color:var(--mute);max-width:72ch;text-wrap:pretty}.bthint:empty{display:none}
+#btAdv>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;min-height:36px;padding:8px 28px 0 0;position:relative}
+#btAdv>summary::-webkit-details-marker{display:none}#btAdv>summary h4{margin:0}#btAdv>summary .mute{font-size:12px;text-wrap:pretty}
+#btAdv>summary::after{content:"";position:absolute;right:6px;top:12px;width:7px;height:7px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform var(--dur-2) var(--ease)}
+#btAdv[open]>summary::after{transform:rotate(-135deg)}#btAdv[open]>summary{margin-bottom:10px}#btAdv{padding-bottom:4px}
+.btacts{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:12px;border-top:1px solid var(--line)}#btRun{height:var(--h);padding:0 22px}#btSave{height:var(--h)}
+.bttrust{margin-top:12px}.bttrust .banner{margin:0}.bthold{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin-top:12px}.bthold .tablewrap{flex:1 1 320px;min-width:0}
+#btWarn:not(:empty){margin-top:12px;display:grid;gap:8px}#btWarn .banner{margin:0}
+.btcache{font-size:12px;margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.btcache button{height:var(--h);font-size:13px}
+@media(max-width:700px){.btacts>*{flex:1 1 100%}#btRun{height:44px}}
+.btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12.5px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre .faint{flex:1 1 100%}.btpre button{flex:1 1 auto;white-space:nowrap}}
 .ctools .ct-yauto{display:none}.ctools .ct-yauto.show{display:inline-flex;color:var(--acc);border-color:var(--warn-line)}
 .bcv:focus{outline:none}.bcv:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}   /* keyboard focus stays visible in the one-chart layout too (the pane outline shows only in multi-chart layouts) */
 .bpop.help{width:min(380px,calc(100vw - 32px))}.hks{display:grid;gap:7px}.hk{display:grid;grid-template-columns:128px 1fr;gap:10px;font-size:12.5px;line-height:1.35}.hk b{font-weight:650}.hk span{color:var(--mute)}
@@ -747,9 +759,8 @@ tr.row.stale{opacity:.55}
   #backtest .fields,#bform .row{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}
   #backtest .fields>*,#bform .row>*{min-width:0}
   #backtest .fields :is(select,input:not([type=checkbox])),#bform .row :is(select,input:not([type=checkbox])){width:100%!important}
-  #backtest .fields>label:first-child,#backtest .fields>span.faint,#btRun,#btCustomL,#backtest .btpre,#bform .row>label:first-child,#pfListL{grid-column:1/-1}
-  #btRun{height:44px!important;order:9}
-  #btVerdict,.tpanel,#pimp{scroll-margin-top:70px}
+  #btStratL,#btCustomL,#bform .row>label:first-child,#pfListL{grid-column:1/-1}
+  #btOut,.tpanel,#pimp{scroll-margin-top:70px}
   #bform .pfbar{display:flex!important}
   /* trade card: sticky header with the close button in the corner */
   .mbox{padding:0 14px 20px}
@@ -1519,60 +1530,68 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
   <!-- BACKTEST -->
   <section id="backtest" class="hidden">
     <div class="phead"><div><h2>Бэктест</h2><p>Как правила бота сработали бы на истории Binance — с комиссиями и проскальзыванием.</p></div></div>
-    <div class="fgroup" style="margin-bottom:12px"><div class="fields" style="align-items:flex-end">
-      <label title="«Отскок» — от границы к обычной цене (как у ботов сейчас); «Отскок по тренду» — только по направлению движения; «Пробой» — вслед за выходом за границу">Идея входа <select id="btStrat">
-        <option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму рынка</option>
-      </select></label>
-      <label title="Таймфрейм свечей: на 4ч торгуют общий бот и профиль «Переключатель · 4h»">Таймфрейм <select id="btTf"><option value="15m">15м</option><option value="1h">1ч</option><option value="4h">4ч</option></select></label>
-      <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option><option value="custom">Свои даты…</option></select></label>
-      <label id="btFromL" class="hidden" title="Первый день периода, по UTC">С <input type="date" id="btFrom" min="2020-01-01"></label>
-      <label id="btToL" class="hidden" title="Последний день периода включительно, по UTC">По <input type="date" id="btTo" min="2020-01-01"></label>
-      <label title="Конец периода показывается отдельно: подбирайте настройки по первой части, а отложенную считайте проверкой. Если на ней итог намного хуже — настройки подогнаны под историю">Отложить для проверки <select id="btHold"><option value="0.2">последние 20%</option><option value="0.3" selected>последние 30%</option><option value="0.5">вторую половину</option></select></label>
-      <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
-      <label id="btPitL" title="Живой бот каждую минуту берёт топ по обороту за последние сутки. «На каждый момент» делает в прошлом так же: монета торгуется, только пока она в топе. «По сегодняшнему» берёт сегодняшний топ на весь период — быстрее, но завышает результат: сегодняшний топ знает, какие монеты потом выросли">Топ считать <select id="btPit"><option value="pit">на каждый момент — честно</option><option value="now">по сегодняшнему — быстрее, завышает</option></select></label>
-      <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
-      <button id="btRun" class="primary" style="height:var(--h);padding:0 22px"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
-      <div class="btpre" role="group" aria-label="Подставить готовые настройки"><span class="faint">Подставить:</span><button id="btShared" title="Те же правила, по которым торгует общий бот — проверить их на истории">правила общего бота</button><button id="btMine" title="Канал и таймфрейм с вкладки «Рынок»">настройки «Рынка»</button></div>
-    </div>
-    <div class="fields" style="align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)">
-      <span class="faint" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;align-self:center;margin-right:4px">Риск-менеджмент</span>
-      <label title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">RR (тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
-      <label title="RM: какую долю баланса теряем, если сработал стоп (без сложного процента — долю стартового баланса)">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
-      <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на все позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
-      <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
-      <label title="С какой суммы начинается проверка: от $100 до $10 000 000">Депозит, $ <input type="number" id="btStart" inputmode="numeric" enterkeyhint="done" min="100" max="10000000" step="100" value="10000" style="width:120px"></label>
-      <label class="inline" title="Включено: риск считается от текущего баланса — после прибыли стоп больше, после убытков меньше. Выключено: риск всегда от стартового баланса — при 1% и $10 000 каждый стоп $100"><input type="checkbox" id="btComp" checked> сложный процент</label>
-    </div></div>
-    <details class="dis" id="btAdv"><summary>Дополнительно <span class="mute">· сила сигнала, режим рынка, фильтры T½ и ширины, канал</span></summary><div class="dbody">
-      <div class="fields" style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
-        <label class="fl" title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" inputmode="numeric" enterkeyhint="done" min="0" max="100" style="width:80px"></label>
-        <label class="fl" title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
-        <label class="fl" title="Входить, только если ширина канала (от нижней до верхней границы) не меньше заданного процента от цены. Чем шире канал, тем больше ход к центру">Мин. ширина канала <select id="btW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option><option value="12">≥ 12%</option></select></label>
-        <label class="fl" title="Закрыть сделку по рынку, если за это число свечей не сработали ни тейк, ни стоп">Тайм-стоп <select id="btTS"><option value="0">выкл</option><option value="24">24 свечи</option><option value="48">48 свечей</option><option value="96">96 свечей</option></select></label>
-        <label class="fl" title="Модель канала">Модель <select id="btMethod">
+    <div class="fgroup btform">
+      <div class="btsec"><h4>Что проверяем</h4><div class="fields">
+        <label id="btStratL" title="Правило, по которому бот решает войти в сделку">Идея входа <select id="btStrat">
+          <optgroup label="Рабочие стратегии"><option value="revert">Отскок от границы</option><option value="revert_trend">Отскок по тренду</option><option value="breakout">Пробой границы</option><option value="switch">Переключатель по режиму рынка</option></optgroup>
+        </select></label>
+        <label class="btch" title="Модель канала: как считаются центр и границы">Канал <select id="btMethod">
           <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
         </select></label>
-        <label class="fl" title="Длина окна канала, свечей">N <input type="number" id="btN" inputmode="numeric" enterkeyhint="done" min="20" max="300" style="width:80px"></label>
-        <label class="fl" title="Ширина канала в σ">k <input type="number" id="btK" enterkeyhint="done" min="1" max="4" step="0.1" style="width:72px"></label>
-        <label class="fl" title="Когда разрешено входить: в любом рынке, только в боковике (флэт) или только в импульсе (сильное движение)">Режим рынка <select id="btReg"><option value="any">любой</option><option value="flat">только флэт</option><option value="impulse">только импульс</option></select></label>
-        <label class="fl" title="По каким монетам определять режим. «BTC+ETH+SOL» — флэт, только когда все три стоят в боковике">Режим по <select id="btSrc"><option value="btc">BTC</option><option value="majors">BTC+ETH+SOL</option></select></label>
-        <label class="fl" title="ER = чистое движение за ~7 дней / весь пройденный путь. Ниже порога — флэт (боковик), выше — импульс">Флэт, если ER <select id="btER"><option value="0.1">&lt; 0.10</option><option value="0.15">&lt; 0.15</option><option value="0.25">&lt; 0.25</option></select></label>
-        <label class="fl" title="Не ловить отскок на монете, которая сама в сильном тренде (ER монеты за ~7 дней выше порога)">Тренд монеты <select id="btCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
-        <label class="fl inl" title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
+        <label class="btch" title="Длина окна канала, свечей">N <input type="number" id="btN" inputmode="numeric" enterkeyhint="done" min="20" max="300" style="width:80px"></label>
+        <label class="btch" title="Ширина канала в σ">k <input type="number" id="btK" enterkeyhint="done" min="1" max="4" step="0.1" style="width:72px"></label>
+      </div><p class="bthint" id="btStratHint"></p></div>
+      <div class="btsec"><h4>На чём</h4><div class="fields">
+        <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
+        <label id="btPitL" title="Живой бот каждую минуту берёт топ по обороту за последние сутки. «На каждый момент» делает в прошлом так же: монета торгуется, только пока она в топе. «По сегодняшнему» берёт сегодняшний топ на весь период — быстрее, но завышает результат: сегодняшний топ знает, какие монеты потом выросли">Топ считать <select id="btPit"><option value="pit">на каждый момент — честно</option><option value="now">по сегодняшнему — быстрее, завышает</option></select></label>
+        <label id="btCustomL" class="hidden" title="Тикеры через запятую или пробел, без USDT">Свои монеты <input id="btCustom" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="BTC, ETH, SOL, PENDLE" style="width:240px"></label>
+        <label title="Таймфрейм свечей: на 4ч торгуют общий бот и профиль «Переключатель · 4h»">Таймфрейм <select id="btTf"><option value="15m">15м</option><option value="1h">1ч</option><option value="4h">4ч</option></select></label>
+        <label title="Сколько последних дней истории проверить">Период <select id="btDays"><option value="7">7 дней</option><option value="14">14 дней</option><option value="30">30 дней</option><option value="60">60 дней</option><option value="90">90 дней</option><option value="180">180 дней</option><option value="365">365 дней</option><option value="custom">Свои даты…</option></select></label>
+        <label id="btFromL" class="hidden" title="Первый день периода, по UTC">С <input type="date" id="btFrom" min="2020-01-01"></label>
+        <label id="btToL" class="hidden" title="Последний день периода включительно, по UTC">По <input type="date" id="btTo" min="2020-01-01"></label>
+      </div></div>
+      <div class="btsec"><h4>Деньги и риск</h4><div class="fields">
+        <label title="С какой суммы начинается проверка: от $100 до $10 000 000">Депозит, $ <input type="number" id="btStart" inputmode="numeric" enterkeyhint="done" min="100" max="10000000" step="100" value="10000" style="width:120px"></label>
+        <label title="Какую долю баланса теряем, если сработал стоп (без сложного процента — долю стартового баланса)">Риск на сделку <select id="btRisk"><option value="0.5">0.5%</option><option value="1">1%</option><option value="2">2%</option><option value="3">3%</option><option value="4">4%</option><option value="5">5%</option></select></label>
+        <label title="Максимальное плечо: сколько балансов можно держать в позициях одновременно (на все позиции). Чем выше плечо — тем больше позиция и комиссия">Плечо до <select id="btLev"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="5">5×</option><option value="10">10×</option></select></label>
+        <label title="Сколько сделок бот держит одновременно. Больше мест — больше сделок, но каждая меньше по размеру при том же плече, а суммарный риск выше">Позиций <select id="btSlots"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></label>
+        <label class="inline" title="Включено: риск считается от текущего баланса — после прибыли стоп больше, после убытков меньше. Выключено: риск всегда от стартового баланса — при 1% и $10 000 каждый стоп $100"><input type="checkbox" id="btComp" checked> сложный процент</label>
+      </div></div>
+      <div class="btsec"><h4>Выход</h4><div class="fields">
+        <label id="btRRL" title="Где тейк. «К центру канала» — как у ботов сейчас. 1:2 — тейк в 2 раза дальше стопа">Тейк (RR, тейк : стоп) <select id="btRR"><option value="0">к центру канала</option><option value="1.5">1 : 1.5</option><option value="2">1 : 2</option><option value="3">1 : 3</option></select></label>
+        <label title="Закрыть сделку по рынку, если за это число свечей не сработали ни тейк, ни стоп">Тайм-стоп <select id="btTS"><option value="0">выкл</option><option value="24">24 свечи</option><option value="48">48 свечей</option><option value="96">96 свечей</option></select></label>
+      </div></div>
+      <details class="btsec" id="btAdv"><summary><h4>Фильтры входа</h4><span class="mute">сила сигнала, T½, ширина канала, тренд монеты, режим рынка</span></summary><div class="fields">
+        <label title="Минимальная сила сигнала для входа">Мин. сила <input type="number" id="btMin" inputmode="numeric" enterkeyhint="done" min="0" max="100" style="width:80px"></label>
+        <label title="Входить, только если T½ монеты (за сколько свечей она обычно проходит половину пути обратно к центру) не больше заданного. Отсекает монеты в тренде">Фильтр T½ <select id="btHL"><option value="0">выкл</option><option value="40">T½ ≤ 40 свечей</option><option value="20">T½ ≤ 20 свечей</option></select></label>
+        <label title="Входить, только если ширина канала (от нижней до верхней границы) не меньше заданного процента от цены. Чем шире канал, тем больше ход к центру">Мин. ширина канала <select id="btW"><option value="0">любая</option><option value="3">≥ 3%</option><option value="5">≥ 5%</option><option value="8">≥ 8%</option><option value="12">≥ 12%</option></select></label>
+        <label title="Не ловить отскок на монете, которая сама в сильном тренде (ER монеты за ~7 дней выше порога)">Тренд монеты <select id="btCoinER"><option value="0">не фильтровать</option><option value="0.3">пропускать ER ≥ 0.3</option><option value="0.2">пропускать ER ≥ 0.2</option></select></label>
+        <label title="Когда разрешено входить: в любом рынке, только в боковике (флэт) или только в импульсе (сильное движение)">Режим рынка <select id="btReg"><option value="any">любой</option><option value="flat">только флэт</option><option value="impulse">только импульс</option></select></label>
+        <label title="По каким монетам определять режим. «BTC+ETH+SOL» — флэт, только когда все три стоят в боковике">Режим по <select id="btSrc"><option value="btc">BTC</option><option value="majors">BTC+ETH+SOL</option></select></label>
+        <label title="ER = чистое движение за ~7 дней / весь пройденный путь. Ниже порога — флэт (боковик), выше — импульс">Флэт, если ER <select id="btER"><option value="0.1">&lt; 0.10</option><option value="0.15">&lt; 0.15</option><option value="0.25">&lt; 0.25</option></select></label>
+        <label class="inline" title="Пропускать сделки SHORT"><input type="checkbox" id="btLong"> только LONG</label>
+      </div></details>
+      <div class="btacts">
+        <button id="btRun" class="primary"><svg class="i"><use href="#i-play"/></svg>Запустить</button>
+        <div class="btpre" role="group" aria-label="Подставить готовые настройки"><span class="faint">Подставить:</span><button id="btShared" title="Те же правила, по которым торгует общий бот — проверить их на истории">правила общего бота</button><button id="btProf" title="Правила и монеты профиля, по которому торгует «Мой бот»">мой профиль</button><button id="btMine" title="Канал и таймфрейм с вкладки «Рынок»">настройки «Рынка»</button></div>
         <button id="btSave" title="Сохранить текущие настройки бэктеста как профиль «Моего бота»">Сохранить как профиль бота</button>
-        <button id="btCache" title="История свечей хранится в этом браузере, чтобы повторные запуски не загружали её заново">Очистить кэш истории<span class="mute" id="btCacheN"></span></button>
       </div>
-    </div></details>
+    </div>
     <div class="mute" id="btStatus" style="margin-bottom:14px;font-size:13px"></div>
     <div class="banner info" id="btEmpty"><svg class="i"><use href="#i-info"/></svg><div><b>Выберите идею входа и нажмите «Запустить» — или начните с готового:</b>
-      <div class="acts"><button class="primary" data-qs="shared">Проверить правила общего бота</button><button data-qs="mine">Проверить мой профиль</button></div>
+      <div class="acts"><button class="primary" data-qs="shared">Проверить правила общего бота</button><button data-qs="mine">Проверить мой профиль</button><button data-qs="market">Проверить настройки «Рынка»</button></div>
       <span class="mute">Если результат в плюсе только на одном периоде — это случайность, а не преимущество. Проверьте на 30 и на 60 днях.</span></div></div>
     <div id="btOut" class="hidden">
-      <div class="banner" id="btVerdict"></div>
       <div id="btCards"></div>
+      <div class="panel bttrust"><div class="ptitle">Можно ли верить <span>· отличается ли итог от случая и от подгонки под историю</span></div>
+        <div class="banner" id="btVerdict"></div>
+        <div class="bthold"><label class="fl" title="Конец периода показывается отдельно: подбирайте настройки по первой части, а отложенную считайте проверкой. Если на ней итог намного хуже — настройки подогнаны под историю">Отложить для проверки <select id="btHold"><option value="0.2">последние 20%</option><option value="0.3" selected>последние 30%</option><option value="0.5">вторую половину</option></select></label>
+          <div class="tablewrap"><table id="btPartsT"></table></div></div>
+        <div id="btWarn"></div>
+      </div>
       <div class="grid" style="margin-top:12px">
-        <div class="panel"><div class="ptitle">По силе сигнала <span>· работает ли «сила»: у сильных сигналов результат должен быть лучше</span></div><div class="tablewrap"><table id="btScore"></table></div></div>
-        <div class="panel"><div class="ptitle">По стороне, причине выхода и частям периода <span>· стабильность</span></div><div class="tablewrap"><table id="btSplit"></table></div></div>
+        <div class="panel" id="btScoreP"><div class="ptitle">По силе сигнала <span>· работает ли «сила»: у сильных сигналов результат должен быть лучше</span></div><div class="tablewrap"><table id="btScore"></table></div></div>
+        <div class="panel"><div class="ptitle">По стороне, причине выхода и режиму рынка</div><div class="tablewrap"><table id="btSplit"></table></div></div>
       </div>
       <div class="panel" style="margin-top:12px"><div class="ptitle">Сделки бэктеста <span>· клик — карточка сделки</span></div>
         <div class="tablewrap"><table><thead><tr>
@@ -1581,6 +1600,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       </div>
       <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: в режиме «на каждый момент» учтены все монеты, которые в какой-то день периода были в топе по обороту, — и те, что потом выпали из топа или были сняты с Binance; в режиме «по сегодняшнему» их нет, а сегодняшний топ берётся на весь период — это завышает результат. Даты — по UTC. Исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Комиссия 0.075% за сторону, проскальзывание 0.05%, заём под шорт и плечо — 0.03% в сутки (оценка: реальная ставка бывает выше, особенно по альткоинам). Прошлое не гарантирует будущего.</div>
     </div>
+    <div class="faint btcache">История свечей хранится в этом браузере — повторные запуски не загружают её заново. <button id="btCache">Очистить кэш истории<span class="mute" id="btCacheN"></span></button></div>
   </section>
 
   <!-- CHANGELOG -->
@@ -4280,7 +4300,13 @@ function btStale() {
   $('#btOut').classList.toggle('stale', stale);
   return stale;
 }
+// one line under «Идея входа»: what the chosen idea does (as wants / modeOf in math.js)
+const BT_HINT = {revert:'Цена коснулась границы канала и развернулась — входим в сторону центра канала.',
+  revert_trend:'Тот же отскок от границы, но только по направлению наклона канала.',
+  breakout:'Свеча закрылась за границей канала на повышенном объёме — входим в ту же сторону.',
+  switch:'Рынок в боковике — отскок от границы; рынок растёт — пробой, только LONG; рынок падает — без сделок.'};
 function btEstimate() {
+  $('#btStratHint').textContent = BT_HINT[$('#btStrat').value] || '';
   // the fields that depend on a select and the fading follow the form during a run too: «Свои даты…» picked while the history
   // loaded used to leave the dates hidden, and a result that came for the settings before the change looked fresh
   $('#btCustomL').classList.toggle('hidden', $('#btTop').value !== 'custom'); $('#btPitL').classList.toggle('hidden', $('#btTop').value === 'custom');
@@ -4382,12 +4408,14 @@ async function runBacktest() {
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
     const goneN = gone.filter(x => hist[x]?.length).length;
     st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${per.custom ? per.label + ' (UTC)' : `${dt(btRes.from)} → ${dt(btRes.to + tfms)}`}, расчёт ${Math.round(performance.now() - t0)} мс.`
-      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · старт $${money(s.start)} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ` от старта ($${money(s.start * s.risk)} со сделки)` : ' от баланса (сложный процент)'} · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`
-      + (miss.length ? ` Не найдены на Binance: ${miss.map(base).join(', ')}.` : '')
-      + (failed.length ? ` ⚠️ Не загрузилась история ${failed.length} ${coinsGen(failed.length)} (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.` : '')
-      + (HS.isOff() ? ' История загружена только с Binance (?history=off).' : '');
+      + ` ${M.STRATEGIES[s.strategy]}${s.longOnly ? ', только LONG' : ''} · RR ${s.rr ? '1:' + s.rr : 'к центру'} · старт $${money(s.start)} · риск ${(s.risk * 100).toFixed(1)}%${s.fixedRisk ? ` от старта ($${money(s.start * s.risk)} со сделки)` : ' от баланса (сложный процент)'} · плечо до ${s.lev}× · ${METHOD_NAME[s.method]} (${s.N}, ${s.k}), ${s.tf}, сила ≥ ${s.minScore}${s.maxHL ? `, T½ ≤ ${s.maxHL}` : ''}${s.minWidth ? `, ширина ≥ ${s.minWidth}%` : ''}, ${s.timeStop ? 'тайм-стоп ' + s.timeStop : 'без тайм-стопа'}.`;
+    // what makes the result incomplete goes to «Можно ли верить» (btWarnShow), the status line keeps the run's summary
+    btRes.warn = [
+      ...(failed.length ? [['warn', `Не загрузилась история ${failed.length} ${coinsGen(failed.length)} (${failed.slice(0, 8).map(base).join(', ')}${failed.length > 8 ? '…' : ''}): итог неполный и может отличаться от следующего запуска — нажмите «Запустить» ещё раз, скачанное заново не качается.`]] : []),
+      ...(miss.length ? [['info', `Не найдены на Binance: ${miss.map(base).join(', ')}.`]] : []),
+      ...(HS.isOff() ? [['info', 'История загружена только с Binance (?history=off).']] : [])];
     btRes.status = st.textContent; btAll = false; renderBacktest(); ok = true; btRandom();
-    if (isPhone()) $('#btVerdict').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
+    if (isPhone()) $('#btOut').scrollIntoView({block:'start'});   // on a phone the result is below the form — go there
   } catch (e) {
     st.textContent = e === STOPPED ? 'Остановлено. Загруженная история сохранилась — следующий запуск продолжит с неё.' : 'Ошибка: ' + btErr(e);
   }
@@ -4395,7 +4423,7 @@ async function runBacktest() {
   // the form may have changed while the run was on: then the result is for the settings before the change, and says so;
   // after a stop or an error the line keeps its message, only the fading follows the form
   if (ok) btEstimate(); else btStale();
-  if ($('#btAdv').open) setTimeout(btCacheShow, 1500);   // the files of this run are still being written to the cache
+  setTimeout(btCacheShow, 1500);   // the files of this run are still being written to the cache
 }
 function groupRow(name, list) {
   const g = M.journalStats(10000, list);
@@ -4521,8 +4549,10 @@ function renderBacktest() {
   $('#btSplit').innerHTML = groupHead + '<tbody>'
     + groupRow('LONG', by(x => x.side, 'LONG')) + groupRow('SHORT', by(x => x.side, 'SHORT'))
     + ['тейк', 'стоп', 'тайм-стоп', 'конец теста'].filter(z => tr.some(x => x.reason === z)).map(z => groupRow('выход: ' + z, by(x => x.reason, z))).join('')
-    + (s.regimeSrc === 'majors' ? [['flat', 'Рынок в боковике'], ['up', 'Рынок растёт'], ['down', 'Рынок падает']] : [['flat', 'BTC во флэте'], ['up', 'BTC в росте'], ['down', 'BTC в падении']]).filter(([k]) => tr.some(x => x.snap?.regime === k)).map(([k, nm]) => groupRow(nm, by(x => x.snap?.regime, k))).join('')
-    + groupRow(name[0] + ' периода · подбор', fit) + groupRow(name[1] + ' · проверка', out) + '</tbody>';
+    + (s.regimeSrc === 'majors' ? [['flat', 'Рынок в боковике'], ['up', 'Рынок растёт'], ['down', 'Рынок падает']] : [['flat', 'BTC во флэте'], ['up', 'BTC в росте'], ['down', 'BTC в падении']]).filter(([k]) => tr.some(x => x.snap?.regime === k)).map(([k, nm]) => groupRow(nm, by(x => x.snap?.regime, k))).join('') + '</tbody>';
+  // «Можно ли верить»: the part the settings were picked on and the held-out part (#btHold), and what made the result incomplete
+  $('#btPartsT').innerHTML = groupHead + '<tbody>' + groupRow(name[0] + ' периода · подбор', fit) + groupRow(name[1] + ' · проверка', out) + '</tbody>';
+  $('#btWarn').innerHTML = (r.warn || []).map(([k, t]) => `<div class="banner ${k}"><svg class="i"><use href="#i-${k}"/></svg><div>${t}</div></div>`).join('');
   btList = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
   // the newest BT_ROWS first, the rest on request: a long 15m run drew thousands of rows at once and froze a phone for a moment
   $('#btTrades').innerHTML = btRowsHtml(btAll ? btList : btList.slice(0, BT_ROWS))
@@ -4561,6 +4591,12 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.105', date:'11 ноября 2026', title:'Понятнее страница бэктеста', items:[
+    'Настройки бэктеста разложены по разделам: что проверяем, на чём, деньги и риск, выход, фильтры входа.',
+    'Под выбором идеи входа появилось короткое описание её правил.',
+    'Добавлен раздел «Можно ли верить»: вердикт, сравнение со случайным входом, отложенный период и предупреждения о неполном итоге.',
+    'Готовый профиль «Моего бота» можно подставить в бэктест одной кнопкой.',
+  ]},
   {v:'2.104', date:'11 ноября 2026', title:'Проверка бэктеста на случайность', items:[
     'Добавлено сравнение результата бэктеста со случайными входами с теми же выходами.',
     'Добавлен отложенный период: конец периода показывается отдельно как проверка.',
@@ -4621,12 +4657,6 @@ const CHANGELOG = [
   {v:'2.94', date:'9 ноября 2026', title:'Монеты моего бота', items:[
     'Добавлен фильтр «Бот» в списке монет на «Рынке»: монеты, которыми сейчас торгует «Мой бот».',
     'Монеты из своего списка в профиле бота видны в таблице, даже если их нет среди самых популярных.',
-  ]},
-  {v:'2.93', date:'9 ноября 2026', title:'Стакан внутри «Рынка»', items:[
-    'Добавлена кнопка «Развернуть» в режиме «Стакан»: «Рынок» во всю ширину — до четырёх графиков и свой список монет.',
-    'Вкладки «Графики» больше нет: всё, что в ней было, теперь на «Рынке».',
-    'Прежние ссылки на «Графики» открывают карточку монеты в режиме «Стакан».',
-    'Справка и правовая информация описывают новое место графиков со стаканом.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4813,7 +4843,7 @@ function go(t, push = true) {
   if (push) setHash(true);
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
   betaSync();   // the live charts: in the card's «Стакан» or the market's «Развернуть», paused elsewhere
-  if (t === 'backtest' && btRes) drawEquity();
+  if (t === 'backtest') { if (btRes) drawEquity(); btCacheShow(); }
   if (t === 'market') { drawChart(); loadWalls(); botRefresh(); }
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
   setTitle();
@@ -5111,7 +5141,6 @@ async function btCacheShow() {
   const s = await HS.cacheStats(), mb = s?.bytes ? s.bytes / 1e6 : 0;
   $('#btCacheN').textContent = mb ? ` · ${mb < 10 ? mb.toFixed(1).replace('.', ',') : Math.round(mb)} МБ` : '';
 }
-$('#btAdv').addEventListener('toggle', () => { if ($('#btAdv').open) btCacheShow(); });
 $('#btCache').onclick = async () => {
   if (btBusy) return toast('Идёт бэктест', 'Очистите кэш, когда он закончится.', 'warn');
   histCache.clear(); histBars = 0;
@@ -5383,10 +5412,17 @@ function profToBacktest(p, who) {
 $('#btEmpty').onclick = e => {
   const b = e.target.closest('[data-qs]'); if (!b || btBusy) return;
   if (b.dataset.qs === 'shared' && !SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; }
-  btFromProf(b.dataset.qs === 'shared' ? sharedProf() : activeProfile());
+  if (b.dataset.qs === 'market') { btFill(S); $('#btTop').value = '50'; btEstimate(); }   // as «Подставить: настройки „Рынка“»
+  else btFromProf(b.dataset.qs === 'shared' ? sharedProf() : activeProfile());
   runBacktest();
 };
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
+// the profile «Мой бот» trades by: the same set as the empty page's quick start, filled in without a run
+$('#btProf').onclick = () => {
+  const p = activeProfile(); btFromProf(p);
+  const tfNote = $('#btTf').value !== p.set.tf ? ` Таймфрейм ${p.set.tf} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
+  toast(`Подставлен профиль «${p.name}»`, `Нажмите «Запустить».${tfNote}`, 'ok');
+};
 ['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp', '#btFrom', '#btTo'].forEach(s => $(s).onchange = btEstimate);
 // «Свои даты…» start on the previous calendar year (UTC); the dates can't run past today
 $('#btDays').addEventListener('change', () => {
