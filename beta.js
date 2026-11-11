@@ -11,6 +11,9 @@ import * as M from './supabase/functions/_shared/math.js';
 let K = null;                       // toolkit from index.html (renderChart, attachZoom, api, fp, …)
 const $ = s => document.querySelector(s);
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+// the price bin of a price: a price right on a bin's edge divides to 1150.9999999999998 as often as to 1151 (115.1 / 0.1),
+// and plain floor then puts it a row lower
+const fl = x => Math.floor(x + 1e-9);
 const TFMS = {'1m': 6e4, '5m': 3e5, '15m': 9e5, '30m': 18e5, '1h': 36e5, '4h': 144e5, '1d': 864e5};
 const TFL = {'1m': '1м', '5m': '5м', '15m': '15м', '30m': '30м', '1h': '1ч', '4h': '4ч', '1d': '1д'};
 const RANGES = [[0, 'авто', 'авто'], [1, '1 день', '1д'], [3, '3 дня', '3д'], [7, '7 дней', '7д'], [30, '30 дней', '30д'], [90, '90 дней', '90д'], [180, '180 дней', '180д'], [365, '1 год', '1г']];
@@ -104,7 +107,7 @@ const PARAMS = {
     {k:'mkTop', name:'Отмечать самые крупные уровни', min:0.5, max:10, step:0.5, def:2, u:v => v + '% от видимых'},
     {k:'mkLines', name:'Линии вправо, пока цена не вернётся к уровню', def:1, opts:[[0, 'выкл'], [1, 'вкл']]}],
   fp:[{k:'fpImb', name:'Подсвечивать перевес (покупки к продажам уровнем ниже и наоборот)', def:3, opts:[[0, 'выкл'], [2, '2×'], [3, '3×'], [4, '4×']]},
-    {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * DOM_STEPS[v - 1]) : DOM_STEPS[v - 1] + '×') : 'авто'; }}],
+    {k:'fpStep', name:'Шаг строк (авто — средний размах свечи / 10)', min:0, max:12, step:1, def:0, u:v => { const p = act(); return v ? (p?.base ? '$' + niceNum(p.base * BOOK_STEPS[v - 1]) : BOOK_STEPS[v - 1] + '×') : 'авто'; }}],   // the steps fpStepFor uses
   vp:[{k:'vpPx', name:'Толщина строки профиля', min:2, max:10, step:1, def:4, u:v => v + ' px'},
     {k:'vpW', name:'Ширина профиля', min:10, max:50, step:5, def:22, u:v => v + '% графика'}],
   vwap:[{k:'vwapPer', name:'С начала', def:0, opts:[[0, 'дня'], [1, 'недели'], [2, 'месяца']]},
@@ -127,6 +130,8 @@ const durTxt = ms => { const m = Math.round(ms / 6e4); return m < 60 ? m + ' м�
 // price buckets of a "nice" size ≈ share of the price, fixed per coin so heatmap columns line up over time
 const {niceStep} = M;
 const maxDays = tf => Math.floor((MAXBARS - C('bbN') - 30) * TFMS[tf] / 864e5 * 10) / 10;
+// when the session a candle belongs to began (UTC): 0 — its day, 1 — its week (from Monday), 2 — its month
+const sessStart = (t, per) => per === 1 ? (Math.floor((t / 864e5 + 3) / 7) * 7 - 3) * 864e5 : per === 2 ? Date.UTC(new Date(t).getUTCFullYear(), new Date(t).getUTCMonth()) : Math.floor(t / 864e5) * 864e5;
 
 // ---------- drawings (Smart VWAP anchors, text notes): per coin, saved, with undo / redo ----------
 let drawings = {}, undoS = [], redoS = [];
@@ -359,12 +364,13 @@ class Pane {
   }
   get step() { return this.base * C('stepX'); }
   // {key: usd} for bids and asks within ±range of the middle; noFar: beyond the snapshot leave the levels to the server's far book
-  buckets(range, step = this.step, noFar = false) {
+  // The keys: bins centred on k·step (walls, as math.js bookBins), or with fromEdge bins [k·step, (k+1)·step) — the heatmap's fine bins
+  buckets(range, step = this.step, noFar = false, fromEdge = false) {
     const m = this.mid(); if (!this.book || !m || !step) return null;
-    const bid = new Map(), ask = new Map();
+    const bid = new Map(), ask = new Map(), key = fromEdge ? p => fl(p / step) : p => Math.round(p / step);
     const bLo = noFar ? this.book.minB || 0 : 0, aHi = noFar ? this.book.maxA || Infinity : Infinity;
-    for (const [p, q] of this.book.bids) if (p >= m * (1 - range) && p >= bLo) { const k = Math.round(p / step); bid.set(k, (bid.get(k) || 0) + p * q); }
-    for (const [p, q] of this.book.asks) if (p <= m * (1 + range) && p <= aHi) { const k = Math.round(p / step); ask.set(k, (ask.get(k) || 0) + p * q); }
+    for (const [p, q] of this.book.bids) if (p >= m * (1 - range) && p >= bLo) { const k = key(p); bid.set(k, (bid.get(k) || 0) + p * q); }
+    for (const [p, q] of this.book.asks) if (p <= m * (1 + range) && p <= aHi) { const k = key(p); ask.set(k, (ask.get(k) || 0) + p * q); }
     return {m, bid, ask, step};
   }
   // every second the current book is folded into the bar it belongs to (max per fine bucket), building the heatmap
@@ -374,7 +380,7 @@ class Pane {
     // a stopped or silent book stream leaves a frozen book: it must not go into the map as if it were live
     if (!this.book?.ok || !this.d || this.ws?.readyState !== 1 || Date.now() - this.msgAt > QUIET_SHOW) return;
     this.heatMs += 1000;
-    const bk = this.buckets(0.04, this.fine); if (!bk) return;
+    const bk = this.buckets(0.04, this.fine, false, true); if (!bk) return;
     const tf = TFMS[this.tf], bar = Math.floor(Date.now() / tf) * tf;
     let col = this.heat.get(bar); if (!col) this.heat.set(bar, col = new Map());
     for (const src of [bk.bid, bk.ask]) for (const [k, v] of src) if (v > (col.get(k) || 0)) col.set(k, v);
@@ -384,7 +390,10 @@ class Pane {
   // (a wall put at +8% is reported by Binance's stream, the server keeps it, the browser's snapshot doesn't reach it)
   walls() {
     const rng = C('domRange') / 100, bk = this.buckets(rng, this.step, !!this.far); if (!bk) return [];
-    const med = M.binMedian(bk);   // typical bin: dense local book only
+    // typical bin: the dense snapshot only. Beyond it the browser knows just the levels that changed since it connected:
+    // those bins are thin, and with them in the median every bin near the price counted as a wall (futures: the snapshot
+    // is ±0.2 %, the search ±8 %). They still take part as candidates: a big order put there is known exactly
+    const med = M.binMedian(this.far ? bk : this.buckets(rng, this.step, true) || bk);
     if (this.far && this.book) {
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
       for (const [p, usd, side] of this.far) {
@@ -441,7 +450,7 @@ class Pane {
   onTrade(x) {   // big market buys / sells: the top N% of recent trades
     const usd = +x.p * +x.q;
     if (this.base && this.d) {   // footprint: every trade into its candle and fine price bin (the server has the history, this keeps the live edge)
-      const tf = TFMS[this.tf], bar = Math.floor(x.T / tf) * tf, k = Math.floor(+x.p / this.base);
+      const tf = TFMS[this.tf], bar = Math.floor(x.T / tf) * tf, k = fl(+x.p / this.base);
       this.fpLive ||= new Map(); let col = this.fpLive.get(bar);
       if (!col) { this.fpLive.set(bar, col = new Map()); if (this.fpLive.size > 600) this.fpLive.delete(this.fpLive.keys().next().value); }
       const r = col.get(k) || [0, 0]; r[x.m ? 1 : 0] += usd; col.set(k, r);   // m = the buyer was the maker: a market sell
@@ -557,9 +566,9 @@ class Pane {
       return;
     }
     this.prevSym = null; this.prevMkt = null; this.toSpot = false;
-    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = M.bookStep(p); this.fine = niceStep(p, 0.00025); renderChips(); }   // chips show steps in $
+    if (!this.base) { const p = this.d.c[this.d.c.length - 1]; this.base = M.bookStep(p); this.fine = this.base / 2; renderChips(); }   // chips show steps in $; fine: see drawHeat
     if (loopOn && !this.el.classList.contains('hidden')) this.connect();
-    this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.rows = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp();
+    this.srv = false; this.far = null; this.liqHeat = null; this.fpHist = null; this.rows = null; this.fromServer().then(() => this.farBook()); this.loadOI(); this.loadLiqHeat(); this.loadFp(); this.loadPre();
   }
   // futures: forced liquidations from the stream (Binance sends the largest per second), drawn as diamonds
   onLiq(o) {
@@ -587,6 +596,23 @@ class Pane {
     const pts = r.map(x => [+x.timestamp, +x.sumOpenInterestValue]).sort((a, b) => a[0] - b[0]);
     let j = 0, cur = NaN; d.oi = d.t.map((t, i) => { const end = t + TFMS[this.tf]; while (j < pts.length && pts[j][0] <= end) cur = pts[j++][1]; return pts[0][0] <= end ? cur : NaN; });
     this.dirty = true;
+  }
+  // VWAP and the developing POC count from the start of a session (day, week, month), and the chart may hold fewer candles
+  // than that (1m: 500 candles are 8 hours). The candles between the earliest session start in use and the first loaded
+  // candle come coarser — 5m, 15m or 1h, whichever fits one request — plus the chart's own up to the first candle;
+  // calc() runs them before the chart's. Until they are here the unfinished first session is not drawn
+  async loadPre() {
+    const d = this.d; if (!d || this.preBusy || !(sel.has('vwap') || sel.has('dpoc'))) return;
+    const t0 = d.t[0], from = Math.min(sel.has('vwap') ? sessStart(t0, C('vwapPer')) : t0, sel.has('dpoc') ? sessStart(t0, TFMS[this.tf] >= 144e5 ? 1 : 0) : t0);
+    if (from >= t0 || d.pre?.from <= from) return;
+    this.preBusy = true;
+    try {
+      const iv = ['5m', '15m', '1h'].find(x => (t0 - from) / TFMS[x] <= 1000), cut = Math.floor(t0 / TFMS[iv]) * TFMS[iv];
+      const q = (i, a, b) => rest(this, `/api/v3/klines?symbol=${this.sym}&interval=${i}&startTime=${a}&endTime=${b - 1}&limit=1000`);
+      const rows = [...(cut > from ? await q(iv, from, cut) : []), ...(cut < t0 ? await q(this.tf, cut, t0) : [])];
+      if (d === this.d) { d.pre = {from, rows:rows.filter(x => x[0] >= from && x[0] < t0).map(x => [x[0], +x[2], +x[3], +x[4], +x[5]])}; calc(d); this.dirty = true; }
+    } catch { return; } finally { this.preBusy = false; }   // no answer: asked again within a minute (the sampler)
+    this.loadPre();   // the settings may have changed meanwhile (a longer session): nothing to do otherwise
   }
   // a server answer belongs to this chart only while coin, timeframe and market are the same; futures are asked with &mkt=fut
   key() { return this.sym + this.tf + this.mkt; }
@@ -618,7 +644,7 @@ class Pane {
   }
   // one candle's clusters at a given row step: Map row -> [buy $, sell $]; server history first, live trades for the rest
   fpBar(bar, step) {
-    const out = new Map(), addCol = (col, base) => { for (const [k, [b, s]] of col) { const kk = Math.floor(k * base / step), a = out.get(kk) || [0, 0]; a[0] += b; a[1] += s; out.set(kk, a); } };
+    const out = new Map(), addCol = (col, base) => { for (const [k, [b, s]] of col) { const kk = fl(k * base / step), a = out.get(kk) || [0, 0]; a[0] += b; a[1] += s; out.set(kk, a); } };
     const H = this.fpHist, h = H?.cols.get(bar), live = this.fpLive?.get(bar), tf = TFMS[this.tf];
     if (h) {   // the server sends its minutes once a minute: the live trades after its last minute keep the forming candle current
       addCol(h, H.base);
@@ -642,7 +668,8 @@ class Pane {
   fpStepFor(G) {
     const d = this.d; let rs = 0, cnt = 0;
     for (let i = G.s; i <= G.e; i++) { rs += d.h[i] - d.l[i]; cnt++; }
-    return Math.max(this.base, C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : niceStep(rs / Math.max(1, cnt) / 10, 1));
+    // a whole number of the trades' bins: with $2 bins a "nice" $5 row took two bins, the next three, and every second row looked bigger
+    return C('fpStep') ? this.base * BOOK_STEPS[C('fpStep') - 1] : this.base * Math.max(1, Math.round(niceStep(rs / Math.max(1, cnt) / 10, 1) / this.base));
   }
   // like ZeroSynapse's markers: circles on the in-candle levels that stand out — big buys / sells, one side outweighing the other, or total volume;
   // the threshold is the top N% of the visible levels, so it adapts to the coin and the zoom
@@ -717,10 +744,12 @@ class Pane {
     // minutes and dollars — folded here the same way)
     const key = this.key(), tf = TFMS[this.tf], r = await srv(`/heat?symbol=${this.sym}${this.sq()}&tf=${this.tf}&since=${this.d.t[0]}`);
     if (!r?.cols?.length || key !== this.key()) return;
-    this.fine = r.base; const heat = new Map(), u = r.u || 1;   // server bins become our fine bins, so live samples line up with the history
+    // the server's bins [k·base, (k+1)·base) become two fine bins each, half the dollars in either, so live samples line up
+    // with the history and a row centred on a round price takes half of the server bin below it and half of the one above
+    this.fine = r.base / 2; const heat = new Map(), u = (r.u || 1) / 2;
     for (const [t, k0, v] of r.cols) {
       const bar = Math.floor(t / tf) * tf; let col = heat.get(bar); if (!col) heat.set(bar, col = new Map());
-      v.forEach((x, i) => { if (x && x * u > (col.get(k0 + i) || 0)) col.set(k0 + i, x * u); });
+      v.forEach((x, i) => { if (x) for (const k of [2 * (k0 + i), 2 * (k0 + i) + 1]) if (x * u > (col.get(k) || 0)) col.set(k, x * u); });
     }
     this.heat = heat; this.heatMs = Math.max(this.heatMs, (r.mins ?? r.cols.length) * 6e4); this.hc = null; this.srv = true; this.dirty = true;
   }
@@ -812,7 +841,11 @@ class Pane {
     const s = Math.floor(left / 1000), dd = Math.floor(s / 86400), hh = Math.floor(s % 86400 / 3600), mm = Math.floor(s % 3600 / 60), ss = s % 60;
     return dd ? `${dd}д ${hh}ч` : (hh ? hh + ':' + String(mm).padStart(2, '0') : mm) + ':' + String(ss).padStart(2, '0');
   }
-  drawHeat(g, G) {   // fine buckets are summed into the display step; the result is cached (mouse moves redraw often)
+  // Fine bins [k·fine, (k+1)·fine), fine = half the coin's base step, are summed into rows centred on k·step (as the walls'
+  // bins are): a row is a whole number of fine bins at every whole «шаг цены». The fine bin used to be a "nice" number of its
+  // own ($20 under $50 rows on BTC): rows took two and three bins in turn, and every second row came out brighter.
+  // The result is cached (mouse moves redraw often)
+  drawHeat(g, G) {
     const d = this.d, step = this.step; if (!step || !this.fine) return;
     const key = `${G.s}|${G.e}|${step}|${C('heatCut')}|${d.t[G.e]}`, now = performance.now(), hc = this.hc;
     let cols, top;
@@ -821,7 +854,7 @@ class Pane {
       cols = [];
       for (let i = G.s; i <= G.e; i++) {
         const col = this.heat.get(d.t[i]); if (!col) continue;
-        const agg = new Map(); for (const [k, v] of col) { const kk = Math.round(k * this.fine / step); agg.set(kk, (agg.get(kk) || 0) + v); }
+        const agg = new Map(); for (const [k, v] of col) { const kk = fl((k + 0.5) * this.fine / step + 0.5); agg.set(kk, (agg.get(kk) || 0) + v); }   // the row its middle is in
         cols.push([i, agg]);
       }
       // one or two collected candles would only be a coloured stripe on the last bar: wait for a few
@@ -872,7 +905,8 @@ class Pane {
     const step = Math.max(L.base, this.step), cols = [];
     for (let i = G.s; i <= G.e; i++) {
       const col = L.cols.get(d.t[i]); if (!col) continue;
-      const agg = new Map(); for (const [k, [s, l]] of col) { const kk = Math.round(k * L.base / step), a = agg.get(kk) || [0, 0]; a[0] += s; a[1] += l; agg.set(kk, a); }
+      // the server's bins are [k·base, (k+1)·base): the rows here are [kk·step, (kk+1)·step) too (drawn around k·step they sat half a bin low)
+      const agg = new Map(); for (const [k, [s, l]] of col) { const kk = fl((k + 0.5) * L.base / step), a = agg.get(kk) || [0, 0]; a[0] += s; a[1] += l; agg.set(kk, a); }
       cols.push([i, agg]);
     }
     const vals = cols.flatMap(([, a]) => [...a.values()].map(([s, l]) => s + l)).sort((a, b) => a - b); if (!vals.length) return;
@@ -882,7 +916,7 @@ class Pane {
     const len = Math.max(G.bw * 2, 30, Math.min(160, G.bw * 8)), parts = [1, 0.55, 0.3, 0.12];
     g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     for (const [i, agg] of cols) for (const [k, [s, l]] of agg) {
-      const y = G.Y(k * step); if (y < G.T0 - h || y > G.pH + h) continue;
+      const y = G.Y((k + 0.5) * step); if (y < G.T0 - h || y > G.pH + h) continue;
       const f = Math.min(1, Math.sqrt((s + l) / top)); if (f < 0.12) continue;   // single small liquidations would only be noise
       const x0 = G.X(i) - G.bw / 2, a = 0.3 + 0.6 * f;
       g.fillStyle = l >= s ? PC.up : PC.lo;
@@ -898,7 +932,7 @@ class Pane {
     if (!this.fine) return;
     const s = Math.floor(Date.now() / 1000); this.act ||= new Map(); let m = this.act.get(s);
     if (!m) { this.act.set(s, m = new Map()); for (const k of this.act.keys()) { if (k < s - 120) this.act.delete(k); else break; } }
-    const k = Math.floor(p / this.fine); m.set(k, (m.get(k) || 0) + d);
+    const k = fl(p / this.fine); m.set(k, (m.get(k) || 0) + d);
   }
   actRows(keyOf) {   // the last N seconds (setting), folded into the book column's rows
     const out = new Map(), from = Math.floor(Date.now() / 1000) - C('actWin'); if (!this.act) return out;
@@ -992,7 +1026,7 @@ class Pane {
     const i0 = K.barAt(d.t, Math.max(x.t0, d.t[0])), i1 = K.barAt(d.t, x.t1); if (i1 < G.s || i0 > G.e || i1 <= i0) return;
     let lo = Infinity, hi = -Infinity, vol = 0; for (let i = i0; i <= i1; i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); vol += d.qv[i]; }
     const rows = 40, sz = (hi - lo) / rows || 1, vp = Array(rows).fill(0);
-    for (let i = i0; i <= i1; i++) { const a = clamp(Math.floor((d.l[i] - lo) / sz), 0, rows - 1), b = clamp(Math.floor((d.h[i] - lo) / sz), 0, rows - 1), sh = d.v[i] / (b - a + 1); for (let k = a; k <= b; k++) vp[k] += sh; }
+    for (let i = i0; i <= i1; i++) { const a = clamp(Math.floor((d.l[i] - lo) / sz), 0, rows - 1), b = clamp(Math.floor((d.h[i] - lo) / sz), 0, rows - 1), sh = d.qv[i] / (b - a + 1); for (let k = a; k <= b; k++) vp[k] += sh; }   // in $, as the label and the visible-range profile
     const max = Math.max(...vp), poc = vp.indexOf(max), xa = G.X(i0) - G.bw / 2, xb = G.X(i1) + G.bw / 2, wMax = (xb - xa) * 0.6;
     g.save(); g.beginPath(); g.rect(G.padL, G.T0, G.W - G.padL - G.padR, G.pH - G.T0); g.clip();
     g.fillStyle = PC.rsi + '10'; g.fillRect(xa, G.Y(hi), xb - xa, G.Y(lo) - G.Y(hi)); g.strokeStyle = PC.rsi + '66'; g.lineWidth = 1; g.strokeRect(xa, G.Y(hi), xb - xa, G.Y(lo) - G.Y(hi));
@@ -1104,7 +1138,7 @@ class Pane {
       // how deep the loaded book reaches: rows beyond it are unknown, not empty
       const bLo = this.book.minB || 0, aHi = this.book.maxA || Infinity;
       // rows: from the current price (like ZeroSynapse: 83 222–84 222–85 222…) or on round levels (like ATAS: 83 000–84 000…)
-      const A = C('domAnchor') ? 0 : Math.round(m / this.base) * this.base, keyOf = p => Math.floor((p - A) / step);
+      const A = C('domAnchor') ? 0 : Math.round(m / this.base) * this.base, keyOf = p => fl((p - A) / step);
       // each row keeps both sides in $ and the volume-weighted price of what is in it
       const byK = new Map(), add = (p, usd, side) => { if (p < G.mn - step || p > G.mx + step) return; const k = keyOf(p), r = byK.get(k) || {a:0, b:0, pw:0}; r[side] += usd; r.pw += p * usd; byK.set(k, r); };
       let totA = 0, totB = 0;   // the whole known book, for the Σ strip
@@ -1253,23 +1287,28 @@ function calc(d) {
   d.delta = d.qv.map((v, i) => 2 * d.tbq[i] - v);   // market buys − market sells, in $
   let cum = 0; d.cvd = d.delta.map(x => cum += x);
   // VWAP from the start of each day / week (from Monday, UTC) / month, with volume-weighted σ bands (like ZeroSynapse's RMS bands)
-  const per = C('vwapPer'), vsess = t => per === 1 ? Math.floor((t / 864e5 + 3) / 7) : per === 2 ? new Date(t).getUTCFullYear() * 12 + new Date(t).getUTCMonth() : Math.floor(t / 864e5);
-  let day = -1, pv = 0, vv = 0, p2 = 0; d.vwapSd = []; d.vwapNew = [];
+  // The chart's first session usually began before its first candle: the candles from there (d.pre, Pane.loadPre) are
+  // counted first. Without them that session is left out — a line "from the start of the day" that starts at the first
+  // loaded candle shows another number (BTC 1m: 0.5 % off the day's VWAP)
+  const per = C('vwapPer'), pre = d.pre?.rows || [], whole = s => s >= d.t[0] || d.pre?.from <= s;
+  let day = -1, pv = 0, vv = 0, p2 = 0, ok = whole(sessStart(d.t[0], per)); d.vwapSd = []; d.vwapNew = [];
+  const add = (t, h, l, c, v) => { const dd = sessStart(t, per), nw = dd !== day; if (nw) { day = dd; pv = 0; vv = 0; p2 = 0; } const tp = (h + l + c) / 3; pv += tp * v; vv += v; p2 += tp * tp * v; return nw; };
+  for (const x of pre) add(...x);
   d.vwap = d.c.map((c, i) => {
-    const dd = vsess(d.t[i]); d.vwapNew[i] = dd !== day; if (dd !== day) { day = dd; pv = 0; vv = 0; p2 = 0; }
-    const tp = (d.h[i] + d.l[i] + c) / 3; pv += tp * d.v[i]; vv += d.v[i]; p2 += tp * tp * d.v[i];
-    const m = vv ? pv / vv : NaN; d.vwapSd[i] = vv ? Math.sqrt(Math.max(0, p2 / vv - m * m)) : NaN; return m;
+    if ((d.vwapNew[i] = add(d.t[i], d.h[i], d.l[i], c, d.v[i])) && i) ok = true;
+    const m = ok && vv ? pv / vv : NaN; d.vwapSd[i] = ok && vv ? Math.sqrt(Math.max(0, p2 / vv - m * m)) : NaN; return m;
   });
-  // developing POC: the price with the most volume since the session start (day; a week on 4h / 1d candles)
-  const tfms = d.t.length > 1 ? d.t[1] - d.t[0] : 864e5, sess = tfms >= 144e5 ? 7 * 864e5 : 864e5, bin = niceStep(d.c[d.c.length - 1], 0.001);
-  let sk = null, hist = new Map(), best = null, bestV = 0;
-  d.dpoc = d.c.map((c, i) => {
-    const s = Math.floor((d.t[i] + (sess > 864e5 ? 3 * 864e5 : 0)) / sess);   // weeks start on Monday
-    if (s !== sk) { sk = s; hist = new Map(); best = null; bestV = 0; }
-    const a = Math.round(d.l[i] / bin), b = Math.round(d.h[i] / bin), share = d.v[i] / (b - a + 1);
-    for (let k = a; k <= b; k++) { const v = (hist.get(k) || 0) + share; hist.set(k, v); if (v > bestV) { bestV = v; best = k; } }
-    return best == null ? NaN : best * bin;
-  });
+  // developing POC: the price with the most volume since the session start (day; a week, from Monday, on 4h / 1d candles)
+  const tfms = d.t.length > 1 ? d.t[1] - d.t[0] : 864e5, sp = tfms >= 144e5 ? 1 : 0, bin = niceStep(d.c[d.c.length - 1], 0.001);
+  let sk = null, hist = new Map(), best = null, bestV = 0, okP = whole(sessStart(d.t[0], sp));
+  const addP = (t, h, l, v) => {
+    const s = sessStart(t, sp), nw = s !== sk; if (nw) { sk = s; hist = new Map(); best = null; bestV = 0; }
+    const a = Math.round(l / bin), b = Math.round(h / bin), share = v / (b - a + 1);
+    for (let k = a; k <= b; k++) { const x = (hist.get(k) || 0) + share; hist.set(k, x); if (x > bestV) { bestV = x; best = k; } }
+    return nw;
+  };
+  for (const [t, h, l, , v] of pre) addP(t, h, l, v);
+  d.dpoc = d.c.map((c, i) => { if (addP(d.t[i], d.h[i], d.l[i], d.v[i]) && i) okP = true; return okP && best != null ? best * bin : NaN; });
 }
 // heatmap scale comes from the CSS tokens --heat-0..3 (cold → hot)
 let HEAT = null;
@@ -1582,8 +1621,8 @@ function renderInd() {
       + `<button data-tog="${id}" aria-label="Убрать ${it.name}" title="Убрать">${ic('x')}</button></div>`; }).join('')
     || '<div class="faint" style="font-size:13px">Ничего не выбрано — только свечи и объём.</div>';
 }
-function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => p.d && calc(p.d)); redrawAll(); renderChips(); }
-function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); if (on('fp') || on('mk')) panes.forEach(p => p.fpHist || p.loadFp()); redrawAll(); requestAnimationFrame(redrawAll); }
+function applyCfg() { K.save('sr_bcfg', cfg); panes.forEach(p => { if (p.d) calc(p.d); p.loadPre(); }); redrawAll(); renderChips(); }   // loadPre: VWAP may now count from a week or a month
+function saveInd() { K.save('sr_bind', [...sel]); K.save('sr_bhide', [...hidden]); renderInd(); renderChips(); if (on('liqheat')) panes.forEach(p => p.liqHeat || p.loadLiqHeat()); if (on('fp') || on('mk')) panes.forEach(p => p.fpHist || p.loadFp()); panes.forEach(p => p.loadPre()); redrawAll(); requestAnimationFrame(redrawAll); }
 const openInd = () => { $('#bInd').classList.remove('hidden'); renderInd(); $('#bIndQ').focus(); };
 const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
@@ -1722,7 +1761,7 @@ export function open(kit, sym, where = 'full') {
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0, tickAt = Date.now();
-  sampler = setInterval(() => { tick++; const slept = Date.now() - tickAt > 3000; tickAt = Date.now(); panes.forEach(p => { p.watch(slept); if (!slept) p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); p.loadFp(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
+  sampler = setInterval(() => { tick++; const slept = Date.now() - tickAt > 3000; tickAt = Date.now(); panes.forEach(p => { p.watch(slept); if (!slept) p.sampleHeat(); p.scanWalls(); p.dirty = true; if (tick % 3 === 0) p.farBook(); if (tick % 60 === 0) { p.loadOI(); p.loadLiqHeat(); p.loadFp(); p.loadPre(); } }); setLive(); renderList(); }, 1000);   // the far book from the server every 3 s
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }

@@ -676,7 +676,8 @@ tr.row.stale{opacity:.55}
 @media(max-width:700px){
   #bInd{padding:0}
   #bInd .indbox{width:100%;height:100%;max-height:none;border-radius:0;display:flex;flex-direction:column}
-  #bInd .ind-tabs{display:flex;margin:2px 16px 10px}#bInd .ind-tabs .tab{flex:1}
+  #bInd .ind-tabs{display:flex;margin:2px 16px 10px}#bInd .ind-tabs .tab{flex:1;min-height:40px}#bInd .ind-chip{height:38px}   /* a finger's 36 px and more */
+  #bInd :is(.ind-it,.sel-it) button{width:40px;height:40px}#bInd .ind-selh button{height:40px}#bInd .ind-lbl{min-height:40px}
   #bInd .ind-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}#bInd .ind-chips::-webkit-scrollbar{display:none}#bInd .ind-chip{flex:0 0 auto}
   #bInd .ind-body{display:flex;flex-direction:column;flex:1;min-height:0}
   #bInd .ind-cats,#bInd .ind-sel{flex:1;min-height:0;max-height:none;border:0;overscroll-behavior:contain}
@@ -4467,6 +4468,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.99', date:'11 ноября 2026', title:'Точнее индикаторы графиков', items:[
+    'VWAP сессии и динамический POC считаются с начала дня, недели или месяца на любом таймфрейме.',
+    'Исправлено: обычные уровни стакана больше не отмечаются как стены.',
+    'Тепловая карта ликвидности стала ровной, без чередования ярких строк.',
+    'Шаг строк футпринта в настройках совпадает с графиком.',
+    'Кнопки в окне индикаторов на телефоне стали крупнее.',
+  ]},
   {v:'2.98', date:'11 ноября 2026', title:'Исправления «Стакана»', items:[
     'Исправлено: монета из поиска и уведомлений открывается и при развёрнутых графиках.',
     'Исправлено: на телефоне страница больше не застревает после перехода из карточки монеты в другой раздел.',
@@ -4528,10 +4536,6 @@ const CHANGELOG = [
     'Вкладка «Бета» стала «Графиками» и открыта всем, кто вошёл на сайт.',
     'Пароль и временный код для этой вкладки больше не нужны.',
     'Прежние ссылки на «Бету» открывают «Графики».',
-  ]},
-  {v:'2.87', date:'9 ноября 2026', title:'Порядок в данных', items:[
-    'Удалены служебные данные прежних версий, которые больше не используются.',
-    'Серверный бот создаётся только для профиля.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
