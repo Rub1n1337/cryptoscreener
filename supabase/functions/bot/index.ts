@@ -262,7 +262,9 @@ const closedMsg = (t: any, who = "общий бот") =>
   `<i>в сделке ${dur(t.tclose - t.time)} · комиссия${t.fin ? " и заём" : ""} $${t.fee.toFixed(2)}</i>`;
 
 // ---------- shared bot ----------
-async function run() {
+// a run that lost its lock (see bot_commit): it stops before the personal bots and writes only its line in bot_runs
+const LOST = "прогон пережил свою блокировку (120 с): ничего не записано, следующий прогон уже идёт";
+async function run(runId: string) {
   const now = Date.now();
   const { data: st, error: e1 } = await db.from("bot_state").select("*").eq("id", 1).single();
   if (e1) throw e1;
@@ -290,11 +292,14 @@ async function run() {
   const res = M.botTick({ rows, klines, open: open!, recentSyms: (recent ?? []).map((x: any) => x.sym), balance: st.balance, start: st.start_balance, S, now, market: mkt });
 
   // trades, positions and balance in one transaction (bot_commit): a failure half-way can't lose a trade's P&L any more.
-  // The regime is kept too: the site and Telegram explain what the bot waits for by it, not by a regime of their own
+  // The regime is kept too: the site and Telegram explain what the bot waits for by it, not by a regime of their own.
+  // p_run: written only while the run lock is still this run's (12.11, after 2.114). A run that outlived its 120 s lock would otherwise put
+  // back positions the next run had closed, with the old balance; now it writes nothing and tells nothing (LOST)
   const upserts = [...res.stillOpen, ...res.opened];
-  const { error } = await db.rpc("bot_commit", { p_closed: res.closed, p_open: upserts, p_balance: res.balance, p_checked: new Date(now).toISOString(), p_scanned: rows.length,
-    p_regime: mkt ? { tf: S.tf, erMax: S.erMax ?? 0.15, state: M.regimeOf(mkt, S), by: mkt.by } : null });
+  const { data: wrote, error } = await db.rpc("bot_commit", { p_closed: res.closed, p_open: upserts, p_balance: res.balance, p_checked: new Date(now).toISOString(), p_scanned: rows.length,
+    p_regime: mkt ? { tf: S.tf, erMax: S.erMax ?? 0.15, state: M.regimeOf(mkt, S), by: mkt.by } : null, p_run: runId });
   if (error) throw error;
+  if (wrote === false) throw new Error(LOST);
   // its Telegram messages go out after the personal bots have traded (see Deno.serve): a long subscriber list must not hold them up
   const notes = { lines: [...res.closed.map((t: any) => closedMsg(t)), ...res.opened.map((p: any) => openedMsg(p))], syms: [...res.opened, ...res.closed].map((x: any) => x.sym) };
   // the book at its confirmed signals, for research (never breaks the run: a failure is told in bot_runs.error)
@@ -701,7 +706,7 @@ Deno.serve(async (req) => {
   REGS = new Map();   // regimes are measured afresh every run (a warm instance would keep the last minute's)
   try { await tgPoll(); } catch { /* Telegram must never break trading */ }
   try {
-    const { notes, ...out } = await run();
+    const { notes, ...out } = await run(runId);
     const t1 = Date.now();
     let users = 0;
     try { users = await runUserBots(Date.now(), t0); } catch { /* personal bots never break the shared one */ }
@@ -715,6 +720,8 @@ Deno.serve(async (req) => {
     return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: t2 - t1, notify: Date.now() - t2 }, kept: KC.size, remote: RSTAT });
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
+    // the next run holds the lock and writes bot_state itself: only this run's line, no error on the bot and no alert
+    if (msg === LOST) { await db.from("bot_runs").insert({ ok: false, ms: Date.now() - t0, error: msg }); return Response.json({ error: msg }, { status: 409 }); }
     await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);
     // alert on the third failure in a row, once: a single lost minute (Binance refusing a shared address for a moment) is not news
     const { data: prev } = await db.from("bot_runs").select("ok").order("ts", { ascending: false }).limit(3);
