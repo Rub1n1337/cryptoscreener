@@ -6046,11 +6046,11 @@ async function checkUpdate() {
   updBusy = true;
   let h; try { h = await fetchVersion(); } finally { updBusy = false; }
   if (reloading || h == null || h === selfHash) return;
-  if (btBusy) return;   // a backtest downloading a year of history is not cut off: the next check (3 min) reloads after it
-  // never reload over unsaved edits, an open dialog, an open trade card or live charts (the card's «Стакан», «Развернуть»: a reload
-  // re-syncs their books) — ask once instead (the next check after they close or the page changes reloads by itself)
+  // never reload over a running backtest (a year of history is minutes of downloads), unsaved edits, an open dialog, an open trade
+  // card or live charts (the card's «Стакан», «Развернуть»: a reload re-syncs their books) — ask once instead (the next check after
+  // they end reloads by itself). Until 12.11 (after 2.119) a backtest was waited out silently: one run after another never got the new version
   const dirty = formDirty();
-  if (dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || betaWhere()) {
+  if (btBusy || dirty || !$('#dlg').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || betaWhere()) {
     if (!updWarned) toast('Вышла новая версия сайта', dirty ? 'Сохраните профиль и обновите страницу — до этого всё работает по-старому.'
       : 'Обновите страницу, когда закончите — до этого всё работает по-старому.', 'warn', () => location.reload(), 15000);
     updWarned = !document.hidden; return;   // a notice shown in a background tab is gone unread in 15 s: it comes again on the return
