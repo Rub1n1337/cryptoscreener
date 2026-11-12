@@ -78,7 +78,10 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
 // This function starts fresh every minute, so the candle cache above rarely outlives a run. The collector runs all the time:
 // it keeps the candles, tops them up and answers with the analyses — one request instead of hundreds. Only if both sides
 // run the same math (M.fingerprint) are its answers used; whatever it doesn't answer is done here as before.
-const SCAN_URL = "https://cryptoscreener-production-f6ba.up.railway.app/scan";
+// Off since 12.11.2026: the Railway address answers «Application not found» (since 06.11), so the name may be taken by
+// someone else, who would get the scan token and could feed this bot made-up analyses. Put the address back once the
+// collector runs under the owner's account again: "https://cryptoscreener-production-f6ba.up.railway.app/scan"
+const SCAN_URL = "";
 let FPRINT = "", SCAN_TOK = "";
 const RSTAT = { calls: 0, rows: 0, ms: 0, err: "" };   // reported in the response, to watch it
 const rkey = (sym: string, S: any) => `${sym}|${S.tf}|${S.method}|${S.N}|${S.k}`;
@@ -90,7 +93,7 @@ function addTask(groups: Groups, S: any, syms: string[]) {
 }
 // lazy: for notifications only, the collector may use candles a few minutes old (see LAZY)
 async function remote(groups: Groups, lazy: boolean, now: number, out: Map<string, any>, timeout: number) {
-  if (!groups.size) return;
+  if (!groups.size || !SCAN_URL) return;   // no collector: every analysis is done here
   FPRINT ||= M.fingerprint();
   const tasks = [...groups.values()].map((g) => ({ tf: g.S.tf, method: g.S.method, N: g.S.N, k: g.S.k, syms: [...g.syms], lazy }));
   const t0 = Date.now();
