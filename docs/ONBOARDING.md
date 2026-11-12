@@ -24,7 +24,8 @@
 `supabase/functions/_shared/math.js` — одна копия для сайта и сервера: анализ канала (`analyze`, `bands`), сигналы и вход
 (`wants`, `levels`, `planEntry`), выход (`checkExit`), сделка и издержки (`closeTrade`, `borrowedOf`, `borrowAt`), шаг бота
 (`botTick`), бэктест (`backtest`), случайный вход для сравнения (`randomSetup`), режим рынка (`regimeOf`, `marketOn`),
-учебные стратегии (Фибоначчи, SMC), отпечаток расчёта (`fingerprint`). Любая правка — с `tests/math.html?ref=_ref/math.js`;
+учебные стратегии (Фибоначчи, SMC), отпечаток расчёта (`fingerprint`). `analyze(sym, K, S, now, lite)`: функция `bot` зовёт
+с `lite = true` (без полей только для показа), сайт — без него; забытый `lite` в боте стоит лишь времени CPU. Любая правка — с `tests/math.html?ref=_ref/math.js`;
 правка бэктеста или `botTick` — ещё и с `tests/backtest-audit.js`.
 
 ## Сервер (Supabase)

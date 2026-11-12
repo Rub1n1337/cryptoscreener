@@ -4266,7 +4266,7 @@ function closeModal() {
 // ---------- backtest ----------
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const histCache = new Map();
-let lastReq = 0, btRes = null, btBusy = false, btHist = null, histIdx;
+let lastReq = 0, btRes = null, btBusy = false, btHist = null, histIdx, idxAsk = false;
 async function throttled(path) { // backtest downloads stay well under Binance's weight limit: ≤ 750 requests a minute of weight 2 is a quarter of it
   const wait = Math.max(0, lastReq + 80 - Date.now()); lastReq = Date.now() + wait;
   if (wait) await sleep(wait);
@@ -4293,7 +4293,8 @@ async function binanceHistory(sym, tf, startT, endT, stop) {
 // stop: throws to end the download between requests (see runBacktest); a coin cut off half-way is not cached
 async function fetchHistory(sym, tf, startT, endT, stop) {
   const key = `${sym}|${tf}|${startT}|${endT}`;
-  if (histCache.has(key)) return histCache.get(key);
+  // a hit moves the download to the end, so trimHistory (oldest first) drops what has not been used longest, not what came first
+  if (histCache.has(key)) { const v = histCache.get(key); histCache.delete(key); histCache.set(key, v); return v; }
   const tfms = TFMS[tf];
   const K = await HS.candles(sym, tf, startT, endT, {api:(s, t, a, b) => binanceHistory(s, t, a, b, stop), stop});
   const out = K.map(k => [k[0], k[1], k[2], k[3], k[4], k[5], k[0] + tfms - 1]);
@@ -4441,12 +4442,17 @@ function btEstimate() {
   // 83 s with stored history, 185 s without. The index is asked once; the estimate redraws when it comes. The honest pool is
   // every coin of the period's daily top-K (periodPool); measured on a year: top-20 (K 40) 383–404 coins, top-50 (K 75)
   // 447–468, top-100 (K 150) 513; two weeks of top-50 — 129
-  if (histIdx === undefined) { histIdx = null; HS.index().then(i => { histIdx = i; if (i) btEstimate(); }); }
+  // asked again while there is none (history.js keeps a failed answer for a minute, so this costs no request meanwhile): until
+  // 2.113 one failed request left the estimate «from Binance» until the page was reloaded
+  if (!histIdx && !idxAsk) { idxAsk = true; HS.index().then(i => { idxAsk = false; if (i && !histIdx) { histIdx = i; btEstimate(); } }, () => { idxAsk = false; }); }
   const K = periodK(s.top), coins = !s.pit ? s.top : Math.round(Math.min(K * 9, K + 400) * Math.min(1, 0.3 + 0.7 * days / 365));
   const stored = !!histIdx?.s?.BTCUSDT?.[s.tf] && per.from - 450 * TFMS[s.tf] >= HS.monthStart(histIdx.from);
   const sec = Math.max(5, Math.round((stored ? coins * ((days / 30 + 1) * 0.03 + 0.03) : Math.ceil(bars / 1000) * coins * 0.09) / 5) * 5);
   $('#btStatus').textContent = `Первый запуск займёт около ${sec < 60 ? sec + ' секунд' : Math.round(sec / 60) + ' мин'} — загружаем историю ${coins} ${coinsGen(coins)}. Повторные — мгновенно.`
-    + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '');
+    + (sec > 180 ? ` Это долго: быстрее будет ${s.tf === '15m' ? 'на 1h или ' : ''}с меньшим числом монет или коротким периодом.` : '')
+    // the run stops past ~3M candles (runBacktest, by the real pool); the pool here is a guess, and a coin rarely spans the whole
+    // period (0.89 of coins × bars on 60 days of 4h, less on a year), so only a clear excess is told, before the downloads start
+    + (coins * bars * 0.6 > 3e6 ? ' Скорее всего, такой прогон не поместится в память вкладки: возьмите период короче, таймфрейм крупнее или меньше монет.' : '');
 }
 // while the history loads, «Запустить» is «Прервать»: a year on a wide pool takes minutes. Each run has its own stop flag,
 // so the downloads of a stopped run end with their current request even if a new run has started; what was fully loaded stays
@@ -4692,6 +4698,11 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.113', date:'12 ноября 2026', title:'Бэктест: оценка и история', items:[
+    'Бэктест заранее предупреждает, если прогон, скорее всего, не поместится в память вкладки.',
+    'Оценка времени бэктеста учитывает сохранённую историю, даже если первая попытка её загрузить не удалась.',
+    'Повторные прогоны дольше сохраняют загруженную историю.',
+  ]},
   {v:'2.112', date:'12 ноября 2026', title:'Обновлены примеры «Учёбы»', items:[
     'Цифры примеров в уроках пересчитаны по новому расчёту займа.',
   ]},
@@ -4744,9 +4755,6 @@ const CHANGELOG = [
   ]},
   {v:'2.102', date:'11 ноября 2026', title:'Длинная история графиков', items:[
     'Добавлено: когда листаете график влево, более старые свечи догружаются сами.',
-  ]},
-  {v:'2.101', date:'11 ноября 2026', title:'Точнее бэктест', items:[
-    'Исправлено: сделка в монете, снятой с торгов, больше не занимает место до конца периода.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
