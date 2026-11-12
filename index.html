@@ -3775,7 +3775,7 @@ function renderBotPanelNow() {
     : `<button class="primary" data-act="server">Запустить на сервере 24/7</button><button data-act="off">Пауза</button>`;
   $('#bhero').className = 'bhero ' + (!on ? 'warn' : srv ? 'ok' : 'warn');
   $('#bhero').innerHTML = `<div style="min-width:0;flex:1 1 360px"><div class="bh-t"><span class="sdot ${!on ? 'idle' : srv ? '' : 'idle'}"></span>${title}</div><div class="bh-s">${sub}</div>${live}${market}
-    ${srv && SB_MINE?.error ? `<div class="bh-err">Ошибка на сервере: ${SB_MINE.error}</div>` : ''}${why}</div><div class="bh-a">${btns}</div>`;
+    ${srv && SB_MINE?.error ? `<div class="bh-err">Ошибка на сервере: ${esc(SB_MINE.error)}</div>` : ''}${why}</div><div class="bh-a">${btns}</div>`;
   tickLive();
   // profile picker: a folded row once there are trades to look at (open while there are none); the user's choice is remembered
   const D0 = srv ? SB_MINE : J;
@@ -4681,7 +4681,7 @@ function renderBacktest() {
   $('#btTrades').innerHTML = btRowsHtml(btAll ? btList : btList.slice(0, BT_ROWS))
     + (!btAll && btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
     || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
-  drawEquity(); eqRestore('bt');
+  eqRestore('bt');
 }
 const BT_ROWS = 300;
 let btList = [], btAll = false;   // btAll: «Показать все» was pressed for this result — a redraw (the theme) keeps the list open
@@ -4689,31 +4689,13 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
     <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td><td class="hm">${x.snap?.score ?? '—'}</td></tr>`).join('');
-function drawEquity() { // legacy canvas curve — the results now use the SVG balance chart in the hero
-  const cv = $('#btEq'); if (!cv) return;
-  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
-  if (!W || !btRes) return;
-  cv.width = W * dpr; cv.height = H * dpr;
-  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-  const pts = btRes.equity, padL = 8, padR = 80, top = 10, bot = H - 22;
-  let mn = btRes.start, mx = btRes.start; for (const [, b] of pts) { mn = Math.min(mn, b); mx = Math.max(mx, b); }
-  const pad = (mx - mn) * 0.08 || 10; mn -= pad; mx += pad;
-  const t0 = pts[0][0], t1 = pts[pts.length - 1][0];
-  const X = t => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR), Y = b => top + (mx - b) / (mx - mn) * (bot - top);
-  g.setLineDash([4, 4]); g.strokeStyle = PC.cross; g.beginPath(); g.moveTo(padL, Y(btRes.start)); g.lineTo(W - padR, Y(btRes.start)); g.stroke(); g.setLineDash([]);
-  const last = pts[pts.length - 1][1], col = last >= btRes.start ? PC.lo : PC.up;
-  g.beginPath(); pts.forEach(([t, b], i) => g[i ? 'lineTo' : 'moveTo'](X(t), Y(b)));
-  g.strokeStyle = col; g.lineWidth = 1.6; g.stroke();
-  g.lineTo(X(t1), Y(btRes.start)); g.lineTo(X(t0), Y(btRes.start)); g.closePath(); g.fillStyle = col + '1a'; g.fill();
-  g.font = '11px system-ui'; g.textBaseline = 'middle';
-  g.fillStyle = PC.mute; g.fillText('$' + btRes.start.toFixed(0), W - padR + 6, Y(btRes.start));
-  g.fillStyle = col; g.fillText('$' + last.toFixed(2), W - padR + 6, clamp(Y(last), 8, bot) + (Math.abs(Y(last) - Y(btRes.start)) < 14 ? 14 : 0));
-  g.fillStyle = PC.axis;
-  for (let q = 0; q <= 4; q++) { const t = t0 + q * (t1 - t0) / 4, txt = dt(t), w = g.measureText(txt).width; g.fillText(txt, clamp(X(t) - w / 2, padL, W - padR - w), H - 9); }
-}
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.111', date:'12 ноября 2026', title:'Меньше трафика', items:[
+    'Проверка новой версии сайта почти не расходует трафик, пока сайт не обновился.',
+    'Исправлено: текст ошибки серверного бота показывается безопасно.',
+  ]},
   {v:'2.110', date:'12 ноября 2026', title:'Точнее заём и режим рынка', items:[
     'Проценты за заём в бэктесте и у бота считаются только с суммы, которой не хватило свободных денег.',
     'Если не загрузились данные BTC, ETH или SOL, режим рынка считается неизвестным, и бот не входит по правилам, зависящим от режима.',
@@ -4769,13 +4751,6 @@ const CHANGELOG = [
     'При обрыве связи бэктест сообщает об ошибке и сохраняет прежний результат.',
     'Результат помечается устаревшим, если настройки изменили во время проверки.',
     'Сообщения о периоде, таймфрейме и связи стали понятнее.',
-  ]},
-  {v:'2.99', date:'11 ноября 2026', title:'Точнее индикаторы графиков', items:[
-    'VWAP сессии и динамический POC считаются с начала дня, недели или месяца на любом таймфрейме.',
-    'Исправлено: обычные уровни стакана больше не отмечаются как стены.',
-    'Тепловая карта ликвидности стала ровной, без чередования ярких строк.',
-    'Шаг строк футпринта в настройках совпадает с графиком.',
-    'Кнопки в окне индикаторов на телефоне стали крупнее.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5057,7 +5032,7 @@ function go(t, push = true) {
   if (push) setHash(true);
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
   betaSync();   // the live charts: in the card's «Стакан» or the market's «Развернуть», paused elsewhere
-  if (t === 'backtest') { if (btRes) drawEquity(); btCacheShow(); }
+  if (t === 'backtest') { btCacheShow(); }
   if (t === 'market') { drawChart(); loadWalls(); botRefresh(); }
   if (t === 'journal') { renderJournal(); fetchShared(); fetchServerBot(); }
   if (t === 'learn') renderLearn();
@@ -5666,7 +5641,6 @@ $('#btTrades').onclick = e => {
   const x = btRes.trades.find(t => String(t.id) === tr.dataset.id);
   if (x) showTrade(x, {isOpen:false, who:'бэктест', set:btRes.settings});
 };
-window.addEventListener('resize', () => { if (btRes) drawEquity(); });
 // the backtest opens on the rules that held up over a year (the shared bot trades by the same), not on a setup that loses
 $('#btDays').value = '60'; btFromProf(PRESETS[0]);
 renderChangelog();
@@ -5977,7 +5951,9 @@ if (matchMedia('(hover: none)').matches) {
 const UPDATE_FILES = [location.pathname, ...['./supabase/functions/_shared/math.js', './supabase/functions/_shared/alerts.js', './beta.js'].map(p => new URL(p, location.href).pathname)];
 const hashText = s => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; };
 const IS_DEV = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);   // no auto-reload while developing locally
-const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p + '?_=' + Date.now(), {cache:'no-store', signal:AbortSignal.timeout(15000)}).then(r => r.ok ? r.text() : null)))
+// cache:'no-cache' asks the server every time, but with the file's ETag: an unchanged file comes back as an empty 304 and is read
+// from the browser's cache. Before 2.111 every check (~870 KB raw) was downloaded whole: a unique ?_= and no-store skipped the cache
+const fetchVersion = () => Promise.all(UPDATE_FILES.map(p => fetch(p, {cache:'no-cache', signal:AbortSignal.timeout(15000)}).then(r => r.ok ? r.text() : null)))
   .then(ts => ts.includes(null) ? null : hashText(ts.join('\n'))).catch(() => null);
 let selfHash = null;
 fetchVersion().then(h => { selfHash = h; });
