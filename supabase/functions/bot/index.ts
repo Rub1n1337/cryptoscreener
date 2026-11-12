@@ -393,7 +393,7 @@ async function runUserBots(now: number, reqStart: number) {
   QUIET.clear();   // recomputed per chat below, each run
   // exits only, no entries: a paused bot's positions its owner asked to close (onlyReq; ub_close marks them closeReq), and an
   // enabled bot left without profiles (ub_set accepts an empty list, the site never sends one) — its stops and takes still work.
-  // Before 2.108 both were never checked: a paused bot's «Закрыть» stayed «закрывается…» for good
+  // Before 2.109 both were never checked: a paused bot's «Закрыть» stayed «закрывается…» for good
   const exitsOnly = async (b: any, onlyReq: boolean) => {
     const { data: pr } = await db.from("user_positions").select("data").eq("bot_id", b.id);
     const all = (pr ?? []).map((x: any) => x.data), open = onlyReq ? all.filter((p: any) => p.closeReq) : all;
