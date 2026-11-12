@@ -456,7 +456,11 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
   const closed = [], stillOpen = [];
   for (const p of open) {
     const K = klines[p.sym];
-    const x = K ? checkExit(p, K, now) : null;
+    // no candles (a coin delisted from Binance answers «Invalid symbol»): checkExit can't see the stop or the take, and until 2.117
+    // the position stayed open for good, holding a slot. A day after its time stop it is closed at its last price, as the backtest
+    // closes a coin that stopped trading; the day keeps a brief failure of one request from closing it at an old price
+    const ts = p.ts ?? TIME_STOP, gone = !K?.length && ts > 0 && now - p.time > ts * p.tfms + 864e5 && +p.last > 0;
+    const x = gone ? { exit: +p.last * (1 - (p.side === 'LONG' ? 1 : -1) * SLIP), reason: 'тайм-стоп' } : K?.length ? checkExit(p, K, now) : null;
     if (!x) { stillOpen.push(p); continue; }
     const t = closeTrade(p, x.exit, x.reason, now);
     balance += t.pnl; closed.push(t);
@@ -783,7 +787,8 @@ export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, s
   if (!rs.length) return null;
   const tfms = TFMS[S.tf], slots = slotsOf(S), risk = S.risk ?? RISK, lev = S.lev ?? 1, ts = S.timeStop ?? TIME_STOP;
   const ratios = trades.map(x => Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl)).filter(x => x > 0 && isFinite(x));
-  // a study idea's stops are its levels (0.786 of an impulse, the edge of a block or a gap), not 1.5 ATR: its random trades take
+  // a study idea's stops are those of its own trades — its levels (0.786 of an impulse, the edge of a block in «zone» or of a gap),
+  // or 1.5 ATR for a block traded as a bounce (planEntry): its random trades take
   // the stop distance and the take : stop of one of its own trades, drawn at random. The ideas of STRATEGIES draw as before
   const own = isStudy(S) ? trades.map(x => [Math.abs(x.entry - x.sl) / x.entry, Math.abs(x.tp - x.entry) / Math.abs(x.entry - x.sl)]).filter(([d, k]) => d > 0 && k > 0 && isFinite(d) && isFinite(k)) : null;
   // per coin: plain arrays of the candles and running sums of quote turnover (volume × close, as backtest()); a year of a wide

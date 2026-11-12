@@ -7,6 +7,7 @@ supabase/*.sql
 supabase/functions/bot
 supabase/functions/tg
 supabase/functions/_shared/tg.ts
+supabase/functions/_shared/login.ts
 tests
 .github
 supabase/config.toml

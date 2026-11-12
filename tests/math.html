@@ -246,6 +246,19 @@ for (const [name, S] of Object.entries(VARIANTS)) {
   check('режим: неизвестный — переключатель не входит', M.modeOf({mkt:m2}, {strategy:'switch', regimeSrc:'majors', erMax:0.15}) === 'none');
 }
 
+// ---------- 2.117: a position whose coin has no candles (delisted) ----------
+{
+  const h = 36e5, t = Date.now();
+  const P = (age, ts, x = {}) => ({id:'a', sym:'XUSDT', side:'LONG', entry:100, last:90, tp:120, sl:80, qty:1, time:t - age, tfms:h, ts, risk:20, snap:{bor:0}, ...x});
+  const tick = (p, K) => M.botTick({rows:[], klines:K ? {XUSDT:K} : {}, open:[p], recentSyms:[], balance:1000, S:{}, now:t, allowEntries:false});
+  const gone = tick(P(73 * h, 48)).closed;
+  check('без свечей: через сутки после тайм-стопа закрыта по последней цене', gone.length === 1 && gone[0].reason === 'тайм-стоп' && near(gone[0].exit, 90 * (1 - M.SLIP)));
+  check('без свечей: до суток после тайм-стопа остаётся открытой', tick(P(71 * h, 48)).closed.length === 0);
+  check('без свечей: с выключенным тайм-стопом остаётся открытой', tick(P(500 * h, 0)).closed.length === 0);
+  check('пустой массив свечей не роняет шаг', tick(P(10 * h, 48), []).stillOpen.length === 1);
+  check('со свечами — обычная проверка выхода', tick(P(5 * h, 48), [[t - 2 * h, 100, 101, 99, 100, 1]]).stillOpen[0]?.last === 100);
+}
+
 // ---------- 3. against the previous copy: nothing else changed ----------
 const refPath = new URLSearchParams(location.search).get('ref');
 if (refPath) {

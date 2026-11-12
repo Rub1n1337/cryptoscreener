@@ -2988,14 +2988,16 @@ const profSummary = p => { const s = profSet(p);
     + (s.timeStop ? ` · тайм-стоп ${s.timeStop} свечей` : ' · без тайм-стопа')
     + ` · позиций одновременно: ${M.slotsOf(s)}`
     + ` · ${p.coins.mode === 'list' ? p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}`; };
-let botRegime = null, botBusy = false, tickerCache = null, botProfile = null;
+let botRegime = null, botBusy = false, tickerCache = null, botProfile = null, botErr = '';   // botErr: the browser bot's last failed step
 // the market regime on a timeframe, measured as the backtest and the server bots do (M.marketOn: BTC/ETH/SOL, closed candles).
 // "The market now" (the auto mode's choice of profile, the line in «Мой бот») is 1h; a profile trades by the regime of its own
 // timeframe. Kept 3 minutes per timeframe
 const REGC = {};
 async function regimeOn(tf) {
   const c = REGC[tf];
-  if (c && Date.now() - c.t < 3 * 6e4) return c.m;
+  // kept up to 3 minutes, but never past the close of a bar: the regime is read at the last closed bar, and one kept from the
+  // previous bar decided the first entries on the new one by the old regime (the server bots measure it every minute)
+  if (c && Date.now() - c.t < 3 * 6e4 && Math.floor(c.t / TFMS[tf]) === Math.floor(Date.now() / TFMS[tf])) return c.m;
   const C = {};
   await Promise.all(M.MAJORS.map(async s => { try { C[s] = M.closedCloses(await klines(s, tf, M.BARS), tf, Date.now()); } catch {} }));
   const m = M.marketOn(s => C[s] || null, tf);
@@ -3177,6 +3179,13 @@ $('#authDlg').onkeydown = e => {
   }
 };
 window.addEventListener('storage', e => {
+  // the browser bot stepped (or a position was closed, the journal reset) in another tab: show that journal here too
+  if (e.key === 'sr_journal') {
+    if (botBusy) return;   // a step under way re-reads it before it writes
+    J = load('sr_journal', J); renderGuard(); renderBotPanel();
+    if (!$('#journal').classList.contains('hidden')) renderJournal();
+    return;
+  }
   if (e.key !== 'sr_auth') return;
   AUTH = load('sr_auth', null);
   if (!AUTH !== LOCKED) return location.reload();   // signed in or out in another tab
@@ -3230,9 +3239,10 @@ async function syncPush() {
 }
 function syncApply(rows, asked) {   // values from the profile → this device's storage, then a reload so everything reads them
   storeRows(rows);
-  const last = +sessionStorage.getItem('sr_syncreload') || 0;
+  let last = 0; try { last = +sessionStorage.getItem('sr_syncreload') || 0; } catch {}   // a browser policy may forbid storage
   if (!asked && Date.now() - last < 15e3) return;   // never a reload loop; the values are stored and apply at the next start
-  sessionStorage.setItem('sr_syncreload', Date.now()); location.reload();
+  try { sessionStorage.setItem('sr_syncreload', Date.now()); } catch { if (!asked) return; }   // can't guard against a loop: wait for the next start
+  location.reload();
 }
 // this device's own server bot, replaced by the profile's: asked once, with its result. Kept, it trades on unseen and never
 // writes to Telegram (only a profile's bot does); it falls asleep 30 days after it was last opened
@@ -3443,8 +3453,16 @@ async function setWhere(w) {
   if (paused != null) toast('Бот работает в этой вкладке', 'серверный бот на паузе и не пишет в Telegram; «На сервере 24/7» вернёт его', 'info');
   renderBotPanel(); renderJournal();
 }
+// Several open tabs each run the browser bot on one journal (sr_journal). Until 2.117 each traded its own copy and the last to save
+// won: trades and their P&L vanished, one coin could be entered twice. Now one tab steps at a time (Web Lock sr_bot; the others skip
+// that minute), and the step re-reads the journal from storage right before botTick, then saves it with no await between
 async function runBot() {
   if (BP.where === 'server') { fetchServerBot(); return; }   // the server trades; the browser only shows the journal
+  if (botBusy) return;
+  if (navigator.locks?.request) return navigator.locks.request('sr_bot', {ifAvailable:true}, lk => lk ? botStep() : null).catch(() => {});
+  return botStep();
+}
+async function botStep() {
   if (botBusy) return; botBusy = true;
   try {
     const now = Date.now();
@@ -3454,7 +3472,7 @@ async function runBot() {
     botProfile = P.id;
     let list;
     if (P.coins.mode === 'list') list = [...P.coins.list];
-    else { if (!tickerCache || now - tickerCache.t > 10 * 6e4) tickerCache = {t:now, d:await api('/api/v3/ticker/24hr')}; list = M.pickSymbols(tickerCache.d, P.coins.top, [], now); }
+    else { if (!tickerCache || now - tickerCache.t > 5 * 6e4) tickerCache = {t:now, d:await api('/api/v3/ticker/24hr')}; list = M.pickSymbols(tickerCache.d, P.coins.top, [], now); }
     // the market scan already has these candles when the profile uses the same timeframe and channel; the same history length
     // as the server bots and the collector (M.BARS), so the strength matches theirs
     const same = set.tf === S.tf && set.N === S.N, own = {}, nb = barsFor(set);
@@ -3463,16 +3481,23 @@ async function runBot() {
     const botRows = list.map(s => { const K = kOf(s); return K ? M.analyze(s, K, {...set, N:effN(K.length, set)}) : null; }).filter(Boolean);
     // exits are checked on each position's own timeframe
     const exitK = {};
+    // enough candles to cover the time since the last check: after the tab was closed for long (more than 150 candles of the
+    // position's timeframe) a stop or a take hit in the gap went unseen and was never checked again. Binance gives 1000 at most
     await pool(J.open, 6, async p => {
-      const tf = tfOf(p.tfms) || set.tf;
-      exitK[p.sym] = tf === set.tf && kOf(p.sym) ? kOf(p.sym) : tf === S.tf && cache[p.sym] ? cache[p.sym] : await klines(p.sym, tf, 150).catch(() => null);
+      const tf = tfOf(p.tfms) || set.tf, need = Math.min(1000, Math.ceil((now - Math.max(p.time, +J.checked || 0)) / p.tfms) + 3);
+      const have = tf === set.tf && kOf(p.sym) ? kOf(p.sym) : tf === S.tf && cache[p.sym] ? cache[p.sym] : null;
+      exitK[p.sym] = have && have.length >= need ? have : await klines(p.sym, tf, Math.max(150, need)).catch(() => have);
     });
     // it trades by the regime of the profile's own timeframe, as the backtest of that profile does. Awaited before the journal
     // is read: an await between reading J.open / J.balance and writing them back let a manual close made meanwhile be undone
     // (the position came back and its P&L was lost). The pause after a trade counts that close too
     const market = (await regimeOn(set.tf)) ?? undefined;
+    J = load('sr_journal', J);   // another tab may have stepped or closed a position since this one read it (see runBot)
+    if (BP.where === 'server') return;   // switched to the server meanwhile
+    // in «Авто» with the market regime unknown (one of BTC/ETH/SOL did not load) no profile is the right one: no entries this minute
+    const blind = BP.mode === 'auto' && M.regimeOf(botRegime, {erMax:BP.erMax, regimeSrc:'majors'}) == null;
     const recent = J.closed.filter(x => now - x.tclose < M.COOLDOWN * TFMS[set.tf]).map(x => x.sym);
-    const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, start:J.start, S:set, now, allowEntries:J.on, market});
+    const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, start:J.start, S:set, now, allowEntries:J.on && !blind, market});
     for (const p of res.opened) { p.note = `«${P.name}» · ${p.note}`; p.snap.profile = P.name; }
     J.open = [...res.stillOpen, ...res.opened];
     J.closed = [...res.closed, ...J.closed]; capJournal();
@@ -3482,8 +3507,9 @@ async function runBot() {
     save('sr_journal', J); renderGuard(); renderBotPanel();
     if (!$('#journal').classList.contains('hidden')) renderJournal();
     if (chart) drawChart();
-  } catch (e) { console.warn('my bot', e); }
-  botBusy = false;
+    if (botErr) { botErr = ''; renderGuard(); }
+  } catch (e) { console.warn('my bot', e); botErr = String(e?.message || e).slice(0, 200); renderGuard(); }   // said in the guard, not only the console
+  finally { botBusy = false; }
 }
 // ---------- sharing profiles: a link carries one profile; everything is re-validated on the way in ----------
 // (names end up in innerHTML, so they are stripped of markup wherever a profile enters: form, link, storage)
@@ -3879,6 +3905,7 @@ function renderGuard() {
   const el = $('#guard'), MD = BP.where === 'server' ? SB_MINE : J, mine = MD ? M.journalStats(baseOf(MD), MD.closed) : null;
   const mineTxt = MD ? `Мой бот (${BP.where === 'server' ? 'на сервере' : 'в этой вкладке'}): ${MD.on ? 'торгует' : 'на паузе'}, позиций ${MD.open.length}, за 24 ч ${usd(mine.pnl24)}`
       + (MD.fetchError ? ` · не удалось обновить, показано состояние ${MD.checked ? ago(Date.now() - MD.checked) + ' назад' : 'с прошлой загрузки'}` : '')
+      + (BP.where !== 'server' && botErr ? ` · последняя проверка рынка не удалась: ${esc(botErr)}` : '')
     : 'Мой бот: загружаю…';
   const open = el.classList.contains('open') ? ' open' : '';
   // with all well only a dot is shown, so the words go to the tooltip and to screen readers
@@ -4723,6 +4750,13 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.117', date:'12 ноября 2026', title:'Надёжность ботов', items:[
+    'Исправлено: бот в браузере, открытый в нескольких вкладках, ведёт один общий журнал.',
+    'Исправлено: позиция по монете, снятой с торгов, закрывается после тайм-стопа.',
+    'Исправлено: в режиме «Авто» без данных о рынке бот не открывает новых сделок.',
+    'Ошибка проверки рынка у бота в браузере показывается в панели состояния.',
+    'Исправлено: график после «Свернуть» перерисовывается сразу.',
+  ]},
   {v:'2.116', date:'12 ноября 2026', title:'Журнал бота в браузере', items:[
     'Журнал бота в браузере хранит последние 3000 сделок; баланс и итог за всё время учитывают все.',
   ]},
@@ -4772,12 +4806,6 @@ const CHANGELOG = [
     'У каждой учебной стратегии свои настройки, а их сделки сравниваются со случайным входом.',
     'Карточка учебной сделки показывает импульс, блок или разрыв, по которым был вход.',
     'Бот по учебным стратегиям не торгует, их нельзя сохранить как профиль.',
-  ]},
-  {v:'2.105', date:'11 ноября 2026', title:'Понятнее страница бэктеста', items:[
-    'Настройки бэктеста разложены по разделам: что проверяем, на чём, деньги и риск, выход, фильтры входа.',
-    'Под выбором идеи входа появилось короткое описание её правил.',
-    'Добавлен раздел «Можно ли верить»: вердикт, сравнение со случайным входом, отложенный период и предупреждения о неполном итоге.',
-    'Готовый профиль «Моего бота» можно подставить в бэктест одной кнопкой.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4899,7 +4927,9 @@ async function closeMine(id) {
     let px; try { px = +(await api(`/api/v3/ticker/price?symbol=${p0.sym}`)).price; } catch {}
     if (!(px > 0)) { noPrice++; if (id != null) toast(`Нет цены ${pair(p0.sym)}`, 'Позиция осталась открытой — попробуйте ещё раз.', 'bad'); continue; }
     // the bot may have run while the confirmation was open or the price was loading: it may have closed this position by its
-    // stop or take already. Closing the old copy again recorded a second trade and counted its P&L twice
+    // stop or take already. Closing the old copy again recorded a second trade and counted its P&L twice.
+    // Read from storage: the bot may have stepped in another tab (see runBot)
+    J = load('sr_journal', J);
     const p = J.open.find(x => x.id === p0.id); if (!p) continue;
     const t = M.closeTrade(p, px * (1 - (p.side === 'LONG' ? 1 : -1) * M.SLIP), 'вручную', now);
     J.open = J.open.filter(x => x.id !== p.id); J.closed = [t, ...J.closed]; capJournal(); J.balance += t.pnl; net += t.pnl; done++;
@@ -5859,6 +5889,8 @@ function setExp(on, own) {
   } finally { betaHold = false; }
   betaSync();
   if (on) scrollTo({top:0, behavior:'instant'});
+  // the chart was hidden while expanded: a draw in that time found it 0 wide and left the old picture (and no hover geometry)
+  else { drawChartSoon(); drawCardSoon(); if (tf2On) drawChart2Soon(); }
 }
 // bexpTok marks this expansion's history entry: an entry left from before a reload carries another one. folding: «Свернуть»
 // went back and waits for popstate — a second press must not go back twice
@@ -5987,7 +6019,10 @@ fetchVersion().then(h => { selfHash = h; });
 // the timer and a return to the tab can start a check at the same moment: one check at a time, and one countdown only
 let updWarned = false, updBusy = false, reloading = false;
 async function checkUpdate() {
-  if (selfHash == null || IS_DEV || updBusy || reloading) return;
+  if (IS_DEV || updBusy || reloading) return;
+  // the first look at the files failed (offline at the start, one file not answering): take it now. Until 2.117 such a tab never
+  // checked again and stayed on its version until reloaded by hand
+  if (selfHash == null) { updBusy = true; try { selfHash = await fetchVersion(); } finally { updBusy = false; } return; }
   updBusy = true;
   let h; try { h = await fetchVersion(); } finally { updBusy = false; }
   if (reloading || h == null || h === selfHash) return;

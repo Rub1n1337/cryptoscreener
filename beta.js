@@ -564,7 +564,7 @@ class Pane {
   async restart() {
     // the old coin's streams stop first, so its book and trades never mix with the new coin's candles
     clearTimeout(this.cuTimer); this.cuTimer = null; this.kPend = null; this.cuFails = 0;
-    this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.fpLive = this.fpMin = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.thr = 0; this.label();
+    this.disconnect(); this.book = null; this.wc = null; this.liqs = []; this.fund = null; this.fpLive = this.fpMin = null; this.view = null; this.setY(null); this.d = null; this.trades = []; this.tradeUsd = []; this.tape = []; this.thr = 0; this.label();
     if (ruler?.pane === this) ruler = null;
     const key = this.mkt + this.sym + this.tf; if (this.heatKey !== key) { this.heat = new Map(); this.heatKey = key; this.heatMs = 0; this.base = 0; }
     if (this === act()) { $('#bNote').innerHTML = '<span>Загружаю…</span>'; $('#bSym').placeholder = K.base(this.sym); }

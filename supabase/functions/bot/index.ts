@@ -390,7 +390,7 @@ async function runUserBots(now: number, reqStart: number) {
   // taken least recently checked first (they used to come in table order, so past 40 the same ones went first every minute and
   // the rest never ran), and KEEP places stay for bots without positions, or those would never get one
   // reset_n: how many times the journal was reset — ub_commit refuses the step's write if it changed meanwhile
-  const RUN = 40, KEEP = 10, FIELDS = "id, config, balance, start_balance, reset_n, tg_chat, alerts, sig_sent", seen = new Date(now - 30 * 864e5).toISOString();
+  const RUN = 40, KEEP = 10, FIELDS = "id, config, balance, start_balance, reset_n, tg_chat, alerts, sig_sent, active_profile, regime", seen = new Date(now - 30 * 864e5).toISOString();
   const oldest = { ascending: true, nullsFirst: true };
   const { data: held } = await db.from("user_bots").select(`${FIELDS}, user_positions!inner(bot_id)`).eq("enabled", true).order("checked_at", oldest).limit(RUN);
   const heldIds = new Set((held ?? []).map((b: any) => b.id));
@@ -427,7 +427,7 @@ async function runUserBots(now: number, reqStart: number) {
   // first, checked_at marked even when nothing closed, so past RUN of them every one still gets its turn.
   // A bot already in this run's queue (paused after it was read) is left to it: two writes of one step would overwrite the balance
   const queued = new Set(bots.map((b: any) => b.id));
-  const { data: paused } = await db.from("user_bots").select(`${FIELDS}, active_profile, regime, user_positions!inner(bot_id)`).eq("enabled", false)
+  const { data: paused } = await db.from("user_bots").select(`${FIELDS}, user_positions!inner(bot_id)`).eq("enabled", false)
     .order("checked_at", oldest).limit(RUN);
   for (const b of (paused ?? []).filter((b: any) => !queued.has(b.id))) {
     if (Date.now() - reqStart > 60_000) break;   // the active bots below come first in the time left
@@ -481,7 +481,9 @@ async function runUserBots(now: number, reqStart: number) {
     const pname = String(P.name ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60);
     const own = Array.isArray(P.coins?.list) ? P.coins.list.filter((s: unknown) => typeof s === "string" && /^[A-Z0-9]{2,20}USDT$/.test(s)).slice(0, 200) : [];
     const list: string[] = P.coins?.mode === "list" && own.length ? own : M.pickSymbols(ticker, Math.round(num(P.coins?.top, 20, 200, 150)), [], now);
-    return { P, S, pname, list, regName };
+    // blind: in "auto" with the market regime unknown (one of BTC/ETH/SOL did not load) no profile is the right one: no entries
+    // this minute, exits as usual. Before 2.117 an unknown regime picked the impulse profile, which could enter by it
+    return { P, S, pname, list, regName, blind: cfg.mode === "auto" && regName == null };
   };
   // every bot's coins in one request to the collector
   const plans = new Map<string, any>(), tradeGroups: Groups = new Map();
@@ -501,7 +503,7 @@ async function runUserBots(now: number, reqStart: number) {
         await db.from("user_bots").update({ checked_at: new Date(now).toISOString(), last_error: "нет профилей" }).eq("id", b.id);
         continue;
       }
-      const { P, S, pname, list, regName } = x;
+      const { P, S, pname, list, regName, blind } = x;
       const { data: pr } = await db.from("user_positions").select("data").eq("bot_id", b.id);
       const open = (pr ?? []).map((x: any) => x.data);
       const Ks: Record<string, any> = {};
@@ -511,7 +513,7 @@ async function runUserBots(now: number, reqStart: number) {
       for (const p of open) exitK[p.sym] = await getK(p.sym, tfOf(p.tfms) || S.tf);
       const { data: rec } = await db.from("user_trades").select("data").eq("bot_id", b.id).gt("tclose", now - M.COOLDOWN * (M.TFMS as any)[S.tf]);
       const mkt = REGT[S.tf] ?? undefined;   // undefined: botTick takes it from the BTC/ETH/SOL rows
-      const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, start: b.start_balance, S, now, market: mkt });
+      const res = M.botTick({ rows, klines: exitK, open, recentSyms: (rec ?? []).map((x: any) => x.data.sym), balance: b.balance, start: b.start_balance, S, now, market: mkt, allowEntries: !blind });
       for (const p of res.opened) { p.note = `«${pname}» · ${p.note}`; p.snap.profile = pname; }
       // trades, positions and balance in one transaction (ub_commit); a manual close sent meanwhile survives it.
       // regime: "the market now" (1h) for the site's line, and `trade` — what the profile trades by on its timeframe.
@@ -708,14 +710,18 @@ Deno.serve(async (req) => {
   Object.assign(RSTAT, { calls: 0, rows: 0, ms: 0, err: "" });   // the collector's answers of this run (a warm instance kept the last one's)
   REGS = new Map();   // regimes are measured afresh every run (a warm instance would keep the last minute's)
   try { await tgPoll(); } catch { /* Telegram must never break trading */ }
+  // personal bots never break the shared one, but a failure of the whole step (not of one bot, which goes to its last_error)
+  // is said in this run's bot_runs.error, as the collector's and the books' are; it used to be swallowed without a trace
+  let users = 0, usersErr = "";
+  const userStep = async () => { try { users = await runUserBots(Date.now(), t0); } catch (e) { usersErr = String((e as Error)?.message ?? e).slice(0, 300); } };
   try {
-    const { notes, ...out } = await run(runId);
+    // a failed shared step no longer costs the personal bots their minute (their stops and takes included): they run after it
+    // anyway — except when the run lost its lock (LOST), when the next run is already doing them
+    let shared: Awaited<ReturnType<typeof run>>;
+    try { shared = await run(runId); } catch (e) { if (String((e as Error)?.message ?? e) !== LOST) await userStep(); throw e; }
+    const { notes, ...out } = shared;
     const t1 = Date.now();
-    let users = 0;
-    // personal bots never break the shared one, but a failure of the whole step (not of one bot, which goes to its last_error)
-    // is said in this run's bot_runs.error, as the collector's and the books' are; it used to be swallowed without a trace
-    let usersErr = "";
-    try { users = await runUserBots(Date.now(), t0); } catch (e) { usersErr = String((e as Error)?.message ?? e).slice(0, 300); }
+    await userStep();
     const t2 = Date.now();
     try { await notify(notes.lines, notes.syms); } catch { /* the trades are written; a failed message must not fail the run */ }
     // the run is fine, but when the collector did not answer the bot computed everything itself: said in `error` of an ok run,
@@ -731,7 +737,7 @@ Deno.serve(async (req) => {
     await db.from("bot_state").update({ last_error: msg, checked_at: new Date().toISOString() }).eq("id", 1);
     // alert on the third failure in a row, once: a single lost minute (Binance refusing a shared address for a moment) is not news
     const { data: prev } = await db.from("bot_runs").select("ok").order("ts", { ascending: false }).limit(3);
-    await db.from("bot_runs").insert({ ok: false, ms: Date.now() - t0, error: msg });
+    await db.from("bot_runs").insert({ ok: false, ms: Date.now() - t0, error: usersErr ? `${msg}; личные боты: ${usersErr}` : msg });
     if (prev?.[0]?.ok === false && prev?.[1]?.ok === false && prev?.[2]?.ok !== false) await notify([`⚠️ <b>Общий бот: ошибка три минуты подряд</b>\n${esc(msg)}`]);
     return Response.json({ error: msg }, { status: 500 });
   } finally {
