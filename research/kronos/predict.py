@@ -28,6 +28,10 @@ from model.kronos import Kronos, KronosTokenizer, auto_regressive_inference
 
 torch.backends.cuda.matmul.allow_tf32 = False   # plain fp32, as the model was published
 DEV = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+if DEV != 'cpu':
+    # on Windows a GPU that runs out of memory spills into system RAM and gets ~9× slower instead of failing: PyTorch's cache
+    # grew to ~7 GB of the 8 on batches of 17–20 pairs. A cap makes it fail loudly; the cache is emptied after each point.
+    torch.cuda.set_per_process_memory_fraction(0.6)
 PRED_DIR = os.path.join(DATA, 'pred')
 
 def stamps(ms):
@@ -60,6 +64,7 @@ def forecast(tok, mod, C, T, items, peek=0, seed=None):
     torch.manual_seed(seed if seed is not None else T // STEP)
     z = auto_regressive_inference(tok, mod, rep(X), rep(XS), rep(YS), CTX, PRED, 5, 1.0, 0, 0.9, 1)   # (n*S, CTX, 6) — sample_count 1: no averaging
     z = z[:, -PRED:, 3].reshape(len(items), SAMPLES, PRED)
+    if DEV != 'cpu': torch.cuda.empty_cache()
     mu, sd = np.array(mu)[:, 3], np.array(sd)[:, 3]
     return (z * (sd[:, None, None] + 1e-5) + mu[:, None, None]).astype(np.float32)
 
