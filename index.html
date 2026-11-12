@@ -2074,6 +2074,9 @@ const barsFor = (set = S) => Math.min(1000, Math.max(M.BARS, set.N + 150));
 const forAnalysis = (K, set = S) => { const n = barsFor(set); return K && K.length > n ? K.slice(-n) : K; };
 // coin avatar: first letter on a colour derived from the ticker
 const coin = sym => { const b = base(sym); let h = 0; for (const ch of b) h = (h * 31 + ch.charCodeAt(0)) % 360; return `<span class="coin"><i style="--h:${h}">${b.replace(/^1000+/, '')[0] || '?'}</i><b>${b}</b></span>`; };
+// title and body are plain text (the same go to the browser's Notification): escaped here, so a server's error message can't
+// put markup on the page. A function declaration, not esc: toast may run before esc is defined further down
+function plainHtml(s) { return String(s).replace(/[<>&"]/g, c => ({"<":"&lt;", ">":"&gt;", "&":"&amp;", '"':"&quot;"}[c])); }
 // in-app toasts: kind = ok | bad | warn | info; click runs onClick
 function toast(title, body = '', kind = 'info', onClick, ms = 6000) {
   // the same message twice at once is noise: keep the one already on screen
@@ -2082,7 +2085,7 @@ function toast(title, body = '', kind = 'info', onClick, ms = 6000) {
   const el = document.createElement('div');
   el.dataset.key = key;
   el.className = 'toast ' + kind;
-  el.innerHTML = `<svg class="i" style="color:var(--${kind === 'ok' ? 'lo' : kind === 'bad' ? 'up' : kind === 'warn' ? 'acc' : 'blue'})"><use href="#i-${kind}"/></svg><div><b>${title}</b>${body ? `<div class="mute">${body}</div>` : ''}</div>`;
+  el.innerHTML = `<svg class="i" style="color:var(--${kind === 'ok' ? 'lo' : kind === 'bad' ? 'up' : kind === 'warn' ? 'acc' : 'blue'})"><use href="#i-${kind}"/></svg><div><b>${plainHtml(title)}</b>${body ? `<div class="mute">${plainHtml(body)}</div>` : ''}</div>`;
   const kill = () => { el.classList.add('out'); setTimeout(() => el.remove(), 200); };
   el.onclick = () => { onClick?.(); kill(); };
   $('#toasts').prepend(el);
@@ -3236,11 +3239,11 @@ function syncApply(rows, asked) {   // values from the profile → this device's
 async function oldBotAsk() {
   const old = load('sr_ubot_old', null); if (!old?.id || old.id === UB?.id) return save('sr_ubot_old', null);
   let r; try { r = await rpc('ub_get', {p_id:old.id, p_secret:old.secret || null}); }
-  catch (e) { if (/forbidden/.test(e.message)) save('sr_ubot_old', null); return; }   // gone, or another profile's: nothing to ask; offline: the next start
+  catch (e) { if (rpcIs(e, /forbidden/)) save('sr_ubot_old', null); return; }   // gone, or another profile's: nothing to ask; offline: the next start
   const b = r.bot, n = r.closed?.length || 0, pos = r.open?.length || 0, pnl = b.balance - b.start_balance;
   const del = await ask({title:'Удалить прежний серверный бот?', ok:'Удалить', no:'Оставить', danger:true,
     text:`На этом устройстве был свой бот на сервере, теперь здесь бот профиля. Итог прежнего: баланс $${money(b.balance)} (${usd(pnl)}), сделок ${n}, открытых позиций ${pos}. Оставленный, он продолжит торговать без Telegram; удалённый — вместе со сделками и позициями. Отменить удаление нельзя.`});
-  if (del) { try { await rpc('ub_delete', {p_id:old.id, p_secret:old.secret || null}); toast('Прежний бот удалён', '', 'ok'); } catch (e) { if (!/forbidden/.test(e.message)) return toast('Не удалось удалить прежний бот', String(e.message || e), 'bad'); } }
+  if (del) { try { await rpc('ub_delete', {p_id:old.id, p_secret:old.secret || null}); toast('Прежний бот удалён', '', 'ok'); } catch (e) { if (!rpcIs(e, /forbidden/)) return toast('Не удалось удалить прежний бот', String(e.message || e), 'bad'); } }
   save('sr_ubot_old', null);
 }
 // a device that synced before, against the profile's rows: the profile's newer values are taken, this device's own changes
@@ -3311,9 +3314,22 @@ renderAcct(); scheduleRefresh(); loadMe().then(() => syncStart()).then(() => pro
 
 // ---------- my bot on the server: the profile's bot (accounts stage 5), one for all its devices ----------
 // signed in, calls go as the person (the profile's Telegram, the Beta, owner rights); a stale token is refreshed once
+// PostgREST answers an error as {code, message, hint, details}: the person reads a sentence (RPC_TEXT), the code tells errors
+// apart by the server's own words, kept in e.raw («P0001 forbidden»). Until 2.114 the toast showed the raw JSON
+const RPC_TEXT = {'forbidden':'нет доступа к этому боту: его удалили или он принадлежит другому профилю', 'no profiles':'нужен хотя бы один профиль',
+  'not signed in':'войдите в аккаунт', 'no bot':'бот не найден', 'config too large':'слишком много настроек — удалите лишние профили',
+  'too big':'слишком большие данные', 'too many keys':'слишком много сохранённых настроек', 'bad key':'неизвестная настройка',
+  'too many bots from this address, try later':'с этого адреса создано слишком много ботов, попробуйте позже',
+  'too many bots created, try later':'сейчас создаётся слишком много ботов, попробуйте позже',
+  'start balance must be 100 … 10000000':'стартовый баланс — от 100 до 10 000 000'};
+const rpcIs = (e, re) => re.test(e?.raw || e?.message || '');
 async function rpc(fn, args) {
   const r = await authedFetch(SB_URL + 'rpc/' + fn, {method:'POST', body:JSON.stringify(args)});
-  if (!r.ok) throw new Error((await r.text()).slice(0, 200));
+  if (!r.ok) {
+    const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {}
+    const raw = String(j?.message || t || `HTTP ${r.status}`).slice(0, 200), e = new Error(RPC_TEXT[raw] || raw);
+    e.raw = `${j?.code || ''} ${raw}`.trim(); e.status = r.status; throw e;
+  }
   const t = await r.text(); return t ? JSON.parse(t) : null;
 }
 // the server bot's id and, for a bot no profile has claimed yet, its secret (a profile's bot answers to the person's token)
@@ -3330,7 +3346,7 @@ async function profileBot() {
   if (moved()) return;
   if (!id && UB?.secret) {
     try { id = (await rpc('ub_claim', {p_id:UB.id, p_secret:UB.secret}))?.id; }
-    catch (e) { if (!/forbidden/.test(e.message)) return; }   // forbidden: this device's bot is gone, or another profile's
+    catch (e) { if (!rpcIs(e, /forbidden/)) return; }   // forbidden: this device's bot is gone, or another profile's
     if (moved()) return;
   }
   if (id && UB?.secret && UB.id !== id) save('sr_ubot_old', UB);
@@ -3378,7 +3394,7 @@ async function fetchServerBot() {
     if (chart) drawChart();
   } catch (e) {
     if (UB?.id !== id) return;
-    if (/forbidden/.test(e.message)) profileBot();   // deleted on another device: the profile may have another bot, or none
+    if (rpcIs(e, /forbidden/)) profileBot();   // deleted on another device: the profile may have another bot, or none
     // any other failure (no connection, a timeout, a server error) was dropped and the panel kept old numbers as if fresh
     else if (SB_MINE) { SB_MINE.fetchError = String(e.message || e); renderGuard(); }
   }
@@ -3663,7 +3679,7 @@ const saveAlerts = (part, msg) => alertsQ = alertsQ.then(async () => {
     if (a && typeof a === 'object' && SB_MINE) { SB_MINE.alerts = a; alertsAt = Date.now(); }
     keepFocus(renderTg); toast('Сохранено', msg(alertsView(SB_MINE?.alerts)), 'ok');
   } catch (e) { toast('Не удалось сохранить', String(e.message || e), 'bad'); keepFocus(renderTg); }
-});
+}).catch(() => {});   // a throw outside the try must not leave the queue rejected: every later save would be skipped silently
 // one plain sentence about what will come, for the current choice
 function alertsHint(v) {
   if (!v.sig.on) return 'Сигналы бота выключены — приходят только его сделки.';
@@ -4698,6 +4714,11 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.114', date:'12 ноября 2026', title:'Понятнее ошибки сервера', items:[
+    'Ошибки сохранения на сервере описаны словами, а не служебным текстом.',
+    'Окно индикаторов закрывается клавишей Esc, а Tab не уходит за его пределы.',
+    'Исправлено: после сбоя сохранение настроек Telegram больше не перестаёт работать.',
+  ]},
   {v:'2.113', date:'12 ноября 2026', title:'Бэктест: оценка и история', items:[
     'Бэктест заранее предупреждает, если прогон, скорее всего, не поместится в память вкладки.',
     'Оценка времени бэктеста учитывает сохранённую историю, даже если первая попытка её загрузить не удалась.',
@@ -4752,9 +4773,6 @@ const CHANGELOG = [
   {v:'2.103', date:'11 ноября 2026', title:'Все монеты рядом с графиком', items:[
     'Добавлена вкладка «Все» с поиском в списке монет развёрнутого вида.',
     'Под монетой в списке показано её расстояние от центра канала.',
-  ]},
-  {v:'2.102', date:'11 ноября 2026', title:'Длинная история графиков', items:[
-    'Добавлено: когда листаете график влево, более старые свечи догружаются сами.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4866,7 +4884,7 @@ async function closeMine(id) {
   if (!(await ask({title:`Закрыть ${what}?`, text:'По текущей цене рынка, с обычной комиссией. Бот не будет входить в эту монету, пока не пройдёт пауза после сделки.', ok:'Закрыть', danger:true}))) return;
   if (BP.where === 'server' && UB) {
     try { await rpc('ub_close', ubArgs({p_pos:id})); }
-    catch (e) { const m = String(e.message || e); toast('Не удалось закрыть', /ub_close|PGRST202|Could not find/.test(m) ? 'Закрытие позиций на сервере ещё не включено — скоро заработает. В браузерном режиме уже работает.' : m, 'bad'); return; }
+    catch (e) { const m = String(e.message || e); toast('Не удалось закрыть', rpcIs(e, /ub_close|PGRST202|Could not find/) ? 'Закрытие позиций на сервере ещё не включено — скоро заработает. В браузерном режиме уже работает.' : m, 'bad'); return; }
     for (const p of open) p.closeReq = true;
     renderJournal(); toast(id == null ? 'Позиции закрываются' : 'Позиция закрывается', 'Бот на сервере закроет по рынку в течение минуты.', 'info');
     setTimeout(fetchServerBot, 65e3); return;
@@ -5229,7 +5247,7 @@ function renderEvents() {
   const on = ntfOn(), can = 'Notification' in window;
   $('#evp').innerHTML = `<div class="evh"><b>События</b><button data-ev="all"${evUnread() ? '' : ' disabled'}>Прочитать всё</button></div>
     <div class="evl">${EV.length ? EV.map(e => `<button class="evi${evRead.has(e.id) ? '' : ' new'}" data-ev="${e.id}"><i class="${e.kind}"></i>
-      <span class="evt"><b>${e.title}</b>${e.body ? `<span>${e.body}</span>` : ''}<span class="faint">${ago(Date.now() - e.t)} назад</span></span></button>`).join('')
+      <span class="evt"><b>${plainHtml(e.title)}</b>${e.body ? `<span>${plainHtml(e.body)}</span>` : ''}<span class="faint">${ago(Date.now() - e.t)} назад</span></span></button>`).join('')
       : '<div class="evempty">Пока тихо. Новые сигналы и сделки ботов появятся здесь.</div>'}</div>
     <div class="evf"><span>${on ? 'Уведомления браузера включены — приходят, пока сайт открыт' : 'Получать уведомления, пока сайт открыт (и в свёрнутой вкладке)'}</span>${can ? `<button data-ev="ntf">${on ? 'Выключить' : 'Включить'}</button>` : ''}</div>
     <div class="evf"><span>Звук при новом сигнале</span><button data-ev="snd" aria-pressed="${sound}">${sound ? 'Выключить' : 'Включить'}</button></div>`;
@@ -5385,7 +5403,7 @@ $('#ubdel').onclick = async () => {
     text:'Серверный бот профиля удалится на всех ваших устройствах: его сделки, позиции и Telegram. Отменить это нельзя. Профили останутся, бот продолжит работать в этой вкладке.'}))) return;
   clearTimeout(syncTimer); ubOn = null;
   try { await rpc('ub_delete', ubArgs()); }
-  catch (e) { if (!/forbidden/.test(e.message)) { toast('Не удалось удалить', String(e.message || e), 'bad'); return; } }   // forbidden: it is gone already
+  catch (e) { if (!rpcIs(e, /forbidden/)) { toast('Не удалось удалить', String(e.message || e), 'bad'); return; } }   // forbidden: it is gone already
   botGone();
   renderBotPanel(); renderJournal(); renderGuard();
   toast('Бот удалён с сервера', 'Профили остались, бот работает в этой вкладке', 'ok');

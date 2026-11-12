@@ -38,7 +38,11 @@
 - Функции выкладывает GitHub Actions при пуше в `supabase/functions` (`.github/workflows/deploy-functions.yml`);
   нужную им миграцию — применить до пуша.
 - SQL: `schema.sql` (таблицы), `security.sql`, `hardening.sql` (права и RLS), `cron.sql`, `telegram.sql`, `alerts.sql`,
-  файлы `2026-MM-*.sql` — миграции по датам. Права на функции — только `authenticated` и `service_role`.
+  файлы `2026-MM-*.sql` — миграции по датам. Права на функции — только `authenticated` и `service_role` (кроме `beta_*` — они
+  проверяют ключ сами — и `tg_bot_name`: имя бота не секрет).
+- Эти файлы — запись того, что применено к живой базе, а не сценарий сборки с нуля: по алфавиту их порядок не совпадает с
+  порядком применения (`2026-11-cleanup.sql` позже `2026-11-profile-bot.sql`, `2026-11-alerts-parts.sql` позже `alerts.sql`).
+  Источник правды — сама база (`pg_get_functiondef`); новую базу собирать из дампа живой.
 
 ## Данные
 

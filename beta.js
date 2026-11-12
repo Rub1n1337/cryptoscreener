@@ -1655,6 +1655,17 @@ const closeInd = () => $('#bInd').classList.add('hidden');
 function wire() {
   $('#bIndBtn').onclick = () => { closePop(); openInd(); };
   $('#bIndClose').onclick = closeInd; $('#bInd').onclick = e => { if (e.target.id === 'bInd') closeInd(); };
+  // a modal dialog: Tab stays inside it, Escape closes it on its own (the page's Escape above only runs while the charts are on
+  // screen) and gives the focus back to the button that opened it
+  $('#bInd').addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.stopPropagation(); closeInd(); $('#bIndBtn')?.focus(); return; }
+    if (e.key !== 'Tab') return;
+    const f = [...$('#bInd .indbox').querySelectorAll('button, input, select, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled && x.offsetParent);
+    if (!f.length) return;
+    const a = f[0], b = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === a) { e.preventDefault(); b.focus(); }
+    else if (!e.shiftKey && document.activeElement === b) { e.preventDefault(); a.focus(); }
+  });
   $('#bIndQ').oninput = renderInd;
   $('#bIndClear').onclick = () => { sel.clear(); hidden.clear(); saveInd(); };
   $('#bLabels').checked = labels; $('#bLabels').onchange = e => { labels = e.target.checked; K.save('sr_blabels', labels); redrawAll(); };
