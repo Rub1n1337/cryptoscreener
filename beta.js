@@ -1629,6 +1629,7 @@ const ICONS = {dom:'book', imb:'imb', act:'act', tape:'tape', obsum:'sigma', hea
   liq:'liq', liqheat:'liqheat', oi:'oi', fp:'fp', mk:'mk', vp:'vp', poc:'poc', dpoc:'dpoc', frvp:'range', vwap:'vwap', vwapv:'vwapv', bb:'channel', rsi:'gauge', fibt:'fib', rafft:'raff'};
 function renderInd() {
   const n = sel.size; ['#bIndN', '#bIndN2', '#bIndN3', '.ind-tabs .ind-n'].forEach(s => $(s).textContent = n);
+  $('#bIndN').classList.toggle('hidden', !n);   // the button's own count only when something is on: a «0» read as a fault
   $('#bQuick').innerHTML = QUICK.map(id => { const it = ITEMS.find(x => x.id === id); return `<button class="ind-chip${sel.has(id) ? ' on' : ''}" data-tog="${id}">${ic(sel.has(id) ? 'check' : 'plus')}${it.name}</button>`; }).join('');
   const q = $('#bIndQ').value.trim().toLowerCase();
   $('#bCats').innerHTML = CATS.map(c => {

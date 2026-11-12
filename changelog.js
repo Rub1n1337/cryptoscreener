@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.96 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.97', date:'10 ноября 2026', title:'Понятнее ошибки и навигация', items:[
+    'Кнопка «Назад» в браузере возвращает в предыдущий раздел сайта.',
+    'Добавлена кнопка «Поделиться монетой» рядом с названием монеты.',
+    'Если график не загрузился, рядом появляется кнопка «Повторить».',
+    'Показатели над графиком объясняют себя по нажатию.',
+    '«Выйти на всех устройствах» сначала спрашивает подтверждение.',
+  ]},
   {v:'2.96', date:'10 ноября 2026', title:'Удобнее на телефоне', items:[
     'Окно индикаторов на телефоне открывается на весь экран с разделами «Все» и «Выбрано».',
     'Кнопка фильтров стоит рядом с поиском, быстрые фильтры занимают строку целиком.',

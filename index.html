@@ -534,7 +534,9 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin var(--dur-2) var(--ease)}
 .bhint button{height:28px;padding:0 10px;font-size:12.5px}
 .bph .bpx{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text)}.bph .live{font-size:11.5px}
-@media(max-width:1250px){#bIndBtn .ib-t{display:none}}
+/* where the full label doesn't fit, «Индикаторы» keeps a short one: an icon and a number alone don't say what the button is */
+.ib-s{display:none}
+@media(max-width:1250px){#bIndBtn .ib-t{display:none}#bIndBtn .ib-s{display:inline}}
 /* the coin card's two views: «Канал» (the channel chart) and «Стакан» (the charts' bar and one chart, moved in from beta.js's
    place). In the card the coin comes from the card (its search, the list), so the charts' own coin field and layout hide */
 #cpanel.ob #cpair,#cpanel.ob #ulv,#cpanel.ob>.legend,#cpanel.ob #sheet,#cpanel.ob #tfseg,#cpanel.ob #cset,#cpanel:not(.ob) #cBeta{display:none}
@@ -562,7 +564,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
   .cbeta .bpane>.bchips{order:-1;flex:0 0 auto}.cbeta .bpane>.bchips.open{order:0;flex:1 1 100%}
   .cbeta .bpane>.bph{flex:1 1 0;min-width:0;padding-bottom:6px}.cbeta .bpane>.cvwrap{flex:1 1 100%}
 }
-@container cbar (max-width:900px){.cbeta .bbar .ib-t{display:none}}
+@container cbar (max-width:900px){.cbeta .bbar .ib-t{display:none}.cbeta #bIndBtn .ib-s{display:inline}}
 .bpop.draw{width:min(340px,calc(100vw - 32px))}.bpop.draw .pact button{flex:1;white-space:nowrap;padding:0 8px}.bpop .pdraw{display:grid;gap:4px}
 .bpop .pdraw button{justify-content:flex-start;gap:10px;height:38px;padding:0 10px;font-weight:600}.bpop .pdraw kbd{margin-left:auto}
 .bpop .pdraw button.on{background:var(--blue);border-color:var(--blue);color:#fff}.bpop.draw .pact button{gap:6px;font-size:12.5px}
@@ -743,6 +745,15 @@ tr.row.stale{opacity:.55}
 @media(max-width:700px){
   .phead p{display:none}
   .tablewrap:has(#jopen) thead,.tablewrap:has(#jclosed) thead,.tablewrap:has(#btTrades) thead{display:none}
+  /* the backtest's summaries by group (strength, side and exit, the two parts of the period): a card per group too, the group's
+     name over its five numbers, each with its name — the same as the trades under them, no sideways scroll */
+  :is(#btScore,#btSplit,#btPartsT) thead{display:none}
+  .tablewrap:has(:is(#btScore,#btSplit,#btPartsT)){overflow-x:hidden}
+  :is(#btScore,#btSplit,#btPartsT),:is(#btScore,#btSplit,#btPartsT) tbody{display:block;width:100%;min-width:0}
+  :is(#btScore,#btSplit,#btPartsT) tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  :is(#btScore,#btSplit,#btPartsT) td{display:block;padding:0;border:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  :is(#btScore,#btSplit,#btPartsT) td:first-child{grid-column:1/-1;font-weight:600;white-space:normal}
+  :is(#btScore,#btSplit,#btPartsT) td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--faint);font-weight:400}
   .tablewrap:has(:is(#jopen,#jclosed,#btTrades)) :is(table,tbody){display:block;width:100%}.tablewrap:has(:is(#jopen,#jclosed,#btTrades)){overflow-x:hidden}
   .sorthint{display:none}
   #jclosed tr.jday,#jclosed tr.jday td{display:block}#jclosed tr.jday td{padding:14px 12px 6px}
@@ -940,7 +951,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 #jclosed tr.jday:first-child td{padding-top:8px}
 .hside{display:flex;gap:28px;font-size:12px;color:var(--mute)}.hside div{display:flex;flex-direction:column;gap:3px}.hside b{font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
 /* touch screens: a number's name that opens an explanation on a tap is underlined with dots (taptip shows the title) */
-@media(hover:none){.statrow .card[title] .t,.hside div[title] .tl{text-decoration:underline dotted var(--faint);text-underline-offset:3px}}
+@media(hover:none){.statrow .card[title] .t,.hside div[title] .tl,.chead .st[title] i{text-decoration:underline dotted var(--faint);text-underline-offset:3px}}
 /* a term inside running text that explains itself on hover or a tap (R in the shared bot's warning) */
 .term{text-decoration:underline dotted var(--faint);text-underline-offset:3px;cursor:help}
 .hchart{position:relative;height:150px;touch-action:pan-y;cursor:crosshair;border-radius:4px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
@@ -1184,6 +1195,8 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
   .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child,.gate,.preview-surface{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
 }
 </style>
+<!-- the browser's bar takes the saved theme's page colour at once, not only when the module starts (applyTheme) -->
+<script>try { document.querySelector('meta[name=theme-color]').content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0c0d0f'; } catch {}</script>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute">
@@ -1400,7 +1413,7 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
             <button class="pick-btn" id="bMktBtn" title="Рынок выделенного графика: спот или фьючерсы USDⓈ-M"><span id="bMktL">Спот</span></button>
             <button class="pick-btn" id="bTfBtn" aria-haspopup="dialog" title="Таймфрейм"><span id="bTfL">5м</span><svg class="i"><use href="#i-chev"/></svg></button>
             <button class="pick-btn" id="bRangeBtn" aria-haspopup="dialog" title="Сколько истории на графике"><svg class="i"><use href="#i-clock"/></svg><span id="bRangeL">авто</span></button>
-            <button class="ind-btn" id="bIndBtn" aria-label="Индикаторы"><svg class="i"><use href="#i-sliders"/></svg><span class="ib-t">Индикаторы</span> <span class="ind-n" id="bIndN">0</span></button>
+            <button class="ind-btn" id="bIndBtn" aria-label="Индикаторы"><svg class="i"><use href="#i-sliders"/></svg><span class="ib-t">Индикаторы</span><span class="ib-s">Инд.</span> <span class="ind-n hidden" id="bIndN">0</span></button>
             <button class="pick-btn" id="bDrawBtn" aria-haspopup="dialog" aria-label="Рисование" title="Рисование: линейка, VWAP от свечи, заметка, профиль участка, Фибоначчи, канал Раффа"><svg class="i"><use href="#i-ruler"/></svg><span class="ib-t">Рисование</span><svg class="i"><use href="#i-chev"/></svg></button>
             <div class="seg mini btools" id="bTools" role="toolbar" aria-label="Инструменты"><button class="tab" data-tool="ruler" title="Линейка: изменение в %, $ и времени (R)" aria-label="Линейка"><svg class="i"><use href="#i-ruler"/></svg></button><button class="tab" data-tool="avwap" title="Smart VWAP: VWAP от выбранной свечи (V)" aria-label="VWAP от свечи"><svg class="i"><use href="#i-anchor"/></svg></button><button class="tab" data-tool="note" title="Заметка на графике (T)" aria-label="Заметка"><svg class="i"><use href="#i-note"/></svg></button><button class="tab" data-tool="frvp" title="Профиль объёма участка: протяните по свечам (P)" aria-label="Профиль объёма участка"><svg class="i"><use href="#i-range"/></svg></button><button class="tab" data-tool="fib" title="Уровни Фибоначчи: протяните от минимума к максимуму или наоборот (F)" aria-label="Уровни Фибоначчи"><svg class="i"><use href="#i-fib"/></svg></button><button class="tab" data-tool="raff" title="Канал Раффа: протяните по свечам (K)" aria-label="Канал Раффа"><svg class="i"><use href="#i-raff"/></svg></button><i></i><button class="tab" data-act="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить"><svg class="i"><use href="#i-undo"/></svg></button><button class="tab" data-act="redo" title="Повторить (Ctrl+Shift+Z)" aria-label="Повторить"><svg class="i"><use href="#i-redo"/></svg></button><button class="tab" data-act="clear" title="Убрать все построения этой монеты" aria-label="Убрать построения"><svg class="i"><use href="#i-erase"/></svg></button></div>
             <div class="bbar-r">
@@ -4534,7 +4547,8 @@ async function runBacktest() {
 }
 function groupRow(name, list) {
   const g = M.journalStats(10000, list);
-  return `<tr><td>${name}</td><td>${g.n}</td><td>${g.wr == null ? '—' : g.wr.toFixed(0) + '%'}</td><td class="${cl(g.expR)}">${rr(g.expR)}</td><td>${g.pf == null ? '—' : g.pf.toFixed(2)}</td><td class="${cl(g.net)}">${usd(g.net)}</td></tr>`;
+  // data-l: the column's name, shown over the number when the table is a card (phone)
+  return `<tr><td>${name}</td><td data-l="Сделок">${g.n}</td><td data-l="Winrate">${g.wr == null ? '—' : g.wr.toFixed(0) + '%'}</td><td data-l="Средний R" class="${cl(g.expR)}">${rr(g.expR)}</td><td data-l="PF">${g.pf == null ? '—' : g.pf.toFixed(2)}</td><td data-l="PnL" class="${cl(g.net)}">${usd(g.net)}</td></tr>`;
 }
 const groupHead = '<thead><tr><th>Группа</th><th>Сделок</th><th>Winrate</th><th title="Средний результат на сделку в R после комиссий">Ср. результат</th><th>PF</th><th>PnL</th></tr></thead>';
 // the held-out part (#btHold): the last share of the period by entry time, shown apart from the part the settings were picked on.
@@ -4700,6 +4714,13 @@ function drawEquity() { // legacy canvas curve — the results now use the SVG b
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.109', date:'12 ноября 2026', title:'Исправления бота и телефона', items:[
+    'Исправлено: позиции бота на паузе теперь закрываются кнопкой «Закрыть».',
+    'В карточке монеты на телефоне появился поиск другой монеты.',
+    'Сводные таблицы бэктеста на телефоне показаны карточками.',
+    'Бэктест предупреждает, если таймфрейм профиля заменён на доступный.',
+    'Кнопка индикаторов на узком экране подписана.',
+  ]},
   {v:'2.108', date:'12 ноября 2026', title:'Раздел «Учёба»', items:[
     'Добавлен раздел «Учёба»: на компьютере — своя вкладка, на телефоне — внутри «Справки».',
     'Добавлен модуль «Как проверить идею»: издержки, ошибка выжившего, подгонка, заглядывание вперёд, случайный вход и разбор профиля.',
@@ -4758,13 +4779,6 @@ const CHANGELOG = [
     'Исправлено: «Назад» после «Свернуть» и закрытия карточки больше не требует лишнего нажатия.',
     'Исправлено: построения на графике больше не теряются, когда сайт открыт в двух вкладках.',
     'Вкладка, открытая в фоне, не загружает стакан, пока на неё не перейдут.',
-  ]},
-  {v:'2.97', date:'10 ноября 2026', title:'Понятнее ошибки и навигация', items:[
-    'Кнопка «Назад» в браузере возвращает в предыдущий раздел сайта.',
-    'Добавлена кнопка «Поделиться монетой» рядом с названием монеты.',
-    'Если график не загрузился, рядом появляется кнопка «Повторить».',
-    'Показатели над графиком объясняют себя по нажатию.',
-    '«Выйти на всех устройствах» сначала спрашивает подтверждение.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5597,9 +5611,10 @@ $('#btVerdict').addEventListener('click', e => {
 });
 $('#btMine').onclick = () => {
   btFill(S); $('#btTop').value = '50'; btEstimate();
-  const tf = $('#btTf').value;   // the backtest has no 5m, 1d and 1w: the note names the timeframe it took, not the market's
-  toast('Подставлены настройки «Рынка»', `${tf}, канал ${S.N}/${S.k}, топ-50 монет.${tf !== S.tf ? ` Таймфрейм ${S.tf} в бэктесте недоступен — взят ${tf}.` : ''} Нажмите «Запустить».`, 'ok');
+  toast('Подставлены настройки «Рынка»', `${$('#btTf').value}, канал ${S.N}/${S.k}, топ-50 монет.${btTfNote(S.tf)} Нажмите «Запустить».`, 'ok');
 };
+// the backtest has no 5m, 1d and 1w (btFill takes 15m): every way into the backtest names the timeframe it took, not the rules'
+const btTfNote = want => $('#btTf').value !== want ? ` Таймфрейм ${want} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
 // the shared bot's rules as a profile, for showing them and for the backtest
 const sharedProf = () => ({name:'Общий бот', coins:{mode:'top', top:SJ.settings.top || 150}, set:{...SJ.settings, erMax:SJ.settings.erMax ?? 0.15}});
 // a profile (or the shared bot's rules) → the backtest form, then the backtest page: check it on history in one click
@@ -5612,24 +5627,24 @@ function btFromProf(p) {   // fill the backtest form from a profile: rules and c
 }
 function profToBacktest(p, who) {
   btFromProf(p); go('backtest');
-  const tfNote = $('#btTf').value !== p.set.tf ? ` Таймфрейм ${p.set.tf} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
-  toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${tfNote}`, 'ok');
+  toast(`Настройки «${who}» перенесены в бэктест`, `Выберите период и нажмите «Запустить».${btTfNote(p.set.tf)}`, 'ok');
 }
 // an empty backtest offers a start: the shared bot's rules or the profile «Мой бот» trades by, checked at once on the period
 // in the form (60 days by default — under a minute)
 $('#btEmpty').onclick = e => {
   const b = e.target.closest('[data-qs]'); if (!b || btBusy) return;
   if (b.dataset.qs === 'shared' && !SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; }
+  let want = S.tf;
   if (b.dataset.qs === 'market') { btFill(S); $('#btTop').value = '50'; btEstimate(); }   // as «Подставить: настройки „Рынка“»
-  else btFromProf(b.dataset.qs === 'shared' ? sharedProf() : activeProfile());
+  else { const p = b.dataset.qs === 'shared' ? sharedProf() : activeProfile(); want = p.set.tf; btFromProf(p); }
   runBacktest();
+  const note = btTfNote(want); if (note) toast(`Бэктест на ${$('#btTf').value}`, note.trim(), 'warn');
 };
 $('#btShared').onclick = () => { if (!SJ) { toast('Правила общего бота ещё загружаются', 'Попробуйте через пару секунд.', 'info'); return; } profToBacktest(sharedProf(), 'общий бот'); };
 // the profile «Мой бот» trades by: the same set as the empty page's quick start, filled in without a run
 $('#btProf').onclick = () => {
   const p = activeProfile(); btFromProf(p);
-  const tfNote = $('#btTf').value !== p.set.tf ? ` Таймфрейм ${p.set.tf} в бэктесте недоступен — взят ${$('#btTf').value}.` : '';
-  toast(`Подставлен профиль «${p.name}»`, `Нажмите «Запустить».${tfNote}`, 'ok');
+  toast(`Подставлен профиль «${p.name}»`, `Нажмите «Запустить».${btTfNote(p.set.tf)}`, 'ok');
 };
 ['#btMethod', '#btN', '#btK', '#btTf', '#btMin', '#btDays', '#btTop', '#btStrat', '#btLong', '#btHL', '#btW', '#btRR', '#btRisk', '#btLev', '#btER', '#btReg', '#btSrc', '#btCoinER', '#btTS', '#btSlots', '#btPit', '#btStart', '#btComp', '#btFrom', '#btTo',
   '#btFibK', '#btFibZone', '#btFibStop', '#btFibTarget', '#btObEntry', '#btObSwing', '#btFvgMin', '#btFvgLife'].forEach(s => $(s).onchange = btEstimate);

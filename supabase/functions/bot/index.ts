@@ -391,6 +391,38 @@ async function runUserBots(now: number, reqStart: number) {
   const others = (rest ?? []).filter((b: any) => !heldIds.has(b.id));
   const bots = [...(held ?? []).slice(0, Math.max(RUN - KEEP, RUN - others.length)), ...others].slice(0, RUN);
   QUIET.clear();   // recomputed per chat below, each run
+  // exits only, no entries: a paused bot's positions its owner asked to close (onlyReq; ub_close marks them closeReq), and an
+  // enabled bot left without profiles (ub_set accepts an empty list, the site never sends one) — its stops and takes still work.
+  // Before 2.108 both were never checked: a paused bot's «Закрыть» stayed «закрывается…» for good
+  const exitsOnly = async (b: any, onlyReq: boolean) => {
+    const { data: pr } = await db.from("user_positions").select("data").eq("bot_id", b.id);
+    const all = (pr ?? []).map((x: any) => x.data), open = onlyReq ? all.filter((p: any) => p.closeReq) : all;
+    if (!open.length) return [];
+    const klines: Record<string, any> = {};
+    for (const p of open) { const tf = tfOf(p.tfms); if (tf) klines[p.sym] = await candles(p.sym, tf, 450).catch(() => null); }
+    const res = M.botTick({ rows: [], klines, open, recentSyms: [], balance: b.balance, S: {}, now, allowEntries: false });
+    if (!res.closed.length) return [];
+    const { data: wrote, error } = await db.rpc("ub_commit", { p_bot: b.id, p_closed: res.closed, p_keep: res.stillOpen, p_balance: res.balance,
+      p_profile: b.active_profile ?? null, p_regime: b.regime ?? null, p_checked: new Date(now).toISOString(), p_gen: b.reset_n ?? null });
+    if (error) throw error;
+    if (wrote === false) return [];
+    if (b.tg_chat) {
+      if (quietNow(alertsOf(b.alerts).quiet)) QUIET.add(String(b.tg_chat));
+      const who = `ваш бот «${esc(String(b.active_profile ?? "Профиль").replace(/[<>&"'`]/g, "").slice(0, 60))}»`;
+      await sendTo([b.tg_chat], res.closed.map((t: any) => closedMsg(t, who)), res.closed.map((t: any) => t.sym));
+    }
+    return res.closed;
+  };
+  const { data: req } = await db.from("user_positions").select("bot_id").eq("data->>closeReq", "true").limit(200);
+  // a bot already in this run's queue (paused after it was read) is left to it: two writes of one step would overwrite the balance
+  const queued = new Set(bots.map((b: any) => b.id)), reqIds = [...new Set((req ?? []).map((x: any) => x.bot_id))].filter((id) => !queued.has(id));
+  if (reqIds.length) {
+    const { data: paused } = await db.from("user_bots").select(`${FIELDS}, active_profile, regime`).in("id", reqIds).eq("enabled", false);
+    for (const b of paused ?? []) {
+      try { await exitsOnly(b, true); }
+      catch (e) { await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e) }).eq("id", b.id); }
+    }
+  }
   if (!bots?.length) return 0;
   const reg = await regimeOn("1h", now), ticker = await ticker24();   // "the market now": the auto mode picks the profile by it
   // one request per coin + timeframe for all bots in this run (compact candles, see candles()); lazy: notify-only, may be minutes old
@@ -453,7 +485,8 @@ async function runUserBots(now: number, reqStart: number) {
     if (over(70_000)) break;
     try {
       const x = plans.get(b.id) ?? plan(b);
-      if (!x) {   // still mark it checked, or it would stay first in the queue forever
+      if (!x) {   // still mark it checked, or it would stay first in the queue forever; its positions still exit
+        await exitsOnly(b, false);
         await db.from("user_bots").update({ checked_at: new Date(now).toISOString(), last_error: "нет профилей" }).eq("id", b.id);
         continue;
       }
@@ -507,7 +540,10 @@ async function runUserBots(now: number, reqStart: number) {
       if (A.sig.on) await mySignals(A.sig, sent, chat, P, S, pname, list, rows, res);
       if (A.mkt) await marketSignals(A.mkt, sent, chat, S);
       // written only when something changed: up to ~20 KB a bot, every minute, was a new copy of the row for nothing
-      if ((A.sig.on || A.mkt) && JSON.stringify(sent) !== before) await db.from("user_bots").update({ sig_sent: sent }).eq("id", b.id);
+      // one retry: a failed write would send the same signals again next minute
+      if ((A.sig.on || A.mkt) && JSON.stringify(sent) !== before) {
+        for (let i = 0; i < 2; i++) { const { error } = await db.from("user_bots").update({ sig_sent: sent }).eq("id", b.id); if (!error) break; }
+      }
     } catch { /* signals must never break trading */ }
   }
   AN = computed;
