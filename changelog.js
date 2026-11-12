@@ -1,6 +1,13 @@
-// Older «Что нового» entries (2.95 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (2.96 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.96', date:'10 ноября 2026', title:'Удобнее на телефоне', items:[
+    'Окно индикаторов на телефоне открывается на весь экран с разделами «Все» и «Выбрано».',
+    'Кнопка фильтров стоит рядом с поиском, быстрые фильтры занимают строку целиком.',
+    'Исправлено: колонка монет выделялась тёмным прямоугольником при ярком стекле.',
+    'Исправлено: кнопка «к последней свече» наезжала на кнопку индикаторов.',
+    'Открытый список индикаторов над графиком занимает всю ширину.',
+  ]},
   {v:'2.95', date:'10 ноября 2026', title:'Компактный стакан в карточке', items:[
     'Режим «Стакан» в карточке монеты стал компактнее: все кнопки в одной строке, график выше.',
     'Инструменты рисования собраны в кнопку «Рисование» с названиями и горячими клавишами.',
