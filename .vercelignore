@@ -12,3 +12,5 @@ tests
 supabase/config.toml
 scripts
 research
+.claude
+supabase/functions/auth
