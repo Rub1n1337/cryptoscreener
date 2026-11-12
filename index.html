@@ -414,6 +414,14 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 .lart{min-width:0}.lart h2{margin:0 0 12px;font-size:24px;line-height:1.25;text-wrap:balance}.lart h2:focus{outline:none}.lart h2:focus-visible{outline:2px solid var(--acc);outline-offset:4px;border-radius:4px}
 .lmeta{font-size:12.5px;margin-bottom:6px}
 .lart .tablewrap{margin:10px 0 14px;max-width:820px}.ltab :is(td,th):not(:first-child){text-align:right;white-space:nowrap}.lart table td,.lart table th{font-variant-numeric:tabular-nums}
+/* lesson schemes (learn.js fig): inline SVG, colours only through tokens, so both themes; ≤ 400 wide so the labels stay text-sized */
+.lfig{margin:14px 0 18px;max-width:400px}.lfig svg{display:block;width:100%;height:auto;overflow:visible}
+.lfig figcaption{margin-top:8px;font-size:13px;line-height:1.5;color:var(--mute);text-wrap:pretty}
+.lfig text{font-family:var(--sans);font-size:12px;fill:var(--mute)}.lfig .t2{fill:var(--text)}.lfig .tu{fill:var(--up-t)}.lfig .tl{fill:var(--lo-t)}
+.lfig .fu{fill:var(--up)}.lfig .fl{fill:var(--lo)}.lfig .fa{fill:var(--acc)}.lfig .fm{fill:var(--mid)}.lfig .bg{fill:var(--s3)}.lfig .band{fill:var(--c-band)}.lfig .zone{fill:var(--accbg)}
+.lfig .su{stroke:var(--up)}.lfig .sl{stroke:var(--lo)}.lfig .sa{stroke:var(--acc);stroke-linecap:round}.lfig .sm{stroke:var(--mid)}.lfig .ax{stroke:var(--c-axis)}.lfig .pr{stroke:var(--c-price)}.lfig .dash{stroke-dasharray:4 3}
+.lsrc{margin-top:22px;max-width:820px}.lsrc>p{margin:0;font-size:13px}.lsrc ol{margin:10px 0 0;padding-left:22px;display:grid;gap:12px}
+.lsrc li p{margin:2px 0 0;font-size:13.5px;color:var(--mute);text-wrap:pretty}.lsrc li .faint{display:block;font-size:13px}
 .ltry{margin-top:22px;padding:14px 16px;border:1px solid var(--line2);border-radius:var(--r);background:var(--s2);max-width:820px}
 .ltry h3{margin:0 0 6px!important}.ltry p{margin:0 0 4px}
 .lta{display:grid;gap:10px;margin-top:10px}.lta>div{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}.lta .mute{font-size:13px;text-wrap:pretty}
@@ -4750,6 +4758,10 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.118', date:'12 ноября 2026', title:'Схемы и источники в уроках', items:[
+    'Добавлены схемы в уроки модуля «Как проверить идею».',
+    'Добавлен блок «Источники» со ссылками на исследования, на которые опирается урок.',
+  ]},
   {v:'2.117', date:'12 ноября 2026', title:'Надёжность ботов', items:[
     'Исправлено: бот в браузере, открытый в нескольких вкладках, ведёт один общий журнал.',
     'Исправлено: позиция по монете, снятой с торгов, закрывается после тайм-стопа.',
@@ -4800,12 +4812,6 @@ const CHANGELOG = [
   {v:'2.107', date:'11 ноября 2026', title:'Точнее топ монет в бэктесте', items:[
     'Исправлено: новая монета в топе бэктеста учитывалась по-разному в зависимости от конца периода.',
     'Новая монета занимает место в топе с первых свечей, а торгуется, когда для неё хватает истории.',
-  ]},
-  {v:'2.106', date:'11 ноября 2026', title:'Учебные стратегии в бэктесте', items:[
-    'Добавлены учебные стратегии: откат по Фибоначчи, ордер-блок SMC и разрыв FVG.',
-    'У каждой учебной стратегии свои настройки, а их сделки сравниваются со случайным входом.',
-    'Карточка учебной сделки показывает импульс, блок или разрыв, по которым был вход.',
-    'Бот по учебным стратегиям не торгует, их нельзя сохранить как профиль.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5008,6 +5014,11 @@ function learnList() {
   return (next && Object.keys(P.done).length ? `<div class="banner info lgo"><svg class="i"><use href="#i-learn"/></svg><div>Продолжить: <a href="#learn/${next.key}">${next.l.title}</a> <span class="mute">· модуль «${next.m.title}»</span></div></div>` : '')
     + `<div class="lmods">${ready.map(mod).join('')}${soon.map(mod).join('')}</div>`;
 }
+// «Источники» under a lesson: references from learn.js (our file, not the network's). A plain link to the work's page is a
+// navigation, which the CSP's connect-src doesn't govern; a new tab with noopener noreferrer so the page can't reach back
+const learnSrc = s => s?.length ? `<section class="lsrc" aria-labelledby="lSrcH"><h3 id="lSrcH">Источники</h3><p class="mute">Работы, на которые опирается урок. Пересказ наш, сами статьи — на страницах издателей.</p><ol>`
+  + s.map(w => `<li><a href="${w.url}" target="_blank" rel="noopener noreferrer">${w.a} (${w.y}). <i>${w.t}</i><span class="sr"> (откроется в новой вкладке)</span></a> <span class="faint">${w.j}</span><p>${w.n}</p></li>`).join('')
+  + '</ol></section>' : '';
 function learnPage(x) {
   const {m, l, i, key} = x, P = learnProg(), n = LEARN.indexOf(m) + 1, done = P.done[key], nx = m.lessons[i + 1];
   const toc = m.lessons.map((y, j) => { const k = m.id + '/' + y.id;
@@ -5017,7 +5028,7 @@ function learnPage(x) {
   return `<div class="lgrid"><nav class="ltoc" aria-label="Уроки модуля"><details${isPhone() ? '' : ' open'}><summary>Модуль ${n} · ${m.title} <span class="lprog">${learnDoneN(m, P)} из ${m.lessons.length}</span></summary>`
     + `<ol>${toc}</ol><a class="lall" href="#learn"><svg class="i"><use href="#i-back"/></svg>Все модули</a></details></nav>`
     + `<article class="panel doc lart"><div class="lmeta faint">Модуль ${n} · урок ${i + 1} из ${m.lessons.length} · ${learnMin(l.min)}</div>`
-    + `<h2 id="lTitle" tabindex="-1">${l.title}</h2>${l.body}`
+    + `<h2 id="lTitle" tabindex="-1">${l.title}</h2>${l.body}${learnSrc(l.src)}`
     + (tries ? `<div class="ltry"><h3>Проверьте сами</h3>${l.tryLead ? `<p>${l.tryLead}</p>` : ''}<div class="lta">${tries}</div></div>` : '')
     + `<div class="lend"><button id="lDone" aria-pressed="${!!done}" title="${done ? `Отмечено ${fmtDay(Date.parse(done))}. Нажмите, чтобы снять отметку` : 'Отметка сохраняется в профиле'}">${done ? '<svg class="i"><use href="#i-check"/></svg>Пройдено' : 'Отметить пройденным'}</button>`
     + (nx ? `<a class="lnext" href="#learn/${m.id}/${nx.id}">Дальше: <b>${nx.title}</b></a>` : `<a class="lnext" href="#learn">Все модули</a>`) + '</div></article></div>';

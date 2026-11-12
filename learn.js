@@ -7,6 +7,8 @@
 // - try: «Проверьте сами» buttons. bt = the backtest form (learnTry in index.html): set — the rules over PROFILE_DEF (risk as
 //   a share, rr 0 = to the channel's centre), top (20/50/100/200) and pit ('pit' honest | 'now' today's top), or coins (a list
 //   without USDT), days (7…365) or from/to ('YYYY-MM-DD', UTC), start ($), hold (0.2 / 0.3 / 0.5 — the held-out part).
+// - src: «Источники» — works the lesson rests on, [{a authors, y year, t title, j journal, url (DOI / arXiv / NBER / BIS page), n our own
+//   one-line summary}]; only references and our words, never text or figures of the papers. Links open in a new tab.
 // - check: «Проверьте себя» questions — wave 4 (docs/PLAN-LEARN.md), null for now.
 // - soon: the titles of a module's lessons that are not written yet (the list shows them under «скоро»).
 //
@@ -15,6 +17,118 @@
 
 // the rules of the preset «Переключатель · 4h» (= the shared bot's since 11.10.2026): PRESETS[0] in index.html
 const SW4H = {tf:'4h', method:'log', N:210, k:3.5, minScore:60, maxHL:20, erMax:0.25, strategy:'switch', rr:2, risk:0.01, lev:3, timeStop:48, maxOpen:3};
+
+// Schemes: our own inline SVG, nothing taken from the papers. The viewBox is 300 wide and the figure at most 400 px (.lfig in
+// index.html), so a 12-unit label reads ≥ 10.5 px on a 320 px phone. Colours only through the classes .lfig styles with tokens:
+// t2 text, tu/tl red/green text, fu/fl/fa/fm/bg fills, su/sl/sa/sm/ax/pr strokes, band/zone areas, dash.
+const fig = (label, cap, h, inner) => `<figure class="lfig"><svg viewBox="0 0 300 ${h}" role="img" aria-label="${label}">${inner}</svg><figcaption>${cap}</figcaption></figure>`;
+const T = (x, y, s, c = '', a = '') => `<text x="${x}" y="${y}"${c ? ` class="${c}"` : ''}${a ? ` text-anchor="${a}"` : ''}>${s}</text>`;
+const L = (x1, y1, x2, y2, c, w = 1.5) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${c}" stroke-width="${w}"/>`;
+const P = (pts, c, w = 2) => `<polyline points="${pts}" class="${c}" stroke-width="${w}" fill="none" stroke-linejoin="round"/>`;
+
+// costs: the share of 1R eaten by the fee and slippage at a stop 1 % and 2.5 % away. Arithmetic from math.js FEE 0.00075 and
+// SLIP 0.0005 (entry and stop): 1 % — 0.0015/0.01 + 0.001/0.01 = 0.15 + 0.1 = 0.25R; 2.5 % — 0.06 + 0.04 = 0.1R
+const FIG_STOP = fig('Две полосы риска 1R: при стопе в 1 % издержки занимают четверть полосы, при стопе в 2.5 % — десятую часть',
+  'Полоса — весь риск сделки, 1R. Красная часть — комиссия и проскальзывание за вход и стоп. При близком стопе они съедают в 2.5 раза большую долю риска.', 140,
+  T(0, 14, 'Стоп в 1 % от цены', 't2') + '<rect class="bg" x="0" y="22" width="300" height="20" rx="3"/><rect class="fu" x="0" y="22" width="75" height="20" rx="3"/>'
+  + T(294, 36, '1R', 't2', 'end') + T(0, 60, '≈ 0.25R — комиссия и проскальзывание', 'tu')
+  + T(0, 90, 'Стоп в 2.5 % от цены', 't2') + '<rect class="bg" x="0" y="98" width="300" height="20" rx="3"/><rect class="fu" x="0" y="98" width="30" height="20" rx="3"/>'
+  + T(294, 112, '1R', 't2', 'end') + T(0, 134, '≈ 0.1R', 'tu'));
+
+// costs: the paragraph's example — +0.1R before costs, 0.25R of costs at a 1 % stop (above), −0.15R after. 1R = 200 units
+const FIG_NET = fig('Три столбика: плюс 0.1R до издержек, минус 0.25R издержек, итог минус 0.15R',
+  'Стратегия зарабатывает 0.1R на сделку до издержек. При стопе в 1 % издержки — около 0.25R, и итог становится минусом.', 128,
+  L(0, 50, 300, 50, 'ax', 1) + T(298, 45, '0', '', 'end')
+  + '<rect class="fl" x="20" y="30" width="70" height="20" rx="2"/><rect class="fu" x="115" y="30" width="70" height="50" rx="2"/><rect class="fu" x="210" y="50" width="70" height="30" rx="2"/>'
+  + L(90, 30, 115, 30, 'ax dash', 1) + L(185, 80, 210, 80, 'ax dash', 1)
+  + T(55, 24, '+0.1R', 'tl', 'middle') + T(150, 96, '−0.25R', 'tu', 'middle') + T(245, 96, '−0.15R', 'tu', 'middle')
+  + T(55, 120, 'до издержек', 't2', 'middle') + T(150, 120, 'издержки', 't2', 'middle') + T(245, 120, 'итог', 't2', 'middle'));
+
+// survivor: five coins over a year; thick gold = in the top by turnover. A sketch, no data
+const survRow = (i, label, segs, faint, end, now) => { const y = 48 + 30 * i;
+  return T(0, y - 8, label) + faint.map(([a, b]) => L(a, y, b, y, 'sm dash', 1.5)).join('') + segs.map(([a, b]) => L(a, y, b, y, 'sa', 6)).join('')
+    + (end ? L(end - 4, y - 4, end + 4, y + 4, 'su', 2) + L(end - 4, y + 4, end + 4, y - 4, 'su', 2) : '')
+    + T(272, y + 4, now ? 'да' : 'нет', now ? 'tl' : 'tu', 'middle'); };
+const FIG_SURV = fig('Пять монет за год: две в сегодняшнем топе, три выпали из топа, сняты с торгов или были в топе недолго',
+  'Жёлтым — время, когда монета была в топе по обороту: честный бэктест торгует каждой только в эти отрезки. Бэктест по сегодняшнему топу берёт две монеты с «да» и торгует ими весь год, а трёх других не видит вовсе.', 180,
+  T(0, 14, 'год назад') + T(240, 14, 'сегодня', '', 'end') + T(272, 14, 'в топе', '', 'middle') + T(272, 27, 'сейчас', '', 'middle')
+  + L(242, 18, 242, 176, 'ax dash', 1)
+  + survRow(0, 'в топе весь год', [[3, 237]], [], 0, true)
+  + survRow(1, 'вошла в топ недавно', [[150, 237]], [[3, 150]], 0, true)
+  + survRow(2, 'выпала из топа', [[3, 120]], [[120, 237]], 0, false)
+  + survRow(3, 'снята с торгов', [[3, 88]], [], 96, false)
+  + survRow(4, 'заскочила ненадолго', [[105, 135]], [[3, 105], [135, 237]], 0, false));
+
+// overfit: a balance that rises on the fitted part and falls on the held-out one. A sketch
+const FIG_FIT = fig('Кривая счёта растёт на отрезке подбора и падает на отложенной проверке',
+  'Настройки подобраны на первой части истории — там счёт растёт. На отложенной части, которую при подборе не трогали, с теми же настройками счёт падает: они описывали прошлое, а не рынок.', 116,
+  '<rect class="bg" x="200" y="0" width="100" height="100"/>' + T(100, 14, 'подбор', 't2', 'middle') + T(250, 14, 'проверка', 't2', 'middle')
+  + L(0, 95, 300, 95, 'ax dash', 1) + T(2, 112, 'старт')
+  + P('0,95 15,92 25,96 40,85 55,88 70,76 85,79 100,68 115,71 130,58 145,62 160,50 175,52 190,40 200,36 212,44 224,40 236,52 248,49 260,60 272,57 284,70 300,74', 'pr'));
+
+// lookahead: the order block of the SMC lesson. Candles [open, high, low, close]; the 3rd is the last down candle before the
+// break of the high 62 on the 8th; y = 10 + (72 − price)·3.3
+const OB_C = [[55, 62, 52, 58], [58, 59, 48, 50], [50, 51, 40, 43], [43, 52, 42, 50], [50, 53, 44, 46], [46, 55, 45, 54], [54, 60, 52, 58], [58, 68, 57, 66], [66, 70, 63, 68]];
+const obY = p => +(10 + (72 - p) * 3.3).toFixed(1);
+const FIG_OB = fig('Девять свечей: ордер-блок на третьей, вход на пятой, слом прежней вершины на восьмой',
+  'Ордер-блок — последняя свеча вниз перед сломом прежней вершины. Ошибочный расчёт считал блок известным с самой этой свечи, и вход на пятой свече «попадал в блок». На деле о блоке можно узнать только после слома, когда вход уже позади.', 180,
+  `<rect class="zone" x="75" y="${obY(51)}" width="225" height="${+(obY(40) - obY(51)).toFixed(1)}"/>` + T(296, 112, 'ордер-блок', '', 'end')
+  + L(15, obY(62), 300, obY(62), 'ax dash', 1) + T(40, 38, 'прежняя вершина')
+  + L(142, 22, 142, 152, 'sm dash', 1) + T(142, 16, 'вход', 't2', 'middle') + T(232, 16, 'слом', 't2', 'middle')
+  + OB_C.map(([o, h, l, c], i) => { const x = 22 + 30 * i, u = c > o, top = obY(Math.max(o, c));
+      return L(x, obY(h), x, obY(l), u ? 'sl' : 'su', 1.5) + `<rect class="${u ? 'fl' : 'fu'}" x="${x - 7}" y="${top}" width="14" height="${+(obY(Math.min(o, c)) - top).toFixed(1)}"/>`; }).join('')
+  + T(75, 138, 'ошибка: блок «есть» с этой свечи', 'tu') + L(75, 146, 300, 146, 'su', 6)
+  + T(233, 176, 'честно: только с момента слома', 'tl', 'end') + L(240, 172, 300, 172, 'sl', 6));
+
+// noise: 300 random runs as a bell (a sketch: centre 130, spread 38), the strategy at ≈ 81 % (centre + 0.88 spread, as in the
+// lesson's example), the 95 % bar (centre + 1.645 spread) and zero to the right of both (the example: random −0.17R, run −0.10R)
+const FIG_RAND = fig('Гистограмма случайных прогонов; стратегия правее большинства, но левее порога 95 % и левее нуля',
+  'Серые столбики — итоги 300 прогонов со случайными входами и теми же выходами. Стратегия правее большинства из них, но не дошла до порога 95 % и сама левее нуля.', 122,
+  Array.from({length:20}, (_, i) => { const x = 10 + 14 * i, h = +(78 * Math.exp(-(((x + 7 - 130) / 38) ** 2) / 2)).toFixed(1);
+    return h < 1 ? '' : `<rect class="fm" x="${x + 1}" y="${100 - h}" width="12" height="${h}"/>`; }).join('')
+  + L(0, 100, 300, 100, 'ax', 1) + L(205, 20, 205, 100, 'ax dash', 1) + T(205, 116, '0R', '', 'middle') + T(130, 116, 'случайные входы', '', 'middle')
+  + L(192, 20, 192, 100, 'sa dash', 1.5) + T(196, 14, '95 %', 't2') + L(163, 20, 163, 100, 'pr', 2) + T(160, 14, 'стратегия', 't2', 'end'));
+
+// case: a bounce from the lower border of the channel; the take 3 times farther than the stop (the profile's rr 3). A sketch
+const FIG_CHAN = fig('Канал из двух границ; цена касается нижней границы, вход, стоп ниже входа, тейк втрое дальше',
+  'Цена коснулась нижней границы канала — вход. Расстояние до стопа — это риск сделки, 1R; тейк втрое дальше, +3R, как в разобранном профиле. В боковике «Переключатель» так же торгует и от верхней границы, в шорт.', 160,
+  '<polygon class="band" points="0,30 300,20 300,120 0,130"/>' + L(0, 30, 300, 20, 'su', 2) + L(0, 130, 300, 120, 'sl', 2) + L(0, 80, 300, 70, 'sm dash', 1)
+  + T(4, 22, 'верхняя граница', 'tu') + T(4, 148, 'нижняя граница', 'tl')
+  + L(170, 88, 300, 88, 'sl dash', 1.5) + L(170, 136, 300, 136, 'su dash', 1.5) + T(298, 82, 'тейк +3R', 'tl', 'end') + T(298, 152, 'стоп −1R', 'tu', 'end')
+  + P('0,70 20,55 40,45 55,38 70,50 90,65 110,85 130,100 150,112 170,124 190,110 205,114 220,100 235,96 250,88', 'pr')
+  + '<circle class="fa" cx="170" cy="124" r="4.5"/>' + T(162, 140, 'вход', 't2', 'end'));
+
+// case: the drawdown — from a peak to the deepest point after it. After −65 % the balance must grow 1/0.35 ≈ 2.86 times
+const FIG_DD = fig('Кривая счёта: пик, падение до дна и частичное восстановление; стрелка от пика до дна — просадка',
+  'Просадка — падение счёта от предыдущего пика до дна, в процентах от пика. «Макс. просадка» в бэктесте — самое глубокое такое падение за период. После просадки 65 % счёту нужно вырасти почти втрое, чтобы вернуться к пику.', 130,
+  L(110, 25, 300, 25, 'ax dash', 1) + T(110, 16, 'пик', 't2', 'middle') + T(200, 124, 'дно', 't2', 'middle')
+  + L(200, 28, 200, 102, 'su', 2) + P('195,34 200,28 205,34', 'su', 2) + P('195,96 200,102 205,96', 'su', 2) + T(208, 70, 'просадка', 'tu')
+  + P('0,95 15,85 30,88 45,70 60,74 75,55 90,48 100,35 110,25 125,40 140,38 155,60 170,72 185,90 200,105 215,95 230,98 245,82 260,85 275,70 290,64 300,60', 'pr'));
+
+// Sources: works from docs/LITERATURE.md (every one opened there; the DOI links resolved 12.11.2026). Only the reference and our own
+// one-line summary — no text or figures of the papers. Rendered as «Источники» under the lesson (learnSrc in index.html)
+const W = {
+  park: {a:'Park, Irwin', y:2007, t:'What Do We Know About the Profitability of Technical Analysis?', j:'Journal of Economic Surveys', url:'https://doi.org/10.1111/j.1467-6419.2007.00519.x',
+    n:'Обзор 95 работ о техническом анализе. Прибыль в них находили в основном на данных до начала 1990-х, а издержки и риск во многих работах учтены плохо.'},
+  hudson: {a:'Hudson, Urquhart', y:2019, t:'Technical trading and cryptocurrencies', j:'Annals of Operations Research', url:'https://doi.org/10.1007/s10479-019-03357-1',
+    n:'Почти 15 000 правил на дневных ценах биткоина и других монет. Авторы считают, при каких издержках правила выходят в ноль, и проверяют их вне выборки: у биткоина там предсказуемости не нашлось.'},
+  fil: {a:'Fil, Krištoufek', y:2020, t:'Pairs Trading in Cryptocurrency Markets', j:'IEEE Access', url:'https://doi.org/10.1109/access.2020.3024619',
+    n:'Парная торговля на 26 монетах Binance на 5-минутных, часовых и дневных свечах. Итог сильно зависит от настроек, издержек и того, как быстро исполняется заявка.'},
+  grobys: {a:'Grobys, Sandretto, Äijö', y:2026, t:'On survivor cryptocurrency momentum', j:'Finance Research Letters', url:'https://doi.org/10.1016/j.frl.2026.109602',
+    n:'Моментум на крипте, недельные данные 2017–2024. По выводу авторов, заметную прибыль дают монеты, которые торговались лишь временно; на монетах, всё время бывших в топ-100, её нет.'},
+  white: {a:'White', y:2000, t:'A Reality Check for Data Snooping', j:'Econometrica', url:'https://doi.org/10.1111/1468-0262.00152',
+    n:'Метод проверки, лучше ли эталона лучшая из перебранных моделей, если учесть, сколько их перебрали.'},
+  dsr: {a:'Bailey, López de Prado', y:2014, t:'The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting, and Non-Normality', j:'Journal of Portfolio Management', url:'https://doi.org/10.3905/jpm.2014.40.5.094',
+    n:'Поправка коэффициента Шарпа на число испытанных вариантов. Без неё ожидания от лучшего варианта завышены.'},
+  pbo: {a:'Bailey, Borwein, López de Prado, Zhu', y:2016, t:'The Probability of Backtest Overfitting', j:'Journal of Computational Finance', url:'https://doi.org/10.21314/jcf.2016.322',
+    n:'Как оценить вероятность того, что лучший в бэктесте вариант подогнан. Авторы считают одну отложенную выборку ненадёжной проверкой.'},
+  harvey: {a:'Harvey, Liu, Zhu', y:2016, t:'…and the Cross-Section of Expected Returns', j:'Review of Financial Studies', url:'https://doi.org/10.1093/rfs/hhv059',
+    n:'Исследователи перебрали сотни «факторов» доходности акций. При таком переборе обычный порог значимости слишком мягкий, и многие заявленные открытия, по выводу авторов, вероятно, ложные.'},
+  stw: {a:'Sullivan, Timmermann, White', y:1999, t:'Data-Snooping, Technical Trading Rule Performance, and the Bootstrap', j:'Journal of Finance', url:'https://doi.org/10.1111/0022-1082.00163',
+    n:'Все технические правила проверены разом на 100 годах индекса Dow Jones. Удачу отделяют от преимущества бутстрэпом — сравнением с итогами на истории, много раз пересобранной из её же кусков.'},
+  chen: {a:'Chen, Wang, Yang', y:2023, t:'Testing the Applicability of the Technical Trading Strategy in the Cryptocurrency Market', j:'Journal of Finance and Economics', url:'https://doi.org/10.12691/jfe-11-4-2',
+    n:'BTC и ETH к USDT, 2017–2023. Правила, прибыльные до декабря 2021, после него в целом прибыли не дали, особенно с поправкой на перебор.'},
+};
 
 // module 4 — the first one written (wave 1): ours, nobody else has it, and every action is on the site already
 const TEST =
@@ -35,7 +149,9 @@ const TEST =
 <p>Результат сделки удобно мерить в <dfn data-term="r">R</dfn> — в рисках: 1R — это сумма, которую теряем, если сработал стоп. Комиссия же берётся не от риска, а от размера позиции. Если стоп в 1 % от цены, комиссия 0.15 % — это 0.15R, ещё около 0.1R уходит на проскальзывание при входе и на стопе. Если стоп в 2.5 % — комиссия всего 0.06R.</p>
 <!-- arithmetic from FEE and SLIP: fee in R = 2·FEE / stop distance; 0.0015 / 0.01 = 0.15R, 0.0015 / 0.025 = 0.06R; slippage 2·SLIP / 0.01 = 0.1R.
      Bots' stops are 1.5·ATR within 0.8–2.5 % (math.js planEntry: clamp(1.5 * atr / e, 0.008, 0.025)) -->
+${FIG_STOP}
 <p>Отсюда главное правило: <b>чем короче сделки и ближе стоп, тем большую долю преимущества съедают издержки.</b> Стратегия, которая в среднем зарабатывает 0.1R до издержек, на коротких стопах после них уже в минусе.</p>
+${FIG_NET}
 <p>Это видно и в исследованиях. В проверке уровней Фибоначчи «плацебо»-зона рядом со стопом проигрывала «золотой» зоне — как будто уровни работают. До издержек обе были около нуля: у зоны ближе к стопу меньше риск, и те же издержки съедали большую долю R.</p>
 <!-- source: docs/LESSONS.md «Бэктест и данные», the placebo row (29.10.2026, docs/RESEARCH-2026-10.md): placebo 0.70–0.75 −0.33R vs golden −0.17R, both ≈ 0 before costs -->
 <h3>Где это в бэктесте</h3>
@@ -58,12 +174,13 @@ const TEST =
        bt:{set:{tf:'1h', method:'log', N:210, k:3.5, minScore:60, strategy:'revert', rr:2, risk:0.01, lev:3, timeStop:48}, top:20, pit:'pit', days:365}},
       {label:'Частые сделки: 15m, канал k 2, 30 дней', note:'много коротких сделок с близким стопом',
        bt:{set:{tf:'15m', method:'log', N:210, k:2, minScore:60, strategy:'revert', rr:0, risk:0.01, lev:3, timeStop:48}, top:20, pit:'pit', days:30}},
-     ], check:null},
+     ], src:[W.park, W.hudson, W.fil], check:null},
 
     {id:'survivor', title:'Ошибка выжившего', min:6,
      body:`
 <p>Представьте проверку «покупать монеты из сегодняшнего топ-50» за прошлый год. Звучит честно, но сегодняшний топ — это монеты, которые за этот год выросли или хотя бы выжили. Тех, что год назад были в топе, а потом рухнули или были сняты с биржи, в таком списке нет. Бот год назад торговал бы и ими.</p>
 <p>Это <dfn data-term="survivorship">ошибка выжившего</dfn>: в прошлое переносится знание, которое появилось только сейчас. Она почти всегда завышает результат, и на глаз её не видно.</p>
+${FIG_SURV}
 <h3>Как бэктест её убирает</h3>
 <ul>
   <li><b>Топ на каждый момент.</b> Живой бот каждую минуту берёт топ по обороту за последние сутки. Бэктест в режиме «на каждый момент — честно» делает в прошлом так же: монета торгуется, только пока она в топе.</li>
@@ -89,13 +206,14 @@ const TEST =
        bt:{set:SW4H, top:50, pit:'now', days:365}},
       {label:'Сразу честно: топ-50 на каждый момент', note:'загрузка дольше: в пуле все монеты, побывавшие в топе за год',
        bt:{set:SW4H, top:50, pit:'pit', days:365}},
-     ], check:null},
+     ], src:[W.grobys], check:null},
 
     {id:'overfit', title:'Подгонка под историю', min:7,
      body:`
 <p>Возьмите любую идею и переберите сто вариантов настроек. Даже если идея ничего не стоит, лучший из ста вариантов на истории будет выглядеть хорошо — просто потому, что из ста случайных результатов какой-то окажется удачным. Это <dfn data-term="overfit">подгонка под историю</dfn>: настройки описывают прошлое, а не рынок.</p>
 <h3>Как её поймать</h3>
 <p>Подбирать настройки на одном отрезке, а проверять на другом, который при подборе не трогали. Если на проверке итог намного хуже — настройки подогнаны.</p>
+${FIG_FIT}
 <ul>
   <li>В бэктесте это <b>«Отложить для проверки»</b> в блоке «Можно ли верить»: конец периода (по умолчанию последние 30 %) показывается отдельно. Подбирайте по первой части, а отложенную считайте проверкой.</li>
   <li>Если на отложенной части итог в минусе или меньше половины того, что было при подборе, бэктест пишет «Похоже на подгонку под историю».</li>
@@ -121,13 +239,14 @@ const TEST =
        bt:{set:SW4H, top:50, pit:'pit', days:365, hold:0.3}},
       {label:'Те же правила на предыдущем году', note:'11.11.2024 – 10.11.2025, «Свои даты»',
        bt:{set:SW4H, top:50, pit:'pit', from:'2024-11-11', to:'2025-11-10', hold:0.3}},
-     ], check:null},
+     ], src:[W.white, W.dsr, W.pbo, W.harvey], check:null},
 
     {id:'lookahead', title:'Заглядывание вперёд', min:6,
      body:`
 <p>Самая коварная ошибка бэктеста — когда решение «в прошлом» принимается по данным, которых в тот момент ещё не было. Её называют <dfn data-term="lookahead">заглядыванием вперёд</dfn> (look-ahead). Такой бэктест показывает отличный результат, а живой бот на тех же правилах проигрывает: у него будущего нет.</p>
 <h3>Пример: ордер-блок</h3>
 <p>В исследовании «Smart Money» фильтр «вход только у ордер-блока» поднял долю прибыльных сделок с 36–40 % до 44–46 %. Выглядело как находка. Но ордер-блок — это последняя свеча перед сломом структуры, и существует он только <i>после</i> слома. В расчёте блок считался существующим с самой свечи. Поэтому сделка «попадала в блок», когда слом в её сторону случался позже, иногда уже после выхода. Фильтр отбирал сделки, после которых цена ушла куда надо: у них было около +0.98R на сделку и 73–78 % прибыльных.</p>
+${FIG_OB}
 <p>Когда блок стали считать известным только с момента слома, фильтр в модели того исследования оказался <b>хуже</b> сделок без него во всех трёх годах (ноябрь 2023 – ноябрь 2026, часовые свечи).</p>
 <!-- source: docs/RESEARCH-SMC.md (7.11.2026): first round 36–40 % → 44–46 %; «only the trades this filter takes because of a break after
      the entry» +0.969 / +0.989 / +0.983R, 73 / 76 / 78 %; honest order block −0.200 / −0.211 / −0.150R vs base −0.130 / −0.145 / −0.048R -->
@@ -170,6 +289,7 @@ const TEST =
 <p>Бэктест делает это сам после каждого прогона и пишет: «Лучше N % случайных прогонов». Ниже 95 % — результат не отличить от случая. Случайные прогоны считаются с одним и тем же зерном, так что одинаковые настройки дают одинаковую строку.</p>
 <!-- source: supabase/functions/_shared/math.js randomSetup / randomRank, RANDOM_RUNS 300; index.html btRandom (seed 1), RAND_BAR 95,
      btRandLine («Лучше N% случайных прогонов», «Результат не отличить от случая») -->
+${FIG_RAND}
 <p>Обратите внимание: случайные входы тоже платят комиссии, поэтому в среднем они в минусе. Стратегия может проиграть меньше случайных — и всё равно быть убыточной. «Лучше случайного» — необходимое условие, а не достаточное.</p>
 <p>Пример — первая кнопка ниже. 12 ноября 2026 года отскок от узкого канала за последний год дал 208 сделок и −0.10R на сделку. Случайные входы с теми же выходами — в среднем −0.17R, и прогон оказался лучше 81 % из них. Убыточно, и даже это «лучше» не отличить от случая.</p>
 <p>Вторая кнопка — те же правила за последние 30 дней. В тот же день: 16 сделок и <b>+0.20R</b> на сделку. Тот, кто проверил бы только месяц, решил бы, что стратегия работает.</p>
@@ -188,7 +308,7 @@ const TEST =
        bt:{set:{tf:'1h', method:'log', N:210, k:2, minScore:60, strategy:'revert', rr:0, risk:0.01, lev:3, timeStop:48}, top:20, pit:'pit', days:365}},
       {label:'Те же правила за 30 дней', note:'сделок меньше — разброс больше',
        bt:{set:{tf:'1h', method:'log', N:210, k:2, minScore:60, strategy:'revert', rr:0, risk:0.01, lev:3, timeStop:48}, top:20, pit:'pit', days:30}},
-     ], check:null},
+     ], src:[W.stw], check:null},
 
     {id:'case', title:'Разбор: профиль на своих монетах', min:8,
      body:`
@@ -198,6 +318,7 @@ const TEST =
      tf:'1h', minScore:51, strategy:'switch', rr:3, risk:0.05, lev:10, minWidth:0, maxHL:40, coinErMax:0, longOnly:false, regimeOnly:'any',
      timeStop:0, maxOpen:2}; no erMax of its own → 0.15 (profSet: BP.erMax, the default). These are the rules «v.6» of
      docs/RESEARCH-2026-10.md (19.10), and 25 of the 32 coins are that report's «список из чата» -->
+${FIG_CHAN}
 <h3>Три прогона</h3>
 <div class="tablewrap"><table class="ltab"><thead><tr><th>Прогон</th><th>Сделок</th><th>На сделку</th><th>Итог с $10 000</th><th>Макс. просадка</th></tr></thead><tbody>
   <tr><td>Свои 32 монеты, 11.11.2025 – 10.11.2026</td><td>114</td><td class="pos">+0.88R</td><td>$765 934</td><td>24.8 %</td></tr>
@@ -221,6 +342,7 @@ const TEST =
      the others −0.35R (92); «Довод „2024–25 слился, потому что там началась медвежка“»: 2025–26 BTC −24 %, 2024–25 BTC +59 %; shorts
      2025–26 +1.11R vs 2024–25 −0.83R («Половина прибыли 2025–26 — шорты от верхней границы на падающем рынке»); time in flat by the
      switch 77 % / 72 %. Run 3 above: −91.6 % -->
+${FIG_DD}
 <h3>Как проверить честно</h3>
 <ol>
   <li>Запустить правила на честном топе на каждый момент, а не на своём списке.</li>
@@ -237,7 +359,7 @@ const TEST =
        bt:{set:{method:'log', N:210, k:3.6, tf:'1h', minScore:51, strategy:'switch', rr:3, risk:0.05, lev:10, maxHL:40, timeStop:0, maxOpen:2}, top:20, pit:'pit', from:'2025-11-11', to:'2026-11-10'}},
       {label:'3. Честный топ-20, предыдущий год', note:'11.11.2024 – 10.11.2025',
        bt:{set:{method:'log', N:210, k:3.6, tf:'1h', minScore:51, strategy:'switch', rr:3, risk:0.05, lev:10, maxHL:40, timeStop:0, maxOpen:2}, top:20, pit:'pit', from:'2024-11-11', to:'2025-11-10'}},
-     ], check:null},
+     ], src:[W.hudson, W.chen], check:null},
    ]};
 
 // in the plan's order (the list shows the written modules first, each keeps its number)
