@@ -224,6 +224,28 @@ for (const [name, S] of Object.entries(VARIANTS)) {
   check('случайный вход: новая монета — не раньше свечи N + 19', R.filter(x => x.sym === 'NEWUSDT').every(x => x.time - TFMS + 1 >= NEW[S.N + 19][0]));
 }
 
+// ---------- 2.110: the loan as a margin account gives it, the regime with a major missing ----------
+{
+  const L = (side, entry, qty, bor) => ({side, entry, qty, snap: bor == null ? {} : {bor}});
+  const a = L('LONG', 100, 50);   // $5 000 on a $10 000 balance
+  check('заём: LONG при свободных деньгах не занимает', M.borrowAt(a, 10000, []) === 0);
+  check('заём: LONG занимает только недостающее', M.borrowAt(L('LONG', 100, 120), 10000, []) === 2000);
+  check('заём: свои деньги в открытых LONG уменьшают свободные', M.borrowAt(L('LONG', 100, 80), 10000, [L('LONG', 100, 50, 0)]) === 3000);
+  check('заём: занятое другой позицией свободных денег не тратит', M.borrowAt(L('LONG', 100, 80), 10000, [L('LONG', 100, 50, 5000)]) === 0);
+  check('заём: SHORT занимает весь размер, свободных денег не тратит', M.borrowAt(L('SHORT', 100, 30), 10000, []) === 3000 && M.borrowAt(L('LONG', 100, 50), 10000, [L('SHORT', 100, 30, 3000)]) === 0);
+  check('заём: при минусовом балансе — весь размер', M.borrowAt(L('LONG', 100, 10), -50, []) === 1000);
+  check('заём: borrowedOf берёт сохранённый snap.bor', M.borrowedOf(L('LONG', 100, 120, 2000)) === 2000);
+  check('заём: старая позиция без snap.bor — прежняя оценка', M.borrowedOf({side:'LONG', entry:100, qty:120, snap:{lev:1.2, settings:{maxOpen:3}}}) === 12000 - 12000 / 1.2 / 3);
+  const full = M.backtest(hist, {...BASE, lev:3}, {start:10000, from}).trades;
+  check('заём: каждая сделка бэктеста хранит snap.bor от 0 до размера', full.length > 0 && full.every(x => x.snap.bor >= 0 && x.snap.bor <= x.entry * x.qty * (1 + 1e-12)));
+  check('заём: при плече 1× LONG не занимает ничего', M.backtest(hist, {...BASE, lev:1}, {start:10000, from}).trades.every(x => x.side === 'SHORT' || x.snap.bor === 0));
+  const m3 = {er:0.1, ch:0.01, majors:[{er:0.1}, {er:0.1}, {er:0.1}]}, m2 = {...m3, majors:[{er:0.1}, {er:0.1}]};
+  check('режим: все три majors — считается', M.regimeOf(m3, {regimeSrc:'majors', erMax:0.15}) === 'flat');
+  check('режим: без одного из majors — неизвестен', M.regimeOf(m2, {regimeSrc:'majors', erMax:0.15}) === null && M.regimeOf({...m3, majors:[]}, {regimeSrc:'majors', erMax:0.15}) === null);
+  check('режим: по одному BTC majors не нужны', M.regimeOf(m2, {regimeSrc:'btc', erMax:0.15}) === 'flat');
+  check('режим: неизвестный — переключатель не входит', M.modeOf({mkt:m2}, {strategy:'switch', regimeSrc:'majors', erMax:0.15}) === 'none');
+}
+
 // ---------- 3. against the previous copy: nothing else changed ----------
 const refPath = new URLSearchParams(location.search).get('ref');
 if (refPath) {

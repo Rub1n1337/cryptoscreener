@@ -70,6 +70,7 @@ const mktName = (m: any) => `${esc(String(m.tf))} · топ-${Number(m.top)} · 
 function regimeOf(by: any, erMax: number) {
   if (!by?.BTCUSDT) return null;
   const ms = ["BTCUSDT", "ETHUSDT", "SOLUSDT"].map((s) => by[s]).filter(Boolean);
+  if (ms.length < 3) return null;   // one of the majors missing: unknown, as math.js regimeOf
   return ms.every((m: any) => m.er < erMax) ? "flat" : by.BTCUSDT.ch > 0 ? "up" : "down";
 }
 const REG: Record<string, string> = { flat: "↔️ боковик", up: "📈 рост", down: "📉 падение" };

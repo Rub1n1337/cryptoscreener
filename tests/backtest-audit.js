@@ -41,6 +41,22 @@ export async function recount(which = 'cur', opt = {}) {
   const pool = Object.keys(H.hist).filter(s => H.only.includes(s) && H.hist[s].length), day = Math.round(DAY / tfms);
   const turn = (s, T) => { const i = idx[s].get(T); if (i == null) return 0; let v = 0; for (let j = Math.max(0, i + 1 - day); j <= i; j++) v += H.hist[s][j][5] * H.hist[s][j][4]; return v; };
   const byClose = [...tr].sort((a, b) => a.tclose - b.tclose);
+  // the loan at entry (2.110): a SHORT borrows its size; a LONG what the free cash lacks — the balance at entry less the own money
+  // (size less loan) of the LONGs open then. Entries on one bar go in an order the trades do not keep, so with another LONG
+  // entered on the same bar the loan is checked within the range [without it, with it]; the others' loans are their snap.bor,
+  // each checked the same way in its turn
+  const balAt = time => { let b = S.start; for (const x of byClose) if (x.reason !== 'конец теста' && x.tclose <= time) b += x.pnl; return b; };
+  const loanRange = t => {
+    const size = t.entry * t.qty;
+    if (t.side === 'SHORT') return [size, size];
+    let lo = 0, hi = 0;
+    for (const x of tr) if (x !== t && x.side === 'LONG' && x.time <= t.time && x.tclose > t.time) {
+      const own = Math.max(0, x.entry * x.qty - (x.snap?.bor ?? 0));
+      hi += own; if (x.time < t.time) lo += own;
+    }
+    const bal = balAt(t.time), of = own => Math.max(0, size - Math.max(0, bal - own));
+    return [of(lo), of(hi)];
+  };
   for (const t of tr) {
     const K = H.hist[t.sym], T = t.time - tfms + 1, i = idx[t.sym].get(T), sg = t.side === 'LONG' ? 1 : -1, e = [], c = K.map(k => k[4]);
     const say = (what, got, want) => e.push(`${what}: ${got} ≠ ${want}`);
@@ -87,14 +103,16 @@ export async function recount(which = 'cur', opt = {}) {
     if (!near(t.exit, exit)) say('выход', t.exit, exit);
     if (t.tclose !== tc) say('время выхода', t.tclose, tc);
     // money
-    const size = entry * qty, borrowed = sg < 0 ? size : Math.max(0, size - bal / slots), fin = borrowed * BORROW * (tc - t.time) / DAY;
+    const [blo, bhi] = loanRange(t), tol = 1e-6 * Math.max(1, t.entry * t.qty), got = t.snap?.bor;
+    if (!(got >= blo - tol && got <= bhi + tol)) say('заём', got, blo === bhi ? blo : `${blo}…${bhi}`);
+    const borrowed = got >= blo - tol && got <= bhi + tol ? got : blo, fin = borrowed * BORROW * (tc - t.time) / DAY;
     const gross = sg * (exit - entry) * qty, fee = (entry + exit) * qty * FEE + fin, pnl = gross - fee, r = pnl / (Math.abs(entry - sl) * qty);
     if (!near(t.pnl, pnl, 1e-6)) say('PnL', t.pnl, pnl);
     if (!near(t.r, r, 1e-6)) say('R', t.r, r);
     // the coin was in the top-N by the 24 h before the entry bar's close
     if (H.top) { const rank = pool.map(s => [s, turn(s, T)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, H.top).map(x => x[0]); if (!rank.includes(t.sym)) say('топ', 'вне топ-' + H.top, 'в топе'); }
     if (e.length) bad.push({ id: t.id, e });
-    if (sample.length < (opt.sample ?? 4) && tr.indexOf(t) % Math.max(1, Math.floor(tr.length / (opt.sample ?? 4))) === 0) sample.push({ sym: t.sym, side: t.side, bar: new Date(T).toISOString().slice(0, 16), close: K[i][4], mid: B?.mid, lo: B?.lo, up: B?.up, atr, entry, slD, sl, tp: t.tp, bal, qty, size: size, exitBar: new Date(tc - tfms + 1).toISOString().slice(0, 16), reason, exit, gross, fee, fin, pnl, r, engine: { entry: t.entry, sl: t.sl, tp: t.tp, qty: t.qty, exit: t.exit, pnl: t.pnl, r: t.r, reason: t.reason } });
+    if (sample.length < (opt.sample ?? 4) && tr.indexOf(t) % Math.max(1, Math.floor(tr.length / (opt.sample ?? 4))) === 0) sample.push({ sym: t.sym, side: t.side, bar: new Date(T).toISOString().slice(0, 16), close: K[i][4], mid: B?.mid, lo: B?.lo, up: B?.up, atr, entry, slD, sl, tp: t.tp, bal, qty, size: entry * qty, borrowed, exitBar: new Date(tc - tfms + 1).toISOString().slice(0, 16), reason, exit, gross, fee, fin, pnl, r, engine: { entry: t.entry, sl: t.sl, tp: t.tp, qty: t.qty, exit: t.exit, pnl: t.pnl, r: t.r, reason: t.reason } });
   }
   // invariants: slots, one position a coin, cooldown, stuck positions
   const inv = { slots: 0, dup: 0, cool: 0, stuck: [] };

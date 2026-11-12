@@ -275,11 +275,14 @@ export function erSeries(c, L) {
 }
 export const MAJORS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
 // market regime: flat when BTC (or, with S.regimeSrc = 'majors', each of BTC/ETH/SOL) has ER below the threshold;
-// otherwise an impulse — up or down by the direction of BTC
+// otherwise an impulse — up or down by the direction of BTC. By the majors with one of them missing (its candles did not load,
+// or it was not listed yet in a backtest) the regime is unknown (null): until 2.110 it was read from the majors that came,
+// so BTC alone could call the market flat
 export function regimeOf(mkt, S) {
   if (!mkt) return null;
   const thr = S.erMax ?? 0.15;
-  const flat = S.regimeSrc === 'majors' && mkt.majors?.length ? mkt.majors.every(m => m.er < thr) : mkt.er < thr;
+  if (S.regimeSrc === 'majors' && (mkt.majors?.length ?? 0) < MAJORS.length) return null;
+  const flat = S.regimeSrc === 'majors' ? mkt.majors.every(m => m.er < thr) : mkt.er < thr;
   return flat ? 'flat' : mkt.ch > 0 ? 'up' : 'down';
 }
 // builds the market-regime object from per-coin {er, ch} values keyed by symbol
@@ -418,9 +421,21 @@ export function checkExit(p, K, now) {
   if (ts > 0 && now - p.time > ts * p.tfms) return { exit: c * (1 - sg * SLIP), reason: 'тайм-стоп' };
   return null;
 }
-// borrowed amount of a position (see BORROW_DAY): from what it stored at entry, so positions already open are priced too
-// (snap.lev = position / balance at entry, snap.settings.maxOpen = slots); a position without them borrows nothing extra
+// what a position borrows at entry, as a margin account lends: a SHORT borrows the coin it sells (its whole size); a LONG only
+// what the free cash lacks — the balance less the own money still in the open LONGs (their size less their loans). Until 2.110
+// every LONG was charged as if the other slots were already taken (size − balance / slots), which overcharged when slots were free.
+// The loan stays as taken until the position closes (an exchange does not repay it by itself)
+export function borrowAt(p, balance, open) {
+  const size = p.entry * p.qty;
+  if (p.side === 'SHORT') return size;
+  const own = open.reduce((s, q) => s + (q !== p && q.side === 'LONG' ? Math.max(0, q.entry * q.qty - borrowedOf(q)) : 0), 0);
+  return Math.max(0, size - Math.max(0, balance - own));
+}
+const lend = (p, balance, open) => { p.snap.bor = borrowAt(p, balance, open); return p; };
+// borrowed amount of a position (see BORROW_DAY): snap.bor, kept at entry (borrowAt). Positions opened before 2.110 have none and
+// are priced by the old estimate (snap.lev = position / balance at entry, snap.settings.maxOpen = slots); without those, nothing
 export function borrowedOf(p) {
+  if (p.snap?.bor != null && isFinite(+p.snap.bor)) return +p.snap.bor;
   const size = p.entry * p.qty;
   if (p.side === 'SHORT') return size;
   const lev = +p.snap?.lev, slots = +p.snap?.settings?.maxOpen || MAX_OPEN;
@@ -458,7 +473,7 @@ export function botTick({ rows, klines, open, recentSyms, balance, S, now, allow
     for (const r of cands) {
       if (stillOpen.length + opened.length >= slotsOf(S)) break;
       const p = planEntry(r, balance, S, now, start);
-      if (p) opened.push(p);
+      if (p) opened.push(lend(p, balance, [...stillOpen, ...opened]));
     }
   }
   return { closed, stillOpen, opened, balance };
@@ -744,7 +759,7 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
       for (const r of cands) {
         if (open.length >= slots) break;
         const p = r.ev ? studyEntry(r.ev, P[r.sym], r.sym, balance, S, T + tfms - 1, start, mkt) : planEntry(r, balance, S, T + tfms - 1, start);
-        if (p) { p.ei = r.i; p.id = `${T}${r.sym}`; if (study && !r.ev) Object.assign(p.snap.settings, studyOf(S)); open.push(p); }
+        if (p) { p.ei = r.i; p.id = `${T}${r.sym}`; if (study && !r.ev) Object.assign(p.snap.settings, studyOf(S)); open.push(lend(p, balance, open)); }
       }
     }
     equity.push([T, balance]);
@@ -824,6 +839,7 @@ export function randomSetup(hist, S, trades, { from = 0, only = null, top = 0, s
     const sl = e * (1 - sg * slD), tp = e * (1 + sg * tpD), qty = Math.min(start * risk / (e * slD), start * lev / slots / e);
     const p = { id: `${T}${sym}`, sym, side: sg > 0 ? 'LONG' : 'SHORT', entry: e, sl, tp, qty, time: T + tfms - 1, risk: Math.abs(e - sl) * qty,
                 snap: { lev: e * qty / start, settings: { maxOpen: slots } } };
+    lend(p, start, []);   // a random trade stands alone: a LONG borrows only what the starting balance lacks
     let exit = null, reason = '', Tc = 0;
     for (let j = i + 1; j < Q.n && exit == null; j++) {   // stop first if one bar hits both, then the take, then the time
       Tc = Q.t[j];
