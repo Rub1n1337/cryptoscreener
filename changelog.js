@@ -1,6 +1,10 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.107', date:'11 ноября 2026', title:'Точнее топ монет в бэктесте', items:[
+    'Исправлено: новая монета в топе бэктеста учитывалась по-разному в зависимости от конца периода.',
+    'Новая монета занимает место в топе с первых свечей, а торгуется, когда для неё хватает истории.',
+  ]},
   {v:'2.106', date:'11 ноября 2026', title:'Учебные стратегии в бэктесте', items:[
     'Добавлены учебные стратегии: откат по Фибоначчи, ордер-блок SMC и разрыв FVG.',
     'У каждой учебной стратегии свои настройки, а их сделки сравниваются со случайным входом.',
