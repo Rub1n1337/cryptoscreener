@@ -6,8 +6,7 @@
 name: Tests
 
 on:
-  push:
-    branches: [main]
+  push:   # every branch: a session's or Lovable's branch is checked before it is merged
     paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml']
   pull_request:
     paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml']
