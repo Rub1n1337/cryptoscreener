@@ -4427,7 +4427,8 @@ function btSettings() {
 function btFill(s) {
   $('#btMethod').value = s.method; $('#btN').value = s.N; $('#btK').value = s.k; $('#btTf').value = TFMS[s.tf] && !['5m', '1d', '1w'].includes(s.tf) ? s.tf : '15m'; $('#btMin').value = s.minScore; $('#btHL').value = String(s.maxHL || 0); hlOpts('#btHL', $('#btTf').value);
   $('#btStrat').value = s.strategy || 'revert'; $('#btLong').checked = !!s.longOnly; $('#btW').value = String(s.minWidth || 0);
-  $('#btRR').value = String(s.rr || 0); $('#btRisk').value = String(Math.round((s.risk ?? M.RISK) * 1000) / 10); $('#btLev').value = String(s.lev ?? 1);
+  // the take comes from the rules: a mark «2 was put in automatically» left by a study idea would turn it back to «к центру»
+  $('#btRR').value = String(s.rr || 0); delete $('#btRR').dataset.auto; $('#btRisk').value = String(Math.round((s.risk ?? M.RISK) * 1000) / 10); $('#btLev').value = String(s.lev ?? 1);
   $('#btER').value = String(s.erMax ?? 0.15); $('#btReg').value = s.regimeOnly || (s.flatOnly ? 'flat' : 'any');
   $('#btSrc').value = s.regimeSrc || 'majors';   // the bot always reads the regime from BTC+ETH+SOL
   $('#btTS').value = String(s.timeStop ?? 48); $('#btSlots').value = String(M.slotsOf(s)); $('#btCoinER').value = String(s.coinErMax || 0);
@@ -4763,6 +4764,11 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.120', date:'12 ноября 2026', title:'Два новых модуля учёбы', items:[
+    'Добавлен модуль «Популярные идеи и что с ними на истории»: отскок от канала, Фибоначчи, SMC, ставка финансирования, тренд на недели и модели-прогнозисты.',
+    'Добавлен модуль «Риск и деньги»: размер позиции, просадка, серии убытков и бумажный бот.',
+    'Исправлено: тейк из правил профиля или урока иногда сбрасывался в бэктесте на «к центру канала».',
+  ]},
   {v:'2.119', date:'12 ноября 2026', title:'Удобнее уроки', items:[
     'Добавлен блок «Главное» в начале каждого урока.',
     'Схемы в уроках стали нагляднее.',
@@ -4812,12 +4818,6 @@ const CHANGELOG = [
     'Сводные таблицы бэктеста на телефоне показаны карточками.',
     'Бэктест предупреждает, если таймфрейм профиля заменён на доступный.',
     'Кнопка индикаторов на узком экране подписана.',
-  ]},
-  {v:'2.108', date:'12 ноября 2026', title:'Раздел «Учёба»', items:[
-    'Добавлен раздел «Учёба»: на компьютере — своя вкладка, на телефоне — внутри «Справки».',
-    'Добавлен модуль «Как проверить идею»: издержки, ошибка выжившего, подгонка, заглядывание вперёд, случайный вход и разбор профиля.',
-    'Кнопки «Проверьте сами» запускают в бэктесте прогон с настройками урока.',
-    'Пройденные уроки можно отмечать, отметки сохраняются в профиле.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
