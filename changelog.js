@@ -1,6 +1,10 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.103', date:'11 ноября 2026', title:'Все монеты рядом с графиком', items:[
+    'Добавлена вкладка «Все» с поиском в списке монет развёрнутого вида.',
+    'Под монетой в списке показано её расстояние от центра канала.',
+  ]},
   {v:'2.102', date:'11 ноября 2026', title:'Длинная история графиков', items:[
     'Добавлено: когда листаете график влево, более старые свечи догружаются сами.',
   ]},

@@ -399,9 +399,9 @@ async function runUserBots(now: number, reqStart: number) {
   const others = (rest ?? []).filter((b: any) => !heldIds.has(b.id));
   const bots = [...(held ?? []).slice(0, Math.max(RUN - KEEP, RUN - others.length)), ...others].slice(0, RUN);
   QUIET.clear();   // recomputed per chat below, each run
-  // exits only, no entries: a paused bot's positions its owner asked to close (onlyReq; ub_close marks them closeReq), and an
-  // enabled bot left without profiles (ub_set accepts an empty list, the site never sends one) — its stops and takes still work.
-  // Before 2.109 both were never checked: a paused bot's «Закрыть» stayed «закрывается…» for good
+  // exits only, no entries: a paused bot's positions (below) and an enabled bot left without profiles (since 2.110 ub_set refuses
+  // an empty list; older ones may remain) — stops, takes, time stops and «Закрыть» (closeReq) still work. onlyReq: closeReq ones only.
+  // Before 2.109 neither was checked: a paused bot's «Закрыть» stayed «закрывается…» for good
   const exitsOnly = async (b: any, onlyReq: boolean) => {
     const { data: pr } = await db.from("user_positions").select("data").eq("bot_id", b.id);
     const all = (pr ?? []).map((x: any) => x.data), open = onlyReq ? all.filter((p: any) => p.closeReq) : all;
@@ -421,15 +421,18 @@ async function runUserBots(now: number, reqStart: number) {
     }
     return res.closed;
   };
-  const { data: req } = await db.from("user_positions").select("bot_id").eq("data->>closeReq", "true").limit(200);
-  // a bot already in this run's queue (paused after it was read) is left to it: two writes of one step would overwrite the balance
-  const queued = new Set(bots.map((b: any) => b.id)), reqIds = [...new Set((req ?? []).map((x: any) => x.bot_id))].filter((id) => !queued.has(id));
-  if (reqIds.length) {
-    const { data: paused } = await db.from("user_bots").select(`${FIELDS}, active_profile, regime`).in("id", reqIds).eq("enabled", false);
-    for (const b of paused ?? []) {
-      try { await exitsOnly(b, true); }
-      catch (e) { await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e) }).eq("id", b.id); }
-    }
+  // a paused bot opens nothing, but its positions keep their stops, takes and time stops — as the browser bot's do (botTick with
+  // allowEntries false) and as the panel says («Новых сделок не открывает»); a «Закрыть» (closeReq) closes at market. Until 12.11
+  // (after 2.114) only the positions marked closeReq were checked, so a paused bot's stop never fired. Least recently checked
+  // first, checked_at marked even when nothing closed, so past RUN of them every one still gets its turn.
+  // A bot already in this run's queue (paused after it was read) is left to it: two writes of one step would overwrite the balance
+  const queued = new Set(bots.map((b: any) => b.id));
+  const { data: paused } = await db.from("user_bots").select(`${FIELDS}, active_profile, regime, user_positions!inner(bot_id)`).eq("enabled", false)
+    .order("checked_at", oldest).limit(RUN);
+  for (const b of (paused ?? []).filter((b: any) => !queued.has(b.id))) {
+    if (Date.now() - reqStart > 60_000) break;   // the active bots below come first in the time left
+    try { if (!(await exitsOnly(b, false)).length) await db.from("user_bots").update({ checked_at: new Date(now).toISOString() }).eq("id", b.id); }
+    catch (e) { await db.from("user_bots").update({ last_error: String((e as Error)?.message ?? e) }).eq("id", b.id); }
   }
   if (!bots?.length) return 0;
   const reg = await regimeOn("1h", now), ticker = await ticker24();   // "the market now": the auto mode picks the profile by it
@@ -709,13 +712,16 @@ Deno.serve(async (req) => {
     const { notes, ...out } = await run(runId);
     const t1 = Date.now();
     let users = 0;
-    try { users = await runUserBots(Date.now(), t0); } catch { /* personal bots never break the shared one */ }
+    // personal bots never break the shared one, but a failure of the whole step (not of one bot, which goes to its last_error)
+    // is said in this run's bot_runs.error, as the collector's and the books' are; it used to be swallowed without a trace
+    let usersErr = "";
+    try { users = await runUserBots(Date.now(), t0); } catch (e) { usersErr = String((e as Error)?.message ?? e).slice(0, 300); }
     const t2 = Date.now();
     try { await notify(notes.lines, notes.syms); } catch { /* the trades are written; a failed message must not fail the run */ }
     // the run is fine, but when the collector did not answer the bot computed everything itself: said in `error` of an ok run,
     // so «Работа сервера» shows it (it used to be visible only in this response, and only as a longer run)
     await db.from("bot_runs").insert({ ok: true, ms: Date.now() - t0, scanned: out.scanned, signals: out.signals, opened: out.opened, closed: out.closed,
-      error: [RSTAT.err && `коллектор: ${RSTAT.err}`, BOOKERR && `стакан сигналов: ${BOOKERR}`].filter(Boolean).join("; ") || null });
+      error: [RSTAT.err && `коллектор: ${RSTAT.err}`, BOOKERR && `стакан сигналов: ${BOOKERR}`, usersErr && `личные боты: ${usersErr}`].filter(Boolean).join("; ") || null });
     // where the time goes (shared bot / personal bots / the shared bot's messages) and how many coins' candles are kept warm
     return Response.json({ ...out, users, analyses: AN, ms: { shared: t1 - t0, users: t2 - t1, notify: Date.now() - t2 }, kept: KC.size, remote: RSTAT });
   } catch (e) {

@@ -214,10 +214,13 @@ async function loginReq(db: any, nonce: string) {   // an open request: not answ
 async function loginPrompt(db: any, nonce: string, say: (t: string, kb?: any[][]) => Promise<any>) {
   const q = await loginReq(db, nonce);
   if (!q) return say("⌛ Ссылка для входа устарела. На сайте нажмите «Войти через Telegram» ещё раз.");
-  const pair = () => { const a = Math.floor(Math.random() * 16); return LOGIN_EMOJI[a] + LOGIN_EMOJI[(a + 1 + Math.floor(Math.random() * 15)) % 16]; };
+  // the decoys and the place of the right code come from crypto, as the code itself does (auth): Math.random's state can be guessed,
+  // and sort with a random comparator is not an even shuffle. Fisher–Yates over crypto values
+  const rnd = (n: number) => crypto.getRandomValues(new Uint32Array(1))[0] % n;
+  const pair = () => { const a = rnd(16); return LOGIN_EMOJI[a] + LOGIN_EMOJI[(a + 1 + rnd(15)) % 16]; };
   const opts = [q.code];
   while (opts.length < 3) { const p = pair(); if (!opts.includes(p)) opts.push(p); }
-  opts.sort(() => Math.random() - 0.5);
+  for (let i = opts.length - 1; i > 0; i--) { const j = rnd(i + 1); [opts[i], opts[j]] = [opts[j], opts[i]]; }
   return say("🔐 <b>Вход на сайт Sigma Radar</b>\nНажмите код, который показан на сайте.\n\nЕсли вход начинали не вы — нажмите «Это не я», и никто не войдёт.",
     [opts.map((c) => btn(c, `L:${nonce}:${c}`)), [btn("✋ Это не я", `L:${nonce}:-`)]]);
 }
