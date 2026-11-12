@@ -1,0 +1,45 @@
+# The strategy-math checks (tests/math.html) and the alerts checks (tests/alerts.html) in headless Chromium on every change to
+# the shared code or the tests. Deploys don't wait for it: Vercel and deploy-functions.yml run as before; a red run here says
+# that what just went out broke a check.
+# Second step: math.html against the previous commit's math.js (?ref=) — «nothing else changed». It is red whenever a change
+# alters trades on purpose (as the honest loan in 2.110 did), so it only reports and never fails the run: read its summary.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml']
+  pull_request:
+    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml']
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # pinned, as the Supabase CLI is in deploy-functions.yml: a new major must not change the run by itself
+      - name: Install Playwright
+        run: |
+          npm install --no-save --no-package-lock playwright@1.47.2
+          npx playwright install --with-deps chromium
+      - name: Serve the repository
+        run: |
+          python3 -m http.server 8000 >/dev/null 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://localhost:8000/tests/math.html >/dev/null && break; sleep 0.5; done
+      - name: math.html and alerts.html
+        run: node tests/ci.mjs http://localhost:8000/tests/math.html http://localhost:8000/tests/alerts.html
+      - name: math.html against the previous commit (report only)
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p tests/_ref
+          if git show HEAD^:supabase/functions/_shared/math.js > tests/_ref/math.js 2>/dev/null; then
+            node tests/ci.mjs "http://localhost:8000/tests/math.html?ref=_ref/math.js"
+          else echo "no previous commit"; fi
