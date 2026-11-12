@@ -3475,7 +3475,7 @@ async function runBot() {
     const res = M.botTick({rows:botRows, klines:exitK, open:J.open, recentSyms:recent, balance:J.balance, start:J.start, S:set, now, allowEntries:J.on, market});
     for (const p of res.opened) { p.note = `«${P.name}» · ${p.note}`; p.snap.profile = P.name; }
     J.open = [...res.stillOpen, ...res.opened];
-    J.closed = [...res.closed, ...J.closed];
+    J.closed = [...res.closed, ...J.closed]; capJournal();
     for (const p of res.opened) notifyUser(`Мой бот: ${p.side} ${pair(p.sym)}`, `«${P.name}» · вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', () => { jMode = 'mine'; go('journal'); });
     for (const t of res.closed) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => { jMode = 'mine'; go('journal'); });
     J.balance = res.balance; J.checked = now; J.scanned = botRows.length;
@@ -3876,7 +3876,7 @@ async function fetchShared() {
   if (chart) { drawChart(); renderDetail(); }
 }
 function renderGuard() {
-  const el = $('#guard'), MD = BP.where === 'server' ? SB_MINE : J, mine = MD ? M.journalStats(MD.start, MD.closed) : null;
+  const el = $('#guard'), MD = BP.where === 'server' ? SB_MINE : J, mine = MD ? M.journalStats(baseOf(MD), MD.closed) : null;
   const mineTxt = MD ? `Мой бот (${BP.where === 'server' ? 'на сервере' : 'в этой вкладке'}): ${MD.on ? 'торгует' : 'на паузе'}, позиций ${MD.open.length}, за 24 ч ${usd(mine.pnl24)}`
       + (MD.fetchError ? ` · не удалось обновить, показано состояние ${MD.checked ? ago(Date.now() - MD.checked) + ' назад' : 'с прошлой загрузки'}` : '')
     : 'Мой бот: загружаю…';
@@ -3937,7 +3937,16 @@ function countUp(el, from, to, fmt, ms = 650) {
   const step = t => { const k = Math.min(1, (t - t0) / ms); el.textContent = fmt(from + (to - from) * ease(k)); if (k < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
-const peakOf = D => { let b = D.start, pk = b; for (const x of [...D.closed].sort((a, b2) => a.tclose - b2.tclose)) { b += x.pnl; pk = Math.max(pk, b); } return pk; };
+// the browser journal keeps its newest JMAX trades (owner's choice 12.11): ~1 KB a trade, and a full storage would stop saving it
+// at all. The trades that go are folded into J.cut {n, pnl}; the balance chart, its peak and the drawdown start from
+// baseOf = start + cut.pnl, so they still end at the balance. The other journals (server bots) have no cut: baseOf = start
+const JMAX = 3000, baseOf = D => D.start + (+D.cut?.pnl || 0);
+function capJournal() {
+  if (J.closed.length <= JMAX) return;
+  const gone = J.closed.splice(JMAX);   // newest first: the oldest go
+  J.cut = {n:(J.cut?.n || 0) + gone.length, pnl:(+J.cut?.pnl || 0) + gone.reduce((s, x) => s + (+x.pnl || 0), 0)};
+}
+const peakOf = D => { let b = baseOf(D), pk = b; for (const x of [...D.closed].sort((a, b2) => a.tclose - b2.tclose)) { b += x.pnl; pk = Math.max(pk, b); } return pk; };
 // balance over time: a step line — the balance only changes when a trade closes.
 // key: 'j' the journal's chart, 'bt' the backtest's — both can be on the page at once (one hidden), so ids carry it.
 // EQ keeps each chart's points for the pointer and the keyboard (eqShow); EQH — the point shown, to show it again after a redraw
@@ -3946,12 +3955,12 @@ function equityChart(D, tEnd, key = 'j') {
   const cl2 = [...D.closed].sort((a, b) => a.tclose - b.tclose);
   if (!cl2.length) { EQ.delete(key); return `<div class="hempty">Закрытых сделок пока нет — здесь появится график баланса и итоги: winrate, средний результат, комиссии, просадка.</div>`; }
   const t0 = Math.min(...cl2.map(x => x.time)), t1 = tEnd ?? Date.now();
-  const pts = [{t:t0, b:D.start, dd:0}]; let b = D.start;
+  const pts = [{t:t0, b:baseOf(D), dd:0}]; let b = baseOf(D);
   for (const x of cl2) { b += x.pnl; pts.push({t:x.tclose, b, x}); }
   // the deepest fall from a peak, measured as M.journalStats measures «Макс. просадка» (same order, same sums, so the band
   // and the number agree): «8.5%» is from the highest balance before it, not from the start — on a chart from 10k to 40k
   // it looked like a small step that never went below the start
-  let peak = D.start, pkI = 0, dd = 0, ddPk = 0, ddTr = 0;
+  let peak = baseOf(D), pkI = 0, dd = 0, ddPk = 0, ddTr = 0;
   for (let i = 1; i < pts.length; i++) {
     if (pts[i].b > peak) { peak = pts[i].b; pkI = i; }
     pts[i].dd = (peak - pts[i].b) / peak;
@@ -4098,7 +4107,7 @@ function renderJournalNow() {
   const D = journalData(), shared = jMode === 'shared';
   const slots = M.slotsOf(shared ? SJ?.settings : profSet(activeProfile()));   // how many positions this bot may hold at once
   if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
-  const st = M.journalStats(D.start, D.closed), set = shared ? SJ.settings : S;
+  const st = M.journalStats(baseOf(D), D.closed), set = shared ? SJ.settings : S;
   $('#jdesc').innerHTML = shared
     ? (sharedNoEdge() ? `<div class="banner warn noedge"><svg class="i"><use href="#i-warn"/></svg><div><b>У правил общего бота не найдено преимущества.</b>
         На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет: <span class="term" title="R — риск одной сделки: сумма, которую она теряет, если сработал стоп. −0.42R на сделку — в среднем каждая сделка теряла почти половину этой суммы">−0.42R, −0.40R и −0.30R на сделку</span>.
@@ -4110,7 +4119,7 @@ function renderJournalNow() {
   tickLive();
   const card = (t, v, s, c = '', tip = '') => `<div class="card"${tip ? ` title="${tip}"` : ''}><div class="t">${t}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
   const other = !shared && SJ ? M.journalStats(SJ.start, SJ.closed) : null;
-  const chg = D.balance / D.start - 1;
+  const chg = D.balance / D.start - 1, cutN = +D.cut?.n || 0, allNet = st.net + (+D.cut?.pnl || 0);   // cut: trades past JMAX
   // last 7 days and the last 20 trades, so the cards say which way things are going, not only where they are
   const wk = D.closed.filter(x => Date.now() - x.tclose < 7 * 864e5), wkNet = wk.reduce((a, x) => a + x.pnl, 0);
   const recent = [...D.closed].sort((a, b) => b.tclose - a.tclose).slice(0, 20).map(M.normTrade).map(x => x.r).filter(x => x != null && isFinite(x));
@@ -4121,12 +4130,12 @@ function renderJournalNow() {
        <div class="htop">
          <div><div class="t">Баланс · виртуальный</div>
            <div class="hv">$${money(D.balance)}</div>
-           <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">за всё время, после комиссий</span>
+           <div class="hchg"><span class="chip ${allNet > 0 ? 'pos' : allNet < 0 ? 'neg' : 'flat'} ${cl(allNet)}">${usd(allNet)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">за всё время, после комиссий</span>
              ${wk.length && wk.length < D.closed.length ? `<span class="chip ${wkNet > 0 ? 'pos' : wkNet < 0 ? 'neg' : 'flat'} ${cl(wkNet)}" style="margin-left:10px">${wkNet > 0 ? '▲' : wkNet < 0 ? '▼' : ''} ${usd(wkNet)}</span><span class="faint">за 7 дней · ${wk.length} ${plural(wk.length, ['сделка', 'сделки', 'сделок'])}</span>` : ''}</div></div>
          <div class="hside">
            <div>Старт<b>$${money(D.start)}</b></div>
            <div>Пик<b>$${money(peakOf(D))}</b></div>
-           <div>Закрыто сделок<b>${st.n}</b></div>
+           <div>Закрыто сделок<b>${st.n + cutN}</b>${cutN ? `<span class="faint" title="Журнал в браузере хранит последние ${JMAX} сделок; итог за всё время и баланс учитывают все">хранятся ${JMAX}</span>` : ''}</div>
          </div>
        </div>
        ${equityChart(D)}
@@ -4714,6 +4723,9 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.116', date:'12 ноября 2026', title:'Журнал бота в браузере', items:[
+    'Журнал бота в браузере хранит последние 3000 сделок; баланс и итог за всё время учитывают все.',
+  ]},
   {v:'2.115', date:'12 ноября 2026', title:'Позиции бота на паузе', items:[
     'Исправлено: позиции серверного бота на паузе закрываются по стопу, тейку и времени.',
   ]},
@@ -4766,12 +4778,6 @@ const CHANGELOG = [
     'Под выбором идеи входа появилось короткое описание её правил.',
     'Добавлен раздел «Можно ли верить»: вердикт, сравнение со случайным входом, отложенный период и предупреждения о неполном итоге.',
     'Готовый профиль «Моего бота» можно подставить в бэктест одной кнопкой.',
-  ]},
-  {v:'2.104', date:'11 ноября 2026', title:'Проверка бэктеста на случайность', items:[
-    'Добавлено сравнение результата бэктеста со случайными входами с теми же выходами.',
-    'Добавлен отложенный период: конец периода показывается отдельно как проверка.',
-    'Бэктест предупреждает, если на отложенной части итог намного хуже.',
-    'В справку добавлен раздел о том, когда результату бэктеста можно верить.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4896,7 +4902,7 @@ async function closeMine(id) {
     // stop or take already. Closing the old copy again recorded a second trade and counted its P&L twice
     const p = J.open.find(x => x.id === p0.id); if (!p) continue;
     const t = M.closeTrade(p, px * (1 - (p.side === 'LONG' ? 1 : -1) * M.SLIP), 'вручную', now);
-    J.open = J.open.filter(x => x.id !== p.id); J.closed = [t, ...J.closed]; J.balance += t.pnl; net += t.pnl; done++;
+    J.open = J.open.filter(x => x.id !== p.id); J.closed = [t, ...J.closed]; capJournal(); J.balance += t.pnl; net += t.pnl; done++;
   }
   save('sr_journal', J); renderJournal(); renderBotPanel(); renderGuard();
   // said as it went: «закрыты» only when all were, otherwise how many and why the rest stayed open (no price from Binance)
