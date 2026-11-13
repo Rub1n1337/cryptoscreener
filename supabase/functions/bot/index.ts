@@ -78,10 +78,9 @@ async function pool<T>(items: T[], n: number, fn: (x: T) => Promise<void>) {
 // This function starts fresh every minute, so the candle cache above rarely outlives a run. The collector runs all the time:
 // it keeps the candles, tops them up and answers with the analyses — one request instead of hundreds. Only if both sides
 // run the same math (M.fingerprint) are its answers used; whatever it doesn't answer is done here as before.
-// Off since 12.11.2026: the Railway address answers «Application not found» (since 06.11), so the name may be taken by
-// someone else, who would get the scan token and could feed this bot made-up analyses. Put the address back once the
-// collector runs under the owner's account again: "https://cryptoscreener-production-f6ba.up.railway.app/scan"
-const SCAN_URL = "";
+// Off 12–13.11.2026 while the address answered «Application not found» (whoever took the name would get the scan token);
+// back on 13.11 once the owner restarted the collector. If it goes dark again, empty this rather than let it point anywhere
+const SCAN_URL = "https://cryptoscreener-production-f6ba.up.railway.app/scan";
 let FPRINT = "", SCAN_TOK = "";
 const RSTAT = { calls: 0, rows: 0, ms: 0, err: "" };   // reported in the response, to watch it
 const rkey = (sym: string, S: any) => `${sym}|${S.tf}|${S.method}|${S.N}|${S.k}`;

@@ -150,9 +150,8 @@ const undo = () => undoRedo(undoS, redoS), redo = () => undoRedo(redoS, undoS);
 
 // ---------- our collector server (server/ on Railway): full books and heatmap history; without it the Beta works as before ----------
 // the address: SERVER below, or ?srv=https://… once in the page URL (remembered in this browser)
-// Off since 12.11.2026: the Railway address answers «Application not found», so the name may belong to someone else now.
-// Back to 'https://cryptoscreener-production-f6ba.up.railway.app' (and into the CSP connect-src) once the collector is the owner's again
-const SERVER = '';
+// Off 12–13.11.2026 while the address answered «Application not found»; back on 13.11 (also in the CSP connect-src of index.html)
+const SERVER = 'https://cryptoscreener-production-f6ba.up.railway.app';
 let srvBase = null, srvSyms = null;
 function srvUrl() {
   if (srvBase !== null) return srvBase;
