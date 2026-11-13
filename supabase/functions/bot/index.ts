@@ -217,17 +217,37 @@ function freshSignals(rows: any[], min: number, sent: Record<string, any>, now: 
   if (first) sent["_init" + pre] = now;   // once: a marker rewritten every minute made the memory look changed every minute
   return first ? [] : fresh;
 }
-// one signal: side and coin first, then where the price is and why it counts; last — how long it can still be entered
-// (a touch counts for M.TOUCH_BARS candles) and whether the coin springs back to the centre on this timeframe (T½)
-const sigLine = (tf: string) => (r: any) => {
+// one signal, in the order a trader reads it: side and coin; the plan (entry, take, stop — prices in <code>, a tap copies them);
+// why it is a signal, in numbers; whether the reversal is confirmed and if not, what is missing; how long it can still be entered
+// (a touch counts for M.TOUCH_BARS candles) and how fast the coin usually gets back to the centre (T½); what the bot does.
+// short: one signal of a list — head, plan in one line and the bot's decision, so 15 of them stay within Telegram's 4096 characters
+const px = (v: number) => `$<code>${fp(v).slice(1)}</code>`;
+const missing = (r: any) => {
+  const c = r.checks || {}, m: string[] = [];
+  if (c.closed === false) m.push("свеча не закрылась");
+  else if (c.candle === false) m.push("цена не развернулась");
+  if (c.inside === false) m.push("цена за границей");
+  if (c.volume === false) m.push("объём обычный");
+  return m.length ? `: ${m.join(", ")}` : "";
+};
+const sigLine = (tf: string, short = false) => (r: any) => {
   const long = r.side === "low", toMid = (r.mid / r.price - 1) * 100, tfms = (M.TFMS as any)[tf];
   const left = r.touchTime + M.TOUCH_BARS * tfms - Date.now(), hlMs = r.hl * tfms;
-  const hl = !isFinite(hlMs) || hlMs >= 30 * 864e5 ? "тренд ⚠️" : `${dur(hlMs)}${r.hl <= 20 ? " ✅" : r.hl > 40 ? " ⚠️" : ""}`;
-  return `${long ? "🟢" : "🔴"} <b>${long ? "LONG" : "SHORT"} ${coin(r.sym)}</b> · сила <b>${r.score}</b>\n` +
-    `цена ${fp(r.price)} · до центра ${toMid >= 0 ? "+" : "−"}${Math.abs(toMid).toFixed(1)}%\n` +
-    `RSI ${Math.round(r.rsi)} · объём ${r.volX ? "×" + r.volX.toFixed(1) : "—"} · ${r.rev ? "✔ отскок подтверждён" : "⏳ ждём подтверждения"}\n` +
-    `⌛ войти можно ещё ${left > 6e4 ? dur(left) : "минуту"} · T½ ${hl}` + (r.lv ? `\n🎯 цель ${fp(r.lv.tp)} (${pct(r.lv.tp, r.lv.e)}) · 🛑 стоп ${fp(r.lv.sl)} (${pct(r.lv.sl, r.lv.e)})` : "") +
+  const head = `${long ? "🟢" : "🔴"} <b>${long ? "LONG" : "SHORT"} ${coin(r.sym)}</b> · сила <b>${r.score}</b>`;
+  const state = r.rev ? "✔ отскок подтверждён" : `⏳ ждём подтверждения${missing(r)}`;
+  const lv = r.lv, rrTxt = lv ? `1 : ${(lv.tpD / lv.slD).toFixed(1)}` : "";
+  if (short) return `${head} · ${r.rev ? "✔" : "⏳"}\n` +
+    (lv ? `вход ${px(lv.e)} · тейк ${px(lv.tp)} ${pct(lv.tp, lv.e)} · стоп ${px(lv.sl)} ${pct(lv.sl, lv.e)}` : `цена ${px(r.price)} · до центра ${toMid >= 0 ? "+" : "−"}${Math.abs(toMid).toFixed(1)}%`) +
     (r.botNote ? `\n${r.botNote}` : "");
+  const plan = lv
+    ? `Вход ${px(lv.e)}\nТейк ${px(lv.tp)} · ${pct(lv.tp, lv.e)}\nСтоп ${px(lv.sl)} · ${pct(lv.sl, lv.e)}\n<i>риск : прибыль ${rrTxt}</i>`
+    : `Цена ${px(r.price)} · до центра ${toMid >= 0 ? "+" : "−"}${Math.abs(toMid).toFixed(1)}%`;
+  const edge = long ? "нижнюю" : "верхнюю";
+  // exc: how far past the band, in σ; a few hundredths is a touch, not a way out
+  const why = [+r.exc >= 0.05 ? `вышла за ${edge} границу на ${(+r.exc).toFixed(+r.exc < 1 ? 2 : 1)}σ` : `коснулась ${long ? "нижней" : "верхней"} границы`,
+    r.volX ? `объём ×${(+r.volX).toFixed(1)}` : "", `RSI ${Math.round(r.rsi)}`].filter(Boolean).join(" · ");
+  const hl = !isFinite(hlMs) || hlMs >= 30 * 864e5 ? "монета в тренде ⚠️" : `к центру обычно за ${dur(hlMs)}${r.hl <= 20 ? " ✅" : r.hl > 40 ? " ⚠️" : ""}`;
+  return `${head}\n\n${plan}\n\n📊 ${why}\n${state}\n⌛ войти можно ещё ${left > 6e4 ? dur(left) : "минуту"} · ${hl}` + (r.botNote ? `\n${r.botNote}` : "");
 };
 // why the profile's own bot passes a signal at its threshold — so a signal it doesn't take is not a mystery
 function whyNot(r: any, S: any, nOpen: number) {
@@ -248,7 +268,7 @@ function whyNot(r: any, S: any, nOpen: number) {
 }
 // a signal message: title, the rules it follows in one grey line, up to 15 signals
 const sigMsg = (title: string, rules: string, list: any[], tf: string) =>
-  [`${title}\n<i>${rules}</i>`, ...list.slice(0, 15).map(sigLine(tf)), ...(list.length > 15 ? [`…и ещё ${list.length - 15} — на сайте`] : [])];
+  [`${title}\n<i>${rules}</i>`, ...list.slice(0, 15).map(sigLine(tf, list.length > 1)), ...(list.length > 15 ? [`…и ещё ${list.length - 15} — на сайте`] : [])];
 // who: "общий бот" or "ваш бот «…»"
 const openedMsg = (p: any, who = "общий бот") =>
   `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side} ${coin(p.sym)}</b> — ${who} вошёл\n` +
@@ -627,8 +647,10 @@ async function runUserBots(now: number, reqStart: number) {
     // levels as the bot would set them now (the regime decides the strategy for "переключатель")
     const text = (r: any, stage: number, failed = false) => {
       const x = { ...r, mkt: r.mkt ?? mktT }, lv = stage < 3 ? M.levels(x, S) : null;
-      return `📡 <b>«${esc(pname)}»</b> · ${S.tf}\n${sigLine(S.tf)({ ...x, lv, botNote: note(r, stage) })}` +
-        (failed ? "\n⚠️ <b>отскок не удержался</b>: цена снова за границей канала — ждём нового подтверждения" : "");
+      // the profile last, like a signature: a notification shows the first line, and that is the side and the coin
+      return sigLine(S.tf)({ ...x, lv, botNote: note(r, stage) }) +
+        (failed ? "\n⚠️ <b>отскок не удержался</b>: цена снова за границей канала — ждём нового подтверждения" : "") +
+        `\n<i>📡 «${esc(pname)}» · ${S.tf}</i>`;
     };
     fresh.sort((a, b) => b.r.score - a.r.score);
     let n = 0;

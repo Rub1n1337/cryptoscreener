@@ -350,6 +350,16 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 .comp .cb{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}.comp .cb i{display:block;height:100%;background:var(--acc);border-radius:3px}
 .comp .cn{color:var(--mute)}.comp .cv{text-align:right;font-variant-numeric:tabular-nums}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;margin-top:10px}
+/* the signal breakdown: the plan (entry, take, stop, take : stop), why it is a signal, the strength's parts folded away */
+.plan{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 12px;padding:10px 12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r)}
+.plan span{display:flex;flex-direction:column;gap:2px;min-width:0}.plan i{font-style:normal;font-size:10.5px;color:var(--faint);white-space:nowrap}
+.plan b{font-size:13.5px;font-weight:650;color:var(--text);overflow-wrap:anywhere}.plan em{font-style:normal;font-size:11.5px;font-variant-numeric:tabular-nums}
+.pnote{font-size:11.5px;margin:6px 0 12px;text-wrap:pretty}.ptitle.sm{font-size:13px;margin:0 0 6px}
+.why{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:5px;font-size:12.5px}.why li{display:flex;gap:8px;align-items:baseline;text-wrap:pretty}
+.why li span{flex:0 0 auto;width:12px;font-weight:700}.why li.faint{color:var(--mute)}
+.scales.one{grid-template-columns:minmax(0,1fr)}
+.scomp{margin-top:2px}.scomp>summary{cursor:pointer;font-size:12.5px;color:var(--blue);min-height:36px;display:flex;align-items:center}
+@media (max-width:380px){.plan{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* ---------- banners, intro, toasts ---------- */
 .banner{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:var(--r);border:1px solid var(--line);background:var(--s1);margin-bottom:14px;font-size:14px;line-height:1.55}
@@ -2829,7 +2839,7 @@ function drawChart() {
 }
 
 // ---------- signal breakdown (shared by the market panel and the trade card) ----------
-function compsHtml(x, side) {
+function compsHtml(x, side, noChecks = false) {
   if (!x?.comps) return '';
   const low = side === 'low' || side === 'LONG';
   const hl = x.hl == null || !isFinite(x.hl) ? null : x.hl;
@@ -2843,7 +2853,7 @@ function compsHtml(x, side) {
   const ck = (ok, txt) => `<span class="${ok ? 'pos' : 'faint'}">${ok ? '✓' : '✗'} ${txt}</span>`;
   return `<div class="faint" style="font-size:12px;margin:2px 0 6px">Из чего сложилась сила сигнала — это оценка условий, не вероятность прибыли</div>`
     + list.map(([nm, v, w, tip]) => `<div class="comp" title="${tip}"><span class="cn">${nm}</span><span class="cb"><i style="width:${v*100}%"></i></span><span class="cv">${Math.round(v*w)} / ${w}</span></div>`).join('')
-    + (x.checks ? `<div class="checks">${ck(x.checks.closed, 'свеча закрылась')}${ck(x.checks.candle, 'цена развернулась')}${ck(x.checks.inside, 'вернулась в диапазон')}${ck(x.checks.volume, 'объём выше обычного')}</div>` : '');
+    + (x.checks && !noChecks ? `<div class="checks">${ck(x.checks.closed, 'свеча закрылась')}${ck(x.checks.candle, 'цена развернулась')}${ck(x.checks.inside, 'вернулась в диапазон')}${ck(x.checks.volume, 'объём выше обычного')}</div>` : '');
 }
 function renderDetail() {
   const el = $('#detail');
@@ -2885,15 +2895,38 @@ function renderDetail() {
     verdict = `${name} в середине своего диапазона (${pct}). Сигналов нет — это нормально, бот просто наблюдает.`;
   }
   if (r.squeeze) verdict += ` Монета сейчас вдвое спокойнее обычного — возможен резкий рывок.`;
-  let html = `<div class="ptitle">Разбор сигнала · ${name}</div><div class="verdict">${verdict}</div><div class="mute" style="font-size:12px;margin-bottom:8px">${hlTxt}</div>`;
+  // with a signal the breakdown answers three things, each once: the plan (levels to trade it by hand), why it is a signal
+  // (one line per condition, with its number), and what the bot does (the verdict). Without one: where the price stands
+  const sig = !!r.side && !!(r.touch || r.rev || r.wasRev);
+  let html = `<div class="ptitle">Разбор сигнала · ${name}</div><div class="verdict">${verdict}</div>`;
+  if (sig) {
+    // the levels the bots' rules give a bounce now (math.js levels: stop 1.5 ATR within 0.8–2.5 %, take at the centre, at most
+    // 3 %); null when the price has already covered most of the way back to the centre
+    const lv = M.levels(r, {...S, rr:0, strategy:'revert'}), low = r.side === 'low';
+    const off = v => { const x = (v / lv.e - 1) * 100; return (x > 0 ? '+' : '−') + Math.abs(x).toFixed(2) + '%'; };
+    html += lv
+      ? `<div class="plan">${[['Вход', fp(lv.e), ''], ['Тейк', fp(lv.tp), `<em class="pos">${off(lv.tp)}</em>`], ['Стоп', fp(lv.sl), `<em class="neg">${off(lv.sl)}</em>`],
+          ['Риск : прибыль', '1 : ' + (lv.tpD / lv.slD).toFixed(1), '']].map(([t, v, d]) => `<span><i>${t}</i><b class="mono">${v}</b>${d}</span>`).join('')}</div>`
+        + `<div class="faint pnote">${r.rev ? '' : 'Разворота ещё нет: боты так рано не входят. '}Уровни — для входа вручную по рынку сейчас: стоп — 1.5 ATR, тейк — центр канала, не дальше 3 %. Боты ставят свои по профилю.</div>`
+      : `<div class="faint pnote">До центра канала осталось меньше стопа — по правилам ботов входить уже поздно.</div>`;
+    const ok = (y, t) => `<li class="${y ? 'pos' : 'faint'}"><span aria-hidden="true">${y ? '✓' : '✗'}</span>${t}</li>`, rsi = Math.round(+r.rsi);
+    const hlOk = isFinite(r.hl) && r.hl * TFMS[S.tf] < 30 * 864e5;
+    html += `<div class="ptitle sm">Почему сигнал</div><ul class="why">`
+      + ok(r.exc >= 0.05, r.exc >= 0.05 ? `цена вышла за ${low ? 'нижнюю' : 'верхнюю'} границу на ${(+r.exc).toFixed(r.exc < 1 ? 2 : 1)}σ` : `цена коснулась ${edge} границы, но почти не вышла за неё`)
+      + ok(r.checks?.volume, `объём ×${(+r.volX || 0).toFixed(1)} к обычному${r.checks?.volume ? '' : ' — нужен повышенный'}`)
+      + ok(low ? rsi < 35 : rsi > 65, `RSI ${rsi} — ${low ? (rsi < 35 ? 'монету перепродали' : 'перепроданности нет') : (rsi > 65 ? 'монету перекупили' : 'перекупленности нет')}`)
+      + ok(r.rev, r.rev ? 'разворот подтверждён: свеча закрылась в сторону сделки' : 'разворота пока нет')
+      + ok(hlOk && r.hl <= 20, hlOk ? `к центру обычно возвращается наполовину за ${dur(r.hl * TFMS[S.tf])} (${r.hl.toFixed(0)} свечей)` : 'монета в тренде и к центру не тянется')
+      + `</ul>`;
+  } else html += `<div class="mute" style="font-size:12px;margin-bottom:8px">${hlTxt}</div>`;
   // where the price and RSI stand, on the same scale as the table: marks at the channel's edges and at RSI 30 / 70
-  const rv = +r.rsi, rsiCol = rv < 30 ? 'var(--lo)' : rv > 70 ? 'var(--up)' : 'var(--blue)';
+  const rv = sig ? NaN : +r.rsi, rsiCol = rv < 30 ? 'var(--lo)' : rv > 70 ? 'var(--up)' : 'var(--blue)';
   const mark = (at, t) => `<span style="left:${at}">${t}</span>`;
   // how far the price has to go: to each edge and to the centre (the bounce's target), in % of the price; minus = below it
   const away = v => { const x = (v / r.price - 1) * 100; return (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x).toFixed(Math.abs(x) < 10 ? 1 : 0) + '%'; };
   const dist = [['до нижней', r.lo], ['до центра', r.mid], ['до верхней', r.up]].filter(([, v]) => isFinite(v) && r.price > 0)
     .map(([t, v]) => `<span><i>${t}</i><b class="mono">${away(v)}</b></span>`).join('');
-  html += `<div class="scales"><div class="sc" title="Где цена внутри своего обычного диапазона: 0% — у нижней границы, 100% — у верхней, за краями — вышла за границу. Ниже — сколько цене пройти до границ и до центра канала (цели отскока), минус — ниже цены">`
+  html += `<div class="scales${sig ? ' one' : ''}"><div class="sc" title="Где цена внутри своего обычного диапазона: 0% — у нижней границы, 100% — у верхней, за краями — вышла за границу. Ниже — сколько цене пройти до границ и до центра канала (цели отскока), минус — ниже цены">`
     + `<div class="sch"><span>Положение в диапазоне</span><b style="color:${pbCol(r.pB)}">${pct}</b></div>${gaugeBar(r.pB, 'wide')}`
     + `<div class="sca" aria-hidden="true">${mark('14.3%', '0%')}${mark('50%', '50%')}${mark('85.7%', '100%')}</div>`
     + (dist ? `<div class="sdist">${dist}</div>` : '') + '</div>'
@@ -2902,7 +2935,7 @@ function renderDetail() {
       + `<span class="gauge wide rsi" aria-hidden="true"><i style="left:${clamp(rv, 0, 100)}%;background:${rsiCol}"></i></span>`
       + `<div class="sca" aria-hidden="true">${mark('30%', '30')}${mark('50%', '50')}${mark('70%', '70')}</div></div>` : '')
     + '</div>';
-  html += compsHtml(r, r.side);
+  if (sig && r.comps) html += `<details class="scomp"><summary>Из чего сложилась сила ${r.score ?? ''}</summary>${compsHtml(r, r.side, true)}</details>`;
   for (const {p, who} of botPositions().filter(x => x.p.sym === chartSym))
     html += `<div style="margin-top:8px;color:var(--violet)">Открыта позиция (${who} бот): ${p.side} от ${fp(p.entry)}, тейк ${fp(p.tp)}, стоп ${fp(p.sl)}.</div>`;
   el.innerHTML = html;
@@ -4764,6 +4797,13 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.121', date:'13 ноября 2026', title:'Сигналы понятнее', items:[
+    'Сигнал в Telegram начинается с плана сделки: вход, тейк и стоп; цену можно скопировать нажатием.',
+    'Причины сигнала собраны в одну строку, а если разворота ещё нет, сказано, чего не хватает.',
+    'Профиль бота указан в конце сообщения.',
+    'В разборе сигнала на сайте появились уровни для входа и список условий без повторов.',
+    'Составляющие силы сигнала в разборе свёрнуты.',
+  ]},
   {v:'2.120', date:'12 ноября 2026', title:'Два новых модуля учёбы', items:[
     'Добавлен модуль «Популярные идеи и что с ними на истории»: отскок от канала, Фибоначчи, SMC, ставка финансирования, тренд на недели и модели-прогнозисты.',
     'Добавлен модуль «Риск и деньги»: размер позиции, просадка, серии убытков и бумажный бот.',
@@ -4811,13 +4851,6 @@ const CHANGELOG = [
   {v:'2.110', date:'12 ноября 2026', title:'Точнее заём и режим рынка', items:[
     'Проценты за заём в бэктесте и у бота считаются только с суммы, которой не хватило свободных денег.',
     'Если не загрузились данные BTC, ETH или SOL, режим рынка считается неизвестным, и бот не входит по правилам, зависящим от режима.',
-  ]},
-  {v:'2.109', date:'12 ноября 2026', title:'Исправления бота и телефона', items:[
-    'Исправлено: позиции бота на паузе теперь закрываются кнопкой «Закрыть».',
-    'В карточке монеты на телефоне появился поиск другой монеты.',
-    'Сводные таблицы бэктеста на телефоне показаны карточками.',
-    'Бэктест предупреждает, если таймфрейм профиля заменён на доступный.',
-    'Кнопка индикаторов на узком экране подписана.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
