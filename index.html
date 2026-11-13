@@ -4797,6 +4797,11 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.122', date:'13 ноября 2026', title:'Учёба: чтение графика и аукцион', items:[
+    'Добавлен модуль «Чтение графика»: свечи, структура, уровни, пробои, ATR, объём и ограничения индикаторов.',
+    'Добавлен модуль «Аукцион и зона стоимости» по книге Джеймса Далтона.',
+    'Кнопки в уроках открывают график монеты и включают нужные индикаторы.',
+  ]},
   {v:'2.121', date:'13 ноября 2026', title:'Сигналы понятнее', items:[
     'Сигнал в Telegram начинается с плана сделки: вход, тейк и стоп; цену можно скопировать нажатием.',
     'Причины сигнала собраны в одну строку, а если разворота ещё нет, сказано, чего не хватает.',
@@ -4847,10 +4852,6 @@ const CHANGELOG = [
   {v:'2.111', date:'12 ноября 2026', title:'Меньше трафика', items:[
     'Проверка новой версии сайта почти не расходует трафик, пока сайт не обновился.',
     'Исправлено: текст ошибки серверного бота показывается безопасно.',
-  ]},
-  {v:'2.110', date:'12 ноября 2026', title:'Точнее заём и режим рынка', items:[
-    'Проценты за заём в бэктесте и у бота считаются только с суммы, которой не хватило свободных денег.',
-    'Если не загрузились данные BTC, ETH или SOL, режим рынка считается неизвестным, и бот не входит по правилам, зависящим от режима.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5057,7 +5058,7 @@ function learnList() {
 // navigation, which the CSP's connect-src doesn't govern; a new tab with noopener noreferrer so the page can't reach back
 // A reference list as papers keep one: small type at the very end, «Authors (year). Title. Journal.», then our one line about it
 const learnSrc = s => s?.length ? `<section class="lsrc" aria-labelledby="lSrcH"><h3 id="lSrcH">Источники</h3><ol>`
-  + s.map(w => `<li>${w.a} (${w.y}). <a href="${w.url}" target="_blank" rel="noopener noreferrer">${w.t}<span class="sr"> (откроется в новой вкладке)</span></a>. <i>${w.j}</i>. <span class="lsn">${w.n}</span></li>`).join('')
+  + s.map(w => `<li>${w.a} (${w.y}). ${w.url ? `<a href="${w.url}" target="_blank" rel="noopener noreferrer">${w.t}<span class="sr"> (откроется в новой вкладке)</span></a>` : w.t}. <i>${w.j}</i>. <span class="lsn">${w.n}</span></li>`).join('')   // a book with no stable page: the title alone
   + '</ol></section>' : '';
 function learnPage(x) {
   const {m, l, i, key} = x, P = learnProg(), n = LEARN.indexOf(m) + 1, done = P.done[key], nx = m.lessons[i + 1];
@@ -5112,6 +5113,7 @@ $('#learnBody').addEventListener('click', e => {
 // saved anywhere, so the person's own settings (profiles, the bot) are untouched
 const BT_STUDY_F = {fibK:'#btFibK', fibZone:'#btFibZone', fibStop:'#btFibStop', fibTarget:'#btFibTarget', obEntry:'#btObEntry', obSwing:'#btObSwing', fvgMin:'#btFvgMin', fvgLife:'#btFvgLife'};
 function learnTry(t, x) {
+  if (t?.go) return learnGo(t.go, x);
   if (!t?.bt) return;
   if (btBusy) { toast('Бэктест уже считает', 'Дождитесь конца прогона или прервите его на странице «Бэктест».', 'info', () => go('backtest')); return; }
   const b = t.bt, s = {...PROFILE_DEF, erMax:0.15, regimeSrc:'majors', ...b.set};
@@ -5123,6 +5125,24 @@ function learnTry(t, x) {
   btFill(s);   // the rules, then btEstimate: the fields that depend on the selects show or hide
   go('backtest'); runBacktest();
   toast(`Урок «${x.l.title}»: запускаю бэктест`, `${t.label}. «Назад» в браузере вернёт к уроку.`, 'info', () => { location.hash = '#learn/' + x.key; });
+}
+
+// «Проверьте сами» → a coin on the market: go:{sym ('BTCUSDT'), mode ('ob' «Стакан», the default | 'ch' «Канал»), ind:[beta.js
+// indicator ids]}. The indicators stay on (owner 11.11, docs/PLAN-LEARN.md): saved like a pick in the window, and the toast takes
+// back only the ones the lesson turned on. «Назад» in the browser returns to the lesson (go('market') pushes the address)
+async function learnGo(g, x) {
+  const ind = g.ind || [], m = g.mode || 'ob';
+  if (cmode !== m) setCmode(m);
+  openCoin(g.sym);
+  if (m === 'ob' && !isPhone()) showOb();
+  if (!ind.length) return;
+  let added;
+  try { betaMod ||= await import('./beta.js'); added = await betaMod.setInd(ind); }
+  catch { toast('Не удалось включить индикатор', 'Проверьте интернет и нажмите кнопку урока ещё раз.', 'bad'); return; }
+  const nm = ids => ids.map(i => `«${betaMod.indName(i)}»`).join(', '), ids = added.map(a => a.id);
+  if (!added.length) { toast(ind.length > 1 ? `Индикаторы ${nm(ind)} уже включены` : `Индикатор ${nm(ind)} уже включён`, '«Назад» в браузере вернёт к уроку.', 'info'); return; }
+  toast(ids.length > 1 ? `Включены индикаторы ${nm(ids)}` : `Включён индикатор ${nm(ids)}`, `Урок «${x.l.title}». Нажмите здесь, чтобы убрать; «Назад» в браузере вернёт к уроку.`, 'info',
+    () => betaMod.undoInd(added), 10000);
 }
 
 // ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes (#charts[/SYMBOL], #beta: the market's «Стакан») ----------

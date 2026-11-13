@@ -1,6 +1,10 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.110', date:'12 ноября 2026', title:'Точнее заём и режим рынка', items:[
+    'Проценты за заём в бэктесте и у бота считаются только с суммы, которой не хватило свободных денег.',
+    'Если не загрузились данные BTC, ETH или SOL, режим рынка считается неизвестным, и бот не входит по правилам, зависящим от режима.',
+  ]},
   {v:'2.109', date:'12 ноября 2026', title:'Исправления бота и телефона', items:[
     'Исправлено: позиции бота на паузе теперь закрываются кнопкой «Закрыть».',
     'В карточке монеты на телефоне появился поиск другой монеты.',

@@ -1797,6 +1797,7 @@ export function open(kit, sym, where = 'full') {
     card = c; closePop(); applyLayout();
   }
   if (sym) want(sym);
+  pendInd.splice(0).forEach(f => f());   // a lesson's indicators asked for before the first open
   if (loopOn) return;
   loopOn = true; renderList();
   let tick = 0, tickAt = Date.now();
@@ -1804,6 +1805,24 @@ export function open(kit, sym, where = 'full') {
   for (const p of panes) p.d ? p.connect() : p.restart();
   requestAnimationFrame(loop);
 }
+// a lesson's «Проверьте сами» (learnGo in index.html): show indicators as if picked in the window. Resolves with what really
+// changed — [{id, hid}], hid: it was chosen but hidden (the eye) — so undoInd («убрать» in the toast) puts back exactly the state
+// before: removes what the lesson added, hides again what it unhid. Before the first open() the choice isn't loaded yet: the
+// change waits and runs at the end of open()
+let pendInd = [];
+export const indName = id => CATS.flatMap(c => c.items).find(x => x.id === id)?.name || id;
+export function setInd(ids) {
+  return new Promise(res => {
+    const f = () => {
+      const n = ids.filter(i => !sel.has(i) || hidden.has(i)).map(i => ({id:i, hid:sel.has(i)}));
+      for (const {id} of n) { sel.add(id); hidden.delete(id); }
+      if (n.length) saveInd();
+      res(n);
+    };
+    wired ? f() : pendInd.push(f);
+  });
+}
+export function undoInd(n) { if (!wired || !n.length) return; for (const {id, hid} of n) hid ? hidden.add(id) : sel.delete(id); saveInd(); }
 // the active chart's coin and market: «Свернуть» gives the card that coin
 export const activeSym = () => { const p = act(); return p ? {sym:p.sym, mkt:p.mkt} : null; };
 // out of view the streams close (no traffic in the background); the heatmap collected so far stays in memory. The indicator
