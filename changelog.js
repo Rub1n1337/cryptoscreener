@@ -1,6 +1,9 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.112', date:'12 ноября 2026', title:'Обновлены примеры «Учёбы»', items:[
+    'Цифры примеров в уроках пересчитаны по новому расчёту займа.',
+  ]},
   {v:'2.111', date:'12 ноября 2026', title:'Меньше трафика', items:[
     'Проверка новой версии сайта почти не расходует трафик, пока сайт не обновился.',
     'Исправлено: текст ошибки серверного бота показывается безопасно.',

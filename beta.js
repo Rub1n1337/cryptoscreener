@@ -1823,6 +1823,20 @@ export function setInd(ids) {
   });
 }
 export function undoInd(n) { if (!wired || !n.length) return; for (const {id, hid} of n) hid ? hidden.add(id) : sel.delete(id); saveInd(); }
+// a lesson's go.mkt: the active chart on 'spot' or 'fut', as the «Спот | Фьючерсы» button does (without its toast — the lesson's
+// toast says it). Resolves with the market it was on, or null when nothing changed, so «убрать» can put it back. Before the
+// streams start (the first open() or a paused tab) only the market changes and the candles are dropped: open() restarts the pane
+export function setMkt(m) {
+  return new Promise(res => {
+    const f = () => {
+      const p = act(); if (!p || p.mkt === m) return res(null);
+      const was = p.mkt; p.autoSpot = false; p.prevMkt = was; p.mkt = m; savePanes(); syncBar();
+      if (loopOn) p.restart(); else { p.d = null; p.label(); }
+      res(was);
+    };
+    wired ? f() : pendInd.push(f);
+  });
+}
 // the active chart's coin and market: «Свернуть» gives the card that coin
 export const activeSym = () => { const p = act(); return p ? {sym:p.sym, mkt:p.mkt} : null; };
 // out of view the streams close (no traffic in the background); the heatmap collected so far stays in memory. The indicator

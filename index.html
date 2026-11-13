@@ -4797,6 +4797,11 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.124', date:'13 ноября 2026', title:'Учёба: как устроен рынок', items:[
+    'Добавлен модуль «Как устроен рынок»: биржа и стакан, цена сделки, плечо и ликвидация, фьючерсы и финансирование, участники рынка.',
+    'В модуль «Риск и деньги» добавлены уроки о прибыли к риску, лимите потерь, плане сделки, журнале и тильте.',
+    'Кнопки уроков о фьючерсах открывают график монеты на фьючерсах.',
+  ]},
   {v:'2.123', date:'13 ноября 2026', title:'Уроки с исследованиями', items:[
     'Уроки модуля «Чтение графика» дополнены выводами научных исследований.',
     'В «Источниках» уроков остались только общедоступные исследования.',
@@ -4849,9 +4854,6 @@ const CHANGELOG = [
     'Бэктест заранее предупреждает, если прогон, скорее всего, не поместится в память вкладки.',
     'Оценка времени бэктеста учитывает сохранённую историю, даже если первая попытка её загрузить не удалась.',
     'Повторные прогоны дольше сохраняют загруженную историю.',
-  ]},
-  {v:'2.112', date:'12 ноября 2026', title:'Обновлены примеры «Учёбы»', items:[
-    'Цифры примеров в уроках пересчитаны по новому расчёту займа.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5128,7 +5130,7 @@ function learnTry(t, x) {
 }
 
 // «Проверьте сами» → a coin on the market: go:{sym ('BTCUSDT'), mode ('ob' «Стакан», the default | 'ch' «Канал»), ind:[beta.js
-// indicator ids]}. The indicators stay on (owner 11.11, docs/PLAN-LEARN.md): saved like a pick in the window, and the toast takes
+// indicator ids], mkt ('fut' — the chart on futures, beta.js setMkt; optional)}. The indicators stay on (owner 11.11, docs/PLAN-LEARN.md): saved like a pick in the window, and the toast takes
 // back only the ones the lesson turned on. «Назад» in the browser returns to the lesson (go('market') pushes the address)
 async function learnGo(g, x) {
   const ind = g.ind || [], m = g.mode || 'ob';
@@ -5136,13 +5138,16 @@ async function learnGo(g, x) {
   openCoin(g.sym);
   if (m === 'ob' && !isPhone()) showOb();
   if (!ind.length) return;
-  let added;
-  try { betaMod ||= await import('./beta.js'); added = await betaMod.setInd(ind); }
+  let added, was = null;
+  try { betaMod ||= await import('./beta.js'); added = await betaMod.setInd(ind); if (g.mkt) was = await betaMod.setMkt(g.mkt); }
   catch { toast('Не удалось включить индикатор', 'Проверьте интернет и нажмите кнопку урока ещё раз.', 'bad'); return; }
   const nm = ids => ids.map(i => `«${betaMod.indName(i)}»`).join(', '), ids = added.map(a => a.id);
-  if (!added.length) { toast(ind.length > 1 ? `Индикаторы ${nm(ind)} уже включены` : `Индикатор ${nm(ind)} уже включён`, '«Назад» в браузере вернёт к уроку.', 'info'); return; }
-  toast(ids.length > 1 ? `Включены индикаторы ${nm(ids)}` : `Включён индикатор ${nm(ids)}`, `Урок «${x.l.title}». Нажмите здесь, чтобы убрать; «Назад» в браузере вернёт к уроку.`, 'info',
-    () => betaMod.undoInd(added), 10000);
+  // go.mkt ('fut'): the chart switched to futures — said in the toast, and «убрать» puts the market back too
+  const mk = was ? (g.mkt === 'fut' ? 'фьючерсы' : 'спот') : '';
+  if (!added.length && !was) { toast(ind.length > 1 ? `Индикаторы ${nm(ind)} уже включены` : `Индикатор ${nm(ind)} уже включён`, '«Назад» в браузере вернёт к уроку.', 'info'); return; }
+  const head = ids.length ? (ids.length > 1 ? `Включены индикаторы ${nm(ids)}` : `Включён индикатор ${nm(ids)}`) : '';
+  toast(head ? head + (mk ? ` · ${mk}` : '') : `Открыты ${mk}`, `Урок «${x.l.title}». Нажмите здесь, чтобы убрать${was ? ` и вернуть ${was === 'fut' ? 'фьючерсы' : 'спот'}` : ''}; «Назад» в браузере вернёт к уроку.`, 'info',
+    () => { betaMod.undoInd(added); if (was) betaMod.setMkt(was); }, 10000);
 }
 
 // ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes (#charts[/SYMBOL], #beta: the market's «Стакан») ----------
