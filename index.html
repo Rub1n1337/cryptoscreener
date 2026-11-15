@@ -2785,6 +2785,12 @@ async function loadChart(sym) {
 function computeChart() {
   if (!chartK) return;
   const d = parse(chartK);
+  // a coin with almost no candles (just listed, or none on this timeframe): no channel to draw — the scale would be ±Infinity
+  if (d.c.length < 20) {
+    chart = null; const cv = $('#cv'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    $('#ctitle').textContent = `${pair(chartSym)} — мало истории для графика`; $('#cstats').textContent = '';
+    return renderDetail();
+  }
   const N = effN(d.c.length);
   chart = Object.assign(d, {sym:chartSym, N, B:bands(d.c, N, S.k, S.method), R:rsi(d.c)});
   const i = d.c.length - 1, B = chart.B;
@@ -3267,6 +3273,7 @@ onSaved = k => {
   syncDirty.add(k); clearTimeout(syncTimer2); syncTimer2 = setTimeout(syncPush, 1500);
 };
 async function syncPush() {
+  let yielded = false;
   for (const k of [...syncDirty]) {
     if (!syncReady || !syncMeta()) return;
     syncDirty.delete(k);
@@ -3278,10 +3285,15 @@ async function syncPush() {
       let nv;
       try { nv = await authFetch('rpc/state_put', {method:'POST', body:JSON.stringify({p_key:k, p_value:value, p_version:v})}); }
       catch { syncDirty.add(k); syncTimer2 = setTimeout(syncPush, 30e3); return; }   // offline or signed out: later
-      if (nv) { syncMeta(m => { m.v[k] = nv; m.h[k] = f; }); done = true; }
-      else v = (await stateRows(false, [k]).catch(() => []))[0]?.version || 0;   // another device wrote first: this change is newer, it wins
+      if (nv) { syncMeta(m => { m.v[k] = nv; m.h[k] = f; }); done = true; continue; }
+      // another device wrote first. The later change wins, as at the start (syncPlan): before 2.125 this change went over the
+      // other one even when it was older (made offline, sent on the way back)
+      const r = (await stateRows(false, [k]).catch(() => []))[0];
+      if (r && SYNCV?.t?.[k] && Date.parse(r.updated_at) > SYNCV.t[k]) { yielded = true; break; }   // the profile's is newer: offered below
+      v = r?.version || 0;
     }
   }
+  if (yielded) syncCheck();   // «Настройки изменены на другом устройстве» — the newer value, as on a return to the tab
 }
 function syncApply(rows, asked) {   // values from the profile → this device's storage, then a reload so everything reads them
   storeRows(rows);
@@ -3366,7 +3378,9 @@ async function syncCheck() {   // back to the tab or to the network: another dev
     try { syncApply(await stateRows(true, rows.map(r => r.key)), true); } catch { toast('Не удалось загрузить настройки', 'Проверьте интернет', 'bad'); }
   }, 15000);
 }
-renderAcct(); scheduleRefresh(); loadMe().then(() => syncStart()).then(() => profileBot());   // one after the other: each may ask something
+renderAcct(); scheduleRefresh();
+// one after the other: each may ask something. A failed sync must not cost the profile's bot its check
+loadMe().then(() => syncStart()).catch(e => console.error('sync', e)).then(() => profileBot());
 
 // ---------- my bot on the server: the profile's bot (accounts stage 5), one for all its devices ----------
 // signed in, calls go as the person (the profile's Telegram, the Beta, owner rights); a stale token is refreshed once
@@ -3462,6 +3476,7 @@ function botGone() {
   UB = null; save('sr_ubot', null); SB_MINE = null;
   if (BP.where === 'server' || BP.srvPaused != null) { BP.where = 'browser'; delete BP.srvPaused; saveBP(); }
 }
+let ubPausing = false;    // «В браузере» waiting for the server bot's pause
 let ubCreating = false;   // a double tap would send two creates (the second gets the first one's bot back, with a second toast)
 async function setWhere(w) {
   let fresh = false;
@@ -3486,10 +3501,16 @@ async function setWhere(w) {
   // knows) — it was running when paused here: «На сервере 24/7» runs it again; one the person had paused stays paused
   let paused = null;
   if (w === 'browser' && BP.where === 'server' && UB) {
-    paused = SB_MINE ? SB_MINE.on !== false : true;
+    // a second tap while this waits would read the bot as paused by the first and overwrite srvPaused with false
+    if (ubPausing) return;
+    ubPausing = true;
+    try {
+    // the bot's state not loaded yet (a tap in the first second): asked here, so a bot the person had paused isn't resumed later
+    paused = SB_MINE ? SB_MINE.on !== false : await rpc('ub_get', ubArgs()).then(r => r.bot?.enabled !== false, () => true);
     clearTimeout(syncTimer); ubOn = null;
     try { await rpc('ub_set', ubArgs({p_config:serverConfig(), p_enabled:false})); }
     catch (e) { toast('Не удалось поставить серверного бота на паузу', String(e.message || e), 'bad'); renderBotPanel(); return; }   // the switch stays where it was
+    } finally { ubPausing = false; }
   }
   const resume = w === 'server' && !fresh && BP.srvPaused === true;
   BP.where = w;
@@ -4797,6 +4818,11 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.125', date:'16 ноября 2026', title:'Надёжность синхронизации и графиков', items:[
+    'Исправлено: при правке одной настройки на двух устройствах сохраняется более поздняя.',
+    'Исправлено: график монеты с короткой историей показывает понятную надпись.',
+    'Исправлено: перекрестие на живом графике сбрасывается при смене вида карточки.',
+  ]},
   {v:'2.124', date:'13 ноября 2026', title:'Учёба: как устроен рынок', items:[
     'Добавлен модуль «Как устроен рынок»: биржа и стакан, цена сделки, плечо и ликвидация, фьючерсы и финансирование, участники рынка.',
     'В модуль «Риск и деньги» добавлены уроки о прибыли к риску, лимите потерь, плане сделки, журнале и тильте.',
@@ -4849,11 +4875,6 @@ const CHANGELOG = [
     'Ошибки сохранения на сервере описаны словами, а не служебным текстом.',
     'Окно индикаторов закрывается клавишей Esc, а Tab не уходит за его пределы.',
     'Исправлено: после сбоя сохранение настроек Telegram больше не перестаёт работать.',
-  ]},
-  {v:'2.113', date:'12 ноября 2026', title:'Бэктест: оценка и история', items:[
-    'Бэктест заранее предупреждает, если прогон, скорее всего, не поместится в память вкладки.',
-    'Оценка времени бэктеста учитывает сохранённую историю, даже если первая попытка её загрузить не удалась.',
-    'Повторные прогоны дольше сохраняют загруженную историю.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;

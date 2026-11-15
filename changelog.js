@@ -1,6 +1,11 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.113', date:'12 ноября 2026', title:'Бэктест: оценка и история', items:[
+    'Бэктест заранее предупреждает, если прогон, скорее всего, не поместится в память вкладки.',
+    'Оценка времени бэктеста учитывает сохранённую историю, даже если первая попытка её загрузить не удалась.',
+    'Повторные прогоны дольше сохраняют загруженную историю.',
+  ]},
   {v:'2.112', date:'12 ноября 2026', title:'Обновлены примеры «Учёбы»', items:[
     'Цифры примеров в уроках пересчитаны по новому расчёту займа.',
   ]},

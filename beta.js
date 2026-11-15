@@ -1841,4 +1841,5 @@ export function setMkt(m) {
 export const activeSym = () => { const p = act(); return p ? {sym:p.sym, mkt:p.mkt} : null; };
 // out of view the streams close (no traffic in the background); the heatmap collected so far stays in memory. The indicator
 // window covers the whole page, so it closes too
-export function pause() { if (!loopOn) return; loopOn = false; clearInterval(sampler); panes.forEach(p => p.disconnect()); closePop(); closeInd(); if (tool) setTool(null); }
+// The crosshair goes too: a tap leaves it with no mouseleave, and it stood at the old place on «Стакан» again
+export function pause() { if (!loopOn) return; loopOn = false; clearInterval(sampler); panes.forEach(p => { p.disconnect(); p.hoverI = p.hoverY = null; }); hoverT = under = null; closePop(); closeInd(); if (tool) setTool(null); }
