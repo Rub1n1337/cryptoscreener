@@ -450,6 +450,33 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 @media(min-width:701px) and (max-width:1000px){.lgrid{grid-template-columns:minmax(0,1fr)}.ltoc{position:static}}   /* a narrow window: the module's list above the lesson */
 @media(min-width:701px) and (max-width:1120px){.top .tab[data-t=learn] .tt{display:none}.top .tab[data-t=learn]{padding:0 10px}}
 .gloss{display:grid;grid-template-columns:210px 1fr;gap:8px 18px;font-size:13px}.gloss b{color:var(--text)}.gloss span{color:var(--mute)}
+.gloss+.glall{margin:8px 0 0;font-size:13px}.glall a{display:inline-flex;align-items:center;min-height:36px}
+/* a term in a lesson (learn.js <dfn data-term>): a dotted underline; a hint under it on hover, a tap or Enter (learnTip) */
+.lart{position:relative}
+/* the vertical padding only widens the tap area to 36+ px (an inline box's padding doesn't move the lines); the highlight stays on the text */
+.lart dfn[data-term]{font-style:normal;text-decoration:underline dotted var(--mute);text-underline-offset:3px;cursor:help;padding:9px 0;background-clip:content-box;transition:background var(--dur-1) var(--ease)}
+.lart dfn[data-term]:hover,.lart dfn[aria-expanded=true]{background-color:var(--accbg)}.lart dfn[data-term]:focus{outline:none}
+.lart dfn[data-term]:focus-visible{background-color:var(--accbg);text-decoration:underline solid var(--acc-t) 2px}
+.ltip{position:absolute;z-index:30;display:grid;gap:4px;width:max-content;max-width:min(320px,calc(100vw - 16px));padding:10px 12px;border:1px solid var(--line2);border-radius:var(--r-s);background:var(--s1);box-shadow:var(--shadow);font-size:13.5px;line-height:1.45;text-wrap:pretty;
+  opacity:0;transition:opacity var(--dur-1) var(--ease)}.ltip.open{opacity:1;transition-duration:var(--dur-2)}
+.ltip b{color:var(--text)}.ltip span{color:var(--mute)}.ltip a{display:inline-flex;align-items:center;gap:4px;min-height:36px;color:var(--acc-t);font-weight:600;justify-self:start}
+/* «Проверьте себя»: answers are buttons; after one, the right answer gets ✓, a wrong pick ✕ — not colour alone */
+.lchk{margin-top:22px;max-width:820px}.lchk>h3{margin:0 0 6px!important}
+.lq{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.lq legend{float:left;width:100%;padding:0;font-weight:600;color:var(--text);line-height:1.45;text-wrap:pretty}   /* float: inside the card, not on its border */
+.lqa{clear:both;display:grid;gap:6px;padding-top:8px}
+.lqa button{height:auto;min-height:40px;padding:8px 12px;justify-content:flex-start;text-align:left;font-weight:400;line-height:1.4;white-space:normal}
+.lqa button::before{content:"";flex:0 0 16px;font-weight:700;text-align:center}
+.lqa button.ok{border-color:var(--ok-line);color:var(--lo-t)}.lqa button.ok::before{content:"✓"}
+.lqa button.no{border-color:var(--bad-line);color:var(--up-t)}.lqa button.no::before{content:"✕"}
+.lqw{margin:8px 0 0;font-size:13.5px;line-height:1.5;color:var(--mute);text-wrap:pretty}.lqw:empty{display:none}.lqw b{color:var(--text)}
+/* «Словарь» (#learn/gloss): every term, a filter, the lessons that use it */
+.lgl{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 14px}.lgl a{display:inline-flex;align-items:center;gap:6px;min-height:36px;color:var(--text)}
+.lgpage{max-width:900px}.lgpage h2{margin:0 0 8px;font-size:24px;text-wrap:balance}.lgpage h2:focus{outline:none}
+.lgq{width:100%;max-width:360px;margin:6px 0 14px}
+.gdl{margin:0;display:grid;gap:2px}.gdl>div{padding:10px 12px;border-radius:var(--r-s);scroll-margin-top:90px}.gdl>div:focus{outline:none}.gdl>div:focus-visible{outline:2px solid var(--focus)}
+.gdl dt{font-weight:600;color:var(--text)}.gdl dd{margin:2px 0 0;color:var(--mute);line-height:1.5;text-wrap:pretty}
+.gdl .gu{display:block;margin-top:4px;font-size:12.5px;color:var(--faint)}.gdl .gu a{color:var(--mute)}
 .cl-item{border-left:2px solid var(--line2);padding:2px 0 2px 18px;margin:0 0 22px;position:relative}
 .cl-item::before{content:"";position:absolute;left:-6px;top:6px;width:10px;height:10px;box-sizing:border-box;border-radius:50%;background:var(--s3);border:2px solid var(--line2)}   /* border-box: * {} doesn't reach ::before, and a 14 px dot sat 2 px off the line */
 .cl-item:first-child::before{background:var(--acc);border-color:var(--acc)}
@@ -1763,35 +1790,14 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <li><b>История тепловой карты</b> самых популярных монет приходит с нашего сервера. У остальных монет, и пока сервер недоступен, карта копится с момента открытия.</li>
       </ul>
       <h3>Быстрый поиск</h3>
-      <p>Кнопка «Поиск» или <kbd>Ctrl</kbd> + <kbd>K</kbd>: наберите монету (btc, sol), раздел или настройку — например «плечо», «риск», «бэктест» — и нажмите Enter.</p>
+      <p>Кнопка «Поиск» или <kbd>Ctrl</kbd> + <kbd>K</kbd>: наберите монету (btc, sol), раздел, настройку, урок или термин — например «плечо», «риск», «бэктест», «спред» — и нажмите Enter.</p>
       <p class="mute" style="font-size:13px">Сервис учебный: торговля бумажная, ордера на биржу не отправляются. Это не инвестиционный совет.</p>
     </div>
 
-    <details class="dis"><summary>Словарь терминов <span class="mute">· что означает каждая цифра</span></summary><div class="dbody">
-      <div class="gloss">
-        <b>Диапазон, %B</b><span>Где цена внутри своего обычного коридора: 0% — у нижней границы, 50% — посередине, 100% — у верхней.</span>
-        <b>Отклонение, σ</b><span>Насколько далеко цена ушла от обычной, в стандартных отклонениях. При k = 3 границы — это ±3σ.</span>
-        <b>Сила сигнала</b><span>Оценка 0–100: глубина выхода за границу, объём, RSI, подтверждение разворота и то, как быстро монета обычно возвращается.</span>
-        <b>Объём ×</b><span>Объём торгов относительно обычного. ×2 — вдвое выше нормы.</span>
-        <b>T½</b><span>За сколько монета обычно проходит половину пути обратно к своей цене. «тренд» — монета сейчас не возвращается к центру (T½ больше месяца или его нет).</span>
-        <b>LONG / SHORT</b><span>Ставка на рост / на падение.</span>
-        <b>Тейк и стоп</b><span>Цена фиксации прибыли и цена ограничения убытка. Задаются сразу при входе.</span>
-        <b>Тайм-стоп</b><span>Выход по рынку, если за N свечей не сработали ни тейк, ни стоп (по умолчанию 48). Освобождает место для свежего сигнала, когда цена «застряла». В профиле можно выключить или поменять.</span>
-        <b>Риск, 1R</b><span>Сколько потеряем, если сработает стоп. Сколько это в % баланса, задаётся в профиле; общий бот рискует 1%.</span>
-        <b>R</b><span>Итог сделки в рисках: +1.5R — заработали в полтора раза больше, чем рисковали; −1R — полный стоп.</span>
-        <b>Средний результат</b><span>Средний R на сделку после комиссий. Больше нуля — у стратегии есть преимущество. Главная цифра журнала.</span>
-        <b>Winrate</b><span>Доля прибыльных сделок. Сама по себе мало что значит: важно, сколько приносит средняя сделка.</span>
-        <b>Profit factor</b><span>Сумма прибылей, делённая на сумму убытков. Больше 1 — в плюсе.</span>
-        <b>Макс. просадка</b><span>Самое большое падение баланса от пика.</span>
-        <b>Комиссия и проскальзывание</b><span>Биржа берёт 0.075% за вход и выход; рыночные ордера исполняются чуть хуже цены — учитываем 0.05%.</span>
-        <b>Стакан</b><span>Заявки, которые ждут исполнения: на покупку ниже цены, на продажу выше.</span>
-        <b>Стена</b><span>Уровень стакана, где заявок в несколько раз больше обычного (по умолчанию в 5 раз и не меньше $20K). Может сдерживать цену, а может исчезнуть в любой момент.</span>
-        <b>Дельта, CVD</b><span>Дельта — покупки по рынку минус продажи по рынку за свечу. CVD — её накопленная сумма: растёт, когда покупатели агрессивнее.</span>
-        <b>Футпринт</b><span>Объём покупок и продаж на каждой цене внутри свечи.</span>
-        <b>POC, VWAP</b><span>POC — цена, на которой прошло больше всего объёма. VWAP — средняя цена сделок с учётом их объёма.</span>
-        <b>Ликвидации</b><span>Принудительное закрытие позиций на фьючерсах, когда у трейдера не хватает залога.</span>
-        <b>Открытый интерес</b><span>Сколько позиций на фьючерсах сейчас открыто. Рост вместе с ценой — в движение входят новые деньги.</span>
-      </div>
+    <!-- the terms live in learn.js (GLOSS, shared with the lessons' hints), loaded when this opens: fillHelpGloss -->
+    <details class="dis" id="hGlossD"><summary>Словарь терминов <span class="mute">· что означает каждая цифра</span></summary><div class="dbody">
+      <div class="gloss" id="hGloss" aria-busy="true"><span class="mute">Загружаю словарь…</span></div>
+      <p class="glall"><a href="#learn/gloss">Весь словарь — с терминами уроков</a></p>
     </div></details>
 
     <details class="dis"><summary>Методика <span class="mute">· для тех, кому интересны формулы</span></summary><div class="dbody doc">
@@ -4818,6 +4824,12 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.126', date:'16 ноября 2026', title:'Учёба: словарь и вопросы', items:[
+    'Добавлен словарь терминов в разделе «Учёба»; справка показывает его основные термины.',
+    'Термины в уроках подчёркнуты: при наведении или нажатии видно объяснение и ссылку в словарь.',
+    'В конце каждого урока появились вопросы «Проверьте себя» с объяснением ответа.',
+    'Быстрый поиск находит уроки и термины словаря.',
+  ]},
   {v:'2.125', date:'16 ноября 2026', title:'Надёжность синхронизации и графиков', items:[
     'Исправлено: при правке одной настройки на двух устройствах сохраняется более поздняя.',
     'Исправлено: график монеты с короткой историей показывает понятную надпись.',
@@ -4870,11 +4882,6 @@ const CHANGELOG = [
   ]},
   {v:'2.115', date:'12 ноября 2026', title:'Позиции бота на паузе', items:[
     'Исправлено: позиции серверного бота на паузе закрываются по стопу, тейку и времени.',
-  ]},
-  {v:'2.114', date:'12 ноября 2026', title:'Понятнее ошибки сервера', items:[
-    'Ошибки сохранения на сервере описаны словами, а не служебным текстом.',
-    'Окно индикаторов закрывается клавишей Esc, а Tab не уходит за его пределы.',
-    'Исправлено: после сбоя сохранение настроек Telegram больше не перестаёт работать.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -5051,8 +5058,18 @@ document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.data
 // The texts are in learn.js (MODULES: {id, title, lead, lessons:[{id, title, min, body, try, check}], soon}), loaded on the first
 // open like changelog.js, so the site's first load doesn't carry them; the version in the address keeps a deploy from serving
 // the old file. Progress: sr_learn = {done:{'test/costs': 'YYYY-MM-DD'}, last:'test/costs'}, written only by «Пройдено»
-let LEARN = null, learnLoad = null, learnPath = '', learnShown = null;
-const loadLearn = () => learnLoad ||= import('./learn.js?v=' + CHANGELOG[0].v).then(m => { LEARN = m.MODULES; }).catch(e => { learnLoad = null; throw e; });
+let LEARN = null, GLOSS = null, learnLoad = null, learnPath = '', learnShown = null;
+const loadLearn = () => learnLoad ||= import('./learn.js?v=' + CHANGELOG[0].v).then(m => { LEARN = m.MODULES; GLOSS = m.GLOSS; }).catch(e => { learnLoad = null; throw e; });
+const glossBy = id => GLOSS?.find(g => g.id === id);
+// «Справка» → «Словарь терминов»: the entries of GLOSS marked help, in their order, filled on the first open
+function fillHelpGloss() {
+  const box = $('#hGloss');
+  if (!$('#hGlossD').open || !box.hasAttribute('aria-busy')) return;
+  box.innerHTML = '<span class="mute">Загружаю словарь…</span>';
+  loadLearn().then(() => { box.removeAttribute('aria-busy'); box.innerHTML = GLOSS.filter(g => g.help).map(g => `<b>${g.t}</b><span>${g.d}</span>`).join(''); },
+    () => { box.innerHTML = '<span class="mute">Не удалось загрузить словарь. Проверьте интернет.</span><span><button id="hGlossR">Повторить</button></span>'; $('#hGlossR').onclick = fillHelpGloss; });
+}
+$('#hGlossD').addEventListener('toggle', fillHelpGloss);
 const learnProg = () => { const v = load('sr_learn', null); return fits('sr_learn', v) ? v : {done:{}}; };
 function learnLesson(path = learnPath) {
   const [mi, li] = path.split('/'), m = LEARN?.find(x => x.id === mi), i = m && li ? m.lessons.findIndex(x => x.id === li) : -1;
@@ -5075,6 +5092,7 @@ function learnList() {
       + (m.lessons.length ? `<ol class="llist">${m.lessons.map((l, j) => row(m, l, j)).join('')}</ol>`
         : `<ul class="llist">${(m.soon || []).map(t => `<li>${t}</li>`).join('')}</ul>`) + '</section>'; };
   return (next && Object.keys(P.done).length ? `<div class="banner info lgo"><svg class="i"><use href="#i-learn"/></svg><div>Продолжить: <a href="#learn/${next.key}">${next.l.title}</a> <span class="mute">· модуль «${next.m.title}»</span></div></div>` : '')
+    + `<nav class="lgl" aria-label="Учёба"><a href="#learn/gloss"><svg class="i"><use href="#i-book"/></svg>Словарь терминов</a></nav>`
     + `<div class="lmods">${ready.map(mod).join('')}${soon.map(mod).join('')}</div>`;
 }
 // «Источники» under a lesson: references from learn.js (our file, not the network's). A plain link to the work's page is a
@@ -5083,6 +5101,60 @@ function learnList() {
 const learnSrc = s => s?.length ? `<section class="lsrc" aria-labelledby="lSrcH"><h3 id="lSrcH">Источники</h3><ol>`
   + s.map(w => `<li>${w.a} (${w.y}). ${w.url ? `<a href="${w.url}" target="_blank" rel="noopener noreferrer">${w.t}<span class="sr"> (откроется в новой вкладке)</span></a>` : w.t}. <i>${w.j}</i>. <span class="lsn">${w.n}</span></li>`).join('')   // a book with no stable page: the title alone
   + '</ol></section>' : '';
+// «Проверьте себя»: the lesson's questions (learn.js CHECKS). The answers come in an order shuffled by the lesson and question
+// (the same every time, so the right one isn't always first); a tap marks the pick, the right answer and shows why. Nothing is stored
+const learnOrder = (seed, n) => { let h = 7; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const o = [...Array(n).keys()]; for (let i = n - 1; i > 0; i--) { h = (Math.imul(h, 1103515245) + 12345) >>> 0; const j = (h >>> 8) % (i + 1); [o[i], o[j]] = [o[j], o[i]]; } return o; };
+const learnCheck = (l, key) => l.check?.length ? `<section class="lchk" aria-labelledby="lChkH"><h3 id="lChkH">Проверьте себя</h3>`
+  + l.check.map((q, qi) => `<fieldset class="lq" data-q="${qi}"><legend>${qi + 1}. ${q.q}</legend><div class="lqa">`
+    + learnOrder(key + '/' + qi, q.a.length).map(ai => `<button type="button" data-a="${ai}" aria-pressed="false">${q.a[ai]}</button>`).join('')
+    + '</div><p class="lqw" aria-live="polite"></p></fieldset>').join('') + '</section>' : '';
+function learnAnswer(b, x) {
+  const fs = b.closest('.lq'), q = x.l.check[+fs.dataset.q], a = +b.dataset.a, ok = a === q.ok;
+  fs.querySelectorAll('[data-a]').forEach(y => { const i = +y.dataset.a; y.setAttribute('aria-pressed', String(i === a)); y.classList.toggle('ok', i === q.ok); y.classList.toggle('no', i === a && !ok); });
+  fs.querySelector('.lqw').innerHTML = `<b>${ok ? 'Верно.' : 'Не совсем.'}</b> ${ok ? '' : `Правильный ответ — «${q.a[q.ok]}». `}${q.why}`;
+}
+// «Словарь» (#learn/gloss, #learn/gloss/<term>): every term of GLOSS by the alphabet, a filter, the lessons that use it
+function learnGloss() {
+  const uses = {};
+  for (const m of LEARN) for (const l of m.lessons) for (const t of new Set([...l.body.matchAll(/data-term="([^"]+)"/g)].map(r => r[1]))) (uses[t] ||= []).push(`<a href="#learn/${m.id}/${l.id}">${l.title}</a>`);
+  const list = [...GLOSS].sort((a, b) => a.t.localeCompare(b.t, 'ru'));
+  return `<nav class="lgl" aria-label="Учёба"><a href="#learn"><svg class="i"><use href="#i-back"/></svg>Все модули</a></nav>`
+    + `<article class="panel doc lgpage"><h2 id="lTitle" tabindex="-1">Словарь</h2><p class="mute">Термины уроков и сайта простыми словами. В уроках термин подчёркнут пунктиром: наведите или нажмите, чтобы увидеть объяснение.</p>`
+    + `<input type="search" id="lgq" class="lgq" placeholder="Найти термин" aria-label="Найти термин" autocomplete="off">`
+    + `<dl class="gdl">${list.map(g => `<div id="g-${g.id}" tabindex="-1" data-s="${[g.t, g.d, ...(g.kw || [])].join(' ').toLowerCase()}"><dt>${g.t}</dt><dd>${g.d}`
+      + (uses[g.id] ? `<span class="gu">В уроках: ${uses[g.id].join(', ')}</span>` : '') + '</dd></div>').join('')}</dl>`
+    + '<p class="mute" id="lgnone" hidden>Такого термина нет. Попробуйте другое слово или быстрый поиск (Ctrl K).</p></article>';
+}
+// a term in a lesson: a hint right after it (so Tab goes from the term to the hint's link) — on hover with a mouse, on a tap
+// or Enter / Space; one at a time, Esc or a tap elsewhere closes it. Placed under the term, kept inside the screen
+let tipFor = null, tipTimer = 0;
+function tipHide(back) {
+  clearTimeout(tipTimer); if (!tipFor) return;
+  const d = tipFor; tipFor = null; d.setAttribute('aria-expanded', 'false');
+  const t = $('#lTip'); if (t) { t.classList.remove('open'); t.removeAttribute('id'); setTimeout(() => t.remove(), 160); }
+  if (back) d.focus();
+}
+function tipShow(d) {
+  clearTimeout(tipTimer); if (tipFor === d) return;
+  const g = glossBy(d.dataset.term); if (!g) return;
+  tipHide(); tipFor = d; d.setAttribute('aria-expanded', 'true');
+  const t = document.createElement('span'); t.id = 'lTip'; t.className = 'ltip'; t.setAttribute('role', 'note');
+  t.innerHTML = `<b>${g.t}</b><span>${g.d}</span><a href="#learn/gloss/${g.id}"><svg class="i" aria-hidden="true"><use href="#i-book"/></svg>В словарь</a>`;
+  d.after(t);
+  // the wanted place on screen, then the shift from where the hint landed (its containing block may be a list item or a table)
+  const rs = d.getClientRects(), r = rs[rs.length - 1], w = t.offsetWidth, h = t.offsetHeight, W = document.documentElement.clientWidth;
+  const bot = r.bottom - 3, top = rs[0].top + 3;   // the term's box has 9 px of tap padding: a 6 px gap from the text itself
+  const x = Math.max(8, Math.min(r.left, W - 8 - w)), y = bot + h <= innerHeight || top - h < 0 ? bot : top - h;
+  t.style.left = t.style.top = '0px';
+  const o = t.getBoundingClientRect(); t.style.left = (x - o.left) + 'px'; t.style.top = (y - o.top) + 'px';
+  void t.offsetWidth; t.classList.add('open');   // the start state is laid out, so the fade-in runs (no rAF: a hidden tab stops it)
+}
+const tipLater = fn => { clearTimeout(tipTimer); tipTimer = setTimeout(fn, 200); };
+function learnTerms(box) {
+  box.querySelectorAll('.lart dfn[data-term]').forEach(d => { if (!glossBy(d.dataset.term)) return;
+    d.tabIndex = 0; d.setAttribute('role', 'button'); d.setAttribute('aria-expanded', 'false'); d.setAttribute('aria-label', d.textContent + ' — что это'); });
+}
 function learnPage(x) {
   const {m, l, i, key} = x, P = learnProg(), n = LEARN.indexOf(m) + 1, done = P.done[key], nx = m.lessons[i + 1];
   const toc = m.lessons.map((y, j) => { const k = m.id + '/' + y.id;
@@ -5090,12 +5162,12 @@ function learnPage(x) {
   const tries = (l.try || []).map((t, j) => `<div><button data-ltry="${j}"${t.primary ? ' class="primary"' : ''}><svg class="i"><use href="#i-play"/></svg>${t.label}</button>${t.note ? `<span class="mute">${t.note}</span>` : ''}</div>`).join('');
   // a phone: the module's list folds at the top; wider: it stands beside the lesson, always open
   return `<div class="lgrid"><nav class="ltoc" aria-label="Уроки модуля"><details${isPhone() ? '' : ' open'}><summary>Модуль ${n} · ${m.title} <span class="lprog">${learnDoneN(m, P)} из ${m.lessons.length}</span></summary>`
-    + `<ol>${toc}</ol><a class="lall" href="#learn"><svg class="i"><use href="#i-back"/></svg>Все модули</a></details></nav>`
+    + `<ol>${toc}</ol><a class="lall" href="#learn"><svg class="i"><use href="#i-back"/></svg>Все модули</a><a class="lall" href="#learn/gloss"><svg class="i"><use href="#i-book"/></svg>Словарь</a></details></nav>`
     + `<article class="panel doc lart"><div class="lmeta faint">Модуль ${n} · урок ${i + 1} из ${m.lessons.length} · ${learnMin(l.min)}</div>`
     + `<h2 id="lTitle" tabindex="-1">${l.title}</h2>`
     + (l.key?.length ? `<aside class="lkey" aria-labelledby="lKeyH"><h3 id="lKeyH">Главное</h3><ul>${l.key.map(k => `<li>${k}</li>`).join('')}</ul></aside>` : '') + l.body
     + (tries ? `<div class="ltry"><h3>Проверьте сами</h3>${l.tryLead ? `<p>${l.tryLead}</p>` : ''}<div class="lta">${tries}</div></div>` : '')
-    + learnSrc(l.src)
+    + learnCheck(l, key) + learnSrc(l.src)
     + `<div class="lend"><button id="lDone" aria-pressed="${!!done}" title="${done ? `Отмечено ${fmtDay(Date.parse(done))}. Нажмите, чтобы снять отметку` : 'Отметка сохраняется в профиле'}">${done ? '<svg class="i"><use href="#i-check"/></svg>Пройдено' : 'Отметить пройденным'}</button>`
     + (nx ? `<a class="lnext" href="#learn/${m.id}/${nx.id}">Дальше: <b>${nx.title}</b></a>` : `<a class="lnext" href="#learn">Все модули</a>`) + '</div></article></div>';
 }
@@ -5111,13 +5183,21 @@ function renderLearn() {
     });
     return;
   }
-  let x = learnLesson();
-  if (learnPath && !x) { learnPath = ''; setHash(); }   // a lesson that isn't (or no longer is) there, or a module alone: the list
-  box.innerHTML = x ? learnPage(x) : learnList();
+  tipHide();
+  const gl = /^gloss(\/|$)/.test(learnPath);
+  let x = gl ? null : learnLesson();
+  if (learnPath && !x && !gl) { learnPath = ''; setHash(); }   // a lesson that isn't (or no longer is) there, or a module alone: the list
+  box.innerHTML = gl ? learnGloss() : x ? learnPage(x) : learnList();
+  learnTerms(box);
   setTitle();
-  // a new lesson opened from a link inside the page: the keyboard goes on from its title, not from the top of the document
-  if (learnShown != null && learnShown !== learnPath && x) $('#lTitle').focus({preventScroll:true});
+  // a new lesson opened from a link inside the page: the keyboard goes on from its title, not from the top of the document;
+  // a term of the dictionary (#learn/gloss/<id>, from a hint or the search): scrolled to, focused and flashed
+  const term = gl && learnPath.split('/')[1], te = term && $('#g-' + term);
+  if (te) setTimeout(() => { te.scrollIntoView({block:'center'}); te.focus({preventScroll:true}); te.classList.remove('flash'); void te.offsetWidth; te.classList.add('flash'); }, 50);
+  else if (learnShown != null && learnShown !== learnPath && (x || gl)) $('#lTitle').focus({preventScroll:true});
   learnShown = learnPath;
+  if (gl) $('#lgq').oninput = e => { const q = e.target.value.trim().toLowerCase(); let n = 0;
+    box.querySelectorAll('.gdl>div').forEach(d => { const on = !q || d.dataset.s.includes(q); d.hidden = !on; n += on; }); $('#lgnone').hidden = n > 0; };
 }
 $('#learnBody').addEventListener('click', e => {
   const x = learnLesson();
@@ -5130,7 +5210,24 @@ $('#learnBody').addEventListener('click', e => {
   }
   const b = e.target.closest('[data-ltry]');
   if (b && x) learnTry(x.l.try[+b.dataset.ltry], x);
+  const qa = e.target.closest('.lq [data-a]');
+  if (qa && x) learnAnswer(qa, x);
+  const d = e.target.closest('dfn[aria-expanded]');
+  if (d) { if (tipFor === d && !hoverable.matches) tipHide(); else tipShow(d); }   // a mouse closes it by leaving, Esc or a click elsewhere
 });
+// the terms' hints: a mouse shows one on hover (and keeps it while the pointer is on the hint); keys and taps toggle it
+const learnBox = $('#learnBody'), hoverable = matchMedia('(hover:hover)');
+learnBox.addEventListener('mouseover', e => { if (!hoverable.matches) return;
+  const d = e.target.closest('dfn[aria-expanded]'); if (d) tipLater(() => tipShow(d)); else if (e.target.closest('#lTip')) clearTimeout(tipTimer); });
+learnBox.addEventListener('mouseout', e => { if (!hoverable.matches || !tipFor) return;
+  if (e.target.closest('dfn[aria-expanded], #lTip') && !e.relatedTarget?.closest?.('#lTip, dfn[aria-expanded=true]')) tipLater(() => tipHide()); });
+learnBox.addEventListener('keydown', e => {
+  const d = e.target.closest('dfn[aria-expanded]');
+  if (d && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (tipFor === d) tipHide(); else tipShow(d); }
+  if (e.key === 'Escape' && tipFor) { e.stopPropagation(); tipHide(true); }
+});
+learnBox.addEventListener('focusout', e => { if (tipFor && !e.relatedTarget?.closest?.('#lTip, dfn[aria-expanded=true]') && e.relatedTarget) tipHide(); });
+document.addEventListener('click', e => { if (tipFor && !e.target.closest('dfn[aria-expanded], #lTip')) tipHide(); });
 // «Проверьте сами» → the backtest form filled as the lesson says, then a run (as btFromProf + «Запустить»). Every field the
 // lesson doesn't name is reset to the rules of PROFILE_DEF, so the run doesn't depend on what was in the form; the form is not
 // saved anywhere, so the person's own settings (profiles, the bot) are untouched
@@ -5198,7 +5295,7 @@ function go(t, push = true) {
 // the browser tab says where it is — «PLUME · Sigma Radar», «Журнал · Sigma Radar» — so several open tabs can be told apart
 const PAGE_TITLE = {journal:'Журнал', backtest:'Бэктест', learn:'Учёба', help:'Как это работает', changes:'Что нового', legal:'Правовая информация', gate:'Вход'};
 function setTitle() {
-  const sub = page === 'market' ? base(chartSym) : page === 'learn' ? learnLesson()?.l.title || PAGE_TITLE.learn : PAGE_TITLE[page];
+  const sub = page === 'market' ? base(chartSym) : page === 'learn' ? learnLesson()?.l.title || (/^gloss/.test(learnPath) ? 'Словарь' : PAGE_TITLE.learn) : PAGE_TITLE[page];
   document.title = sub ? sub + ' · Sigma Radar' : 'Sigma Radar';
 }
 // push: a change of section is a step «Назад» returns from (before 2.96 «Назад» left the site); a new coin and the rest
@@ -5831,7 +5928,8 @@ const CMD_PAGES = [
   {label:'Мой бот', hint:'профили и журнал', kw:['мой', 'бот', 'my', 'bot', 'личн'], run:openMine},
   {label:'Бэктест', hint:'проверка на истории', kw:['бэктест', 'backtest', 'история', 'тест'], run:() => go('backtest')},
   {label:'Учёба', hint:'как проверить идею, не обманывая себя', kw:['учёба', 'учеба', 'урок', 'обучен', 'learn', 'курс', 'теори'], run:() => { learnPath = ''; go('learn'); }},
-  {label:'Как это работает', hint:'справка и словарь', kw:['справка', 'help', 'словарь', 'термин', 'помощь'], run:() => go('help')},
+  {label:'Словарь', hint:'термины уроков и сайта', kw:['словарь', 'термин', 'glossary', 'что значит'], run:() => { learnPath = 'gloss'; go('learn'); }},
+  {label:'Как это работает', hint:'справка', kw:['справка', 'help', 'помощь'], run:() => go('help')},
   {label:'Что нового', hint:'обновления сайта', kw:['новое', 'обновлен', 'changelog', 'версия'], run:() => go('changes')},
   {label:'Правовая информация', hint:'условия, данные, контакты', kw:['правов', 'условия', 'конфиденц', 'privacy', 'terms', 'данные', 'cookie', 'контакт', 'владел'], run:() => go('legal')},
 ];
@@ -5888,6 +5986,14 @@ function cmdBuild(raw) {
   const pr = BP.profiles.filter(p => hit(p.name, ['профиль', 'profile'])).map(p => ({id:'p:' + p.id, label:`Профиль «${p.name}»`,
     hint:p.id === activeProfile().id ? 'сейчас выбран' : 'торговать по нему', run:() => { openMine(); pickProfile(p.id); }}));
   if (pr.length) groups.push(['Профили', pr]);
+  // «Учёба»: lessons by title, terms by title and their words (learn.js — loaded by the first query, cmdRender draws again)
+  if (LEARN && q.length >= 2) {
+    const ls = LEARN.flatMap(m => m.lessons.filter(l => hit(l.title)).map(l => ({id:`l:${m.id}/${l.id}`, label:l.title, hint:`урок · ${m.title}`,
+      run:() => { learnPath = m.id + '/' + l.id; go('learn'); }}))).slice(0, 6);
+    if (ls.length) groups.push(['Уроки', ls]);
+    const gs = GLOSS.filter(g => hit(g.t, g.kw)).map(g => ({id:'t:' + g.id, label:g.t, hint:'словарь', run:() => { learnPath = 'gloss/' + g.id; go('learn'); }})).slice(0, 6);
+    if (gs.length) groups.push(['Словарь', gs]);
+  }
   // nothing matched: maybe a coin outside the scanner's list — offer to open its chart
   const sym = qs.find(x => /^[a-z0-9]{2,12}$/.test(x));
   if (!groups.length && sym) { const s = sym.toUpperCase() + 'USDT';
@@ -5913,7 +6019,9 @@ $('#cmdx').onclick = cmdClose;
 function cmdRun(i) { const it = cmdItems[i]; if (!it) return; cmdClose(); if (/^[cg]:/.test(it.id)) recentAdd(it.id); it.run(); }
 $('#cmdbtn').onclick = cmdOpen;
 if (/Mac|iPhone|iPad/.test(navigator.platform)) $('#cmdbtn').title = $('#cmdbtn').title.replace('Ctrl K', '⌘K');
-$('#cmdq').oninput = () => { cmdIdx = 0; cmdRender(); };
+$('#cmdq').oninput = () => { cmdIdx = 0; cmdRender();
+  // the lessons and the dictionary join the results once learn.js is here: loaded by the first word typed, not by the site's start
+  if (!LEARN && $('#cmdq').value.trim().length >= 2) loadLearn().then(() => { if (!$('#cmdk').classList.contains('hidden')) cmdRender(); }, () => {}); };
 $('#cmdq').onkeydown = e => {
   if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && cmdItems.length) { e.preventDefault(); cmdIdx = (cmdIdx + (e.key === 'ArrowDown' ? 1 : -1) + cmdItems.length) % cmdItems.length; cmdRender(); }
   if (e.key === 'Tab') e.preventDefault();   // focus stays in the dialog: arrows move, Enter opens

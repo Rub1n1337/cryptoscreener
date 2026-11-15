@@ -1,6 +1,11 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.114', date:'12 ноября 2026', title:'Понятнее ошибки сервера', items:[
+    'Ошибки сохранения на сервере описаны словами, а не служебным текстом.',
+    'Окно индикаторов закрывается клавишей Esc, а Tab не уходит за его пределы.',
+    'Исправлено: после сбоя сохранение настроек Telegram больше не перестаёт работать.',
+  ]},
   {v:'2.113', date:'12 ноября 2026', title:'Бэктест: оценка и история', items:[
     'Бэктест заранее предупреждает, если прогон, скорее всего, не поместится в память вкладки.',
     'Оценка времени бэктеста учитывает сохранённую историю, даже если первая попытка её загрузить не удалась.',
