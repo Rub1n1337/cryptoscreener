@@ -47,7 +47,7 @@
   --ease:cubic-bezier(.2,.8,.2,1);--dur-1:160ms;--dur-2:240ms;--dur-3:500ms;
   --shadow:0 10px 30px rgba(0,0,0,.35);
   --on-acc:#1a1300;   /* text on gold: the same dark in both themes */
-  --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#16a34a;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags, server cells, focus ring */
+  --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#15803d;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags (white text ≥ 4.5:1), server cells, focus ring */
   /* how strong the glass is: every light and every see-through below is multiplied by this one number, set per device in
      the profile (data-glass on <html>, the rules right after the light theme): 0 no glass, .35 quiet, .7 soft (default), 1 full, 1.5 bright */
   --g:.7;
@@ -185,6 +185,8 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 /* wide mode: the chart takes the whole row, the coin list goes under it */
 body.wide #market .grid{grid-template-columns:minmax(0,1fr)}body.wide #cv{height:min(74vh,820px)}
 .grid>*{min-width:0}
+/* two columns: the coin list stays in view while the signal breakdown under the chart scrolls; the list fits the screen height */
+@media(min-width:1201px){body:not(.wide) #market .tpanel{position:sticky;top:72px}body:not(.wide) #market .tpanel .tablewrap{max-height:min(660px,calc(100vh - 210px))}body:not(.wide) #market #mtable.more{max-height:min(660px,calc(100vh - 290px))}}   /* 72 = header 59 + gap; open filters (#morebar) take ~80 px more */
 .panel{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:16px}
 .ptitle{font-weight:650;font-size:14px;margin-bottom:10px}.ptitle span{font-weight:400;font-size:12px;color:var(--mute)}
 
@@ -192,10 +194,10 @@ body.wide #market .grid{grid-template-columns:minmax(0,1fr)}body.wide #cv{height
 button,select,input{font:inherit;color:var(--text)}
 button,select,input:not([type=checkbox]):not([type=range]){height:var(--h);background:var(--s2);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 12px}
 button{cursor:pointer;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
-button:hover{background:var(--s3);border-color:var(--hover)}
-button:disabled{opacity:.5;cursor:wait}
+button:where(:not(:disabled)):hover{background:var(--s3);border-color:var(--hover)}   /* :where keeps the old weight: class :hover rules still win */
+button:disabled{opacity:.5;cursor:not-allowed}   /* «can't now»; a running request shows its own spinner (.busy), not the cursor */
 button.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc);font-weight:650}
-button.primary:hover{background:var(--acc-h);border-color:var(--acc-h)}
+button.primary:where(:not(:disabled)):hover{background:var(--acc-h);border-color:var(--acc-h)}
 button.icon{width:var(--h);padding:0;color:var(--mute)}button.icon.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
 input:not([type=checkbox]):not([type=range]):focus,select:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 input::placeholder{color:var(--faint)}
@@ -934,7 +936,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .er-note{color:var(--mute);font-size:11.5px}.bh-why .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.bh-why button{height:34px;font-size:13px}
 /* shared profile banner */
 .pimp{display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap;padding:14px 16px;margin-bottom:12px;border-radius:var(--r);border:1px solid var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
-.pimp>div{flex:1 1 320px;min-width:0}.pimp p{margin:3px 0 0;font-size:13px;color:var(--mute)}
+.pimp.off{display:none}.pimp>div{flex:1 1 320px;min-width:0}.pimp p{margin:3px 0 0;font-size:13px;color:var(--mute)}
 /* quick jump (Ctrl+K) */
 .cmdk{position:fixed;inset:0;z-index:80;background:var(--backdrop);display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px}
 .cmdbox{width:min(620px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:var(--r-l);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
@@ -1562,11 +1564,14 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
       <button class="tab jm" data-m="shared" title="Один бот на сервере для всех посетителей. Работает круглосуточно, даже когда сайт никто не открывал">Общий бот 24/7</button>
       <button class="tab jm" data-m="mine" title="Ваш личный бот: торгует по вашим профилям на виртуальные деньги">Мой бот</button>
     </div>
+    <!-- the answer first: the no-edge warning (shared bot), then the balance; the description, profile and server below it -->
+    <div id="jwarn"></div>
+    <div class="pimp hidden" id="pimp"></div>
+    <div id="jcards"></div>
     <div class="sub" id="jdesc"></div>
     <div id="srv"></div>
     <div class="panel" id="jmine" style="margin-bottom:12px">
-      <!-- 1. what the bot is doing right now, in plain words, with one main action -->
-      <div class="pimp hidden" id="pimp"></div>
+      <!-- 1. what the bot is doing right now, in plain words, with one main action (a shared profile's offer #pimp is above the balance) -->
       <div class="bhero" id="bhero"></div>
       <div class="btg" id="btg"></div>
       <!-- 2. which rules it trades by -->
@@ -1617,7 +1622,6 @@ h1,h2,h3,h4,.card .v{letter-spacing:0}
         <div class="row pfbar" id="pfBar" style="margin-top:12px"><span class="pfbt" id="pfBarT"></span><button id="pfSave" class="primary">Сохранить профиль</button><button id="pfCancel">Отмена</button></div>
       </div>
     </div>
-    <div id="jcards"></div>
     <div class="panel" style="margin-bottom:12px"><div class="ptitle jot">Открытые позиции <span>· клик — карточка позиции</span><button id="jcloseAll" class="hidden" title="Закрыть все позиции вашего бота по рынку">Закрыть все</button></div>
       <div class="tablewrap"><table><thead><tr>
         <th>Открыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Сейчас</th><th class="hm" title="Сумма позиции в долларах">Размер</th><th class="hm">Тейк</th><th class="hm">Стоп</th>
@@ -2820,6 +2824,9 @@ function computeChart() {
 // my bot's positions live in the browser or, in server mode, in the server journal
 const myOpen = () => BP.where === 'server' ? (SB_MINE?.open || []) : J.open;
 const botPositions = () => [...(SJ?.open || []).map(p => ({p, who:'общий'})), ...myOpen().map(p => ({p, who:'мой'}))];
+// an open position's result at the last price, after the entry and exit fee (the journal's «PnL сейчас» and the close dialog)
+function openPnl(p) { const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry;
+  return {u:sg * (last - p.entry) * p.qty - (p.entry + last) * p.qty * M.FEE, risk:p.risk || Math.abs(p.entry - p.sl) * p.qty}; }
 // by default show as many candles as fit as real candles (≈5 px each), within the history the user loads
 // room for the toolbar over the top-left of the canvas; on phones the toolbar sits above the canvas instead
 const chartTop = () => matchMedia('(max-width:700px)').matches ? 8 : 44;
@@ -4203,16 +4210,17 @@ function renderJournal() { const r = keepFocus(renderJournalNow); eqRestore('j')
 function renderJournalNow() {
   document.querySelectorAll('.jm').forEach(b => b.classList.toggle('on', b.dataset.m === jMode));
   $('#jmine').classList.toggle('hidden', jMode !== 'mine');
+  $('#pimp').classList.toggle('off', jMode !== 'mine');   // a shared profile's offer is for «Мой бот» (.hidden stays its own: shown / answered)
   renderServer();
   const D = journalData(), shared = jMode === 'shared';
   const slots = M.slotsOf(shared ? SJ?.settings : profSet(activeProfile()));   // how many positions this bot may hold at once
-  if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
+  if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jwarn', '#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
   const st = M.journalStats(baseOf(D), D.closed), set = shared ? SJ.settings : S;
-  $('#jdesc').innerHTML = shared
-    ? (sharedNoEdge() ? `<div class="banner warn noedge"><svg class="i"><use href="#i-warn"/></svg><div><b>У правил общего бота не найдено преимущества.</b>
+  $('#jwarn').innerHTML = shared && sharedNoEdge() ? `<div class="banner warn noedge"><svg class="i"><use href="#i-warn"/></svg><div><b>У правил общего бота не найдено преимущества.</b>
         На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет: <span class="term" title="R — риск одной сделки: сумма, которую она теряет, если сработал стоп. −0.42R на сделку — в среднем каждая сделка теряла почти половину этой суммы">−0.42R, −0.40R и −0.30R на сделку</span>.
-        Общий бот показывает, как работает бот, а не стратегию, по которой стоит торговать. Проверить самому — кнопка «Проверить в бэктесте» ниже.</div></div>` : '')
-    + `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
+        Общий бот показывает, как работает бот, а не стратегию, по которой стоит торговать. Проверить самому — кнопка «Проверить в бэктесте» ниже.</div></div>` : '';
+  $('#jdesc').innerHTML = shared
+    ? `Один бот для всех — торгует на сервере круглосуточно, даже когда сайт закрыт. ${liveTag(SJ.checked, 5 * 60e3, 'проверка рынка')}
       <div class="sprof"><div style="min-width:0;flex:1"><span class="faint">Профиль общего бота</span><div class="pplain">${profPlain(sharedProf())}</div><div class="ptech">${profSummary(sharedProf())}</div></div>
         <div class="sprof-a">${tgBot ? `<button id="jSharedTg" title="Входы и выходы общего бота — сообщениями в Telegram">Получать в Telegram</button>` : ''}<button id="jSharedBt" title="Перенести правила общего бота в бэктест и проверить их на истории">Проверить в бэктесте</button></div></div>${sharedIdle()}`
     : `Ваш личный бот на виртуальные $${Math.round(D.start || 10000).toLocaleString('ru')}: торгует по вашим профилям, журнал видите только вы.`;
@@ -4253,8 +4261,7 @@ function renderJournalNow() {
   countUp($('#jcards .hv'), lastBal[jMode], D.balance, v => '$' + money(v)); lastBal[jMode] = D.balance;
   const now = Date.now();
   $('#jopen').innerHTML = D.open.map(p => {
-    const sg = p.side === 'LONG' ? 1 : -1, last = p.last ?? p.entry;
-    const u = sg * (last - p.entry) * p.qty - (p.entry + last) * p.qty * M.FEE, risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
+    const last = p.last ?? p.entry, {u, risk} = openPnl(p);
     return `<tr tabindex="0" class="row" data-kind="open" data-id="${p.id}" title="Открыть карточку позиции"><td>${dt(p.time)} <span class="faint">${dur(now - p.time)}</span></td><td>${coin(p.sym)}</td>
       <td class="${p.side === 'LONG' ? 'pos' : 'neg'}">${p.side}</td><td>${fp(p.entry)}</td><td>${fp(last)}</td><td class="hm">$${(p.qty * p.entry).toFixed(0)}</td><td class="hm">${fp(p.tp)}</td><td class="hm">${fp(p.sl)}</td>
       <td class="${cl(u)}">${usd(u)}</td><td class="${cl(u)}">${rr(risk ? u / risk : null)}</td><td>${scoreOf(p)}</td>
@@ -4824,6 +4831,13 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.127', date:'16 ноября 2026', title:'Журнал и таблица удобнее', items:[
+    'Баланс бота в «Журнале» стал виден сразу, без прокрутки.',
+    'Список монет на компьютере остаётся на экране, пока читаете разбор сигнала.',
+    'Окно закрытия позиции показывает, с каким результатом она закроется.',
+    'Метка LONG стала контрастнее.',
+    'Недоступные кнопки больше не похожи на загрузку.',
+  ]},
   {v:'2.126', date:'16 ноября 2026', title:'Учёба: словарь и вопросы', items:[
     'Добавлен словарь терминов в разделе «Учёба»; справка показывает его основные термины.',
     'Термины в уроках подчёркнуты: при наведении или нажатии видно объяснение и ссылку в словарь.',
@@ -4879,9 +4893,6 @@ const CHANGELOG = [
   ]},
   {v:'2.116', date:'12 ноября 2026', title:'Журнал бота в браузере', items:[
     'Журнал бота в браузере хранит последние 3000 сделок; баланс и итог за всё время учитывают все.',
-  ]},
-  {v:'2.115', date:'12 ноября 2026', title:'Позиции бота на паузе', items:[
-    'Исправлено: позиции серверного бота на паузе закрываются по стопу, тейку и времени.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
@@ -4990,7 +5001,11 @@ $('#tb').onclick = e => {
 async function closeMine(id) {
   const open = myOpen().filter(p => !p.closeReq && (id == null || p.id === id)); if (!open.length) return;
   const what = id == null ? `все ${open.length} ${plural(open.length, ['позицию', 'позиции', 'позиций'])}` : `${open[0].side} ${pair(open[0].sym)}`;
-  if (!(await ask({title:`Закрыть ${what}?`, text:'По текущей цене рынка, с обычной комиссией. Бот не будет входить в эту монету, пока не пройдёт пауза после сделки.', ok:'Закрыть', danger:true}))) return;
+  // the receipt: what closing locks in, the same estimate as the «PnL сейчас» column
+  const est = open.reduce((a, p) => { const {u, risk} = openPnl(p); return {u:a.u + u, risk:a.risk + risk}; }, {u:0, risk:0});
+  const at = id == null ? '' : ` по цене ${fp(open[0].last ?? open[0].entry)}`;
+  const text = `Сейчас это ≈ ${usd(est.u)}${est.risk && id != null ? ` (${rr(est.u / est.risk)})` : ''} после комиссии${at}; итог — по цене в момент закрытия и с проскальзыванием. Бот не будет входить в ${id == null ? 'эти монеты' : 'эту монету'}, пока не пройдёт пауза после сделки.`;
+  if (!(await ask({title:`Закрыть ${what}?`, text, ok:'Закрыть', danger:true}))) return;
   if (BP.where === 'server' && UB) {
     try { await rpc('ub_close', ubArgs({p_pos:id})); }
     catch (e) { const m = String(e.message || e); toast('Не удалось закрыть', rpcIs(e, /ub_close|PGRST202|Could not find/) ? 'Закрытие позиций на сервере ещё не включено — скоро заработает. В браузерном режиме уже работает.' : m, 'bad'); return; }
