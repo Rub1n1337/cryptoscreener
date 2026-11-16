@@ -226,6 +226,19 @@ kbd{font:11px/1 var(--mono);color:var(--faint);border:1px solid var(--line2);bor
    on its outer edge, so any number of rows and a half-empty last row work */
 .cards,.statrow{gap:0;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
 .cards>.card,.statrow>.card{background:transparent;border:0;border-radius:0;box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line)}
+/* the market radar in the first card (DESIGN-RULES п. 71): only where the card is wide enough, else the meter stays */
+.radar{display:none}
+@media(min-width:1100px){
+  .cards>.card:first-child{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:center}
+  .cards>.card:first-child>:not(.radar){grid-column:1}
+  .cards>.card:first-child .meter{display:none}
+  .radar{display:block;grid-column:2;grid-row:1/span 4;width:96px;height:96px;overflow:visible}
+  .radar .rd-ring{fill:none;stroke:var(--line);stroke-width:.6}
+  .radar .rd-band{fill:var(--s2);stroke:var(--c-grid);stroke-width:.6;stroke-dasharray:1.5 2.5}
+  .radar .rd-mid{fill:var(--mid)}.radar .rd-lo{fill:var(--lo)}.radar .rd-hi{fill:var(--up)}
+  .radar .rd-sig{stroke:var(--acc);stroke-width:1.2;paint-order:stroke}
+  .radar circle[data-sym]{cursor:pointer}.radar circle[data-sym]:hover{stroke:var(--text);stroke-width:1}
+}
 .meter{height:4px;background:var(--s3);border-radius:2px;margin-top:10px}.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--lo),var(--acc),var(--up));border-radius:2px}
 [title]{cursor:help}button[title],select[title],input[title],tr[title],label[title]{cursor:pointer}
 .stats{font-size:13px;color:var(--mute);line-height:1.7}.stats b{color:var(--text);font-weight:600}
@@ -677,6 +690,9 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 @keyframes sheetin{from{transform:translateY(24px);opacity:0}}
 @keyframes rowflash{0%,30%{background:var(--accbg)}100%{background:transparent}}
 section:not(.hidden){animation:pagein var(--dur-2) var(--ease)}
+/* a section's first opening: its blocks one after another (DESIGN-RULES п. 70); the reduced-motion rule below stops it too */
+section.enter:not(.hidden){animation:none}
+section.enter>*{animation:pagein var(--dur-2) var(--ease) backwards;animation-delay:calc(var(--i,0) * 60ms)}
 .modal:not(.hidden),.cmdk:not(.hidden){animation:fadein var(--dur-1) var(--ease)}
 .modal:not(.hidden) .mbox,.cmdk:not(.hidden) .cmdbox,.cmdk:not(.hidden) .dlgbox{animation:popin var(--dur-2) var(--ease)}
 .evp.open,.guard.open{animation:popin var(--dur-2) var(--ease)}
@@ -998,6 +1014,11 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 /* the balance chart's pointer: a line, a dot on the balance, a note (see eqShow); the drawdown band's size */
 .hcross{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:var(--c-cross);pointer-events:none}   /* not .hx: that marks the market table's extra columns */
 .hdot{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;box-shadow:0 0 0 4px var(--ring);pointer-events:none}
+/* the tactile chart (DESIGN-RULES п. 69): the point glows in its own colour (currentColor = the line's), what lies after it
+   dims under a veil of the card's own surface; no animation — it follows the pointer frame by frame */
+.hdot{box-shadow:0 0 0 3px var(--ring),0 0 14px 3px currentColor}
+.hdim{position:absolute;top:-2px;bottom:-2px;right:-2px;background:var(--s1);opacity:.62;pointer-events:none}
+.hv.peek{color:var(--text)}
 .htip{position:absolute;top:0;z-index:2;padding:7px 10px;background:var(--c-tip);border:1px solid var(--line2);border-radius:var(--r);box-shadow:var(--shadow);font-size:12px;line-height:1.5;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
 .htip b{font-size:14px}
 .hdd{position:absolute;font-size:11px;white-space:nowrap;pointer-events:none}

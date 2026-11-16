@@ -207,7 +207,7 @@
       <button id="introOk" class="primary">Понятно</button>
     </div>
     <div class="cards wait" id="cards">
-      <div class="card" title="Где сейчас рынок в целом: 50% — монеты в середине своих обычных диапазонов, ближе к 0% — у нижних границ, ближе к 100% — у верхних."><div class="t">Настроение рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s"></div><div class="meter"><i id="c1m" style="width:0"></i></div></div>
+      <div class="card" title="Где сейчас рынок в целом: 50% — монеты в середине своих обычных диапазонов, ближе к 0% — у нижних границ, ближе к 100% — у верхних."><div class="t">Настроение рынка</div><div class="v" id="c1">—</div><div class="s" id="c1s"></div><div class="meter"><i id="c1m" style="width:0"></i></div><svg class="radar" id="c1r" viewBox="0 0 100 100" role="img" aria-label="Радар рынка"></svg></div>
       <div class="card" data-cf="lo" role="button" tabindex="0" title="Монеты у нижней границы своего диапазона или ниже — возможен отскок вверх. Нажмите, чтобы показать их."><div class="t" data-s="Дешевле">Дешевле обычного</div><div class="v" id="c2">—</div><div class="s" id="c2s"></div></div>
       <div class="card" data-cf="hi" role="button" tabindex="0" title="Монеты у верхней границы своего диапазона или выше — возможен откат вниз. Нажмите, чтобы показать их."><div class="t" data-s="Дороже">Дороже обычного</div><div class="v" id="c3">—</div><div class="s" id="c3s"></div></div>
       <div class="card" data-cf="sig" role="button" tabindex="0" title="Подтверждённые развороты: цена вышла за границу, вернулась, и это подтвердил объём. Нажмите, чтобы показать их."><div class="t">Сигналы</div><div class="v" id="c4">—</div><div class="s" id="c4s"></div></div>
@@ -1036,6 +1036,20 @@ function tickFoot() {
   $('#foot').textContent = footBase + (lastScan ? ` · следующее обновление через ${left} с` : '');
 }
 
+// the market radar (DESIGN-RULES п. 71): a dot per coin. The centre is its usual price, the dashed ring its channel's band,
+// beyond it «за границей»; left half cheaper than usual, right half dearer. Colour only at the edges (п. 65); a gold ring —
+// a signal the bot would take. The angle comes from the ticker, so a coin keeps its place between scans. A click opens it
+function radarSvg(list) {
+  const ang = s => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) % 997; return (h / 997 - 0.5) * Math.PI * 0.9; };
+  const dots = list.map(r => {
+    const pB = clamp(r.pB, -0.3, 1.3), side = pB < 0.5 ? -1 : 1, d = Math.min(1.33, Math.abs(pB - 0.5) * 2) * 36, a = ang(r.sym);
+    const x = 50 + side * Math.cos(a) * d, y = 50 + Math.sin(a) * d, edge = pB < 0.1 || pB > 0.9;
+    const sig = r.rev && r.score >= S.minScore;
+    return `<circle class="${pB < 0.1 ? 'rd-lo' : pB > 0.9 ? 'rd-hi' : 'rd-mid'}${sig ? ' rd-sig' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${sig ? 2.6 : edge ? 2.1 : 1.5}" data-sym="${r.sym}"><title>${base(r.sym)} · ${(r.pB * 100).toFixed(0)}% диапазона</title></circle>`;
+  });
+  return `<circle class="rd-ring" cx="50" cy="50" r="48"/><circle class="rd-band" cx="50" cy="50" r="36"/><circle class="rd-ring" cx="50" cy="50" r="18"/>`
+    + `<line class="rd-ring" x1="50" y1="3" x2="50" y2="97"/>` + dots.join('');
+}
 function renderCards() {
   if (!rows.length) return;
   $('#cards').classList.remove('wait');   // the loading shimmer gives way to the numbers
@@ -1044,6 +1058,7 @@ function renderCards() {
   $('#c1').textContent = med < 35 ? 'Распродажа' : med > 65 ? 'Разогрет' : 'Спокойный';
   $('#c1s').textContent = `монеты в среднем на ${med.toFixed(0)}% своего диапазона`;
   $('#c1m').style.width = med + '%';
+  $('#c1r').innerHTML = radarSvg(rows);
   $('#c2').textContent = cold; $('#c2s').textContent = `из ${rows.length} монет · возможен отскок вверх`;
   $('#c3').textContent = hot; $('#c3s').textContent = `из ${rows.length} монет · возможен откат вниз`;
   // "signals" = what a bot would act on: a confirmed reversal with strength at the threshold; weaker ones are counted apart
@@ -2890,7 +2905,7 @@ function equityChart(D, tEnd, key = 'j') {
       <path d="${d}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>
       <span class="hlab" style="top:${ys}%">старт $${money(D.start)}</span>${ddLab}
       <span class="hend" style="top:${ye}%;background:${col}"></span>
-      <span class="hcross" hidden></span><span class="hdot" hidden></span><div class="htip" hidden></div><span class="sr" aria-live="polite"></span></div>
+      <span class="hdim" hidden></span><span class="hcross" hidden></span><span class="hdot" hidden></span><div class="htip" hidden></div><span class="sr" aria-live="polite"></span></div>
     <div class="haxis"><span>${dt(t0)}</span><span>${dt((t0 + t1) / 2)}</span><span>${tEnd ? dt(t1) : 'сейчас'}</span></div>`;
 }
 // the point under the pointer: the trade close nearest in time (a binary search — a long backtest has thousands)
@@ -2906,11 +2921,15 @@ function eqShow(el, i, say = false) {
   const E = EQ.get(el.dataset.eq); if (!E) return;
   i = clamp(i, 0, E.pts.length - 1);
   const p = E.pts[i], W = el.clientWidth, x = (p.t - E.t0) / Math.max(1, E.t1 - E.t0) * W, y = (E.mx - p.b) / (E.mx - E.mn) * el.clientHeight;
-  const ln = el.querySelector('.hcross'), dot = el.querySelector('.hdot'), tip = el.querySelector('.htip');
+  const ln = el.querySelector('.hcross'), dot = el.querySelector('.hdot'), tip = el.querySelector('.htip'), dim = el.querySelector('.hdim');
   Object.assign(EQH, {key:el.dataset.eq, t:p.t});
   ln.hidden = dot.hidden = tip.hidden = false;
-  ln.style.left = dot.style.left = x + 'px'; dot.style.top = y + 'px'; dot.style.background = E.col;
+  ln.style.left = dot.style.left = x + 'px'; dot.style.top = y + 'px'; dot.style.background = E.col; dot.style.color = E.col;
+  // a tactile chart (DESIGN-RULES п. 69): what lies after the point dims, and the large balance above shows the point's value
+  if (dim) { dim.hidden = false; dim.style.left = x + 'px'; }
   const chg = p.b / E.start - 1, tr = p.x;
+  const hv = el.closest('.hero')?.querySelector('.hv');
+  if (hv) { if (hv.dataset.orig == null) hv.dataset.orig = hv.innerHTML; hv.innerHTML = curH('$' + money(p.b)); hv.classList.add('peek'); }
   tip.innerHTML = `<div class="faint">${i === 0 ? 'старт · ' : ''}${p.end ? (E.live ? 'сейчас' : 'конец периода') : dt(p.t)}</div>`
     + `<div><b>$${money(p.b)}</b> <span class="${cl(chg)}">${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(1)}%</span> <span class="faint">от старта</span></div>`
     + (i ? `<div>${p.dd >= 0.0005 ? `<span class="neg">−${(p.dd * 100).toFixed(1)}%</span> <span class="faint">от пика</span>` : '<span class="faint">на пике</span>'}</div>` : '')
@@ -2920,7 +2939,9 @@ function eqShow(el, i, say = false) {
   if (say) el.querySelector('.sr').textContent = tip.textContent;
 }
 function eqHide(el) {
-  for (const s of ['.hcross', '.hdot', '.htip']) { const n = el?.querySelector(s); if (n) n.hidden = true; }
+  for (const s of ['.hcross', '.hdot', '.htip', '.hdim']) { const n = el?.querySelector(s); if (n) n.hidden = true; }
+  const hv = el?.closest('.hero')?.querySelector('.hv');
+  if (hv?.dataset.orig != null) { hv.innerHTML = hv.dataset.orig; delete hv.dataset.orig; hv.classList.remove('peek'); }
   if (!el || EQH.key === el.dataset.eq) Object.assign(EQH, {key:null, t:null, sticky:false});
 }
 // the journal is redrawn every 30-60 s: a note still shown (the mouse hasn't left, the finger hasn't tapped elsewhere, the
@@ -4046,6 +4067,15 @@ async function learnGo(g, x) {
 // ---------- routing: #market[/SYMBOL] · #journal · #backtest · #help · #changes (#charts[/SYMBOL], #beta: the market's «Стакан») ----------
 const PAGES = ['market', 'journal', 'backtest', 'learn', 'help', 'changes', 'legal', 'gate'];   // legal has no tab: the footer links to it
 let page = 'market';
+// one orchestrated entrance (DESIGN-RULES п. 70): the first time a section opens in this tab, its top blocks come in one after
+// another, 60 ms apart (at most 6 steps); later visits keep the plain fade. prefers-reduced-motion stops it in CSS
+function pageEnter(t) {   // the set lives on the function: a go() during the module's top-level await must not hit a TDZ
+  const done = pageEnter.done ||= new Set(), s = $('#' + t); if (!s || done.has(t)) return;
+  done.add(t);
+  [...s.children].filter(c => !c.classList.contains('hidden')).forEach((c, i) => c.style.setProperty('--i', Math.min(i, 6)));
+  s.classList.add('enter');
+  setTimeout(() => s.classList.remove('enter'), 900);
+}
 function go(t, push = true) {
   if (!PAGES.includes(t)) t = 'market';
   if (LOCKED && t !== 'legal') { t = 'gate'; push = false; }   // signed out: the sign-in screen; the address keeps where a link led
@@ -4056,6 +4086,7 @@ function go(t, push = true) {
   document.querySelectorAll('.tab[data-t]').forEach(x => { x.classList.toggle('on', x.dataset.t === t); x.dataset.t === t ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'); });
   $('.top .tab[data-t=help]').classList.toggle('on-ph', t === 'learn');   // a phone has no «Учёба» tab: it lives in «Справка»
   PAGES.forEach(id => $('#' + id).classList.toggle('hidden', id !== t));
+  pageEnter(t);
   $('#foot').classList.toggle('hidden', t !== 'market');   // the scanner status belongs to the market tab
   if (push) setHash(true);
   if (t === 'changes') { save('sr_seenv', CHANGELOG[0].v); $('#ver').classList.remove('fresh'); loadOldChangelog(); }
@@ -4132,6 +4163,7 @@ document.querySelectorAll('.card[data-cf]').forEach(c => {
   };
   c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); c.click(); } };
 });
+$('#c1r').onclick = e => { const s = e.target.closest?.('[data-sym]')?.dataset.sym; if (s) openCoin(s); };   // a dot on the radar opens its coin
 // #coin/SYM — a link to a coin's chart (Telegram's «📈 SOL»): on a phone the chart opens over the list at once. #market/SYM is
 // the address the site keeps itself on every visit, so it only selects the coin: opening the chart on it would put the chart
 // over the list on every return to the site
