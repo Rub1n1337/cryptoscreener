@@ -1,6 +1,9 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.116', date:'12 ноября 2026', title:'Журнал бота в браузере', items:[
+    'Журнал бота в браузере хранит последние 3000 сделок; баланс и итог за всё время учитывают все.',
+  ]},
   {v:'2.115', date:'12 ноября 2026', title:'Позиции бота на паузе', items:[
     'Исправлено: позиции серверного бота на паузе закрываются по стопу, тейку и времени.',
   ]},

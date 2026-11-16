@@ -2015,6 +2015,8 @@ const KEYS = {
   sr_bprof:'device', sr_jmode:'device', sr_blay:'device', sr_bhide:'device', sr_bact:'device', sr_bactph:'device', sr_cmode:'device',
   // this browser's notification permission and sound, the intro, caches, the charts' server override
   sr_ntf:'device', sr_sound:'device', sr_intro:'device', sr_pool:'device', sr_bsrv:'device',
+  // how many different backtest settings were tried here (btTries): the correction for trying many is about this person's search
+  sr_bttries:'device',
   // old keys, read once to move to newer ones or removed on start (sr_delisted, sr_beta)
   sr_bsym:'device', sr_btf:'device', sr_delisted:'device', sr_beta:'device',
 };
@@ -4662,6 +4664,7 @@ async function runBacktest() {
     btHist = {hist, from, endT, only:traded, top:s.pit ? s.top : 0, S:s};   // window.__sr.btHist: to check a run by hand (tests/backtest-audit.js)
     btRes = M.backtest(hist, s, {start:s.start, from, only:traded, top:s.pit ? s.top : 0});
     btRes.settings = s; btRes.days = days; btRes.period = per.key; btRes.periodLabel = per.label; btRes.H = btHist;   // H: the candles, for btRandom
+    btRes.tries = btTry(s, per.key);
     const miss = s.pit ? [] : traded.filter(x => !hist[x]?.length && !failed.includes(x));   // a coin of the wider pool without history simply never makes the top
     const goneN = gone.filter(x => hist[x]?.length).length;
     st.textContent = `Готово: ${coinsLabel(btRes)}${goneN ? `, из них ${goneN} уже сняты с Binance` : ''}, ${per.custom ? per.label + ' (UTC)' : `${dt(btRes.from)} → ${dt(btRes.to + tfms)}`}, расчёт ${Math.round(performance.now() - t0)} мс.`
@@ -4700,8 +4703,34 @@ function btParts(r) {
 }
 // the verdict: the result as a whole, the held-out part (btParts) and the comparison with random entries (btRandom, r.rand).
 // Green only when all three agree; redrawn on its own when the comparison moves on
+// the correction for trying many settings (M.dsr, Bailey & López de Prado 2014): the more different settings one tries, the better
+// the best of them looks by luck alone. btTry counts the different settings (with the period) run in this browser, the current
+// one included; btDsr is the probability that the result beats the best luck would give after that many — needs ≥ RAND_BAR
+const DSR_KEEP = 500;
+function btTry(s, period) {
+  const key = JSON.stringify({...s, start:undefined, period});
+  let h = 0; for (let i = 0; i < key.length; i++) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0;
+  const list = (load('sr_bttries', []) || []).filter(x => typeof x === 'number');
+  if (!list.includes(h)) { list.push(h); save('sr_bttries', list.slice(-DSR_KEEP)); }
+  return Math.max(1, Math.min(list.length, DSR_KEEP));
+}
+function btDsr(r) {
+  const s = M.sharpeOf(r.trades.map(t => t.r)), N = r.tries || 1;
+  if (!s || s.n < 30 || !(s.sr > 0)) return null;
+  const d = M.dsr(s, N);
+  return d && d.p != null ? {sr:s.sr, n:s.n, N, p0:M.psr(s), p:d.p, sr0:d.sr0} : null;
+}
+function btDsrLine(r) {
+  const d = btDsr(r);
+  if (!d) return '';
+  const pc = x => Math.round(x * 100) + '%';
+  return `<div class="btrand">С поправкой на перебор: результат не случаен с вероятностью <b>${pc(d.p)}</b>${d.p * 100 < RAND_BAR ? ' — <b>мало, нужно от 95%</b>' : ''}.`
+    + ` <span class="mute">Шарп на сделку ${d.sr.toFixed(2)} (${d.n} ${plural(d.n, ['сделка', 'сделки', 'сделок'])}); без поправки — ${pc(d.p0)}.`
+    + ` Здесь проверено ${d.N} ${plural(d.N, ['вариант', 'варианта', 'вариантов'])} настроек: лучший из стольких получил бы Шарп ${d.sr0.toFixed(2)} и без преимущества, просто случайно.</span></div>`;
+}
 function btVerdictShow() {
   const r = btRes, st = M.journalStats(r.start, r.trades), s = r.settings, {sf, so, name} = btParts(r);
+  const dsr = btDsr(r), picked = dsr && dsr.p * 100 < RAND_BAR;   // in the plus, but the best of many tries would look as good
   const rk = r.rand?.rank, luck = rk && rk.pct < RAND_BAR, beat = rk && rk.pct >= RAND_BAR;
   const parts = `на подборе (${name[0]} периода) ${rr(sf.expR)}, на проверке (${name[1]}) ${rr(so.expR)}`;
   // held out much worse than picked: in the minus, or under half of the picked part's result
@@ -4712,6 +4741,7 @@ function btVerdictShow() {
   else if (overfit) { v = `<b style="color:var(--acc)">Похоже на подгонку под историю:</b> в целом ${rr(st.expR)} на сделку, но ${parts}. На проверке настройки работают намного хуже, чем там, где их подбирали.${so.n < 30 ? ` На отложенной части всего ${so.n} ${plural(so.n, ['сделка', 'сделки', 'сделок'])} — выводы предварительные.` : ''}`; vk = 'warn'; }
   else if (!(sf.expR > 0 && so.expR > 0)) { v = `<b style="color:var(--acc)">В плюсе, но нестабильно:</b> в целом ${rr(st.expR)} на сделку, а ${parts}. Похоже на удачный отрезок, а не на устойчивое преимущество.`; vk = 'warn'; }
   else if (luck) { v = `<b style="color:var(--acc)">В плюсе, но не отличить от случая:</b> ${rr(st.expR)} на сделку, ${parts}. Случайные входы с теми же выходами дают такой же результат слишком часто.`; vk = 'warn'; }
+  else if (beat && picked) { v = `<b style="color:var(--acc)">Лучше случайного входа, но может быть удачным подбором:</b> ${rr(st.expR)} на сделку, ${parts}. Здесь проверено ${dsr.N} ${plural(dsr.N, ['вариант', 'варианта', 'вариантов'])} настроек, а среди стольких такой результат находится и случайно.`; vk = 'warn'; }
   else if (beat) { v = `<b class="pos">У настроек есть преимущество:</b> ${rr(st.expR)} на сделку после комиссий, ${parts}, и это лучше случайного входа. Хороший знак, но проверьте и на другом периоде.`; vk = 'ok'; }
   else { v = `<b style="color:var(--acc)">В плюсе:</b> ${rr(st.expR)} на сделку, ${parts}. Отличается ли это от случая, покажет сравнение ниже.`; vk = 'warn'; }
   // "today's top" over the whole past knows which coins later grew: its verdict is never green, and the honest run is one click
@@ -4731,7 +4761,7 @@ function btVerdictShow() {
     if (vk === 'ok' || vk === 'info') vk = 'warn';
   }
   $('#btVerdict').className = 'banner ' + vk;
-  $('#btVerdict').innerHTML = `<svg class="i"><use href="#i-${vk === 'info' ? 'info' : vk}"/></svg><div>${v}${btRandLine(r)}</div>`;
+  $('#btVerdict').innerHTML = `<svg class="i"><use href="#i-${vk === 'info' ? 'info' : vk}"/></svg><div>${v}${btRandLine(r)}${btDsrLine(r)}</div>`;
 }
 // random entries (M.randomSetup in math.js): the same coins, period, number of trades and exits as the result on screen, the
 // moments, coins and sides at random, RAND_RUNS runs with a fixed seed — the same result gives the same line. Counted in slices
@@ -4831,6 +4861,11 @@ const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="
 
 // ---------- changelog ----------
 const CHANGELOG = [
+  {v:'2.128', date:'16 ноября 2026', title:'Поправка на перебор', items:[
+    'В бэктесте появилась строка «С поправкой на перебор»: насколько результат убедителен с учётом того, сколько разных настроек вы проверили.',
+    'Вывод бэктеста не становится зелёным, если результат мог найтись простым перебором настроек.',
+    'В «Учёбе» появился урок «Поправка на перебор», в словаре — два новых термина.',
+  ]},
   {v:'2.127', date:'16 ноября 2026', title:'Журнал и таблица удобнее', items:[
     'Баланс бота в «Журнале» стал виден сразу, без прокрутки.',
     'Список монет на компьютере остаётся на экране, пока читаете разбор сигнала.',
@@ -4890,9 +4925,6 @@ const CHANGELOG = [
     'Исправлено: в режиме «Авто» без данных о рынке бот не открывает новых сделок.',
     'Ошибка проверки рынка у бота в браузере показывается в панели состояния.',
     'Исправлено: график после «Свернуть» перерисовывается сразу.',
-  ]},
-  {v:'2.116', date:'12 ноября 2026', title:'Журнал бота в браузере', items:[
-    'Журнал бота в браузере хранит последние 3000 сделок; баланс и итог за всё время учитывают все.',
   ]},
 ];
 let CHANGELOG_OLD = [], oldAsked = false;
