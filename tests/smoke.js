@@ -2,7 +2,8 @@
 //   await (await import('/tests/smoke.js?' + Date.now())).run()
 // Returns a short report: version, width, theme, horizontal scroll, what sticks out of the screen, cut text (including the
 // short card titles drawn by ::after, which scrollWidth doesn't see), touch targets under 36 px on touch screens, and
-// browser-storage keys that index.html's KEYS doesn't declare (keys).
+// browser-storage keys that index.html's KEYS doesn't declare (keys), modules imported at start without a modulepreload
+// link (preload).
 // Errors are not here: read_console_messages has them, including the ones before this loads.
 const sel = el => el.id ? '#' + el.id : el.tagName.toLowerCase() + (el.classList.length ? '.' + [...el.classList].slice(0, 2).join('.') : '');
 const shown = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
@@ -31,5 +32,17 @@ export async function run({ limit = 8 } = {}) {
   // every browser-storage key is declared «profile» or «device» (KEYS in index.html): a new one is not synced, or kept, by accident
   const K = window.__sr?.KEYS;
   if (K) { const unk = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith('sr_') && !(k in K)) unk.push(k); } if (unk.length) out.keys = unk; }
+  // every module imported at start (the page's and theirs, static imports only) has a <link rel=modulepreload>: the auto-update
+  // compares exactly those files (UPDATE_FILES), so a module missing there would change without open tabs noticing
+  const pre = new Set([...document.querySelectorAll('link[rel=modulepreload]')].map(l => new URL(l.href).pathname)), seen = new Set(), miss = [];
+  const imports = (txt, base) => [...txt.matchAll(/^\s*import\s[^'"()]*?['"]([^'"]+)['"]/gm)].map(m => new URL(m[1], base));
+  const page = await (await fetch(location.pathname, { cache: 'no-store' })).text();
+  let todo = [...page.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)].flatMap(m => imports(m[1], location.href));
+  while (todo.length) {
+    const u = todo.shift(); if (u.origin !== location.origin || seen.has(u.pathname)) continue; seen.add(u.pathname);
+    if (!pre.has(u.pathname)) miss.push(u.pathname);
+    try { todo.push(...imports(await (await fetch(u.pathname)).text(), u.href)); } catch {}
+  }
+  if (miss.length) out.preload = miss;
   return out;
 }

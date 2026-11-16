@@ -5,7 +5,7 @@ v="$1"; sha=$(git rev-parse HEAD); site=https://cryptoscreener-topaz.vercel.app;
 wait10() { timeout 10 tail -f /dev/null; }
 if [ -n "$v" ]; then
   for i in $(seq 1 18); do
-    got=$(curl -s "$site/?nc=$RANDOM" | grep -o "v:'[0-9.]*'" | head -1)
+    got=$(curl -s "$site/app/changes.js?nc=$RANDOM" | grep -o "v:'[0-9.]*'" | head -1)   # CHANGELOG[0].v (in index.html up to 2.129)
     [ "$got" = "v:'$v'" ] && { echo "vercel: $v"; break; }
     [ "$i" = 18 ] && echo "vercel: still $got after 3 min — redeploy by hand (create_deployment withLatestCommit)"; wait10
   done

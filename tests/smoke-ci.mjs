@@ -3,7 +3,7 @@
 //   node tests/smoke-ci.mjs http://localhost:8000/index.html
 // Nothing leaves the runner except the page's own files: Supabase answers from here (a made-up session, an empty profile, no
 // bot), Binance from tests/fixtures/binance.json (the runner may get 429 or 451 from the real one), everything else is
-// aborted, WebSocket is a stub that never connects. Red when smoke reports hscroll, overflow, cut or small (touch targets on
+// aborted, WebSocket is a stub that never connects. Red when smoke reports hscroll, overflow, cut, preload or small (touch targets on
 // the phone widths), or the page throws / logs an error — except failed loads of the aborted hosts.
 import { chromium } from 'playwright';
 import { appendFileSync, readFileSync } from 'node:fs';
@@ -106,7 +106,7 @@ for (const signedIn of [false, true]) for (const w of WIDTHS) {
       if (signedIn && t === 'market' && seen.rows < 10) lines.push(`- #market: ${seen.rows} rows in the table — the fake Binance didn't reach the scan`);
       const r = await page.evaluate(async () => (await import('/tests/smoke.js?' + Date.now())).run());
       checked.push(`${t}${t === 'market' && signedIn ? ` (${seen.rows} rows)` : ''}`);
-      const issues = ['hscroll', 'overflow', 'cut', 'small'].filter(k => k === 'hscroll' ? r.hscroll : r[k]?.length);
+      const issues = ['hscroll', 'overflow', 'cut', 'small', 'preload'].filter(k => k === 'hscroll' ? r.hscroll : r[k]?.length);
       if (issues.length) lines.push(`- ${r.page} (${r.v}, ${r.theme}): ` + issues.map(k => k === 'hscroll' ? 'hscroll' : `${k}: ${r[k].join('; ')}`).join(' · '));
       if (r.keys) console.log(`  note ${label} ${r.page}: storage keys not in KEYS: ${r.keys.join(', ')}`);
     }

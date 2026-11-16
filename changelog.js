@@ -1,5 +1,5 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
-// The newest ones stay in CHANGELOG in index.html; when that list grows past ~12, its oldest move here (newest first).
+// The newest ones stay in CHANGELOG in app/changes.js; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
   {v:'2.117', date:'12 ноября 2026', title:'Надёжность ботов', items:[
     'Исправлено: бот в браузере, открытый в нескольких вкладках, ведёт один общий журнал.',

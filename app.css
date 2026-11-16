@@ -1,0 +1,1230 @@
+/* Sigma Radar's styles (moved out of index.html's <style> in wave 0 of docs/PLAN-UNTANGLE-modules.md). Colours only through the
+   tokens below (:root = dark, :root[data-theme=light]); canvas code reads them via pal() into PC. Rules: docs/DESIGN-RULES.md */
+@font-face{font-family:Manrope;font-style:normal;font-weight:400 800;font-display:swap;src:url(/fonts/manrope-cyrillic.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:Manrope;font-style:normal;font-weight:400 800;font-display:swap;src:url(/fonts/manrope-greek.woff2) format('woff2');unicode-range:U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF}
+@font-face{font-family:Manrope;font-style:normal;font-weight:400 800;font-display:swap;src:url(/fonts/manrope-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:400 700;font-display:swap;src:url(/fonts/jbmono-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+/* ---------- design tokens ---------- */
+:root{
+  /* graphite: the same lightness steps as the old navy surfaces, almost no hue (oklch chroma ~.005), so gold, red and green
+     are the only colours on the page */
+  --bg:#0c0d0f;--s1:#131517;--s2:#1a1b1e;--s3:#222426;--line:#282a2d;--line2:#333539;
+  --text:#e8eaec;--mute:#979ca3;--faint:#83888f;   /* faint text: 4.8–5.5:1 on the page and cards (WCAG AA for small text) */
+  --acc:#f5b70a;--accbg:rgba(245,183,10,.12);--up:#f0525f;--lo:#22c55e;--blue:#5b8cff;--violet:#a78bfa;--mid:#64748b;
+  --panel:var(--s1);--panel2:var(--s2);
+  --r:8px;--r-s:6px;--r-l:12px;--h:34px;   /* panels 8, controls 6, dialogs 12 (Lovable v3); tags and status pills stay round */
+  --sans:Manrope,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  /* motion (DESIGN-RULES §13): one curve — quick start, soft stop; three durations: small things, menus / sheets / pages,
+     large blocks. Highlights (a new signal, a price change) hold longer and fade along the same curve */
+  --ease:cubic-bezier(.2,.8,.2,1);--dur-1:160ms;--dur-2:240ms;--dur-3:500ms;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+  --on-acc:#1a1300;   /* text on gold: the same dark in both themes */
+  --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#15803d;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags (white text ≥ 4.5:1), server cells, focus ring */
+  /* how strong the glass is: every light and every see-through below is multiplied by this one number, set per device in
+     the profile (data-glass on <html>, the rules right after the light theme): 0 no glass, .35 quiet, .7 soft (default), 1 full, 1.5 bright */
+  --g:.7;
+  --topbg:rgba(12,13,15,calc(1 - .18*var(--g)));--navbg:rgba(12,13,15,calc(1 - .06*var(--g)));--backdrop:rgba(4,5,6,.7);--ring:rgba(255,255,255,.05);
+  --hover:#414448;--row-line:#1c1d20;--sel:#272416;--canvas:#0e0f11;   /* selected row: a gold tint, as in the light theme */
+  --intro:linear-gradient(135deg,#1c1912,#131517);--intro-line:#403723;
+  --glow:rgba(245,183,10,calc(.07*var(--g)));--logo-glow:0 0 0 1px rgba(245,183,10,calc(.4*var(--g))),0 8px 30px -10px rgba(245,183,10,calc(.5*var(--g)));   /* gold light behind the logo */
+  /* the mark itself, the same in both themes (an app icon keeps its colours): ruby band, gold price with a bright turn,
+     emerald band, on a graphite glass tile */
+  --logo-tile:#1a1b1e;--logo-hi:#dc5465;--logo-gold:#f3a44a;--logo-shine:#f8d376;--logo-lo:#49b67f;
+  --logo-sheen:rgba(255,255,255,.1);--logo-rim:rgba(255,255,255,.07);
+  /* glass (Lovable's smoky graphite with a cool edge; their oklch / color-mix values baked to rgba, so a browser without them
+     still gets a header): fill of blurred menus, top edge, bottom shade, pearl and cool reflections, warm light, press */
+  --glass-fill:rgba(19,24,26,calc(1 - .14*var(--g)));--glass-edge:rgba(207,229,229,calc(.23*var(--g)));--glass-shine:rgba(226,245,245,calc(.1*var(--g)));--glass-shade:rgba(0,3,3,calc(.32*var(--g)));
+  --glass-pearl:rgba(232,247,247,calc(.13*var(--g)));--glass-cool:rgba(155,211,211,calc(.09*var(--g)));--glass-rim:rgba(177,208,208,calc(.32*var(--g)));--glass-warm:rgba(228,200,137,calc(.11*var(--g)));
+  --glass-press:rgba(0,3,3,.38);--glass-drop:rgba(0,0,0,calc(.65*var(--g)));--light-wash:rgba(241,184,71,calc(.07*var(--g)));--light-edge:rgba(237,188,73,calc(.34*var(--g)));
+  --glass-line:rgba(66,75,75,.76);--glass-line2:rgba(77,88,88,.66);--glass-top:rgba(65,73,73,.69);   /* --line2 / --line with the rim */
+  --card-lo:rgba(38,204,102,.08);--card-hi:rgba(241,85,99,.07);   /* a summary card's light on hover: its meaning's colour */
+  --glass-blur:calc(20px*var(--g));--glass-blur-s:calc(12px*var(--g));   /* big surfaces; small bars, table heads, chart tools */
+  --glass-inset:inset 0 1px 0 var(--glass-edge),inset 0 -1px 0 var(--glass-shade);--glass-shadow:0 12px 32px -16px var(--glass-drop);
+  --glass-hover-shadow:0 5px 18px -9px var(--glass-rim);
+  --control-shine:linear-gradient(160deg,var(--glass-pearl),var(--glass-shine) 18%,transparent 52%,var(--glass-cool));
+  --glass-reflection:linear-gradient(115deg,transparent 30%,var(--glass-pearl) 44%,transparent 58%);
+  --surface-light:linear-gradient(115deg,var(--light-wash),transparent 44%,var(--glass-cool));
+  /* panels: a faint pearl sheen top-left and a cool one bottom-right; the frosted table header */
+  --panel-sheen:linear-gradient(160deg,rgba(232,247,247,calc(.085*var(--g))),transparent 40%,transparent 62%,rgba(155,211,211,calc(.065*var(--g))));
+  --th-glass:rgba(19,21,23,calc(1 - .24*var(--g)));
+  /* the chosen pane in a segmented control or the header's group; the sample of the glass in the profile (see-through more than
+     the real fill, or the steps would be hard to tell apart in a small box) */
+  --ui-selected:var(--s3);--ui-shadow:0 1px 3px var(--glass-press);--glass-sample:rgba(19,24,26,calc(1 - .5*var(--g)));
+  /* its centre is set in px from the top-left and follows the logo when the header's 1500px column is centred, so the page's
+     layer and the header's (same box origin) line up into one patch */
+  --glow-bg:radial-gradient(60rem 30rem at max(7rem, calc(50% - 750px + 7rem)) -6rem, var(--glow), transparent 70%);
+  --tag-t:#d2d4d8;--up-t:#ff9aa3;--lo-t:#86efac;--acc-t:#fcd34d;
+  --bad-line:#6b2027;--bad-bg:#2a1216;--ok-line:#1d5b35;--warn-line:#5c4a12;
+  /* chart colours (read by the canvas code through pal()) */
+  --heat-0:#28469f;--heat-1:#00aaff;--heat-2:#ffdc00;--heat-3:#ff5a14;
+  --c-up:#ef4444;--c-lo:#22c55e;--c-mid:#64748b;--c-trade:#a78bfa;--c-price:#e5e7eb;--c-acc:#f5b70a;
+  --c-axis:#66696f;--c-label:#6e7278;--c-grid:#3d4046;--c-cross:#51545a;--c-rsi:#60a5fa;--c-mute:#979ca3;
+  --c-band:rgba(59,130,246,.07);--c-tip:rgba(19,21,23,.95);--c-volup:rgba(34,197,94,.45);--c-voldn:rgba(239,68,68,.45);
+  --c-hi:rgba(239,68,68,.06);--c-lo2:rgba(34,197,94,.06);--c-base:#414448;
+  color-scheme:dark;
+}
+:root[data-theme=light]{
+  --bg:#f4f5f8;--s1:#ffffff;--s2:#f3f4f7;--s3:#e8ebf0;--line:#e3e6ec;--line2:#d2d8e1;
+  --text:#11161f;--mute:#5a6375;--faint:#687183;   /* 4.5–4.9:1 on white and the page (was #7c8596, ~3.4:1) */
+  --acc:#c28a00;--accbg:rgba(194,138,0,.12);--up:#d42a3a;--lo:#15803d;--blue:#2f6bf0;--violet:#7c3aed;--mid:#64748b;
+  --shadow:0 10px 30px rgba(15,23,42,.12);
+  --focus:rgba(47,107,240,.55);
+  --topbg:rgba(244,245,248,calc(1 - .15*var(--g)));--navbg:rgba(255,255,255,calc(1 - .06*var(--g)));--backdrop:rgba(15,23,42,.35);--ring:rgba(15,23,42,.06);
+  --hover:#b9c1ce;--row-line:#edf0f4;--sel:#fff6dc;--canvas:#ffffff;
+  --intro:linear-gradient(135deg,#fffaf0,#f6f8fc);--intro-line:#ecdcb4;
+  --glow:rgba(245,183,10,calc(.1*var(--g)));--logo-glow:0 0 0 1px rgba(194,138,0,calc(.35*var(--g))),0 8px 24px -10px rgba(194,138,0,calc(.45*var(--g)));
+  /* pearl glass */
+  --glass-fill:rgba(245,252,252,calc(1 - .09*var(--g)));--glass-edge:rgba(255,255,255,calc(.95*var(--g)));--glass-shine:rgba(255,255,255,calc(.52*var(--g)));--glass-shade:rgba(49,59,59,calc(.1*var(--g)));
+  --glass-pearl:rgba(255,255,255,calc(.72*var(--g)));--glass-cool:rgba(133,188,188,calc(.09*var(--g)));--glass-rim:rgba(92,131,131,calc(.25*var(--g)));--glass-warm:rgba(228,200,146,calc(.11*var(--g)));
+  --glass-press:rgba(74,82,82,.12);--glass-drop:rgba(44,44,50,calc(.18*var(--g)));--light-wash:rgba(241,198,113,calc(.07*var(--g)));--light-edge:rgba(185,142,26,calc(.3*var(--g)));
+  --glass-line:rgba(193,209,208,.74);--glass-line2:rgba(183,202,200,.62);--glass-top:rgba(201,214,214,.66);
+  --card-lo:rgba(26,128,64,.08);--card-hi:rgba(213,43,57,.07);
+  --panel-sheen:linear-gradient(160deg,rgba(241,198,113,calc(.06*var(--g))),transparent 40%,transparent 62%,rgba(133,188,188,calc(.09*var(--g))));
+  --th-glass:rgba(255,255,255,calc(1 - .22*var(--g)));
+  --ui-selected:var(--s1);--glass-sample:rgba(255,255,255,calc(1 - .5*var(--g)));
+  --tag-t:#334155;--up-t:#b4232f;--lo-t:#15803d;--acc-t:#8a6100;
+  --bad-line:#f2b8be;--bad-bg:#fdecee;--ok-line:#a7dcb9;--warn-line:#ead198;
+  --c-up:#dc2626;--c-lo:#16a34a;--c-mid:#7b8798;--c-trade:#7c3aed;--c-price:#1f2937;--c-acc:#c28a00;
+  --c-axis:#7c8596;--c-label:#7c8596;--c-grid:#d2d8e1;--c-cross:#9aa4b2;--c-rsi:#2f6bf0;--c-mute:#5a6375;
+  --c-band:rgba(47,107,240,.06);--c-tip:rgba(255,255,255,.97);--c-volup:rgba(22,163,74,.4);--c-voldn:rgba(220,38,38,.4);
+  --c-hi:rgba(220,38,38,.05);--c-lo2:rgba(22,163,74,.05);--c-base:#c3cad5;
+  color-scheme:light;
+}
+/* the five strengths in the profile (2 is the default --g above). «Выкл» and «Тихо» follow Lovable's material hierarchy: data and
+   forms are matte, plain lines instead of the glass rims, no sheen on panels, table heads simply cover the rows */
+:root[data-glass="0"]{--g:0}:root[data-glass="1"]{--g:.35}:root[data-glass="3"]{--g:1}:root[data-glass="4"]{--g:1.5}
+:root[data-glass="0"],:root[data-glass="1"]{--glass-line:var(--line2);--glass-line2:var(--line2);--glass-top:var(--line);--glass-rim:var(--hover);--panel-sheen:none;--surface-light:none;--glass-reflection:none;--th-glass:var(--s1)}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+/* type scale (DESIGN-RULES п. 64): sizes 11 / 12 / 13 / 14 / 16 / 18 / 20 / 24 / 32 (+ the 40 px balance), weights 400 / 500 / 600 — the browser's bold 700 too */
+b,strong,th,h1,h2,h3,h4,h5,summary b{font-weight:600}
+.num,td,.card .v,.kv b,.mono{font-variant-numeric:tabular-nums}
+/* numbers in JetBrains Mono: prices, percentages, counts. Its file has Latin only, so a word in a number cell («тренд», «5.2д»,
+   «Распродажа») falls back to Manrope letter by letter. The live charts (.bmain, .bside) keep their own styles */
+.num,.mono,td.n,.card .v,.kv b,.sch b,.sca,.comp .cv,.thero-v,.tpath-l,.ttiles b,.hero .hv,.hchg .chip,.hside b,.cprice,.ctitle>.pos,.ctitle>.neg,.chead .st b,.cnt,kbd{font-family:var(--mono)}
+a{color:inherit}
+::selection{background:var(--accbg)}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}   /* iOS enlarges text on turning the phone sideways */
+/* no grey flash on tap (presses scale instead) and no double-tap-zoom wait before the click */
+button,a,[role=button],label,select,summary{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+/* type=search: the system clear ✕ and «Найти» on the keyboard, but our field shape, not Safari's rounded one */
+input[type=search]{-webkit-appearance:none;appearance:none}input[type=search]::-webkit-search-decoration{-webkit-appearance:none}
+.hidden{display:none!important}
+.pos{color:var(--lo)}.neg{color:var(--up)}.mute{color:var(--mute)}.faint{color:var(--faint)}
+svg.i{width:16px;height:16px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- top bar ---------- */
+.top{position:sticky;top:0;z-index:40;background:var(--control-shine),var(--glow-bg),var(--topbg);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border-bottom:1px solid var(--glass-top);box-shadow:var(--glass-inset),0 8px 20px -16px var(--glass-shade)}
+/* the gold light from the top-left corner (Lovable v1): one still layer under everything; panels stay opaque, so it shows on
+   the page around them and in the frosted header, which carries the same patch */
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--glow-bg)}
+.brand svg{border-radius:6px;box-shadow:var(--logo-glow)}
+.topin{max-width:1500px;margin:0 auto;padding:0 16px;height:58px;display:flex;align-items:center;gap:18px}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;font-weight:600;font-size:16px;white-space:nowrap}
+@media (pointer:coarse){.brand{min-width:36px;min-height:36px}}   /* the logo alone on a phone was a 28 px target */
+.brand .bt span{font-weight:500;color:var(--mute)}   /* «Sigma» carries the name, «Radar» steps back */
+.brand small{font-weight:600;font-size:12px;color:var(--acc);background:var(--accbg);padding:2px 8px;border-radius:999px}
+.tabs{display:flex;gap:2px;align-items:center}
+.top .tabs{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.top .tabs::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:7px;height:36px;padding:0 12px;border:0;background:transparent;color:var(--mute);border-radius:var(--r-s);font-weight:500;white-space:nowrap}
+.tab:hover{background:var(--s2);color:var(--text);border:0}
+.tab.on{background:var(--s3);color:var(--text)}
+.tab.on svg{stroke:var(--acc)}
+/* the header's sections (wider than a phone): full-height tabs, no plate — the open one is marked by a gold line on the
+   header's lower edge (on phones the tabs are the bottom bar, see the 700 px block) */
+@media(min-width:701px){.top .tabs{align-self:stretch}.top .tab{position:relative;height:100%;border-radius:0}
+  .top .tab:hover,.top .tab.on{background:transparent}.top .tab:focus-visible{outline-offset:-6px}
+  .top .tab::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;border-radius:2px 2px 0 0;background:var(--acc);opacity:0;transition:opacity var(--dur-1) var(--ease)}
+  .top .tab.on::after{opacity:1}}
+/* the quick filter that is on: solid gold, as a set filter should read */
+.seg .tab[data-fl].on{background:var(--acc);color:var(--on-acc);font-weight:600}.seg .tab[data-fl].on .cnt{color:inherit;opacity:.7}
+.tab .badge{font-size:11px;color:var(--faint)}
+.tools{display:flex;gap:6px;align-items:center}
+.pill{display:flex;align-items:center;gap:8px;height:var(--h);padding:0 12px;border-radius:999px;border:1px solid var(--line2);background:var(--s2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 3px var(--ring)}
+.pill.ok .dot{background:var(--lo);box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.pill.idle .dot{background:var(--acc);box-shadow:0 0 0 3px var(--accbg)}
+.pill.bad{border-color:var(--bad-line);background:var(--bad-bg)}.pill.bad .dot{background:var(--up);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(240,82,95,.0)}0%{box-shadow:0 0 0 0 rgba(240,82,95,.5)}}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1500px;margin:0 auto;padding:18px 16px 40px}
+.phead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:2px 0 14px}
+.phead h2{margin:0;font-size:24px;font-weight:600;letter-spacing:-.01em}
+.phead p{margin:4px 0 0;color:var(--mute);font-size:13px;max-width:900px}
+.sub{color:var(--mute);font-size:13px;margin:4px 0 12px}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;align-items:start}
+/* wide mode: the chart takes the whole row, the coin list goes under it */
+body.wide #market .grid{grid-template-columns:minmax(0,1fr)}body.wide #cv{height:min(74vh,820px)}
+.grid>*{min-width:0}
+/* two columns: the coin list stays in view while the signal breakdown under the chart scrolls; the list fits the screen height */
+@media(min-width:1201px){body:not(.wide) #market .tpanel{position:sticky;top:72px}body:not(.wide) #market .tpanel .tablewrap{max-height:min(660px,calc(100vh - 210px))}body:not(.wide) #market #mtable.more{max-height:min(660px,calc(100vh - 290px))}}   /* 72 = header 59 + gap; open filters (#morebar) take ~80 px more */
+.panel{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.ptitle{font-weight:600;font-size:14px;margin-bottom:10px}.ptitle span{font-weight:400;font-size:12px;color:var(--mute)}
+
+/* ---------- controls ---------- */
+button,select,input{font:inherit;color:var(--text)}
+button,select,input:not([type=checkbox]):not([type=range]){height:var(--h);background:var(--s2);border:1px solid var(--line2);border-radius:var(--r-s);padding:0 12px}
+button{cursor:pointer;font-weight:500;display:inline-flex;align-items:center;justify-content:center;gap:7px;transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+button:where(:not(:disabled)):hover{background:var(--s3);border-color:var(--hover)}   /* :where keeps the old weight: class :hover rules still win */
+button:disabled{opacity:.5;cursor:not-allowed}   /* «can't now»; a running request shows its own spinner (.busy), not the cursor */
+button.primary{background:var(--acc);border-color:var(--acc);color:var(--on-acc);font-weight:600}
+button.primary:where(:not(:disabled)):hover{background:var(--acc-h);border-color:var(--acc-h)}
+button.icon{width:var(--h);padding:0;color:var(--mute)}button.icon.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
+input:not([type=checkbox]):not([type=range]):focus,select:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+input::placeholder{color:var(--faint)}
+input[type=checkbox]{accent-color:var(--acc);width:16px;height:16px}
+/* iOS Safari gives a date field its own minimum width (the backtest's «По» spilled past the form on an iPhone) and centres the
+   date: the field takes its cell's width and reads from the left like the selects next to it (2.80) */
+input[type=date]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;text-align:left}
+input[type=date]::-webkit-date-and-time-value{text-align:left}
+input[type=range]{padding:0;width:120px;accent-color:var(--acc)}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin:10px 0}
+.ctrl label{color:var(--mute);font-size:12px;display:flex;align-items:center;gap:8px}
+.ctrl label b{color:var(--text);min-width:28px;font-weight:600}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}.filters>*{flex:1;min-width:110px}
+.filters>.icon,.filters>.seg{flex:0 0 auto;min-width:0}
+.search{position:relative;display:flex;align-items:center}
+.search input:not([type=checkbox]):not([type=range]){width:100%;padding-left:34px}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
+kbd{font:11px/1 var(--mono);color:var(--faint);border:1px solid var(--line2);border-radius:4px;padding:2px 5px}
+.seg{display:inline-flex;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:3px;gap:2px;margin-bottom:14px}
+/* «Выбираю сам / Автоматически по рынку» ran 23px past a 320px screen: on narrow screens the two halves share the width and wrap */
+@media(max-width:380px){#bmode{display:flex;max-width:100%}#bmode .tab{flex:1 1 0;min-width:0;white-space:normal;height:auto;min-height:36px;line-height:1.2;padding:5px 8px;text-align:center}}
+.seg .tab{height:32px}
+/* backtest form */
+.form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:stretch;margin-bottom:12px}
+.fgroup{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.fgroup h4{margin:0 0 10px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);font-weight:600}
+.fgroup .fields{display:flex;flex-wrap:wrap;gap:10px}
+.fgroup label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute)}
+.fgroup label.inline{flex-direction:row;align-items:center;height:var(--h);margin-top:19px}
+.factions{display:flex;flex-direction:column;gap:8px;justify-content:center;min-width:190px}
+.factions button.primary{height:44px;font-size:16px}
+
+/* ---------- cards ---------- */
+.cards{display:grid;grid-template-columns:repeat(5,1fr);margin-bottom:14px}
+.cards.auto{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+/* before the first scan the summary's numbers shimmer like the table's rows (.sk), not a row of «—»; a failed scan stops it */
+.cards.wait .card .v{color:transparent;position:relative}
+.cards.wait .card .v::after{content:"";position:absolute;left:0;top:50%;width:min(70%,110px);height:14px;margin-top:-7px;border-radius:7px;background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:sk 1.2s infinite}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden}
+.card .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+/* the market cards: neutral numbers, the meaning is a small mark by the label (colour only for state, DESIGN-RULES п. 65) */
+.cards .card[data-cf] .t::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;margin:0 6px 1px 0;vertical-align:middle;background:var(--acc)}
+.cards .card[data-cf=lo] .t::before{background:var(--lo)}.cards .card[data-cf=hi] .t::before{background:var(--up)}
+@media(max-width:700px){.cards .card[data-cf] .t::before{width:5px;height:5px;margin-right:3px}.cards .card .t{letter-spacing:.03em}}
+.card .v{font-size:24px;font-weight:600;margin:4px 0 2px;letter-spacing:-.02em}.card .s{font-size:12px;color:var(--mute)}
+/* summary strip: one panel, its cells split by hairlines. Each cell draws a line on its left and top; the panel clips the ones
+   on its outer edge, so any number of rows and a half-empty last row work */
+.cards,.statrow{gap:0;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.cards>.card,.statrow>.card{background:transparent;border:0;border-radius:0;box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line)}
+.meter{height:4px;background:var(--s3);border-radius:2px;margin-top:10px}.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--lo),var(--acc),var(--up));border-radius:2px}
+[title]{cursor:help}button[title],select[title],input[title],tr[title],label[title]{cursor:pointer}
+.stats{font-size:13px;color:var(--mute);line-height:1.7}.stats b{color:var(--text);font-weight:600}
+
+/* ---------- chart ---------- */
+canvas{width:100%;display:block;background:var(--canvas);border-radius:var(--r);border:1px solid var(--line);touch-action:pan-y}
+#cv{height:clamp(440px,60vh,700px);cursor:crosshair}
+.cvwrap{position:relative}
+.cvwrap[data-wait] canvas{opacity:.15;transition:opacity var(--dur-1) var(--ease)}
+.cvwrap[data-wait]::after{content:attr(data-wait);position:absolute;inset:0;display:grid;place-items:center;color:var(--mute);font-size:13px;pointer-events:none}canvas:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+/* chart toolbar: zoom, back to the latest candle, reset, wide mode */
+.ctools{position:absolute;top:8px;left:8px;display:flex;gap:4px;z-index:2;opacity:.85;transition:opacity var(--dur-1) var(--ease)}.cvwrap:hover .ctools,.ctools:focus-within{opacity:1}
+.ctools button{width:34px;height:30px;padding:0;font-size:16px;line-height:1;background:var(--s1);border-color:var(--line2);color:var(--mute)}.ctools button:hover{color:var(--text)}
+@media(max-width:1200px){.ctools [data-z=expand]{display:none}}
+.ctools button.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}.ctools .ct-txt{width:auto;padding:0 9px;font-size:12px;font-weight:600}
+#cv.picking,#cv2.picking{cursor:copy}
+/* second timeframe: under the main chart, side by side with it in wide mode */
+.cpair{display:grid;gap:12px}body.wide .cpair.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+#cv2{height:clamp(300px,40vh,460px);cursor:crosshair}body.wide .cpair.two #cv2{height:min(74vh,820px)}
+body.wide .cpair.two .tf2{display:flex;flex-direction:column}body.wide .cpair.two .tf2 .cvwrap{flex:1}
+.tf2head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 8px;font-size:13px;font-weight:600}.tf2head .mute{font-weight:400;font-size:12px}
+.ulv{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:12px}.ulv:empty{display:none}
+.ctools .ct-latest{display:none}.ctools.away .ct-latest{display:inline-flex;color:var(--acc);border-color:var(--warn-line);width:auto;padding:0 10px;font-size:12px;font-weight:600}
+@media (pointer:coarse){.ctools button{width:40px;height:36px}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--mute);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:0;border-top:2px solid;vertical-align:middle;margin-right:5px}
+.zoomhint{font-size:12px;color:var(--faint);margin-top:6px}
+.hint-touch{display:none}@media (pointer:coarse){.hint-mouse{display:none}.hint-touch{display:inline}}
+
+/* ---------- tables ---------- */
+.tablewrap{max-height:660px;overflow:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{position:sticky;top:0;z-index:3;background:var(--s1);color:var(--mute);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;text-align:left;padding:10px 8px;cursor:pointer;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:hover{color:var(--text)}th.sorted{color:var(--acc)}th[data-dir=desc]::after{content:" ↓"}th[data-dir=asc]::after{content:" ↑"}
+/* a column that sorts shows ↕ under the mouse — out of the flow, so the heading doesn't move: after the name, or before it in a
+   right-aligned (number) column, where the space after is the cell's padding */
+@media (hover:hover){th[data-s]:not([data-s=fav]):not([data-dir=asc]):not([data-dir=desc]):hover::after{content:"↕";position:absolute;margin-left:3px;color:var(--faint);font-weight:400}
+  th.n[data-s]:not([data-dir=asc]):not([data-dir=desc]):hover::after{content:none}th.n[data-s]:not([data-dir=asc]):not([data-dir=desc]):hover::before{content:"↕";position:absolute;margin-left:-11px;color:var(--faint);font-weight:400}}
+td{padding:9px 8px;border-bottom:1px solid var(--row-line);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+tr.row{cursor:pointer;transition:background var(--dur-1) var(--ease)}tr.row:hover{background:var(--s2)}
+tr.row:focus{outline:none}tr.row:focus-visible{background:var(--s2)}tr.row:focus-visible>td:first-child{box-shadow:inset 3px 0 0 var(--focus)}   /* the row the arrows are on: an outline on a tr is cut or missing */
+tr.sel{background:var(--sel);box-shadow:inset 3px 0 0 var(--acc)}
+.coin{display:inline-flex;align-items:center;gap:8px}td .coin b{font-weight:500}   /* a row's ticker: the price and signal carry the weight */
+.coin i{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;font-style:normal;font-size:11px;font-weight:600;color:#fff;background:hsl(var(--h) 55% 38%);background:oklch(.5 .09 var(--h))}   /* oklch: every hue equally bright (in hsl yellow glared, blue sank) */
+@media (pointer:coarse){.favbtn{min-width:40px;min-height:40px;margin:-4px}}   /* the chart's star: a finger-sized target, the same place in the line */
+.favbtn{height:32px;width:32px;padding:0;border-radius:50%;font-size:18px;color:var(--faint);background:transparent;border-color:transparent}.favbtn:hover{color:var(--acc);background:var(--s2)}.favbtn.on{color:var(--acc)}
+.star{color:var(--faint);cursor:pointer;font-size:16px}.star{height:auto;padding:0;border:0;background:none;line-height:1;font-weight:400;min-width:0}   /* a button now (keyboard, screen readers); the touch padding below still wins */.star:hover{color:var(--mute)}.star.on{color:var(--acc)}
+/* one scale for the table and the signal breakdown: a thin track, tinted green below --a and red above --b (the channel's
+   edges, or RSI 30 / 70), a mark in the middle; the dot wears a ring of the background it sits on (--ring) */
+.gauge{--a:14.3%;--b:85.7%;--ring:var(--s1);display:inline-block;width:64px;height:4px;position:relative;vertical-align:middle;margin-right:8px;background:var(--s3);border-radius:2px}
+.gauge::before{content:"";position:absolute;inset:0;border-radius:inherit;opacity:.55;background:linear-gradient(90deg,var(--lo) var(--a),transparent var(--a) var(--b),var(--up) var(--b))}
+.gauge::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;border-left:1px solid var(--hover)}
+.gauge i{position:absolute;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;z-index:1;box-shadow:0 0 0 2px var(--ring)}
+tr.row:hover .gauge,tr.row:focus-visible .gauge{--ring:var(--s2)}tr.sel .gauge{--ring:var(--sel)}
+.gauge.wide{display:block;width:auto;height:6px;margin:0;border-radius:3px}.gauge.wide i{width:11px;height:11px;margin:-5.5px 0 0 -5.5px}
+.gauge.rsi{--a:30%;--b:70%}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--s3);color:var(--tag-t);white-space:nowrap}
+.tag.weak{opacity:.55;filter:saturate(.6)}   /* a confirmed reversal below the bot threshold: visible, but not an invitation */
+#more.dot{position:relative}#more.dot::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--acc)}   /* table filters are on */
+.filters select.on{border-color:var(--acc);color:var(--text)}   /* a table filter that is set */
+.fchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-2px 0 10px;font-size:12px}
+.fhint{flex-basis:100%;color:var(--mute);font-size:12px;line-height:1.45}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;border:1px solid var(--acc);background:var(--accbg);color:var(--text);font-size:12px;cursor:pointer}
+.chip span{color:var(--mute);font-size:14px;line-height:1}.chip:hover span{color:var(--text)}.chip.clear{border-color:var(--line2);color:var(--mute)}
+@media (pointer:coarse){.chip{height:36px}}
+.whint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 14px;border-radius:var(--r);background:var(--s3);border:1px solid var(--line2);color:var(--text);font-size:12px;pointer-events:none;opacity:0;transition:opacity var(--dur-1) var(--ease);z-index:3;white-space:nowrap}.whint.show{opacity:1;transition-duration:var(--dur-2)}
+.botnow{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;border:1px solid var(--line);border-radius:var(--r);background:var(--s1);cursor:pointer;font-size:14px}.botnow:hover{border-color:var(--line2)}.botnow:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
+@media(max-width:560px){.botnow{display:block}.bn-dot{display:inline-block;margin-right:8px;vertical-align:1px}.bn-main{display:inline}.bn-go{display:block;margin-top:6px}
+  .bn-last{display:none}}   /* the phone's first screen is for the coins; the last trade is in «Журнал» one tap away */
+.tag.up{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.lo{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sq{background:var(--accbg);color:var(--acc-t)}
+.tag.upc{background:var(--sig-up);color:#fff}.tag.loc{background:var(--sig-lo);color:#fff}
+.tag.uo{background:transparent;color:var(--up-t);box-shadow:inset 0 0 0 1px var(--bad-line)}.tag.lout{background:transparent;color:var(--lo-t);box-shadow:inset 0 0 0 1px var(--ok-line)}
+.tag.tp{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sl{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.ts{background:var(--s3);color:var(--tag-t)}
+td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:1.5;text-wrap:pretty}td.tbl-empty button{margin:8px auto 0;display:flex}   /* a long «why empty» wraps instead of widening the table */
+.tbl-err{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 12px;text-align:center;white-space:normal}.tbl-err button{margin-top:8px}
+.sk td{color:transparent}
+.sk td::after{content:"";display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:sk 1.2s infinite}
+@keyframes sk{to{background-position:-200% 0}}
+#refresh.busy{color:var(--acc)}#refresh.busy svg{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+#btStatus.busy::before{content:"";display:inline-block;width:11px;height:11px;margin-right:8px;vertical-align:-1px;border:2px solid var(--line2);border-top-color:var(--acc);border-radius:50%;animation:spin .9s linear infinite}
+.btmore td{text-align:center;padding:12px}.btmore button{width:100%;max-width:320px}
+
+/* ---------- signal breakdown ---------- */
+.detail{margin-top:12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+/* no frame inside a frame (DESIGN-RULES п. 66): inside a panel a block stands out by its surface step, its own line goes
+   transparent (the size stays, nothing moves); controls (buttons, fields, segments) keep their borders */
+.panel :is(.detail,.tablewrap,canvas),.detail .plan{border-color:transparent}.detail .plan{background:var(--s3)}
+/* walls in the coin card: sells above the price, buys below, as in a book */
+.cwh{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap;margin-bottom:8px}.cwh .ptitle{margin:0}
+.cwl{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:6px 20px;align-items:baseline;font-size:13px}
+@media(max-width:420px){.cwl{column-gap:14px}}   /* 320 px: «$0.000005077  −1.68%  $1.4M» fits */
+.cwr{display:contents}.cwr>:not(:first-child){text-align:right}
+.cwg,.cwp{grid-column:1/-1;font-size:12px}.cwg.ask{color:var(--up-t)}.cwg.bid{color:var(--lo-t)}.cwg:not(:first-child){margin-top:2px}
+.cwp{color:var(--mute);border-block:1px dashed var(--line);padding:4px 0}.cwp b{color:var(--text);font-weight:500}
+.cwm{font-size:13px}.cwn{font-size:12px;margin-top:10px;line-height:1.45;text-wrap:pretty}.cwalls:empty{display:none}
+.verdict{font-size:14px;margin-bottom:10px;line-height:1.55}.verdict b{color:var(--acc)}
+.scales{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px;margin:4px 0 14px}.detail .gauge{--ring:var(--s2)}
+.sch{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:12px;color:var(--mute)}.sch b{font-size:16px;font-variant-numeric:tabular-nums}
+.sca{position:relative;height:14px;margin-top:5px;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}.sca span{position:absolute;transform:translateX(-50%)}
+/* the search's hotkey shown in the field, with a mouse and a keyboard only; gone while typing (the ✕ takes its place) */
+.search .skey{position:absolute;right:9px;top:50%;transform:translateY(-50%);pointer-events:none;display:none}
+@media (hover:hover) and (pointer:fine){.search .skey{display:block}#fs{padding-right:30px}.search input:focus~.skey,.search input:not(:placeholder-shown)~.skey{display:none}}
+/* distances under the range scale, laid out like it: the lower edge left, the centre in the middle, the upper edge right */
+.sdist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:8px}
+.sdist span{display:flex;flex-direction:column;gap:1px;min-width:0}.sdist span:nth-child(2){text-align:center}.sdist span:nth-child(3){text-align:right}
+.sdist i{font-style:normal;font-size:11px;color:var(--faint);white-space:nowrap}.sdist b{font-size:12px;font-weight:600;color:var(--text)}
+@media(max-width:400px){.scales{grid-template-columns:minmax(0,1fr)}}
+.comp{display:grid;grid-template-columns:150px 1fr 64px;gap:10px;align-items:center;font-size:12px;margin:6px 0}
+.comp .cb{height:6px;background:var(--s3);border-radius:3px;overflow:hidden}.comp .cb i{display:block;height:100%;background:var(--acc);border-radius:3px}
+.comp .cn{color:var(--mute)}.comp .cv{text-align:right;font-variant-numeric:tabular-nums}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:10px}
+/* the signal breakdown: the plan (entry, take, stop, take : stop), why it is a signal, the strength's parts folded away */
+.plan{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 12px;padding:10px 12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r)}
+.plan span{display:flex;flex-direction:column;gap:2px;min-width:0}.plan i{font-style:normal;font-size:11px;color:var(--faint);white-space:nowrap}
+.plan b{font-size:14px;font-weight:600;color:var(--text);overflow-wrap:anywhere}.plan em{font-style:normal;font-size:12px;font-variant-numeric:tabular-nums}
+.pnote{font-size:12px;margin:6px 0 12px;text-wrap:pretty}.ptitle.sm{font-size:13px;margin:0 0 6px}
+.why{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:5px;font-size:12px}.why li{display:flex;gap:8px;align-items:baseline;text-wrap:pretty}
+.why li span{flex:0 0 auto;width:12px;font-weight:600}.why li.faint{color:var(--mute)}
+.scales.one{grid-template-columns:minmax(0,1fr)}
+.scomp{margin-top:2px}.scomp>summary{cursor:pointer;font-size:12px;color:var(--blue);min-height:36px;display:flex;align-items:center}
+@media (max-width:380px){.plan{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---------- banners, intro, toasts ---------- */
+.banner{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:var(--r);border:1px solid var(--line);background:var(--s1);margin-bottom:14px;font-size:14px;line-height:1.55}
+.banner svg.i{width:20px;height:20px;margin-top:1px}
+.banner.ok{border-color:var(--ok-line);background:linear-gradient(0deg,rgba(34,197,94,.07),rgba(34,197,94,.07)),var(--s1)}.banner.ok svg{color:var(--lo)}
+.banner.warn{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}.banner.warn svg{color:var(--acc)}
+.banner.bad{border-color:var(--bad-line);background:linear-gradient(0deg,rgba(240,82,95,.08),rgba(240,82,95,.08)),var(--s1)}.banner.bad svg{color:var(--up)}
+.banner.info svg{color:var(--blue)}
+.banner .btrand{margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.banner .btrand button{margin-left:4px;vertical-align:middle}
+.banner b{color:var(--text)}.banner .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.banner.away{position:relative;margin-top:14px;padding:8px 48px 8px 14px;align-items:center;font-size:13px}   /* one line: the product is the first screen (DESIGN-RULES п. 61) */.away-x{position:absolute;top:6px;right:6px;width:36px;height:36px;padding:0;border:0;background:none;font-size:20px;line-height:1;color:var(--mute)}
+.intro{display:flex;gap:16px;align-items:flex-start;background:var(--intro);border:1px solid var(--intro-line);border-radius:var(--r);padding:16px 18px;margin-bottom:14px;font-size:14px}
+.intro ol{margin:6px 0 0;padding-left:18px;line-height:1.7}.intro .h{font-weight:600;font-size:16px}.intro button{margin-left:auto;flex:0 0 auto}
+/* touch screens: a tooltip shown by a tap (or a long press on a button), see "tooltips on touch screens" */
+.taptip{position:fixed;z-index:95;max-width:320px;background:var(--s2);color:var(--text);border:1px solid var(--line2);border-radius:var(--r);padding:8px 11px;font-size:13px;line-height:1.45;box-shadow:var(--shadow);pointer-events:none}
+.taptip[hidden]{display:none}
+#toasts{position:fixed;right:16px;bottom:16px;z-index:70;display:flex;flex-direction:column;gap:8px;width:min(380px,calc(100vw - 32px))}
+.toast{display:flex;gap:10px;align-items:flex-start;background:var(--s2);border:1px solid var(--line2);border-left:3px solid var(--blue);border-radius:var(--r);padding:11px 14px;box-shadow:var(--shadow);font-size:13px;animation:tin var(--dur-2) var(--ease);cursor:pointer}
+.toast.ok{border-left-color:var(--lo)}.toast.bad{border-left-color:var(--up)}.toast.warn{border-left-color:var(--acc)}
+.toast b{display:block;margin-bottom:2px}.toast .mute{font-size:12px}
+.toast{transition:transform var(--dur-1) var(--ease),opacity var(--dur-1) var(--ease)}.toast.out{transform:translateX(20px);opacity:0;pointer-events:none}   /* leaves quicker than it came */
+@keyframes tin{from{transform:translateY(10px);opacity:0}}
+
+/* ---------- guard popover ---------- */
+.guard{position:fixed;top:64px;right:16px;z-index:45;width:min(460px,calc(100vw - 32px));background:var(--s2);border:1px solid var(--line2);border-radius:var(--r);padding:14px 16px;font-size:13px;box-shadow:var(--shadow);line-height:1.6}
+.guard b{color:var(--lo);margin-right:8px}.guard.bad b{color:var(--up)}.guard.idle b{color:var(--acc)}
+.guard span{color:var(--mute);display:block;margin-top:4px}
+.guard:not(.open){display:none}
+
+/* ---------- server strip ---------- */
+.strip{display:flex;gap:1.5px;height:18px;margin:8px 0}.strip i{flex:1;border-radius:2px;background:var(--s3)}.strip i.ok{background:var(--sig-lo)}.strip i.err{background:var(--bad)}.strip i.warn{background:var(--acc)}
+
+/* ---------- docs ---------- */
+.doc{line-height:1.6}.doc p,.doc li{max-width:820px}.doc h3{color:var(--text);font-size:18px;margin:26px 0 8px}.doc h3:first-child{margin-top:0}
+.doc code{background:var(--s3);padding:1px 6px;border-radius:5px;font-size:12px}
+.doc li{margin:5px 0}
+/* «Учёба» (renderLearn): the list of modules and a lesson. On a phone it has no tab of its own: «Справка» switches to it (.hsw) */
+.hsw{display:none}.hsw a.tab{color:var(--mute);text-decoration:none;justify-content:center}.hsw a.tab.on{color:var(--text)}
+.lmods{display:grid;gap:12px}
+.lmh{display:flex;gap:12px;align-items:flex-start}.lmt{flex:1;min-width:0}
+.lnum{flex:0 0 auto;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accbg);color:var(--acc-t);font-weight:600;font-variant-numeric:tabular-nums}
+.lmod h3{margin:3px 0 4px;font-size:18px;text-wrap:balance}.lmod .lead{margin:0;color:var(--mute);max-width:760px;text-wrap:pretty;line-height:1.5}
+.lprog{flex:0 0 auto;white-space:nowrap;font-size:12px;color:var(--mute);font-weight:400;font-variant-numeric:tabular-nums;margin-top:6px}
+.llist{list-style:none;margin:10px 0 0;padding:0 0 0 44px;display:grid;gap:2px}
+.lmod.soon{background:transparent}.lmod.soon .lnum{background:var(--s2);color:var(--mute)}.lmod.soon .llist li{padding:3px 0;color:var(--mute);font-size:14px}
+.lrow{display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 10px;margin-left:-10px;border-radius:var(--r-s);color:var(--text);text-decoration:none;transition:background var(--dur-1) var(--ease)}
+.lrow:hover{background:var(--s2)}.lrow .lt{flex:1;min-width:0;text-wrap:pretty}
+.ln{flex:0 0 1.3em;color:var(--faint);font-variant-numeric:tabular-nums;text-align:right}
+.lm{color:var(--faint);font-size:12px;white-space:nowrap}
+.lck{flex:0 0 18px;color:var(--lo-t)}.lck .i{width:18px;height:18px;display:block}
+.lgo{margin-bottom:12px}.lgo a{color:var(--text);font-weight:600}
+.lsk{display:grid;gap:10px}.lsk i{display:block;height:14px;border-radius:6px;background:var(--s2)}.lsk i:first-child{width:40%;height:18px}.lsk i:nth-child(2){width:75%}.lsk i:nth-child(3){width:60%}.lsk i:nth-child(4){width:65%}
+.lgrid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;align-items:start}
+.ltoc{position:sticky;top:70px}
+.ltoc summary{list-style:none;display:flex;gap:8px;align-items:baseline;justify-content:space-between;font-weight:600;font-size:14px;padding:2px 10px 6px;text-wrap:balance}
+.ltoc summary::-webkit-details-marker{display:none}
+.ltoc ol{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.ltoc a{display:flex;align-items:center;gap:8px;min-height:36px;padding:6px 10px;border-radius:var(--r-s);color:var(--mute);text-decoration:none;font-size:14px;line-height:1.35;transition:background var(--dur-1) var(--ease)}
+.ltoc a:hover{background:var(--s2);color:var(--text)}.ltoc a[aria-current]{background:var(--s3);color:var(--text)}.ltoc a .lt{flex:1;min-width:0;text-wrap:pretty}
+.ltoc .lck{width:16px;height:16px;flex-basis:16px}
+.ltoc .lall{margin-top:6px}.ltoc .lall .i{width:14px;height:14px}
+.lart{min-width:0}.lart h2{margin:0 0 12px;font-size:24px;line-height:1.25;text-wrap:balance}.lart h2:focus{outline:none}.lart h2:focus-visible{outline:2px solid var(--acc);outline-offset:4px;border-radius:4px}
+.lmeta{font-size:12px;margin-bottom:6px}
+.lart .tablewrap{margin:10px 0 14px;max-width:820px}.ltab :is(td,th):not(:first-child){text-align:right;white-space:nowrap}.lart table td,.lart table th{font-variant-numeric:tabular-nums}
+/* lesson schemes (learn.js fig): inline SVG, colours only through tokens, so both themes; ≤ 400 wide so the labels stay text-sized */
+.lfig{margin:16px 0 20px;max-width:420px;padding:14px 10px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--s2)}.lfig svg{display:block;width:100%;height:auto;overflow:visible}
+.lfig figcaption{margin:10px 2px 0;padding-top:8px;border-top:1px solid var(--line);font-size:13px;line-height:1.5;color:var(--mute);text-wrap:pretty}
+.lfig text{font-family:var(--sans);font-size:13px;fill:var(--mute)}.lfig .t2{fill:var(--text);font-weight:600}.lfig .sm2{font-size:12px}.lfig .tu{fill:var(--up-t)}.lfig .tl{fill:var(--lo-t)}
+.lfig .fu{fill:var(--up)}.lfig .fl{fill:var(--lo)}.lfig .fa{fill:var(--acc)}.lfig .fm{fill:var(--mid)}.lfig .bg{fill:var(--s3)}.lfig .band{fill:var(--c-band)}.lfig .zone{fill:var(--accbg)}
+.lfig .su{stroke:var(--up)}.lfig .sl{stroke:var(--lo)}.lfig .sa{stroke:var(--acc);stroke-linecap:round}.lfig .sm{stroke:var(--mid)}.lfig .ax{stroke:var(--c-axis)}.lfig .pr{stroke:var(--c-price)}.lfig .dash{stroke-dasharray:4 3}
+/* «Главное»: the lesson in three lines, before the text */
+.lkey{margin:4px 0 18px;padding:10px 14px 10px 16px;border-left:3px solid var(--acc);border-radius:0 var(--r-s) var(--r-s) 0;background:var(--s2);max-width:820px;font-size:14px;line-height:1.5}
+.lkey h3{margin:0 0 4px!important;font-size:13px!important;color:var(--acc-t)!important;font-weight:600}.lkey ul{margin:0;padding-left:18px}.lkey li{margin:2px 0;text-wrap:pretty}
+/* «Источники»: a reference list in small type at the end, as papers keep one */
+.lsrc{margin-top:22px;padding-top:12px;border-top:1px solid var(--line);max-width:820px;font-size:12px;line-height:1.5;color:var(--mute)}
+.lsrc h3{margin:0 0 6px!important;font-size:13px!important;color:var(--mute)!important;font-weight:600}
+.lsrc ol{margin:0;padding-left:18px;display:grid;gap:6px}.lsrc li{max-width:none;text-wrap:pretty}.lsrc a{color:var(--text)}.lsrc .lsn{color:var(--faint)}
+.ltry{margin-top:22px;padding:14px 16px;border:1px solid var(--line2);border-radius:var(--r);background:var(--s2);max-width:820px}
+.ltry h3{margin:0 0 6px!important}.ltry p{margin:0 0 4px}
+.lta{display:grid;gap:10px;margin-top:10px}.lta>div{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}.lta .mute{font-size:13px;text-wrap:pretty}
+.lend{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--line);max-width:820px}
+.lend #lDone[aria-pressed=true]{color:var(--lo-t)}.lnext{margin-left:auto;color:var(--text)}
+@media(max-width:700px){.top .tab[data-t=learn]{display:none}.hsw{display:flex}.hsw .tab{flex:1}#learn .phead p{display:block;font-size:13px}   /* phones hide page leads; this one carries «не финансовый совет» */
+  .lgrid{grid-template-columns:minmax(0,1fr);gap:12px}.ltoc{position:static;background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:8px 6px}
+  .ltoc summary{cursor:pointer;min-height:36px;align-items:center;padding:4px 8px}.ltoc summary::after{content:"";width:8px;height:8px;border:solid var(--mute);border-width:0 2px 2px 0;transform:rotate(45deg);margin:0 4px 3px 0;flex:0 0 auto}
+  .ltoc details[open] summary::after{transform:rotate(-135deg);margin-bottom:-3px}.ltoc ol{margin-top:4px}
+  .llist{padding-left:0}.lart h2{font-size:20px}.lnext{margin-left:0}.lend>*{flex:1 1 100%}.lend #lDone{justify-content:center}}
+@media(min-width:701px) and (max-width:1000px){.lgrid{grid-template-columns:minmax(0,1fr)}.ltoc{position:static}}   /* a narrow window: the module's list above the lesson */
+@media(min-width:701px) and (max-width:1120px){.top .tab[data-t=learn] .tt{display:none}.top .tab[data-t=learn]{padding:0 10px}}
+.gloss{display:grid;grid-template-columns:210px 1fr;gap:8px 18px;font-size:13px}.gloss b{color:var(--text)}.gloss span{color:var(--mute)}
+.gloss+.glall{margin:8px 0 0;font-size:13px}.glall a{display:inline-flex;align-items:center;min-height:36px}
+/* a term in a lesson (learn.js <dfn data-term>): a dotted underline; a hint under it on hover, a tap or Enter (learnTip) */
+.lart{position:relative}
+/* the vertical padding only widens the tap area to 36+ px (an inline box's padding doesn't move the lines); the highlight stays on the text */
+.lart dfn[data-term]{font-style:normal;text-decoration:underline dotted var(--mute);text-underline-offset:3px;cursor:help;padding:9px 0;background-clip:content-box;transition:background var(--dur-1) var(--ease)}
+.lart dfn[data-term]:hover,.lart dfn[aria-expanded=true]{background-color:var(--accbg)}.lart dfn[data-term]:focus{outline:none}
+.lart dfn[data-term]:focus-visible{background-color:var(--accbg);text-decoration:underline solid var(--acc-t) 2px}
+.ltip{position:absolute;z-index:30;display:grid;gap:4px;width:max-content;max-width:min(320px,calc(100vw - 16px));padding:10px 12px;border:1px solid var(--line2);border-radius:var(--r-s);background:var(--s1);box-shadow:var(--shadow);font-size:14px;line-height:1.45;text-wrap:pretty;
+  opacity:0;transition:opacity var(--dur-1) var(--ease)}.ltip.open{opacity:1;transition-duration:var(--dur-2)}
+.ltip b{color:var(--text)}.ltip span{color:var(--mute)}.ltip a{display:inline-flex;align-items:center;gap:4px;min-height:36px;color:var(--acc-t);font-weight:600;justify-self:start}
+/* «Проверьте себя»: answers are buttons; after one, the right answer gets ✓, a wrong pick ✕ — not colour alone */
+.lchk{margin-top:22px;max-width:820px}.lchk>h3{margin:0 0 6px!important}
+.lq{margin:0 0 14px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.lq legend{float:left;width:100%;padding:0;font-weight:600;color:var(--text);line-height:1.45;text-wrap:pretty}   /* float: inside the card, not on its border */
+.lqa{clear:both;display:grid;gap:6px;padding-top:8px}
+.lqa button{height:auto;min-height:40px;padding:8px 12px;justify-content:flex-start;text-align:left;font-weight:400;line-height:1.4;white-space:normal}
+.lqa button::before{content:"";flex:0 0 16px;font-weight:600;text-align:center}
+.lqa button.ok{border-color:var(--ok-line);color:var(--lo-t)}.lqa button.ok::before{content:"✓"}
+.lqa button.no{border-color:var(--bad-line);color:var(--up-t)}.lqa button.no::before{content:"✕"}
+.lqw{margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--mute);text-wrap:pretty}.lqw:empty{display:none}.lqw b{color:var(--text)}
+/* «Словарь» (#learn/gloss): every term, a filter, the lessons that use it */
+.lgl{display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 14px}.lgl a{display:inline-flex;align-items:center;gap:6px;min-height:36px;color:var(--text)}
+.lgpage{max-width:900px}.lgpage h2{margin:0 0 8px;font-size:24px;text-wrap:balance}.lgpage h2:focus{outline:none}
+.lgq{width:100%;max-width:360px;margin:6px 0 14px}
+.gdl{margin:0;display:grid;gap:2px}.gdl>div{padding:10px 12px;border-radius:var(--r-s);scroll-margin-top:90px}.gdl>div:focus{outline:none}.gdl>div:focus-visible{outline:2px solid var(--focus)}
+.gdl dt{font-weight:600;color:var(--text)}.gdl dd{margin:2px 0 0;color:var(--mute);line-height:1.5;text-wrap:pretty}
+.gdl .gu{display:block;margin-top:4px;font-size:12px;color:var(--faint)}.gdl .gu a{color:var(--mute)}
+.cl-item{border-left:2px solid var(--line2);padding:2px 0 2px 18px;margin:0 0 22px;position:relative}
+.cl-item::before{content:"";position:absolute;left:-6px;top:6px;width:10px;height:10px;box-sizing:border-box;border-radius:50%;background:var(--s3);border:2px solid var(--line2)}   /* border-box: * {} doesn't reach ::before, and a 14 px dot sat 2 px off the line */
+.cl-item:first-child::before{background:var(--acc);border-color:var(--acc)}
+.cl-item ul{margin:6px 0 0;padding-left:18px}
+.clold>summary{cursor:pointer;font-weight:600;padding:6px 0 14px;color:var(--blue)}.clold>summary .mute{font-weight:400}
+
+/* ---------- trade card ---------- */
+.modal{position:fixed;inset:0;background:var(--backdrop);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow:auto}
+.mbox{background:var(--s1);border:1px solid var(--line2);border-radius:var(--r-l);width:min(1400px,100%);padding:18px;box-shadow:var(--shadow)}
+.mhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.mhead h2{margin:0;font-size:18px}.mhead .mute{font-size:13px}.mhead button{margin-left:auto}
+.mgrid{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"chart aside" "why aside";align-content:start;gap:14px}
+.mgrid>:first-child{grid-area:chart}#maside{grid-area:aside}#mwhy{grid-area:why}#maside>h4:first-child{margin-top:0}
+.twhy{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 28px;align-items:start}
+@media(max-width:1100px){.mgrid{grid-template-areas:"chart" "aside" "why"}}
+@media(max-width:700px){.twhy{grid-template-columns:minmax(0,1fr)}}
+#tcv{height:560px}
+/* trade card aside: the result on top, the price between stop and take, then the numbers as two-column tiles */
+.thero{background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.thero-k{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.thero-v{display:flex;align-items:baseline;gap:10px;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.thero-v b{font-size:32px;font-weight:600;line-height:1.15}.thero-v span{font-size:16px;font-weight:600}
+.thero-s{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.tpath{margin-top:14px}
+.tpath-bar{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--c-hi),var(--s3) 50%,var(--c-lo2))}
+.tpath-bar i{position:absolute;top:0;bottom:0;border-radius:3px;background:var(--mid)}.tpath-bar i.pos{background:var(--lo)}.tpath-bar i.neg{background:var(--up)}
+.tpath-bar b{position:absolute;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;box-sizing:border-box;border:2px solid var(--s2)}
+.tpath-bar b.te{background:var(--c-trade)}.tpath-bar b.tc{background:var(--text)}.tpath-bar b.tc.pos{background:var(--lo)}.tpath-bar b.tc.neg{background:var(--up)}
+.tpath-l{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.tpath-l b{font-weight:600}
+.ttiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.ttiles>div{background:var(--s2);padding:9px 12px;min-width:0}
+.ttiles span{display:block;font-size:12px;color:var(--mute)}
+.ttiles b{display:block;margin-top:2px;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ttiles i{display:block;font-style:normal;font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums}
+.ttiles:has(>div:nth-child(odd):last-child)>div:last-child{grid-column:span 2}   /* an odd tile out takes the whole row */
+.aside h4{margin:14px 0 8px;font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+.foot{text-align:center;color:var(--faint);font-size:12px;margin-top:18px}
+.sfoot{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0 16px;color:var(--faint);font-size:12px;margin-top:22px}.sfoot a{color:var(--mute);text-underline-offset:2px}
+@media(pointer:coarse){.sfoot a{display:inline-flex;align-items:center;min-height:36px}.doc a{padding:10px 0}}   /* a link inside text: the padding widens the tap area, not the line */
+
+/* ---------- progressive disclosure ---------- */
+#hdr{display:none}
+.fl{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--mute)}.fl.inl{flex-direction:row;align-items:center;gap:8px;height:var(--h)}
+div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.bstate{font-size:13px;margin-top:12px;padding:10px 12px;background:var(--s2);border:1px solid var(--line);border-radius:var(--r);line-height:1.55}
+.prof{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);margin-bottom:6px;background:var(--s1)}
+.prof.on{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
+.prof b{font-size:14px}.prof .ps{font-size:12px;color:var(--mute);flex:1;min-width:0}.prof .pa{display:flex;gap:6px}.prof .pa button{height:30px;padding:0 10px;font-size:12px}
+/* ---------- live charts with the order book (beta.js; ids, file and keys keep the name «beta» from its test days): the card's
+   «Стакан» and the market's «Развернуть» ---------- */
+.bgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.bbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.bsym{flex:0 1 160px}.bsym input{width:100%}
+.ind-btn{gap:8px;font-weight:600}.ind-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:12px;font-weight:600}
+#btOut{transition:opacity var(--dur-2) var(--ease)}#btOut.stale{opacity:.45}
+.bchart{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+.bpanes{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);min-width:0}.bpanes[data-lay="2"],.bpanes[data-lay="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
+.bpane{position:relative;min-width:0;border-radius:10px;outline:1px solid transparent;outline-offset:2px;transition:outline-color var(--dur-1) var(--ease);container:bpane/inline-size}
+.bpanes:not([data-lay="1"]) .bpane.on{outline-color:var(--blue)}
+.bph{display:flex;align-items:baseline;gap:8px;font-size:12px;color:var(--mute);padding:0 2px 4px;min-width:0}.bph .lg{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-variant-numeric:tabular-nums;color:var(--text)}.bph .lg>span{margin-right:3px}.bph .lg i{font-style:normal;color:var(--faint);margin-right:2px}.bph b{color:var(--text)}.bpane.on .bph b{color:var(--blue)}
+/* a narrow chart (phone, 2 or 4 charts): the candle legend gets its own lines under the coin, wrapped between values, never cut */
+@container bpane (max-width:560px){.bph{flex-wrap:wrap;row-gap:2px}.bph .lg{order:5;flex:1 1 100%;white-space:normal;overflow:visible;line-height:1.45}.bph .lg>span{white-space:nowrap}}
+.bcv{display:block;width:100%;height:clamp(440px,64vh,760px);cursor:crosshair;touch-action:pan-y}
+.bpanes[data-lay="2"] .bcv{height:clamp(400px,60vh,720px)}.bpanes[data-lay="4"] .bcv{height:clamp(240px,33vh,400px)}
+.bpane.tool .bcv{cursor:copy;touch-action:none}   /* with a drawing tool a finger draws, it doesn't scroll the page */
+.bbar-r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.pick-btn{gap:6px;font-weight:600}.pick-btn .i{width:15px;height:15px}.pick-btn[aria-pressed=true]{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
+/* backtest form: one card, a titled section per kind of setting (docs/PLAN-UNTANGLE-backtest.md) */
+.btform{margin-bottom:12px}.btsec{padding:12px 0;border-top:1px solid var(--line)}.btsec:first-child{padding-top:0;border-top:0}.btsec .fields{align-items:flex-end}
+.btrrfib{align-self:center;font-size:12px;max-width:40ch;text-wrap:pretty}
+.bthint{margin:8px 0 0;font-size:12px;color:var(--mute);max-width:72ch;text-wrap:pretty}.bthint:empty{display:none}
+#btAdv>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;min-height:36px;padding:8px 28px 0 0;position:relative}
+#btAdv>summary::-webkit-details-marker{display:none}#btAdv>summary h4{margin:0}#btAdv>summary .mute{font-size:12px;text-wrap:pretty}
+#btAdv>summary::after{content:"";position:absolute;right:6px;top:12px;width:7px;height:7px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform var(--dur-2) var(--ease)}
+#btAdv[open]>summary::after{transform:rotate(-135deg)}#btAdv[open]>summary{margin-bottom:10px}#btAdv{padding-bottom:4px}
+.btacts{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding-top:12px;border-top:1px solid var(--line)}#btRun{height:var(--h);padding:0 22px}#btSave{height:var(--h)}
+.bttrust{margin-top:12px}.bttrust .banner{margin:0}.bthold{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;margin-top:12px}.bthold .tablewrap{flex:1 1 320px;min-width:0}
+#btWarn:not(:empty){margin-top:12px;display:grid;gap:8px}#btWarn .banner{margin:0}
+.btcache{font-size:12px;margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}.btcache button{height:var(--h);font-size:13px}
+@media(max-width:700px){.btacts>*{flex:1 1 100%}#btRun{height:44px}}
+.btpre{display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap}.btpre .faint{font-size:12px}.btpre button{height:var(--h);font-size:13px}@media(max-width:700px){.btpre{margin-left:0;flex:1 1 100%}.btpre .faint{flex:1 1 100%}.btpre button{flex:1 1 auto;white-space:nowrap}}
+.ctools .ct-yauto{display:none}.ctools .ct-yauto.show{display:inline-flex;color:var(--acc);border-color:var(--warn-line)}
+.bcv:focus{outline:none}.bcv:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}   /* keyboard focus stays visible in the one-chart layout too (the pane outline shows only in multi-chart layouts) */
+.bpop.help{width:min(380px,calc(100vw - 32px))}.hks{display:grid;gap:7px}.hk{display:grid;grid-template-columns:128px 1fr;gap:10px;font-size:12px;line-height:1.35}.hk b{font-weight:600}.hk span{color:var(--mute)}
+.ind-lbl{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--mute);margin:-2px 0 10px;cursor:pointer}.ind-lbl input{accent-color:var(--blue)}
+.ind-chip{display:inline-flex;gap:6px;align-items:center}.ind-chip .i{width:14px;height:14px}.btools .tab .i,.ctools .i{width:17px;height:17px}.ctools .ct-yauto.show{width:auto;padding:0 9px;gap:5px;font-size:12px;font-weight:600}#bLay .tab .i{width:17px;height:17px}.sel-it button .i{width:15px;height:15px}
+@media(max-width:700px){.bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.bchips::-webkit-scrollbar{display:none}.bchip,.bchip-t{flex:0 0 auto}.bchips .bchip{max-width:none}.bchip .s{max-width:96px}}
+#bMktBtn.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
+.bpop.fpp{width:min(380px,calc(100vw - 32px))}.fps{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-bottom:10px;font-size:12px;color:var(--mute)}.fps span{display:grid;gap:1px}.fps b{font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}.fpr{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:6px;font-size:12px;padding:4px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}.fpr span:not(:first-child){text-align:right}.fph{color:var(--faint);font-size:11px;border-top:0}
+.bmain{position:relative}#bLive{min-width:0;max-width:100%}#bLive .live{white-space:normal;align-items:flex-start;line-height:1.4}#bLive .live i{margin-top:5px;flex:0 0 auto}
+.bhead-r{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.bhead-r:empty{display:none}
+@media(max-width:700px){.bhead-r{align-items:flex-start}}
+.bchips{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:0 2px 6px;min-height:0}.bchips:empty{display:none}
+.bchip-t,.bchip{display:inline-flex;align-items:center;gap:5px;height:26px;border:1px solid var(--line);border-radius:8px;background:var(--s1);font-size:12px;color:var(--text)}
+.bchip-t{padding:0 8px;color:var(--mute);font-weight:600}.bchip-t .i{width:14px;height:14px}.bchip-t[aria-expanded=true]{color:var(--blue);border-color:var(--blue)}
+.bchip{padding:0 2px 0 8px;max-width:100%}.bchip b{font-weight:600;white-space:nowrap}.bchip .s{color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;font-variant-numeric:tabular-nums}
+.bchip button{width:22px;height:22px;padding:0;border:0;background:transparent;color:var(--faint);display:inline-grid;place-items:center}.bchip button:hover{color:var(--text);background:var(--s2)}.bchip button .i{width:13px;height:13px}
+.bchip.off{opacity:.5}.bchip.off b{text-decoration:line-through}
+/* 2 and 4 charts: the chips stay one line that scrolls sideways (the wheel scrolls it too), so they don't eat the chart's height */
+.bpanes:not([data-lay="1"]) .bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.bpanes:not([data-lay="1"]) .bchip,.bpanes:not([data-lay="1"]) .bchip-t{flex:0 0 auto;max-width:none}.bpanes[data-lay="4"] .bchip .s{display:none}
+.sel-cfg .pf{display:grid;gap:7px;font-size:12px;color:var(--mute)}.sel-cfg .pf>span{display:flex;justify-content:space-between;gap:8px}.sel-cfg .pf b{color:var(--blue);font-weight:600}
+.pseg{display:flex;gap:4px;flex-wrap:wrap}.pseg button{height:30px;padding:0 10px;font-size:12px;font-weight:600}.pseg button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.btools .tab{min-width:34px;padding:0 9px;font-weight:600}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue);color:#fff}
+.bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin var(--dur-2) var(--ease)}
+.bhint button{height:28px;padding:0 10px;font-size:12px}
+.bph .bpx{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text)}.bph .live{font-size:12px}
+/* where the full label doesn't fit, «Индикаторы» keeps a short one: an icon and a number alone don't say what the button is */
+.ib-s{display:none}
+@media(max-width:1250px){#bIndBtn .ib-t{display:none}#bIndBtn .ib-s{display:inline}}
+/* the coin card's two views: «Канал» (the channel chart) and «Стакан» (the charts' bar and one chart, moved in from beta.js's
+   place). In the card the coin comes from the card (its search, the list), so the charts' own coin field and layout hide */
+#cpanel.ob #cpair,#cpanel.ob #ulv,#cpanel.ob>.legend,#cpanel.ob #sheet,#cpanel.ob #tfseg,#cpanel.ob #cset,#cpanel:not(.ob) #cBeta{display:none}
+#cpanel:not(.ob) [data-bexp],#cpanel.ob [data-charts]{display:none}   /* «Развернуть» belongs to «Стакан»; the walls' link leads to it */
+#cExp{gap:6px;font-weight:600}
+/* «Развернуть»: the market at full width is the live charts' workspace (1 / 2 / 4 charts and their list) instead of the card,
+   the summary cards and the coin table */
+#market.bx>.grid,#market.bx>.cards,#market.bx>.botnow,#market.bx>.intro,#market:not(.bx)>#bWork{display:none}
+.bwh{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;margin-bottom:12px}#bCollapse{gap:4px;font-weight:600}
+.bwh #bLive{flex:1 1 240px;font-size:12px}
+.cbeta{margin-top:12px}.cbeta .bmain{padding:0;border:0;border-radius:0;background:none;box-shadow:none}
+.cbeta .bsym,.cbeta .bbar-r{display:none}.cbeta .bcv{height:clamp(440px,60vh,700px)}body.wide .cbeta .bcv{height:min(74vh,820px)}
+.cbeta #bLive{margin-top:8px;font-size:12px}
+/* the card's «Стакан» on a computer: one bar — the view switch, market, timeframe, history, indicators, «Рисование» (the nine
+   drawing buttons as one list) and «Развернуть»; the card's own switch and «Развернуть» above hide. In a narrow card the
+   buttons keep their icons only. The chart's line (OHLC…) shares a row with the folded indicator chips; open chips take a
+   row of their own. A phone keeps its rows (the sheet scrolls) */
+.bcm,#bDrawBtn,#bExpBtn{display:none}
+.cbeta{container:cbar/inline-size}.cbeta .bph b{display:none}   /* the coin is in the card's header */
+#bDrawBtn.on{color:var(--acc);border-color:var(--warn-line);background:var(--accbg)}
+@media(min-width:701px){
+  .cbeta .bcm,.cbeta #bDrawBtn,.cbeta #bExpBtn{display:inline-flex}.cbeta #bExpBtn{margin-left:auto}
+  .cbeta #bTools,#cpanel.ob .cact #cmode,#cpanel.ob .cact #cExp{display:none}
+  .cbeta .bpane{display:flex;flex-wrap:wrap;align-items:center;column-gap:6px}
+  .cbeta .bpane>.bchips{order:-1;flex:0 0 auto}.cbeta .bpane>.bchips.open{order:0;flex:1 1 100%}
+  .cbeta .bpane>.bph{flex:1 1 0;min-width:0;padding-bottom:6px}.cbeta .bpane>.cvwrap{flex:1 1 100%}
+}
+@container cbar (max-width:900px){.cbeta .bbar .ib-t{display:none}.cbeta #bIndBtn .ib-s{display:inline}}
+.bpop.draw{width:min(340px,calc(100vw - 32px))}.bpop.draw .pact button{flex:1;white-space:nowrap;padding:0 8px}.bpop .pdraw{display:grid;gap:4px}
+.bpop .pdraw button{justify-content:flex-start;gap:10px;height:38px;padding:0 10px;font-weight:600}.bpop .pdraw kbd{margin-left:auto}
+.bpop .pdraw button.on{background:var(--blue);border-color:var(--blue);color:#fff}.bpop.draw .pact button{gap:6px;font-size:12px}
+/* phone: the tool hint covers the chart's header (legend, chips), not the plot, and doesn't push the chart down — a chart that
+   moved under the finger between choosing a tool and drawing, and jumped back after it */
+@media(max-width:700px){#bLay [data-lay="4"]{display:none}.bhint{top:0;bottom:auto;left:0;right:0;transform:none;justify-content:space-between;white-space:normal;border-radius:12px;line-height:1.35}}
+@media(pointer:coarse) and (max-height:500px){#bLay [data-lay="4"]{display:none}}   /* a phone on its side: still two charts at most (SMALL in beta.js) */
+.bpop{position:absolute;z-index:30;background:var(--s1);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow);padding:14px;width:min(340px,calc(100vw - 32px));animation:popin var(--dur-2) var(--ease)}
+.bpop h4{margin:0 0 10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px}.bpop h4 button{width:30px;height:30px;padding:0}
+.bpop .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.bpop .pgrid button{height:36px;padding:0;font-weight:600}.bpop .pgrid button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.bpop .phint{font-size:12px;color:var(--faint);margin:10px 0 0;line-height:1.4}
+.bpop textarea{width:100%;min-height:64px;resize:vertical;font:inherit;font-size:14px}
+.bpop .pcols{display:flex;gap:8px;margin:10px 0}.bpop .pcols button{width:28px;height:28px;padding:0;border-radius:999px;border:2px solid transparent}.bpop .pcols button.on{border-color:var(--text)}
+.bpop .pact{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.bpop.cfg{width:min(360px,calc(100vw - 32px))}.bpop.cfg .sel-cfg{border-top:0;padding:0}
+
+.bnote{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:13px;color:var(--mute)}.bnote b{color:var(--text)}
+.bside .seg{margin-bottom:10px;display:flex}.bside .seg .tab{flex:1 1 auto;min-width:0;padding-inline:6px}
+.bls{margin-bottom:8px}.bls input{width:100%;height:36px;border:1px solid var(--line2);border-radius:10px;background:var(--s1);color:var(--text);font:inherit;font-size:13px}
+.blist{display:flex;flex-direction:column;gap:2px;max-height:calc(64vh + 60px);overflow:auto}
+.bli{display:grid;grid-template-columns:minmax(0,1fr) 64px auto;gap:8px;align-items:center;width:100%;height:auto;padding:8px 10px;border:0;border-radius:10px;background:transparent;text-align:left;justify-content:stretch;font-weight:500}
+.bli:hover{background:var(--s2);border:0}.bli.on{background:var(--s3)}
+.bli .bn b{display:block;font-size:14px}.bli .bn span{font-size:12px;color:var(--faint)}.bli svg{width:64px;height:26px}
+.bli .bp{text-align:right;font-size:12px;font-variant-numeric:tabular-nums}.bli .bp span{display:block;font-size:12px}
+.indbox{width:min(920px,100%);max-height:84vh}
+.ind-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 6px}.ind-h b{font-size:18px;display:flex;gap:8px;align-items:center}
+.ind-quick{padding:0 16px 8px}.ind-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ind-chip{height:32px;border-radius:999px;font-size:13px;padding:0 12px;gap:6px}.ind-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.ind-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;min-height:0;overflow:hidden;border-top:1px solid var(--line)}
+.ind-cats{overflow:auto;padding:10px 12px;max-height:56vh}.ind-sel{border-left:1px solid var(--line);padding:12px 14px;overflow:auto;max-height:56vh}
+.ind-selh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.ind-selh button{height:30px;font-size:12px}
+.ind-cat{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:var(--s1)}
+.ind-cat>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}.ind-cat>summary::-webkit-details-marker{display:none}
+.ind-it{display:flex;gap:12px;align-items:center;padding:10px 12px;margin:0 8px 8px;border-radius:10px;background:var(--s2)}
+.ind-it .ii{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:var(--blue);color:#fff;flex:0 0 auto}.ind-it .ii svg{width:17px;height:17px}
+.ind-it .it{flex:1;min-width:0}.ind-it .it b{display:block;font-size:14px}.ind-it .it span{font-size:12px;color:var(--faint);line-height:1.35;display:block}
+.ind-it button{width:34px;height:34px;padding:0}.ind-it.on button{background:var(--blue);border-color:var(--blue);color:#fff}
+.ind-it.soon{opacity:.55}.ind-it.soon .ii{background:var(--s3);color:var(--mute)}
+.sel-it{display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;font-size:13px}.sel-it span{flex:1}.sel-it button{width:30px;height:30px;padding:0;background:transparent;border-color:transparent}
+.sel-it .off{opacity:.45}
+.sel-it{flex-wrap:wrap}.sel-it.open{border-color:var(--blue)}.sel-it.open [data-cfg]{color:var(--blue)}
+.sel-cfg{flex:1 1 100%;display:grid;gap:12px;padding:8px 2px 2px;border-top:1px solid var(--line);margin-top:2px}
+.sel-cfg label{display:grid;gap:6px;font-size:12px;color:var(--mute)}.sel-cfg label>span{display:flex;justify-content:space-between;gap:8px}.sel-cfg b{color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.sel-cfg input[type=range]{width:100%;accent-color:var(--blue);height:24px}
+.sel-it .sel-def{width:auto;height:32px;padding:0 12px;justify-self:start;border:1px solid var(--line);background:var(--s2);font-size:12px}
+.bl-h{padding:12px 10px 6px;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}.bl-e{padding:4px 10px 8px;font-size:12px}
+@media(max-width:1100px){.bgrid{grid-template-columns:1fr}.blist{max-height:none}}
+/* phone: the Beta bar in three even rows (coin + indicators; market, timeframe, history, layout; drawing tools) and the
+   chart's layers and zoom on one line above it — four ragged rows and three lines of buttons pushed the chart off the screen */
+@media(max-width:700px){
+  .bmain{padding:10px}
+  .bbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:6px}
+  .bbar .bsym{grid-column:1/4}
+  .bbar #bIndBtn{grid-column:4;grid-row:1;justify-content:center}
+  #bMktBtn,#bTfBtn,#bRangeBtn{justify-content:center;min-width:0;font-size:13px}
+  .bbar .bbar-r{grid-column:4;grid-row:2;margin:0}
+  .bbar #bTools{grid-column:1/-1;display:flex;overflow-x:auto;scrollbar-width:none}.bbar #bTools::-webkit-scrollbar{display:none}
+  .bbar #bTools .tab{flex:1 1 0;min-width:0;padding:0}   /* all nine fit, «повторить» and «убрать всё» too: no hidden end of the row */
+  .bpane{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:6px}
+  .bpane>.bph{grid-column:1/-1}
+  .bpane>.cvwrap{display:contents}
+  .bpane>.bchips{grid-row:2;grid-column:1;padding-bottom:6px}
+  .bpane .ctools{grid-row:2;grid-column:2;margin:0 0 6px}
+  .bpane .bcv{grid-row:3;grid-column:1/-1}
+}
+@media(max-width:700px){.bbar{gap:6px}.bbar .bsym{flex:1 1 80px;min-width:0}.bbar .pick-btn,.bbar .ind-btn{padding:0 10px}.bbar-r{margin-left:auto}#bLink .ib-t{display:none}.btools .tab,#bLay .tab{min-width:30px;padding:0 6px}#bLink{padding:0 9px}.bbar-r{gap:6px}@media(max-width:420px){.ib-t{display:none}}.bpanes[data-lay]{grid-template-columns:minmax(0,1fr)}.bpanes[data-lay="1"] .bcv{height:58vh}.bpanes[data-lay="2"] .bcv,.bpanes[data-lay="4"] .bcv{height:44vh}.ind-body{grid-template-columns:1fr}.ind-sel{border-left:0;border-top:1px solid var(--line)}.indbox{max-height:92vh}}
+/* ---------- motion: short, soft, and off for people who asked their system for less motion ---------- */
+@keyframes pagein{from{opacity:0;transform:translateY(6px)}}
+@keyframes popin{from{opacity:0;transform:translateY(-4px) scale(.98)}}
+@keyframes fadein{from{opacity:0}}
+@keyframes sheetin{from{transform:translateY(24px);opacity:0}}
+@keyframes rowflash{0%,30%{background:var(--accbg)}100%{background:transparent}}
+section:not(.hidden){animation:pagein var(--dur-2) var(--ease)}
+.modal:not(.hidden),.cmdk:not(.hidden){animation:fadein var(--dur-1) var(--ease)}
+.modal:not(.hidden) .mbox,.cmdk:not(.hidden) .cmdbox,.cmdk:not(.hidden) .dlgbox{animation:popin var(--dur-2) var(--ease)}
+.evp.open,.guard.open{animation:popin var(--dur-2) var(--ease)}
+/* closing is quicker than opening (--dur-1 against --dur-2) and is a transition, so reopening halfway turns it back smoothly;
+   display waits for the fade (allow-discrete); browsers without it just hide */
+.modal,.cmdk,.evp,.guard,.bpop{transition:opacity var(--dur-1) var(--ease),display var(--dur-1);transition-behavior:allow-discrete}
+.modal.hidden,.cmdk.hidden,.evp:not(.open),.guard:not(.open),.bpop.hidden{opacity:0;pointer-events:none}
+details.dis[open]>.dbody{animation:pagein var(--dur-2) var(--ease)}
+.card,.prof,.btn,.botnow,button{transition:background var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}
+@media (hover:hover){.prof.pick:hover{transform:translateY(-1px)}}
+/* a press: buttons, tabs, chips, the bottom bar and row-buttons sink a little. Not the filter cards (cells of one strip) and
+   profiles (their transform is the hover lift), not fields, sliders or charts; nothing for people who asked for less motion */
+@media (prefers-reduced-motion:no-preference){button:not(:disabled):active,[role=button]:not(.card):active{transform:scale(.97)}}
+tr.row.newsig td{animation:rowflash 2.4s var(--ease)}
+/* a price that moved since the last update glows green / red for a moment (the arrow-less colour is a hint only: the number itself changed) */
+@keyframes tickup{0%,35%{color:var(--lo-t);background:var(--c-lo2)}}
+@keyframes tickdn{0%,35%{color:var(--up-t);background:var(--c-hi)}}
+.tick-up{animation:tickup 1s var(--ease)}.tick-dn{animation:tickdn 1s var(--ease)}
+/* shown for the first time (data-first, see firstShow): the balance line draws itself from the left, the ER bars fill up */
+@keyframes eqdraw{from{clip-path:inset(0 100% 0 0)}}
+@keyframes erfill{from{transform:scaleX(0)}}
+.hchart[data-first] svg{animation:eqdraw var(--dur-3) var(--ease)}
+.hchart[data-first] .hend{animation:fadein var(--dur-2) var(--ease) var(--dur-3) backwards}
+[data-first] .er-bar i{transform-origin:left;animation:erfill var(--dur-3) var(--ease)}
+@media(max-width:700px){body.sheet #cpanel{animation:sheetin var(--dur-2) var(--ease);transition:opacity var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+  body.sheet-out #cpanel{opacity:0;transform:translateY(24px);pointer-events:none}}   /* closeSheet: leaves quicker than it came */
+/* line breaks: headings and short titles balanced, short descriptions and list items without a lonely last word;
+   not tables, numbers, code or long text */
+h1,h2,h3,h4,.card .t,.toast b{text-wrap:balance}
+.phead p,.mhead .mute,.toast .mute,.sub,.hint,.hempty,.er-note,.bh-why,li:not(.doc li){text-wrap:pretty}
+/* theme switch: the new theme spreads as a circle from the button (View Transitions; browsers without it just swap) */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){animation:themereveal var(--dur-3) var(--ease)}
+@keyframes themereveal{from{clip-path:circle(0 at var(--vt-x,100%) var(--vt-y,0))}to{clip-path:circle(160vmax at var(--vt-x,100%) var(--vt-y,0))}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after,::view-transition-new(root){animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+/* "what's new" tab: a dot until the latest version has been seen */
+#ver.fresh{color:var(--acc);font-weight:600}#ver.fresh::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);margin-left:4px;vertical-align:2px}
+/* summary cards double as filter shortcuts */
+.card[data-cf]{cursor:pointer;transition:background var(--dur-1) var(--ease),box-shadow var(--dur-1) var(--ease)}.card[data-cf]:hover{background:var(--s2)}
+.card[data-cf].on{background:var(--sel);box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line),inset 0 -2px 0 var(--acc)}   /* the filter it set is on: a tint and a gold underline */
+.card[data-cf]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}   /* inside the strip: its overflow would cut an outer ring */
+.sheetbar{display:none}
+/* ---------- phone: the market is a list first; a coin's chart opens full screen ---------- */
+@media(max-width:700px){
+  #market .phead{margin-bottom:8px}#market .phead p{display:none}
+  .intro{padding:12px 14px;gap:10px;font-size:13px}.intro .h{font-size:14px}.intro ol li:not(:first-child){display:none}.intro ol{padding-left:16px}.intro button{height:36px}
+  .cards>.card{min-width:0;padding:8px 9px}.cards .card .s,.cards .meter{display:none}
+  .cards .card .t{font-size:11px}.cards .card .v{font-size:18px;margin:2px 0 0}
+  #market .grid{display:flex;flex-direction:column;align-items:stretch;gap:12px}
+  #market .tpanel{order:-1;padding:10px}
+  /* the search + quick filters stay under the header while scrolling the list */
+  .tpanel>.filters:first-child{position:sticky;top:59px;z-index:6;background:var(--s1);margin:-10px -10px 8px;padding:10px;border-radius:var(--r) var(--r) 0 0}
+  #cpanel{display:none}
+  body.sheet #cpanel{display:block;position:fixed;inset:0;z-index:60;overflow:auto;overscroll-behavior:contain;border:0;border-radius:0;background:var(--bg);padding:0 12px 24px}
+  body.sheet .sheetbar{display:flex;position:sticky;top:0;z-index:2;margin:0 -12px 10px;padding:8px 6px;background:var(--control-shine),var(--topbg);backdrop-filter:blur(var(--glass-blur-s));-webkit-backdrop-filter:blur(var(--glass-blur-s));border-bottom:1px solid var(--line);box-shadow:var(--glass-inset)}
+  .sheetbar button{background:transparent;border-color:transparent;color:var(--blue);font-weight:600;gap:2px;padding:0 8px;height:40px}
+  .sheetbar .sb-r{margin-left:auto;gap:6px}#cExp{display:none}   /* on a phone «Развернуть» sits in the sheet's bar */
+  body.sheet #cv{height:52vh}
+  #cpanel .cact .seg{flex:1}#cpanel .cact #cmode{flex:1 1 150px}   /* «Канал | Стакан» shares its row with the coin search */
+  #cpanel .cact .search{flex:1 1 112px;min-width:0}#cpanel .cact .search input{width:100%!important;min-width:0}   /* another coin by its ticker, without going back to the list */
+  #refresh{display:none}
+  /* chart toolbar above the canvas, not over it */
+  .cvwrap{display:flex;flex-direction:column-reverse}.ctools{position:static;opacity:1;margin-bottom:6px;flex-wrap:wrap}
+  .tpanel>.filters:first-child .seg{flex:1 1 auto;min-width:0}.tpanel>.filters:first-child .seg .tab{flex:1;padding:0 8px}
+}
+/* five quick filters on a narrow phone: «Бот» without its count (the line «Показано N из …» has it while the filter is on),
+   and at 320 tighter tabs that still keep 36 px for the finger */
+@container (max-width:620px){#cntBot{display:none}}   /* a narrow list (a phone, a computer with the card beside it): the refresh button stays on the row */
+@media(max-width:359px){#flseg .tab{flex:1 0 auto;padding:0 5px;min-width:36px}#flseg .cnt{display:none}}   /* at 320 the counts are in the summary cards above */
+/* the list's filter row: on a computer the quick filters and buttons keep their size; a phone puts the filter button next to
+   the search and gives the quick filters a row of their own, evenly (2.96) */
+.tpanel>.filters:first-child>#flseg,.tpanel>.filters:first-child>.icon{flex:0 0 auto}
+@media(max-width:700px){.tpanel>.filters:first-child>#more{order:1}.tpanel>.filters:first-child>#flseg{order:2;flex:1 1 100%}
+  .tpanel>.filters:first-child>.search{flex:1 1 0!important}}   /* beats the phones' «every search on its own row» */
+/* the coin table on one background: the pinned coin column and the header are opaque, and the panel's sheen under the
+   other cells made them look like dark blocks at «Ярко» */
+.tpanel .tablewrap{background:var(--s1)}
+/* a coin that didn't load this minute keeps its previous numbers, dimmed (scan); the chart's load error with «Повторить» */
+tr.row.stale{opacity:.55}
+#chartErr{margin:10px 0 0;align-items:center;flex-wrap:wrap;gap:8px 12px}#chartErr .bnact{margin-left:auto;display:flex;gap:8px}
+@media(min-width:701px){#chartList{display:none}}   /* the list is beside the card */
+.ctitle .shbtn{display:inline-grid;place-items:center;width:32px;height:32px;padding:0;border:0;background:none;color:var(--mute);vertical-align:middle}.ctitle .shbtn:hover{color:var(--text)}.ctitle .shbtn .i{width:18px;height:18px}
+@media(pointer:coarse){.ctitle .shbtn{width:40px;height:40px}}
+.chead .st[title]{cursor:help}
+/* a phone's live charts: «к последней свече» is an arrow (the full text pushed the toolbar over the indicator button), and
+   open indicator chips take the chart's width */
+@media(max-width:700px){
+  .bpane .ctools .ctl-t{display:none}.bpane .ctools.away .ct-latest{width:40px;padding:0;justify-content:center}
+  .bpane.chips-open>.bchips{grid-column:1/-1;grid-row:3;flex-wrap:wrap}.bpane.chips-open .bcv{grid-row:4}
+}
+/* the indicator window on a phone: the whole screen, «Все | Выбрано» instead of two lists squeezed one over the other,
+   quick picks in one row that scrolls sideways */
+.ind-tabs{display:none}
+@media(max-width:700px){
+  #bInd{padding:0}
+  #bInd .indbox{width:100%;height:100%;max-height:none;border-radius:0;display:flex;flex-direction:column}
+  #bInd .ind-tabs{display:flex;margin:2px 16px 10px}#bInd .ind-tabs .tab{flex:1;min-height:40px}#bInd .ind-chip{height:38px}   /* a finger's 36 px and more */
+  #bInd :is(.ind-it,.sel-it) button{width:40px;height:40px}#bInd .ind-selh button{height:40px}#bInd .ind-lbl{min-height:40px}
+  #bInd .ind-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}#bInd .ind-chips::-webkit-scrollbar{display:none}#bInd .ind-chip{flex:0 0 auto}
+  #bInd .ind-body{display:flex;flex-direction:column;flex:1;min-height:0}
+  #bInd .ind-cats,#bInd .ind-sel{flex:1;min-height:0;max-height:none;border:0;overscroll-behavior:contain}
+  #bInd .indbox:not(.sel-tab) .ind-sel,#bInd .indbox.sel-tab :is(.ind-cats,.ind-quick,.cmdin){display:none}
+}
+/* ---------- phone: trade tables become cards (coin, side and result first; details under them) ---------- */
+@media(max-width:700px){
+  .phead p{display:none}
+  .tablewrap:has(#jopen) thead,.tablewrap:has(#jclosed) thead,.tablewrap:has(#btTrades) thead{display:none}
+  /* the backtest's summaries by group (strength, side and exit, the two parts of the period): a card per group too, the group's
+     name over its five numbers, each with its name — the same as the trades under them, no sideways scroll */
+  :is(#btScore,#btSplit,#btPartsT) thead{display:none}
+  .tablewrap:has(:is(#btScore,#btSplit,#btPartsT)){overflow-x:hidden}
+  :is(#btScore,#btSplit,#btPartsT),:is(#btScore,#btSplit,#btPartsT) tbody{display:block;width:100%;min-width:0}
+  :is(#btScore,#btSplit,#btPartsT) tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  :is(#btScore,#btSplit,#btPartsT) td{display:block;padding:0;border:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  :is(#btScore,#btSplit,#btPartsT) td:first-child{grid-column:1/-1;font-weight:600;white-space:normal}
+  :is(#btScore,#btSplit,#btPartsT) td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--faint);font-weight:400}
+  .tablewrap:has(:is(#jopen,#jclosed,#btTrades)) :is(table,tbody){display:block;width:100%}.tablewrap:has(:is(#jopen,#jclosed,#btTrades)){overflow-x:hidden}
+  .sorthint{display:none}
+  #jclosed tr.jday,#jclosed tr.jday td{display:block}#jclosed tr.jday td{padding:14px 12px 6px}
+  #jopen,#jclosed,#btTrades{container:trades/inline-size}
+  /* the first column grows when an entry price is longer than it (spot prices of PEPE, SHIB: «$0.000005077», 12 signs);
+     the date keeps the column's own width (max-width), so only the price widens it */
+  #jopen tr.row,#jclosed tr.row,#btTrades tr.row{display:grid;grid-template-columns:minmax(112px,max-content) minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:11px 12px;border-bottom:1px solid var(--row-line)}
+  :is(#jopen,#jclosed,#btTrades) tr.row td:nth-child(1){max-width:112px}
+  #jopen tr.row td,#jclosed tr.row td,#btTrades tr.row td{display:none;padding:0;border:0;text-align:left}
+  /* closed trades (journal and backtest): 1 date · 2 coin · 3 side · 4 entry · 5 exit · 7 reason · 11 PnL · 12 R */
+  :is(#jclosed,#btTrades) tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(7),:nth-child(11),:nth-child(12)){display:block}
+  :is(#jclosed,#btTrades) tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry exit reason"}
+  :is(#jclosed,#btTrades) td:nth-child(2){grid-area:coin}:is(#jclosed,#btTrades) td:nth-child(3){grid-area:side;font-size:12px;font-weight:600}
+  :is(#jclosed,#btTrades) td:nth-child(11){grid-area:pnl;text-align:right}:is(#jclosed,#btTrades) td:nth-child(12){grid-area:r;text-align:right;font-size:12px}
+  /* backtest trades also show the signal strength (13), at the right end of the coin line: the «По силе сигнала» table
+     groups them by it. A column of its own would squeeze the exit price at 320 px */
+  #btTrades tr.row td:nth-child(13){display:block;grid-area:coin;justify-self:end;font-size:12px;color:var(--mute)}#btTrades tr.row td:nth-child(13)::before{content:'сила '}
+  #btTrades tr.row td:nth-child(2){padding-right:60px}
+  :is(#jclosed,#btTrades) td:nth-child(1){grid-area:date;font-size:12px;color:var(--mute)}:is(#jclosed,#btTrades) td:nth-child(7){grid-area:reason;justify-self:end}:is(#jopen,#jclosed,#btTrades) td{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  :is(#jclosed,#btTrades) td:nth-child(4){grid-area:entry}:is(#jclosed,#btTrades) td:nth-child(5){grid-area:exit}
+  :is(#jclosed,#btTrades) td:is(:nth-child(4),:nth-child(5)),#jopen td:is(:nth-child(4),:nth-child(5)){font-size:12px;color:var(--mute)}
+  :is(#jclosed,#btTrades) td:nth-child(4)::before,#jopen td:nth-child(4)::before{content:"вход "}
+  :is(#jclosed,#btTrades) td:nth-child(5)::before{content:"выход "}#jopen td:nth-child(5)::before{content:"сейчас "}
+  /* «вход $0.00001234» (~111 px) and «выход $0.00001234» (~120 px) beside «тайм-стоп» need ~360 px of the table itself
+     (a screen of ~414 px; gutters and scrollbars differ, so it's a container query). Narrower, the prices read
+     «$0.005517 → $0.005658», the first column fits a date with a year (~94 px; one that doesn't fit goes on two lines)
+     and the reason tag is compact, as in the narrow coin table */
+  @container trades (max-width:359.98px){
+    :is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:minmax(96px,max-content) minmax(0,1fr) auto;column-gap:8px}
+    :is(#jopen,#jclosed,#btTrades) tr.row td:nth-child(1){max-width:96px}
+    :is(#jopen,#jclosed,#btTrades) td:nth-child(4)::before{content:none}:is(#jopen,#jclosed,#btTrades) td:nth-child(5)::before{content:"→ "}
+    :is(#jopen,#jclosed,#btTrades) td:nth-child(1){white-space:normal}:is(#jclosed,#btTrades) td:nth-child(7) .tag{padding:3px 6px;font-size:11px}
+  }
+  /* under 300 px of table (a 320 px screen) a row has ~225 px for «$0.00001234 → $0.00001236» (PEPE, SHIB on spot) and
+     «тайм-стоп», a $1 000+ result or «Закрыть», so everything in it is a little tighter. The first column fits a date
+     without a year (~75 px) */
+  @container trades (max-width:299.98px){
+    :is(#jopen,#jclosed,#btTrades) tr.row{grid-template-columns:minmax(76px,max-content) minmax(0,1fr) auto;column-gap:4px;padding-left:6px;padding-right:6px}
+    :is(#jopen,#jclosed,#btTrades) tr.row td:nth-child(1){max-width:76px}
+    #jclosed tr.jday td{padding-left:6px;padding-right:6px}
+    /* «$0.000005077 → $0.000004824» beside «тайм-стоп» and a $1 000+ result: prices a little tighter, gaps 4 px, row edges 6 px */
+    :is(#jopen,#jclosed,#btTrades) td:is(:nth-child(4),:nth-child(5)){font-size:11px;letter-spacing:-.3px}#jopen td.jx button{min-width:0}
+  }
+  /* open positions: 1 opened · 2 coin · 3 side · 4 entry · 5 now · 9 PnL · 10 R */
+  #jopen tr.row td:is(:nth-child(1),:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(9),:nth-child(10)){display:block}
+  #jopen tr.row{grid-template-areas:"coin coin pnl" "date side r" "entry now x"}#jopen tr.row td.jx{display:block;grid-area:x}
+  #jopen td:nth-child(2){grid-area:coin}#jopen td:nth-child(3){grid-area:side;font-size:12px;font-weight:600}#jopen td:nth-child(9){grid-area:pnl;text-align:right;font-weight:600}
+  #jopen td:nth-child(10){grid-area:r;text-align:right;font-size:12px}#jopen td:nth-child(1){grid-area:date;font-size:12px;color:var(--mute)}
+  #jopen td:nth-child(4){grid-area:entry}#jopen td:nth-child(5){grid-area:now}
+  /* empty-state rows keep their single full-width cell */
+  :is(#jopen,#jclosed,#btTrades) tr:not(.row) td{display:block;padding:14px 12px;white-space:normal}
+  .statrow .card{padding:11px 12px}.statrow .card .v{font-size:18px}
+  .prof .ptech{display:none}
+  .steps{gap:8px}.step{padding:12px 14px}.step .n{display:inline-grid;width:22px;height:22px;font-size:12px;margin:0 8px 0 0;vertical-align:1px}.step b{display:inline;font-size:14px}.step p{margin-top:4px}
+  /* forms (backtest, profile): an even two-column grid, every control full width */
+  #backtest .fields,#bform .row{display:grid!important;grid-template-columns:1fr 1fr;gap:10px}
+  #backtest .fields>*,#bform .row>*{min-width:0}
+  #backtest .fields :is(select,input:not([type=checkbox])),#bform .row :is(select,input:not([type=checkbox])){width:100%!important}
+  #btStratL,#btCustomL,#bform .row>label:first-child,#pfListL{grid-column:1/-1}
+  #btOut,.tpanel,#pimp{scroll-margin-top:70px}
+  #bform .pfbar{display:flex!important}
+  /* trade card: sticky header with the close button in the corner */
+  .mbox{padding:0 14px 20px}
+  .mhead{position:sticky;top:0;z-index:3;margin:0 -14px 12px;padding:12px 60px 10px 14px;background:var(--topbg);backdrop-filter:blur(var(--glass-blur-s));-webkit-backdrop-filter:blur(var(--glass-blur-s));border-bottom:1px solid var(--line);gap:2px 10px}
+  .mhead h2{font-size:18px;flex-basis:100%}.mhead .mute{font-size:12px}
+  #mclose{position:absolute;top:10px;right:10px;margin:0;width:40px;padding:0}
+}
+/* own confirm / prompt dialog */
+.cmdk.dlgwrap{align-items:center;padding:16px;z-index:90}
+.gate{max-width:560px;margin:8vh auto 0;padding:0 16px;display:grid;gap:16px}.gate h1{margin:0;font-size:32px;text-wrap:balance}
+.gate-lead{margin:0;font-size:18px;line-height:1.5;color:var(--text)}.gate-list{margin:0;padding-left:20px;display:grid;gap:6px;line-height:1.5}
+.gate-in{height:48px;font-size:16px;justify-self:start;padding:0 22px}.gate p.faint{margin:0;line-height:1.5}
+.locked .tabs,.locked .tools>:not(.tgroup),.locked .tgroup>:not(#acct){display:none}
+.locked .top .tools{margin-left:auto}   /* the tabs (flex:1) pushed «Войти» right; signed out they're hidden (2.80) */
+.authbox{width:min(400px,100%)}.authh{display:flex;justify-content:space-between;align-items:center;gap:8px}.authh h3{margin:0}
+.authb{display:grid;gap:12px;margin-top:10px}.authb p{margin:0}
+.authcode{font-size:44px;line-height:1.15;text-align:center;letter-spacing:8px;padding:6px 0}
+.authgo{display:flex;align-items:center;justify-content:center;height:44px;border-radius:var(--r-s);background:var(--acc);color:var(--on-acc);font-weight:600;text-decoration:none}
+.authgo:hover{background:var(--acc-h)}.authrow{display:flex;gap:8px;flex-wrap:wrap}
+#acct.on .pt{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlgbox{width:min(440px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:var(--r-l);box-shadow:var(--shadow);padding:20px}
+.dlgbox h3{margin:0 0 6px;font-size:18px}.dlgbox p{margin:0;color:var(--mute);font-size:14px;line-height:1.5}
+.dlgbox input:not([type=checkbox]):not([type=range]){width:100%;margin-top:14px}
+.dlga{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}.dlga button{height:40px;padding:0 16px}
+button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight:600}button.danger:hover{filter:brightness(1.08);background:var(--up);border-color:var(--up)}
+@media(max-width:560px){.dlga button{flex:1}}
+/* profile form: sticky "unsaved changes" bar */
+.pfbar{align-items:center!important}.pfbar.dirty{position:sticky;bottom:12px;z-index:5}
+.pfbar.dirty{background:var(--s2);border:1px solid var(--warn-line);border-radius:var(--r);padding:10px 12px;box-shadow:var(--shadow)}
+.pfbt{flex:1 1 200px;font-weight:600;font-size:14px}.pfbar:not(.dirty) .pfbt{display:none}
+@media(max-width:700px){.pfbar.dirty{bottom:80px}.pfbar button{flex:1}}
+@media(max-width:560px){.pfbar.dirty .pfbt{flex-basis:100%}.pfbar button{flex:1}}
+/* events popover under the bell */
+#ntf{position:relative}
+.nbadge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--up);color:#fff;font-size:11px;font-weight:600;line-height:16px;box-shadow:0 0 0 2px var(--bg)}
+.evp{position:fixed;top:64px;right:16px;z-index:45;width:min(380px,calc(100vw - 32px));background:var(--s2);border:1px solid var(--line2);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.evp:not(.open){display:none}
+.evh{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 8px 14px;border-bottom:1px solid var(--line)}
+.evh button{height:32px;font-size:12px;background:transparent;border-color:transparent;color:var(--blue)}
+.evl{max-height:min(420px,60vh);overflow:auto;padding:6px}
+.evi{display:flex;gap:10px;align-items:flex-start;width:100%;height:auto;min-height:44px;padding:9px 10px;border:0;background:transparent;text-align:left;justify-content:flex-start;border-radius:var(--r);font-weight:400}
+.evi:hover{background:var(--s3);border:0}
+.evi>i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:0 0 auto;background:var(--blue)}.evi>i.ok{background:var(--lo)}.evi>i.bad{background:var(--up)}.evi>i.warn{background:var(--acc)}
+.evt{display:flex;flex-direction:column;gap:2px;min-width:0;font-size:12px;color:var(--mute)}.evt b{font-size:13px;font-weight:600;color:var(--text)}
+.evi:not(.new) .evt b{font-weight:500;color:var(--mute)}
+.evi.new .evt b::after{content:"новое";margin-left:8px;font-size:11px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.04em}
+.evempty{padding:22px 12px;text-align:center;color:var(--mute);font-size:13px}
+.evf{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--mute)}.evf button{height:32px;font-size:12px;flex:0 0 auto}
+@media(max-width:700px){.evp{top:62px;right:10px;width:calc(100vw - 20px)}}
+/* journal: change chips and the one-line takeaway */
+.dchip{display:inline-block;vertical-align:middle;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
+.dchip.pos{background:rgba(34,197,94,.12)}.dchip.neg{background:rgba(240,82,95,.12)}
+.insight{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13px;color:var(--text);line-height:1.5}.insight svg{color:var(--blue);margin-top:2px}
+/* live freshness: pulsing dot + ticking "updated N s ago" */
+.live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--lo);flex:0 0 auto;animation:livep 2.4s infinite}
+.live.stale{color:var(--acc-t)}.live.stale i{background:var(--acc);animation:none}.live.wait i{background:var(--faint);animation:none}
+@keyframes livep{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+@media (prefers-reduced-motion:reduce){.live i{animation:none}}
+/* why the bot is idle */
+.bh-why{margin-top:12px;padding:10px 12px;border-radius:var(--r);background:var(--accbg);border:1px solid var(--warn-line);font-size:13px;line-height:1.5}
+.bh-why b{color:var(--text)}
+.erscale{display:grid;gap:5px;max-width:380px;margin-top:10px;font-size:12px}
+.er-row{display:grid;grid-template-columns:36px minmax(0,1fr) 34px;gap:8px;align-items:center}.er-row>span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.er-bar{position:relative;height:6px;border-radius:3px;background:var(--s3)}
+.er-bar i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--faint)}.er-bar i.over{background:var(--acc)}
+.er-bar b{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:1px;background:var(--text)}
+.er-note{color:var(--mute);font-size:12px}.bh-why .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.bh-why button{height:34px;font-size:13px}
+/* shared profile banner */
+.pimp{display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap;padding:14px 16px;margin-bottom:12px;border-radius:var(--r);border:1px solid var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}
+.pimp.off{display:none}.pimp>div{flex:1 1 320px;min-width:0}.pimp p{margin:3px 0 0;font-size:13px;color:var(--mute)}
+/* quick jump (Ctrl+K) */
+.cmdk{position:fixed;inset:0;z-index:80;background:var(--backdrop);display:flex;justify-content:center;align-items:flex-start;padding:12vh 16px 16px}
+.cmdbox{width:min(620px,100%);background:var(--s1);border:1px solid var(--line2);border-radius:var(--r-l);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;max-height:70vh}
+.cmdin{display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line)}
+.cmdin svg{color:var(--faint)}
+.cmdin input:not([type=checkbox]):not([type=range]){flex:1;min-width:0;height:54px;border:0;background:transparent;font-size:16px;padding:0;outline:none}
+.cmdl{overflow:auto;padding:6px}
+.cmdg{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);padding:10px 10px 4px}
+.cmdi{display:flex;align-items:center;gap:10px;width:100%;height:auto;min-height:44px;padding:8px 10px;border:0;border-radius:var(--r-s);background:transparent;text-align:left;justify-content:flex-start;font-weight:500}
+.cmdi:hover{background:var(--s2);border:0}.cmdi.on{background:var(--s3)}
+.cmdi .ct{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cmdi .ch{font-size:12px;color:var(--mute);white-space:nowrap}
+.cmdempty{padding:22px 12px;text-align:center;color:var(--mute);font-size:13px}
+.cmdf{display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
+@media(max-width:700px){.cmdk{padding:10px}.cmdbox{max-height:80vh}.cmdf{display:none}}
+/* the close control: «Esc» where there is a keyboard and a mouse, a cross a finger can hit on a touch screen — closing used to
+   need the thin strip of backdrop under the list (2.80) */
+.cmdin .cmdx,.cmdin .cmdx:hover,.cmdin .cmdx:active{height:auto;padding:0;border:0;background:none;box-shadow:none;color:var(--faint);flex:0 0 auto}
+.cmdin .cmdx svg{display:none}
+/* a narrow phone: the hint goes under the name instead of cutting it («Журнал общего бота» at 320 px) (2.80) */
+@media(max-width:420px){.cmdi{flex-direction:column;align-items:flex-start;gap:2px}.cmdi .ct{flex:none;max-width:100%;white-space:normal}.cmdi .ch{white-space:normal}}
+@media (hover:none),(pointer:coarse){.cmdin .cmdx kbd{display:none}.cmdin .cmdx svg{display:block;color:var(--mute)}:is(.cmdin .cmdx,.cmdin .cmdx:hover,.cmdin .cmdx:active){width:44px;height:44px;margin-right:-10px}}
+.flash{animation:flash 1.6s var(--ease)}
+@keyframes flash{0%,40%{box-shadow:0 0 0 3px var(--acc)}100%{box-shadow:0 0 0 3px transparent}}
+/* my bot: status, profile picker, extra options */
+.bhero{display:flex;gap:14px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--s2)}
+.bhero.ok{border-color:var(--ok-line)}.bhero.warn{border-color:var(--warn-line)}
+.bh-t{font-size:18px;font-weight:600;display:flex;align-items:center;gap:10px}.bh-t .sdot{width:10px;height:10px}
+.bh-s{color:var(--mute);font-size:13px;margin-top:4px}
+.bh-m{font-size:13px;margin-top:10px;color:var(--mute)}.bh-m b{color:var(--text)}
+.bh-err{font-size:13px;margin-top:8px;color:var(--up)}
+.bh-a{display:flex;gap:8px;flex-wrap:wrap}.bh-a button{height:40px;padding:0 16px}
+.bsec{margin:14px 0 0}.bsec .dbody{padding-top:4px}
+.linkbtn{display:inline;height:auto;padding:0;border:0;background:none;color:var(--blue);font:inherit;font-weight:500;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}.linkbtn:hover{background:none;border:0;text-decoration-style:solid}
+@media (pointer:coarse){.linkbtn{padding:10px 4px;margin:-10px -4px}}   /* a finger-sized target; inline padding doesn't move the line */
+#bprof{scroll-margin-top:70px}
+.bsech{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.bsech h3{margin:0;font-size:16px}
+.hint{font-size:13px;color:var(--mute);margin:8px 0 10px;max-width:820px}
+.prof.pick{cursor:pointer}.prof.pick:hover{border-color:var(--hover)}
+.prof .radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto;background:var(--s1)}
+.prof.on .radio{border-color:var(--acc);background:var(--acc);box-shadow:inset 0 0 0 3px var(--s1)}
+.prof .pplain{font-size:13px;color:var(--text);margin-top:3px}.prof .ptech{font-size:12px;color:var(--faint);margin-top:3px}
+.jot{display:flex;align-items:center;gap:8px}.jot button{margin-left:auto;height:28px;padding:0 10px;font-size:12px}td.jx{text-align:right;white-space:nowrap}@media (pointer:coarse){td.jx button{height:36px!important;min-width:72px}}td.jx button{height:26px;padding:0 9px;font-size:12px}
+.sprof{display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--s1)}.sprof .pplain{font-size:13px;color:var(--text);margin-top:3px}.sprof .ptech{font-size:12px;color:var(--faint);margin-top:3px}.sprof-a{display:flex;gap:8px;flex:0 0 auto}
+@media(max-width:560px){.sprof{flex-wrap:wrap}.sprof-a{width:100%;flex-direction:column}.sprof-a button{width:100%}}
+.prof .roles{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chipb{height:30px!important;border-radius:999px;font-size:12px;padding:0 12px}.chipb.on{background:var(--accbg);border-color:var(--warn-line);color:var(--acc-t)}
+.bmore{margin:16px 0 0}
+.bopt{display:flex;gap:12px 20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)}.bopt:first-child{border-top:0;padding-top:0}
+.btg{display:flex;align-items:center;gap:12px;margin:10px 0 4px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--s1)}.btg p{margin:2px 0 0;font-size:12px;color:var(--mute)}.btg-i{display:grid;place-items:center;width:32px;height:32px;border-radius:var(--r-s);background:var(--accbg);color:var(--acc);flex:0 0 auto}.btg button{flex:0 0 auto}
+.btg-hint{margin:6px 0 0;font-size:12px;color:var(--text)}.btg-set{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;font-size:12px;color:var(--mute)}.btg-set select{height:32px;font-size:12px;max-width:100%}.btg-set button{height:32px;font-size:12px}
+@media (pointer:coarse){.btg-set select,.btg-set button{height:36px}}   /* notification fields: finger-sized on a phone */
+@media(max-width:560px){.btg{flex-wrap:wrap}.btg button{width:100%}}
+.bopt>div{flex:1 1 320px;min-width:0}.bopt b{font-size:14px}.bopt p{margin:3px 0 0;font-size:13px;color:var(--mute);max-width:640px}
+#bform{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.tablewrap:not(.more) .hx{display:none}
+.hero{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:22px 24px 16px;margin-bottom:12px}
+.hero .t{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.hero .hv{font-size:40px;font-weight:600;letter-spacing:-.03em;margin:4px 0 8px;font-variant-numeric:tabular-nums;line-height:1.1}
+.htop{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
+.hchg{font-size:13px}.hchg .chip{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:600;margin-right:6px;font-variant-numeric:tabular-nums}
+.hchg .chip.pos{background:rgba(34,197,94,.12)}.hchg .chip.neg{background:rgba(240,82,95,.12)}.hchg .chip.flat{background:var(--s3)}
+/* the journal's day headings (newest-first order): the date, how many trades and the day's result */
+#jclosed tr.jday td{padding:16px 10px 6px;font-size:12px;font-weight:600;color:var(--mute);border-bottom:1px solid var(--line);background:transparent;text-align:left}
+#jclosed tr.jday:first-child td{padding-top:8px}
+.hside{display:flex;gap:28px;font-size:12px;color:var(--mute)}.hside div{display:flex;flex-direction:column;gap:3px}.hside b{font-size:16px;color:var(--text);font-variant-numeric:tabular-nums}
+/* touch screens: a number's name that opens an explanation on a tap is underlined with dots (taptip shows the title) */
+@media(hover:none){.statrow .card[title] .t,.hside div[title] .tl,.chead .st[title] i{text-decoration:underline dotted var(--faint);text-underline-offset:3px}}
+/* a term inside running text that explains itself on hover or a tap (R in the shared bot's warning) */
+.term{text-decoration:underline dotted var(--faint);text-underline-offset:3px;cursor:help}
+.hchart{position:relative;height:150px;touch-action:pan-y;cursor:crosshair;border-radius:4px}.hchart svg{width:100%;height:100%;display:block;overflow:visible}
+.hchart:focus{outline:none}.hchart:focus-visible{outline:2px solid var(--focus);outline-offset:6px}
+/* the balance chart's pointer: a line, a dot on the balance, a note (see eqShow); the drawdown band's size */
+.hcross{position:absolute;top:0;bottom:0;width:1px;margin-left:-.5px;background:var(--c-cross);pointer-events:none}   /* not .hx: that marks the market table's extra columns */
+.hdot{position:absolute;width:9px;height:9px;margin:-4.5px 0 0 -4.5px;border-radius:50%;box-shadow:0 0 0 4px var(--ring);pointer-events:none}
+.htip{position:absolute;top:0;z-index:2;padding:7px 10px;background:var(--c-tip);border:1px solid var(--line2);border-radius:var(--r);box-shadow:var(--shadow);font-size:12px;line-height:1.5;white-space:nowrap;font-variant-numeric:tabular-nums;pointer-events:none}
+.htip b{font-size:14px}
+.hdd{position:absolute;font-size:11px;white-space:nowrap;pointer-events:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.hlab{position:absolute;left:0;transform:translateY(-130%);font-size:11px;color:var(--faint);pointer-events:none}
+.hend{position:absolute;right:0;width:9px;height:9px;margin:-4.5px -4.5px 0 0;border-radius:50%;box-shadow:0 0 0 4px var(--ring)}
+.haxis{display:flex;justify-content:space-between;font-size:11px;color:var(--faint);margin-top:8px}
+.hempty{min-height:72px;padding:14px;text-align:center;display:grid;place-items:center;color:var(--faint);border:1px dashed var(--line2);border-radius:var(--r);font-size:13px}
+.statrow{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin-bottom:14px}
+.statrow .card .v{font-size:20px}
+@media(max-width:1100px){.statrow{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.hero{padding:16px}.hero .hv{font-size:32px}.hside{gap:18px}.hchart{height:120px}.statrow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* the coin table adapts to the width of its own panel, not of the window */
+.tpanel{container-type:inline-size}
+@container (max-width:680px){.tpanel .gauge{display:none}.tpanel td,.tpanel th{padding-left:6px;padding-right:6px}.tpanel .coin i{display:none}}
+/* below ~560px the star column goes (favourites are toggled from the chart header) so «Сила» always fits */
+@container (max-width:560px){#mhead th:nth-child(1),#tb td:nth-child(1):not([colspan]){display:none}.tpanel .tag{padding:3px 7px;font-size:11px}}
+@container (max-width:440px){
+  .tpanel .coin i{display:none}.tpanel .tag{padding:3px 6px;font-size:11px}
+  .tpanel table{font-size:12px}.tpanel td,.tpanel th{padding-left:4px;padding-right:4px}
+  /* on a phone: coin, range, signal, strength and T½ (price is in the chart header); a wider table scrolls sideways under a pinned coin column */
+  .tpanel .tablewrap{overflow-x:auto}
+  #mhead th:nth-child(2),#tb td:nth-child(2){position:sticky;left:0;z-index:1;background:var(--s1)}
+  #tb tr.row:hover td:nth-child(2){background:var(--s2)}#tb tr.sel td:nth-child(2){background:var(--sel)}
+  #mhead th:nth-child(3),#tb td:nth-child(3){display:none}
+}
+.tab .ts{display:none}
+/* mid widths (laptops, tablets): the header keeps every tab whole — short labels first, then icons only for the extras */
+@media(min-width:701px) and (max-width:1380px){.top .tab .tt.lg{display:none}.top .tab .ts{display:inline}}
+@media(min-width:701px) and (max-width:1120px){#ver{font-size:0;padding:0;background:none;min-width:0}#ver:not(.fresh){display:none}.top .tab[data-t=help] .ts,.top .tab[data-t=changes] .ts{display:none}.top .tab[data-t=help],.top .tab[data-t=changes]{padding:0 10px}}
+@media(min-width:701px) and (max-width:900px){.top .tab .tt{display:none}.top .tab{padding:0 10px}.top .tab.on .tt{display:inline}}
+.chead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.ctitle{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:18px;font-weight:600}
+.ctitle .coin i{width:30px;height:30px;font-size:13px}.ctitle .coin b{font-size:18px}
+.cprice{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.chead .stats{display:flex;flex-wrap:wrap;gap:4px 18px;margin-top:6px;line-height:1.35}
+.chead .st{display:flex;flex-direction:column;min-width:0}.chead .st i{font-style:normal;font-size:11px;color:var(--faint)}
+.chead .st b{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.chead .st b.pos{color:var(--lo)}.chead .st b.neg{color:var(--up)}.chead .st b.faint{color:var(--faint);font-weight:500}   /* beat .stats b */
+.cact{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cnt{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums;margin-left:2px}.tab.on .cnt{color:var(--mute)}
+.seg.mini{margin:0;padding:2px;border-radius:var(--r)}.seg.mini .tab{height:30px;padding:0 10px;font-size:13px;border-radius:var(--r-s)}
+details.dis{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);margin:0 0 12px}
+details.dis>summary{list-style:none;cursor:pointer;padding:14px 44px 14px 16px;display:block;position:relative;font-weight:600;line-height:1.45}
+details.dis>summary::-webkit-details-marker{display:none}
+details.dis>summary .sdot{margin-right:8px;vertical-align:1px}
+details.dis>summary::after{content:"";position:absolute;right:18px;top:19px;width:8px;height:8px;border-right:2px solid var(--mute);border-bottom:2px solid var(--mute);transform:rotate(45deg);transition:transform var(--dur-2) var(--ease)}
+details.dis[open]>summary::after{transform:rotate(-135deg)}
+details.dis>summary .mute{font-weight:400;font-size:13px}
+details.dis>.dbody{padding:0 16px 16px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 16px}
+.step{background:var(--s2);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.step .n{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--accbg);color:var(--acc);font-weight:600;font-size:13px;margin-bottom:10px}
+.step b{display:block;margin-bottom:4px;font-size:14px}.step p{margin:0;color:var(--mute);font-size:13px;line-height:1.5}
+.sdot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--lo)}.sdot.bad{background:var(--up)}.sdot.idle{background:var(--acc)}
+@media(max-width:900px){.steps{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.steps{grid-template-columns:1fr}}
+
+/* ---------- responsive ---------- */
+@media(max-width:1180px){.form{grid-template-columns:1fr 1fr}.factions{grid-column:1/-1;flex-direction:row}}
+@media(max-width:1200px){.grid{grid-template-columns:1fr;align-items:stretch}}
+@media(max-width:1100px){.mgrid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(6,1fr)}.cards>.card{grid-column:span 2}.cards>.card:nth-child(-n+2){grid-column:span 3}}
+@media(max-width:860px){.brand span.bt{display:none}.pill .pt{display:none}}
+@media(max-width:700px){
+  .topin{gap:10px;padding:0 10px;justify-content:space-between}
+  .brand small{display:none}
+  /* backdrop-filter would make the header the containing block of the fixed bottom bar */
+  .top{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--control-shine),var(--glow-bg),var(--bg)}
+  /* navigation becomes a bottom tab bar on phones */
+  .top .tabs{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--control-shine),linear-gradient(100deg,var(--glass-warm),transparent 45%,var(--glass-cool)),var(--navbg);backdrop-filter:blur(var(--glass-blur-s));-webkit-backdrop-filter:blur(var(--glass-blur-s));border-top:1px solid var(--glass-top);box-shadow:inset 0 1px 0 var(--glass-edge);justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));overflow:visible;flex:none}
+  .top .tab{flex:1;flex-direction:column;height:auto;gap:3px;padding:6px 2px;font-size:11px;min-width:0}
+  .top .tab svg.i{width:20px;height:20px}
+  .top .tab .badge{display:none}.top .tab{position:relative}
+  /* the open section: gold name and a short gold line on the bar's top edge instead of a plate */
+  .top .tab.on,.top .tab.on-ph{background:transparent;color:var(--acc-t)}.top .tab.on-ph svg{stroke:var(--acc)}.top :is(.tab.on,.tab.on-ph)::before{content:"";position:absolute;top:-6px;left:50%;width:28px;height:2px;margin-left:-14px;border-radius:0 0 2px 2px;background:var(--acc)}
+  /* a new version still shows as a dot over the «Новое» icon (the badge with the number is hidden here) */
+  .top .tab #ver.fresh{display:block;position:absolute;top:4px;left:calc(50% + 7px);font-size:0;padding:0;background:none;min-width:0}.top .tab #ver.fresh::after{margin:0}
+  .top .tab .tt.lg{display:none}.top .tab .ts{display:inline}
+  /* summary cards: the market mood on one line, the four filter shortcuts in one row under it — all on screen, nothing to swipe */
+  .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 12px;padding:0}
+  .cards>.card,.cards>.card:nth-child(-n+2){grid-column:auto}   /* the tablet layout spans cards over a 6-column grid */
+  .cards>.card:first-child{grid-column:1/-1!important;display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:8px 12px}
+  .cards>.card:first-child .v{font-size:16px}
+  .cards .card .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cards .card .t[data-s]{font-size:0}.cards .card .t[data-s]::after{content:attr(data-s);font-size:11px}
+  /* 320 px: in capitals with spacing the short titles were cut to «ДЕШЕВЛ», «СИГНА…»; in plain letters they fit in one row */
+  @media(max-width:360px){.cards>.card{padding:8px 7px}.cards .card .t,.cards .card .t[data-s]::after{text-transform:none;letter-spacing:0;font-size:11px}}
+  .cact .search{flex:1 1 100%}.cact .seg{flex:1}.cact .seg .tab{flex:1}
+  body{padding-bottom:calc(72px + env(safe-area-inset-bottom))}   /* the tab bar grows by the home-indicator inset */
+  /* no scroll inside the page scroll on phones */
+  .tablewrap{max-height:none}
+  .wrap{padding:12px 10px 28px}.phead h2{font-size:18px}
+  .hm:not(.hl){display:none}   /* T½ stays: it tells a bounce from a trend */
+  td,th{padding:8px 5px}
+  .ctrl label{flex:1 1 44%}
+  .filters>*{min-width:0}.filters>.search{flex:1 1 100%!important}.filters>select{flex:1 1 44%}
+  .cact{width:100%}.cact .search{flex:1 1 140px}.cact .search input{width:100%!important}
+  #toasts{top:66px;bottom:auto;left:10px;right:10px;width:auto}
+  #toasts .toast:nth-child(n+3){display:none}
+  .modal{padding:0}.mbox{border-radius:0;min-height:100%;border:0}
+  .form{grid-template-columns:1fr}
+  .guard{top:62px;right:10px}
+}
+@media(max-width:560px){.live{white-space:normal;max-width:100%}.prof{flex-wrap:wrap}.prof .pa{width:100%;flex-wrap:wrap}.prof .pa button{flex:1 1 auto;white-space:nowrap}.bh-a{width:100%;flex-direction:column}.bh-a button{width:100%}.intro{flex-direction:column;gap:12px}.intro button{margin-left:0;width:100%}#cv{height:360px}#tcv{height:420px}.comp{grid-template-columns:110px 1fr 56px}.gloss{grid-template-columns:1fr}.card .v{font-size:18px}}
+/* numbers right-aligned so digits line up (columns are marked by alignNums) */th.n,td.n{text-align:right}/* touch screens: controls at least 36-40px tall */@media (pointer:coarse){:root{--h:40px}.prof .pa button{height:36px}.seg .tab{height:38px}.seg.mini .tab{height:36px}.star{display:inline-block;padding:8px;margin:-8px}
+  .pseg button,.bhint button,.ind-chip,.bh-why button{min-height:36px}.chipb{height:36px!important}.ind-it button{width:36px;height:36px}
+  .sel-it button,.bpop .pcols button{width:36px;height:36px}.bchip button{width:36px;height:36px;margin:-7px}   /* a bigger target, the chip keeps its size */
+  .bchip-t,.bchip{height:36px}.bpop h4 button{width:36px;height:36px}#bIndClear{min-height:36px}.ind-lbl{min-height:36px}
+  /* iOS zooms the page into any text field under 16px and leaves it zoomed */
+  input:not([type=checkbox]):not([type=range]),select,textarea{font-size:16px!important}}
+/* ---------- glass (Lovable, the owner's pick): light sits on surfaces — a pearl top edge, a cool reflection, a darker
+   bottom — on the header, its tools, menus and dialogs; gold stays for what is chosen. Rows, numbers and chart pixels stay
+   opaque and sharp; the header's own rules are with .top ---------- */
+.top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)){background-image:var(--glass-reflection),var(--control-shine);background-size:240% 100%,100% 100%;background-position:100% 0,0 0;border-color:var(--glass-line);box-shadow:var(--glass-inset)}
+.top .tools button:not(.primary,.on,.bad){background-color:var(--s2)}
+.top .tools button:not(.primary,.on,.bad):focus-visible{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}
+/* hover glass only with a real pointer: a phone keeps :hover on the last tapped button — the bell stayed framed after the tap
+   that closed its panel (2.81; the fill was moved under hover:hover in 2.80, this border wasn't) */
+@media (hover:hover){.top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)):hover{border-color:var(--glass-rim);box-shadow:var(--glass-inset),var(--glass-hover-shadow)}}
+/* on hover a reflection crosses the button once */
+@media (hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+  .top .tools button:not(.primary,.on,.bad),.ctools button:not(.on),button.icon:not(.on),button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)){transition:background-position var(--dur-3) var(--ease),border-color var(--dur-1) var(--ease),box-shadow var(--dur-2) var(--ease),color var(--dur-1) var(--ease),transform var(--dur-1) var(--ease)}
+  .top .tools button:not(.primary,.on,.bad):hover,.ctools button:not(.on):hover,button.icon:not(.on):hover,button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)):hover{background-position:0 0,0 0}
+}
+.top .tools button:not(.primary):active,.seg .tab:active,.ctools button:active,button.icon:active,button:not([class]):not(:where(.bmain *,.bside *,#bInd *,.bpop *)):active{box-shadow:inset 0 2px 5px var(--glass-press)}
+.top .tab.on::after{box-shadow:0 2px 8px var(--light-edge)}
+/* segmented controls (timeframes, filters, modes) are a glass track; the chosen tab sits in it as a lighter pane */
+.seg{background:var(--control-shine),var(--s2);border-color:var(--glass-line);box-shadow:var(--glass-inset)}
+.seg .tab.on:not([data-fl]){background:var(--control-shine),var(--ui-selected);box-shadow:inset 0 0 0 1px var(--line2),var(--ui-shadow);color:var(--text);border-radius:var(--r-s)}
+button.primary,.authgo,button.primary:hover,.authgo:hover{background-image:var(--control-shine)}
+button.primary,.authgo{box-shadow:var(--glass-inset),0 4px 12px -8px var(--light-edge)}
+button.primary:hover,.authgo:hover{box-shadow:var(--glass-inset),0 4px 16px -6px var(--light-edge)}
+/* the summary strip: warm light from the top-left; a card lights up in its meaning's colour */
+.cards,.statrow{background:var(--surface-light),var(--s1)}
+/* every card on a page is the same glass — panels, strips, collapsibles, the balance hero, the backtest form, profiles,
+   help steps, banners: a faint sheen, a lit top edge, a soft drop. No blur — text, numbers and charts stay sharp. Coloured
+   borders (banners, the welcome card, the chosen profile) keep their colour; tinted banners keep their tint */
+.panel{background:var(--panel-sheen),var(--s1)}
+.botnow,.sprof,.dis,.hero,.fgroup,.btg,.prof:not(.on),.banner:not(.ok,.warn,.bad),.step{background-image:var(--panel-sheen)}
+.panel,.cards,.statrow,.botnow,.sprof,.dis,.hero,.fgroup,.btg,.prof:not(.on),.banner:not(.ok,.warn,.bad),.step{border-top-color:var(--glass-top)}
+.panel,.cards,.statrow,.botnow,.sprof,.dis,.hero,.fgroup,.btg,.prof:not(.on),.banner,.intro,.step{box-shadow:inset 0 1px 0 var(--glass-edge),0 10px 28px -20px var(--glass-drop)}
+/* a card inside a card (the signal breakdown, the bot's hero, the trade card's head): only the lit edge */
+.detail,.bhero,.thero{background-image:var(--panel-sheen);box-shadow:inset 0 1px 0 var(--glass-shine)}
+/* fields sit a little into the glass: a soft shade under the top edge, the same cool rim as the buttons */
+:where(input:not([type=checkbox],[type=range]),select):not(:where(.cmdin *,.bmain *,.bside *,#bInd *,.bpop *)){border-color:var(--glass-line);box-shadow:inset 0 1px 2px var(--glass-shade)}
+/* the sign-in screen, the first thing a visitor sees: one glass card over the gold light (frosted below where it can blur) */
+.gate{width:min(560px,calc(100% - 32px));padding:28px 28px 24px;border:1px solid var(--line);border-top-color:var(--glass-top);border-radius:var(--r-l);background:var(--panel-sheen),var(--s1);box-shadow:inset 0 1px 0 var(--glass-edge),0 24px 60px -30px var(--glass-drop)}
+@media(max-width:560px){.gate{padding:22px 18px 20px}}
+th{border-bottom-color:var(--glass-top)}
+.card[data-cf]{--card-light:var(--glass-warm)}.card[data-cf=lo]{--card-light:var(--card-lo)}.card[data-cf=hi]{--card-light:var(--card-hi)}.card[data-cf=sq]{--card-light:var(--glass-cool)}
+.card[data-cf]:hover,.card[data-cf]:focus-visible{background:linear-gradient(160deg,var(--card-light),transparent 75%),var(--s2)}
+.card[data-cf].on{background:linear-gradient(160deg,var(--card-light),transparent 80%),var(--sel)}
+.card[data-cf]:focus-visible{outline-offset:-3px}
+.prof.pick:not(.on):hover{background-image:var(--control-shine)}
+.prof.on{box-shadow:inset 2px 0 0 var(--acc),inset 0 1px 0 var(--glass-shine)}
+/* menus, dialogs, toasts: frosted where the browser can blur, solid otherwise. Toasts keep their coloured left edge */
+.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty{background:var(--control-shine),var(--s1);box-shadow:var(--glass-inset),var(--glass-shadow)}
+.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast{background-image:var(--control-shine),linear-gradient(115deg,var(--glass-warm),transparent 32%,transparent 78%,var(--glass-cool))}
+.cmdbox,.dlgbox,.mbox,.evp,.guard{border-color:var(--glass-line2)}.toast{border-top-color:var(--glass-line2);border-right-color:var(--glass-line2);border-bottom-color:var(--glass-line2)}
+.cmdbox:focus-within,.dlgbox:focus-within{border-color:var(--light-edge)}
+@supports ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty{background-color:var(--glass-fill);backdrop-filter:blur(var(--glass-blur)) saturate(115%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(115%)}
+  .ctools button:not(.on){background-color:var(--glass-fill);backdrop-filter:blur(var(--glass-blur-s));-webkit-backdrop-filter:blur(var(--glass-blur-s))}
+  /* the table header is frosted: rows blur under it while the list scrolls (the sticky coin column's cell too) */
+  th,#mhead th:nth-child(2){background:var(--th-glass);backdrop-filter:blur(var(--glass-blur-s)) saturate(120%);-webkit-backdrop-filter:blur(var(--glass-blur-s)) saturate(120%)}
+  /* phone: the search and filters bar that sticks under the header — the list scrolls under it */
+  @media(max-width:700px){.tpanel>.filters:first-child{background:var(--th-glass);backdrop-filter:blur(var(--glass-blur-s));-webkit-backdrop-filter:blur(var(--glass-blur-s))}}
+  .gate{background:var(--panel-sheen),var(--glass-fill);backdrop-filter:blur(var(--glass-blur)) saturate(115%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(115%)}
+}
+h1,h2,h3,h4,.card .v{letter-spacing:0}
+@media(max-width:700px){
+  .top .tab.on::before{box-shadow:0 2px 8px var(--light-edge)}
+  .top .tabs .tab.on svg{filter:drop-shadow(0 0 5px var(--light-edge))}
+  .mbox{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+  .mhead{background:var(--control-shine),var(--topbg);box-shadow:var(--glass-inset)}   /* the trade card's sticky head */
+}
+/* the header's tools are one glass group: inside it a rounded pane marks hover and an open menu (Lovable v5), no circle that
+   touches the group's edges; signed out only «Войти» is left, with its word */
+.tgroup{display:flex;align-items:center;gap:2px;padding:3px;border:1px solid var(--glass-line);border-radius:var(--r-l);background:var(--control-shine),var(--s2);box-shadow:var(--glass-inset)}
+.top .tools .tgroup button{position:relative;width:36px;height:36px;min-width:36px;padding:0;border:1px solid transparent;border-radius:var(--r);background:transparent;box-shadow:none;color:var(--mute);transition:background-color var(--dur-1) var(--ease),border-color var(--dur-1) var(--ease),color var(--dur-1) var(--ease)}
+/* hover only where there is a real pointer: a phone keeps :hover on the last tapped button, so the bell and search stayed lit
+   after the second tap that closed them (2.80) */
+.top .tools .tgroup button:focus-visible{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:none}
+@media (hover:hover){.top .tools .tgroup button:hover{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:none}}
+.top .tools .tgroup button[aria-expanded=true]{background:var(--control-shine),var(--ui-selected);border-color:var(--line2);color:var(--text);box-shadow:var(--ui-shadow)}
+.top .tools .tgroup button:active{background:var(--s3);border-color:var(--line2);box-shadow:inset 0 1px 3px var(--glass-press)}
+.top .tools .tgroup .nbadge{top:1px;right:1px;box-shadow:0 0 0 2px var(--s2);pointer-events:none}
+#acct .pt{display:none}
+.top .tools .tgroup #acct:is(.locked *){width:auto;padding:0 12px;gap:8px;color:var(--text)}.locked #acct .pt{display:inline}
+/* the bots' status: all well is a small dot with a finger-sized target (its words stay for screen readers and the tooltip);
+   while loading too, so the header doesn't jump; a problem shows its words, also on a phone, where they wrap inside the row */
+.top .tools #guardPill{min-height:36px;background:transparent;box-shadow:none;border-color:transparent}
+#guardPill .dot{flex:none;width:7px;height:7px}#guardPill.ok .dot{box-shadow:none}
+.top .tools #guardPill:is(.ok,.load){width:36px;min-width:36px;padding:0;justify-content:center;border-radius:var(--r)}
+.top .tools #guardPill[aria-expanded=true]:is(.ok,.load){background:var(--ui-selected);border-color:var(--line2)}
+@media (hover:hover){.top .tools #guardPill:is(.ok,.load):hover{background:var(--ui-selected);border-color:var(--line2)}}   /* no stuck pad after a tap (2.81) */
+#guardPill:is(.ok,.load) #guardTxt{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.top .tools #guardPill:not(.ok,.load){height:auto;padding:4px 9px;gap:7px;border-radius:var(--r);background:var(--s2);border-color:var(--line2);white-space:normal}
+.top .tools #guardPill.bad{background:var(--bad-bg);border-color:var(--bad-line);color:var(--up-t)}
+.top .tools #guardPill.idle:not(.load){color:var(--acc-t);border-color:var(--warn-line)}
+#guardPill:not(.ok,.load) #guardTxt{display:inline;overflow-wrap:anywhere;font-size:12px;line-height:1.3;text-align:left}
+.guard .guard-heading{display:block;margin-bottom:8px;font-size:16px}.guard:not(.bad,.idle) .guard-heading{color:var(--text)}
+.guard .guard-message{margin:0 0 12px;color:var(--text)}
+.guard .guard-bot{padding:10px 0 0;margin-top:10px;border-top:1px solid var(--line)}
+.guard .guard-bot b{color:var(--text);font-size:13px}.guard .guard-bot span{margin-top:3px}
+@media(max-width:700px){.top .tools{flex:1 1 auto;min-width:0;justify-content:flex-end}.top .tools #guardPill:not(.ok,.load){flex:0 1 auto;min-width:0}}
+/* the signed-in profile (Lovable v5): the sign-in steps in the same dialog stay as they were */
+#authDlg:not(.profile-open) :is(#profileSettings,#authFoot){display:none}
+#authDlg.profile-open .authbox{width:min(560px,100%);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain;padding:0 20px 8px;background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+#authDlg.profile-open .authh{position:sticky;top:0;z-index:2;margin:0 -20px;padding:14px 20px;background:var(--s1);border-bottom:1px solid var(--line)}
+.profile-identity{display:flex;align-items:center;gap:12px;min-width:0;padding:6px 0 6px}
+.profile-avatar{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:var(--r);background:var(--s3);font-size:20px;font-weight:600}
+.profile-identity h4{margin:0;font-size:18px;overflow-wrap:anywhere}.profile-identity p{font-size:13px;color:var(--mute);overflow-wrap:anywhere}
+.profile-section{padding:16px 0;border-top:1px solid var(--line)}#profileSettings{margin-top:12px}
+.profile-section h4{margin:0 0 12px;font-size:14px}.profile-section h4 .faint{font-weight:400}
+.profile-section .pl{margin:12px 0 7px;font-size:12px;color:var(--mute)}
+.profile-section .seg{display:flex;width:100%;margin:0}
+.profile-section .seg .tab{flex:1 1 0;min-width:0;min-height:36px;padding:0 3px;font-size:12px;justify-content:center}
+.profile-section .pcap{min-height:2.9em;margin:8px 0 0;font-size:12px;line-height:1.45;color:var(--mute);text-wrap:pretty}
+.profile-scope{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--mute);text-wrap:pretty}
+.profile-setting{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px}.profile-setting span{min-width:0}
+.profile-setting button{flex:none;min-width:96px;min-height:36px;font-size:12px}
+.profile-session{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.profile-session button{min-height:36px}
+.profile-danger h4{color:var(--up-t)}.profile-danger button{margin-top:12px;min-height:36px}
+/* a sample of the glass right in the window: colour bars under a real pane of it, since the dialog's backdrop hides the page */
+.glass-preview{position:relative;isolation:isolate;overflow:hidden;height:92px;margin:12px 0 0;border-radius:var(--r);background:var(--s2)}
+.preview-stripes{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);gap:22px;transform:rotate(-12deg) scale(1.8)}
+.preview-stripes i:nth-child(1){background:var(--lo)}.preview-stripes i:nth-child(2){background:var(--acc)}.preview-stripes i:nth-child(3){background:var(--blue)}
+.preview-surface{position:absolute;inset:18px 22px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:var(--r);background:var(--control-shine),var(--glass-sample);box-shadow:var(--glass-inset);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));font-size:13px;font-weight:600}
+/* «Выкл» means no blur at all (less work for a weak device); in «Тихо» table heads simply cover the rows */
+:root[data-glass="0"] :is(.top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child,.gate,.sheetbar),:root[data-glass="1"] :is(th,#mhead th:nth-child(2),.tpanel>.filters:first-child){backdrop-filter:none;-webkit-backdrop-filter:none}
+/* «reduce transparency» in the system: solid surfaces, no blur */
+@media(prefers-reduced-transparency:reduce){
+  .top,.top .tabs,.cmdbox,.dlgbox,.mbox,.evp,.guard,.toast,.pfbar.dirty,.ctools button:not(.on),th,#mhead th:nth-child(2),.mhead,.tpanel>.filters:first-child,.gate,.preview-surface{background:var(--s1);backdrop-filter:none;-webkit-backdrop-filter:none}
+}

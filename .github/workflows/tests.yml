@@ -8,9 +8,9 @@ name: Tests
 
 on:
   push:   # every branch: a session's or Lovable's branch is checked before it is merged
-    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', '**.css']
+    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', 'history.js', 'app/**', '**.css']
   pull_request:
-    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', '**.css']
+    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', 'history.js', 'app/**', '**.css']
   workflow_dispatch:
 
 jobs:
