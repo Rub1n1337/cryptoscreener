@@ -6,7 +6,7 @@
 
 - Сайт: **2.128** (16.11.2026). Проверка: `curl -s https://cryptoscreener-topaz.vercel.app/ | grep -m1 -o "v:'[0-9.]*'"`. Если в снимке версия старше — снимок устарел. Номера идут 2.98, 2.99, 2.100, 2.101 — это не десятичная дробь: 2.100 новее 2.99 (3.0 оставлена для этапа 5 `PLAN-V3.md`).
 - Функции `bot` v52, `tg` v19 и `auth` v5 (2.90; прогоны после выкладки без новых ошибок — только известное «коллектор: no rows») выкладываются из репозитория (GitHub Actions, Supabase CLI закреплён на 2.122.0) и совпадают с ним.
-- CI (с 12.11): `.github/workflows/tests.yml` — `tests/math.html` и `tests/alerts.html` в headless Chromium (`tests/ci.mjs`, Playwright 1.47.2) на каждый пуш в любую ветку и PR, затрагивающий `supabase/functions/_shared/` или `tests/`; второй шаг — сверка с `math.js` прошлого коммита, только отчёт. Проверено: зелёный на `main`, красный на ветке с намеренно сломанной проверкой. `backtest-audit.js` в CI нет (нужна история из R2). Выкладку CI не задерживает.
+- CI (с 12.11): `.github/workflows/tests.yml` — `tests/math.html` и `tests/alerts.html` в headless Chromium (`tests/ci.mjs`, Playwright 1.47.2) на каждый пуш в любую ветку и PR, затрагивающий `supabase/functions/_shared/`, `tests/`, `index.html`, `beta.js`, `learn.js`, `changelog.js` или `*.css`; второй шаг — сверка с `math.js` прошлого коммита, только отчёт. С 16.11 — smoke вёрстки (`tests/smoke-ci.mjs`): `tests/smoke.js` на 320 / 375 / 1280 px без входа (экран входа, `#legal`) и со входом на подменённом Supabase (все разделы), Binance — из `tests/fixtures/binance.json`, красный при `hscroll` / `overflow` / `cut` / `small` и ошибках страницы или консоли; итог без входа в GitHub — `bash scripts/ci-result.sh`. Проверено: зелёный на `main`, красный на ветке с намеренной поломкой. `backtest-audit.js` в CI нет (нужна история из R2). Выкладку CI не задерживает.
 - История свечей: Cloudflare R2, ночная задача `history.yml` (GitHub Actions); итог последнего прогона — `status.json` в бакете.
 - База: применены миграции из `supabase/*.sql`, последние — `2026-11-bot-commit-run.sql` (12.11, после 2.114, `bot_commit` только при своей блокировке), `2026-11-state-key-digits.sql` (12.11, после 2.113, ключи `state_put` — `^sr_[a-z0-9]{1,20}$`), `2026-11-ub-set-profiles.sql` (12.11, 2.110, `ub_set` отказывает без профилей), `2026-11-signal-books.sql` (09.11, 2.90, стакан в моменты сигналов) и `2026-11-cleanup.sql` (09.11, распутывание аккаунтов, исправление 10). Функции: `bot`, `tg`, `auth` (вход через Telegram).
 
@@ -476,7 +476,7 @@
 
 - UX-аудит 16.11 (`docs/UX-AUDIT-2026-11.md`): пункты 1–5 сделаны в 2.127. Четыре правила внесены в `DESIGN-RULES.md` (п. 60–63, чек-лист §12). Не выбраны: 6 (кнопка «Обновить сейчас» уходит на вторую строку при 1280 px) и 7 (✓ / ✗ в «Почему сигнал» на SVG). Что из исследования не подходит — таблица в отчёте, повторно не предлагать.
 
-- Разборы 16.11: `backtest-audit.js` в CI (нужна история R2 на раннере); модули `index.html`; очередь рассылки Telegram; property-/snapshot-тесты; e2e smoke в CI.
+- Разборы 16.11: `backtest-audit.js` в CI (нужна история R2 на раннере); модули `index.html`; очередь рассылки Telegram; property-/snapshot-тесты. Smoke вёрстки в CI сделан 16.11 (строка CI вверху).
 
 - Разборы 12.11: вопросы владельцу решены в 2.110; осталось предложение — оба режима (1h и ТФ профиля) в панели бота.
 

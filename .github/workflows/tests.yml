@@ -1,15 +1,16 @@
 # The strategy-math checks (tests/math.html) and the alerts checks (tests/alerts.html) in headless Chromium on every change to
-# the shared code or the tests. Deploys don't wait for it: Vercel and deploy-functions.yml run as before; a red run here says
-# that what just went out broke a check.
+# the shared code or the tests, and the layout smoke (tests/smoke-ci.mjs: tests/smoke.js at 320 / 375 / 1280 px, signed out
+# and signed in on a fake server, plus page / console errors) on every change to the site's files. Deploys don't wait for it:
+# Vercel and deploy-functions.yml run as before; a red run here says that what just went out broke a check.
 # Second step: math.html against the previous commit's math.js (?ref=) — «nothing else changed». It is red whenever a change
 # alters trades on purpose (as the honest loan in 2.110 did), so it only reports and never fails the run: read its summary.
 name: Tests
 
 on:
   push:   # every branch: a session's or Lovable's branch is checked before it is merged
-    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml']
+    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', '**.css']
   pull_request:
-    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml']
+    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', '**.css']
   workflow_dispatch:
 
 jobs:
@@ -34,6 +35,9 @@ jobs:
           for i in $(seq 1 20); do curl -sf http://localhost:8000/tests/math.html >/dev/null && break; sleep 0.5; done
       - name: math.html and alerts.html
         run: node tests/ci.mjs http://localhost:8000/tests/math.html http://localhost:8000/tests/alerts.html
+      - name: Layout smoke (320 / 375 / 1280, signed out and in)
+        if: always()
+        run: node tests/smoke-ci.mjs http://localhost:8000/index.html
       - name: math.html against the previous commit (report only)
         if: always()
         continue-on-error: true
