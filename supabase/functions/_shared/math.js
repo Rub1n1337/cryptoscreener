@@ -772,6 +772,58 @@ export function backtest(hist, S, { start = 10000, from = 0, only = null, top = 
   return { trades, equity, balance, start, from: times[0], to: times[times.length - 1], pairs: top || tradable.length, pool: tradable.length };
 }
 
+// ---------- the deflated Sharpe ratio: a result corrected for how many variants were tried ----------
+// Bailey & López de Prado (2014), The Deflated Sharpe Ratio, Journal of Portfolio Management 40(5) (docs/LITERATURE.md §1).
+// Per trade: sr = mean R / std R of the trades. psr(sr0) is the probability that the true Sharpe is above sr0, given the
+// number of trades and the skew and kurtosis of their R (fat tails make a high sr less sure). With N variants tried, the best of
+// them shows expMaxSR(N, V) by luck alone — V the variance of the variants' Sharpe ratios, by default that of one estimate
+// under no edge, 1 / (n − 1). dsr = psr(expMaxSR): the probability that the result beats the best that luck would give.
+// Pure functions, no state; nothing else in this file uses them.
+export function normCdf(x) {   // Abramowitz & Stegun 7.1.26 on erf, |error| < 1.5e-7
+  const z = Math.abs(x) / Math.SQRT2, t = 1 / (1 + 0.3275911 * z);
+  const e = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z);
+  return x >= 0 ? (1 + e) / 2 : (1 - e) / 2;
+}
+export function normInv(p) {   // Acklam's rational approximation, relative error < 1.2e-9
+  if (!(p > 0 && p < 1)) return p === 0 ? -Infinity : p === 1 ? Infinity : NaN;
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239];
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572];
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416];
+  const q = Math.min(p, 1 - p);
+  let x;
+  if (q < 0.02425) { const r = Math.sqrt(-2 * Math.log(q)); x = (((((c[0] * r + c[1]) * r + c[2]) * r + c[3]) * r + c[4]) * r + c[5]) / ((((d[0] * r + d[1]) * r + d[2]) * r + d[3]) * r + 1); }
+  else { const r = (q - 0.5) ** 2; x = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * (q - 0.5) / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1); }
+  return p < 0.5 ? x : -x;   // x is computed for the lower of p and 1 − p; the upper half is its mirror
+}
+// the trades' Sharpe ratio and the moments psr needs: {n, sr, skew, kurt} (kurt is plain, 3 for a normal); null under 3 trades
+export function sharpeOf(rs) {
+  const x = rs.filter(v => v != null && isFinite(v)), n = x.length;
+  if (n < 3) return null;
+  const m = x.reduce((a, v) => a + v, 0) / n;
+  let m2 = 0, m3 = 0, m4 = 0;
+  for (const v of x) { const d = v - m; m2 += d * d; m3 += d ** 3; m4 += d ** 4; }
+  m2 /= n; m3 /= n; m4 /= n;
+  const sd = Math.sqrt(m2 * n / (n - 1));
+  if (!(sd > 0)) return null;
+  return { n, sr: m / sd, skew: m3 / m2 ** 1.5, kurt: m4 / m2 ** 2 };
+}
+export function psr(s, sr0 = 0) {
+  if (!s) return null;
+  const den = 1 - s.skew * s.sr + (s.kurt - 1) / 4 * s.sr ** 2;
+  return den > 0 ? normCdf((s.sr - sr0) * Math.sqrt(s.n - 1) / Math.sqrt(den)) : null;
+}
+const EULER = 0.5772156649015329;
+export function expMaxSR(N, V) {
+  if (!(N > 1) || !(V > 0)) return 0;
+  return Math.sqrt(V) * ((1 - EULER) * normInv(1 - 1 / N) + EULER * normInv(1 - 1 / (N * Math.E)));
+}
+export function dsr(s, N, V = s ? 1 / (s.n - 1) : 0) {
+  if (!s) return null;
+  const sr0 = expMaxSR(N, V);
+  return { sr0, p: psr(s, sr0) };
+}
+
 // ---------- random entries: can a backtest result be told apart from luck? ----------
 // The same coins (at each moment the same top by 24 h turnover as backtest(), refreshed hourly), the same period, as many trades
 // as the strategy made and its exits — stop 1.5 ATR within 0.8–2.5 %, the take at the strategy's own take : stop (S.rr, or else
