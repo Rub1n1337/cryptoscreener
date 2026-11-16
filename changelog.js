@@ -1,6 +1,10 @@
 // Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in app/changes.js; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.118', date:'12 ноября 2026', title:'Схемы и источники в уроках', items:[
+    'Добавлены схемы в уроки модуля «Как проверить идею».',
+    'Добавлен блок «Источники» со ссылками на исследования, на которые опирается урок.',
+  ]},
   {v:'2.117', date:'12 ноября 2026', title:'Надёжность ботов', items:[
     'Исправлено: бот в браузере, открытый в нескольких вкладках, ведёт один общий журнал.',
     'Исправлено: позиция по монете, снятой с торгов, закрывается после тайм-стопа.',

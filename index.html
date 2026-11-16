@@ -1604,7 +1604,7 @@ function computeChart() {
   const pB = (d.c[i] - B.lo[i]) / (B.up[i] - B.lo[i]), hl = halfLife(d.c, B.mid);
   const ch = (d.c[i] / d.c[Math.max(0, i - Math.round(864e5 / TFMS[S.tf]))] - 1) * 100;
   const fav = favs.has(chartSym);
-  $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button><button class="shbtn" data-cshare title="Поделиться монетой: ссылка открывает её график" aria-label="Поделиться монетой"><svg class="i"><use href="#i-share"/></svg></button> <span class="cprice ${tickCls('c:' + chartSym, d.c[i])}">${fp(d.c[i])}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
+  $('#ctitle').innerHTML = `${coin(chartSym)} <button class="favbtn${fav ? ' on' : ''}" data-cfav aria-pressed="${fav}" title="${fav ? 'Убрать из избранного' : 'В избранное — будет наверху таблицы'}" aria-label="${fav ? 'Убрать из избранного' : 'Добавить в избранное'}">${fav ? '★' : '☆'}</button><button class="shbtn" data-cshare title="Поделиться монетой: ссылка открывает её график" aria-label="Поделиться монетой"><svg class="i"><use href="#i-share"/></svg></button> <span class="cprice ${tickCls('c:' + chartSym, d.c[i])}">${curH(fp(d.c[i]))}</span> <span class="${cl(ch)}" style="font-size:14px;font-weight:600">${ch >= 0 ? '+' : '−'}${Math.abs(ch).toFixed(2)}% за 24ч</span>`;
   // the coin's numbers as named pairs (a small name over each value), not one line joined by dots
   const st = (name, v, cls = '', tip = '') => `<span class="st"${tip ? ` title="${tip}"` : ''}><i>${name}</i><b class="${cls}">${v}</b></span>`;
   // each number explains itself on hover, and on a tap (a phone has no hover): #cstats.onclick shows the title as a toast
@@ -2831,11 +2831,13 @@ function renderServer() {
 
 // ---------- journal ----------
 const money = v => v.toLocaleString('ru', {minimumFractionDigits:2, maximumFractionDigits:2});
+// a large sum with the currency set lighter than the value (DESIGN-RULES п. 67): «$» in .cur, after a sign if there is one
+const curH = s => String(s).replace(/^([+−-]?)\$/, '$1<span class="cur">$</span>');
 const lastBal = {};
 function countUp(el, from, to, fmt, ms = 650) {
   if (!el || from == null || from === to || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const t0 = performance.now(), ease = x => 1 - (1 - x) ** 3;
-  const step = t => { const k = Math.min(1, (t - t0) / ms); el.textContent = fmt(from + (to - from) * ease(k)); if (k < 1) requestAnimationFrame(step); };
+  const step = t => { const k = Math.min(1, (t - t0) / ms); el.innerHTML = fmt(from + (to - from) * ease(k)); if (k < 1) requestAnimationFrame(step); };   // fmt gives figures and our own markup only
   requestAnimationFrame(step);
 }
 // the browser journal keeps its newest JMAX trades (owner's choice 12.11): ~1 KB a trade, and a full storage would stop saving it
@@ -3031,12 +3033,12 @@ function renderJournalNow() {
     `<div class="hero">
        <div class="htop">
          <div><div class="t">Баланс · виртуальный</div>
-           <div class="hv">$${money(D.balance)}</div>
+           <div class="hv">${curH('$' + money(D.balance))}</div>
            <div class="hchg"><span class="chip ${allNet > 0 ? 'pos' : allNet < 0 ? 'neg' : 'flat'} ${cl(allNet)}">${usd(allNet)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">за всё время, после комиссий</span>
              ${wk.length && wk.length < D.closed.length ? `<span class="chip ${wkNet > 0 ? 'pos' : wkNet < 0 ? 'neg' : 'flat'} ${cl(wkNet)}" style="margin-left:10px">${wkNet > 0 ? '▲' : wkNet < 0 ? '▼' : ''} ${usd(wkNet)}</span><span class="faint">за 7 дней · ${wk.length} ${plural(wk.length, ['сделка', 'сделки', 'сделок'])}</span>` : ''}</div></div>
          <div class="hside">
-           <div>Старт<b>$${money(D.start)}</b></div>
-           <div>Пик<b>$${money(peakOf(D))}</b></div>
+           <div>Старт<b>${curH('$' + money(D.start))}</b></div>
+           <div>Пик<b>${curH('$' + money(peakOf(D)))}</b></div>
            <div>Закрыто сделок<b>${st.n + cutN}</b>${cutN ? `<span class="faint" title="Журнал в браузере хранит последние ${JMAX} сделок; итог за всё время и баланс учитывают все">хранятся ${JMAX}</span>` : ''}</div>
          </div>
        </div>
@@ -3052,7 +3054,7 @@ function renderJournalNow() {
        ${card('Просадка', st.maxDD.toFixed(1) + '%', 'максимальная', st.maxDD > 10 ? 'neg' : '', 'Самое большое падение баланса от предыдущего пика, а не от старта. На графике баланса оно подсвечено')}
      </div>` : ''}`;
   // the balance counts to its new value instead of jumping (only when it actually changed)
-  countUp($('#jcards .hv'), lastBal[jMode], D.balance, v => '$' + money(v)); lastBal[jMode] = D.balance;
+  countUp($('#jcards .hv'), lastBal[jMode], D.balance, v => curH('$' + money(v))); lastBal[jMode] = D.balance;
   const now = Date.now();
   $('#jopen').innerHTML = D.open.map(p => {
     const last = p.last ?? p.entry, {u, risk} = openPnl(p);
@@ -3112,7 +3114,7 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
   const nowW = isOpen ? 'сейчас' : 'выход';
   let html = `<div class="thero">
     <div class="thero-k">${isOpen ? 'PnL сейчас' : 'PnL после комиссий'}</div>
-    <div class="thero-v"><b class="${cl(net)}">${usd(net)}</b><span class="${cl(net)}">${rr(!isOpen && x.r != null ? x.r : risk ? net / risk : null)}</span></div>
+    <div class="thero-v"><b class="${cl(net)}">${curH(usd(net))}</b><span class="${cl(net)}">${rr(!isOpen && x.r != null ? x.r : risk ? net / risk : null)}</span></div>
     <div class="thero-s">до комиссий ${usd(gross)} · ${x.fin ? 'комиссия и заём' : 'комиссия'} ${usd(-fee)}${x.fin ? ` (заём ${usd(-x.fin)})` : ''}</div>
     <div class="tpath" role="img" aria-label="Цена между стопом и тейком: вход ${fp(x.entry)}, ${nowW} ${fp(last)} (${pct(last)}), стоп ${fp(x.sl)}, тейк ${fp(x.tp)}">
       <div class="tpath-bar"><i class="${cl(mv)}" style="left:${Math.min(pe, pc)}%;width:${Math.abs(pc - pe).toFixed(1)}%"></i><b class="te" style="left:${pe}%"></b><b class="tc ${cl(mv)}" style="left:${pc}%"></b></div>
@@ -3605,7 +3607,7 @@ function renderBacktest() {
     `<div class="hero">
        <div class="htop">
          <div><div class="t">Итоговый баланс · ${r.periodLabel || r.days + ' дней'} · ${coinsLabel(r)}</div>
-           <div class="hv">$${money(r.balance)}</div>
+           <div class="hv">${curH('$' + money(r.balance))}</div>
            <div class="hchg"><span class="chip ${st.net > 0 ? 'pos' : st.net < 0 ? 'neg' : 'flat'} ${cl(st.net)}">${usd(st.net)} · ${chg >= 0 ? '+' : '−'}${Math.abs(chg * 100).toFixed(2)}%</span><span class="faint">после комиссий</span></div></div>
          <div class="hside">
            <div title="Средний итог сделки в рисках (R) после комиссий: +1R — заработали столько, сколько рисковали. Больше 0 — у правил есть преимущество"><span class="tl">Средний результат</span><b class="${cl(st.expR)}">${rr(st.expR)}</b></div>
