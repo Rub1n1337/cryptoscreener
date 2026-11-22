@@ -51,10 +51,11 @@ async function pool(items, n, fn) { let i = 0; await Promise.all(Array.from({len
 const compact = K => K.map(k => [k[0], +k[1], +k[2], +k[3], +k[4], +k[5]]);
 
 // series "SYM|tf" → {K, at: last refresh, used: last asked for, tradeAt: last asked for trading (not just notifications), an: analyses}
-const SER = new Map();
+const SER = new Map(), FIRST = new Map();   // FIRST: the download of a series not in SER yet, shared by callers asking at once
 function refresh(key) {
   const s = SER.get(key);
   if (s?.busy) return s.busy;
+  if (!s && FIRST.has(key)) return FIRST.get(key);
   const [sym, tf] = key.split('|'), tfms = M.TFMS[tf];
   const job = (async () => {
     if (s?.K.length && Date.now() - s.K[s.K.length - 1][0] < 2 * tfms) {
@@ -64,8 +65,8 @@ function refresh(key) {
     if (!fullBudget()) throw new Error('download budget spent this minute');
     const K = compact(await api(`/api/v3/klines?symbol=${sym}&interval=${tf}&limit=${LIMIT()}`));
     SER.set(key, {K, at:Date.now(), used:s?.used || Date.now(), tradeAt:s?.tradeAt || 0, an:new Map()});
-  })().finally(() => { const x = SER.get(key); if (x) x.busy = null; });
-  if (s) s.busy = job;
+  })().finally(() => { const x = SER.get(key); if (x) x.busy = null; if (!s) FIRST.delete(key); });
+  if (s) s.busy = job; else FIRST.set(key, job);
   return job;
 }
 const stale = (s, tf, lazy) => !s?.K.length || Date.now() - s.at > Math.max(FRESH, lazy ? LAZY[tf] || 0 : 0) || Date.now() - s.K[s.K.length - 1][0] >= M.TFMS[tf];

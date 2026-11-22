@@ -176,7 +176,7 @@
     </section>
   </div>
 </div></div>
-<div id="toasts"></div>
+<div id="toasts" role="status" aria-live="polite"></div>
 <div id="cmdk" class="cmdk hidden"><div class="cmdbox" role="dialog" aria-modal="true" aria-label="Быстрый переход">
   <div class="cmdin"><svg class="i"><use href="#i-search"/></svg><input id="cmdq" enterkeyhint="go" autocorrect="off" role="combobox" aria-expanded="true" aria-autocomplete="list" aria-label="Быстрый переход" placeholder="Монета, раздел или настройка…" autocomplete="off" spellcheck="false" aria-controls="cmdl"><button type="button" class="cmdx" id="cmdx" title="Закрыть (Esc)" aria-label="Закрыть поиск"><kbd>Esc</kbd><svg class="i"><use href="#i-x"/></svg></button></div>
   <div id="cmdl" class="cmdl" role="listbox"></div>
@@ -447,7 +447,7 @@
           <option value="log">Лог-канал</option><option value="classic">Классика</option><option value="robust">Робастная</option><option value="ewma">EWMA</option>
         </select></label>
         <label class="btch" title="Длина окна канала, свечей">N <input type="number" id="btN" inputmode="numeric" enterkeyhint="done" min="20" max="300" style="width:80px"></label>
-        <label class="btch" title="Ширина канала в σ">k <input type="number" id="btK" enterkeyhint="done" min="1" max="4" step="0.1" style="width:72px"></label>
+        <label class="btch" title="Ширина канала в σ">k <input type="number" id="btK" enterkeyhint="done" min="1" max="5" step="0.1" style="width:72px"></label>
       </div><p class="bthint" id="btStratHint"></p></div>
       <div class="btsec"><h4>На чём</h4><div class="fields">
         <label title="Сколько самых ликвидных монет взять — или свой список">Монеты <select id="btTop"><option value="20">Топ-20</option><option value="50">Топ-50</option><option value="100">Топ-100</option><option value="200">Топ-200</option><option value="custom">Свой список…</option></select></label>
@@ -683,7 +683,7 @@
         <li>По другим вопросам о данных напишите владельцу в Telegram.</li>
       </ul>
       <h3>Лицензии</h3>
-      <p>Шрифт Inter распространяется по лицензии <a href="/fonts/LICENSE.txt" target="_blank" rel="noopener">SIL Open Font License 1.1</a>. Рыночные данные предоставляет Binance; история свечей хранится копией его открытых данных в Cloudflare R2.</p>
+      <p>Шрифты Manrope и JetBrains Mono распространяются по лицензии <a href="/fonts/LICENSE.txt" target="_blank" rel="noopener">SIL Open Font License 1.1</a>. Рыночные данные предоставляет Binance; история свечей хранится копией его открытых данных в Cloudflare R2.</p>
     </div>
   </section>
 
@@ -3296,7 +3296,7 @@ const coinsGen = n => plural(n, ['монеты', 'монет', 'монет']);  
 const coinsLabel = r =>r.pool && r.pool > r.pairs ? `топ-${r.pairs} на каждый момент (из ${r.pool} ${coinsGen(r.pool)})` : `${r.pairs} ${plural(r.pairs, ['монета', 'монеты', 'монет'])}`;
 function btSettings() {
   const custom = $('#btTop').value === 'custom' ? parseCoins($('#btCustom').value) : null;
-  return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 4), tf:$('#btTf').value,
+  return {method:$('#btMethod').value, N:clamp(+$('#btN').value || 210, 20, 300), k:clamp(+$('#btK').value || 3, 1, 5), tf:$('#btTf').value,
           minScore:clamp(+$('#btMin').value || 0, 0, 100), maxHL:+$('#btHL').value || 0, minWidth:+$('#btW').value || 0,
           top:custom ? custom.length : +$('#btTop').value, custom, pit:!custom && $('#btPit').value === 'pit',
           strategy:$('#btStrat').value, longOnly:$('#btLong').checked,

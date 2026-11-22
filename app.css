@@ -20,6 +20,8 @@
   --shadow:0 10px 30px rgba(0,0,0,.35);
   --on-acc:#1a1300;   /* text on gold: the same dark in both themes */
   --acc-h:#ffc62e;--sig-up:#c9303d;--sig-lo:#15803d;--bad:#dc2626;--focus:rgba(91,140,255,.55);   /* primary hover, solid signal tags (white text ≥ 4.5:1), server cells, focus ring */
+  --blue-fill:#3f6fe0;   /* blue under white text (selected tabs, chips, counters): ≥ 4.5:1, --blue itself is 3.2:1 */
+  --lo-tint:color-mix(in srgb,var(--lo) 12%,transparent);--up-tint:color-mix(in srgb,var(--up) 12%,transparent);   /* soft fills of the theme's own --lo/--up */
   /* how strong the glass is: every light and every see-through below is multiplied by this one number, set per device in
      the profile (data-glass on <html>, the rules right after the light theme): 0 no glass, .35 quiet, .7 soft (default), 1 full, 1.5 bright */
   --g:.7;
@@ -66,7 +68,7 @@
 :root[data-theme=light]{
   --bg:#f4f5f8;--s1:#ffffff;--s2:#f3f4f7;--s3:#e8ebf0;--line:#e3e6ec;--line2:#d2d8e1;
   --text:#11161f;--mute:#5a6375;--faint:#687183;   /* 4.5–4.9:1 on white and the page (was #7c8596, ~3.4:1) */
-  --acc:#c28a00;--accbg:rgba(194,138,0,.12);--up:#d42a3a;--lo:#15803d;--blue:#2f6bf0;--violet:#7c3aed;--mid:#64748b;
+  --acc:#c28a00;--accbg:rgba(194,138,0,.12);--up:#d42a3a;--lo:#15803d;--blue-fill:#2f6bf0;--blue:#2f6bf0;--violet:#7c3aed;--mid:#64748b;
   --shadow:0 10px 30px rgba(15,23,42,.12);
   --focus:rgba(47,107,240,.55);
   --topbg:rgba(244,245,248,calc(1 - .15*var(--g)));--navbg:rgba(255,255,255,calc(1 - .06*var(--g)));--backdrop:rgba(15,23,42,.35);--ring:rgba(15,23,42,.06);
@@ -149,10 +151,10 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;ba
 .tools{display:flex;gap:6px;align-items:center}
 .pill{display:flex;align-items:center;gap:8px;height:var(--h);padding:0 12px;border-radius:999px;border:1px solid var(--line2);background:var(--s2);color:var(--text);font-size:13px;font-weight:500;white-space:nowrap}
 .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);box-shadow:0 0 0 3px var(--ring)}
-.pill.ok .dot{background:var(--lo);box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+.pill.ok .dot{background:var(--lo);box-shadow:0 0 0 3px color-mix(in srgb,var(--lo) 18%,transparent)}
 .pill.idle .dot{background:var(--acc);box-shadow:0 0 0 3px var(--accbg)}
 .pill.bad{border-color:var(--bad-line);background:var(--bad-bg)}.pill.bad .dot{background:var(--up);animation:pulse 1.2s infinite}
-@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(240,82,95,.0)}0%{box-shadow:0 0 0 0 rgba(240,82,95,.5)}}
+@keyframes pulse{50%{box-shadow:0 0 0 6px transparent}0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--up) 50%,transparent)}}
 
 /* ---------- layout ---------- */
 .wrap{max-width:1500px;margin:0 auto;padding:18px 16px 40px}
@@ -310,10 +312,10 @@ tr.row:hover .gauge,tr.row:focus-visible .gauge{--ring:var(--s2)}tr.sel .gauge{-
 .bn-dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:0 0 auto}.bn-dot.on{background:var(--lo)}.bn-dot.wait{background:var(--acc)}.bn-main{min-width:0}.bn-pos{display:inline-flex;gap:5px;margin-left:8px}.bn-last{font-size:12px}.bn-go{margin-left:auto;color:var(--blue);font-weight:600;font-size:13px}
 @media(max-width:560px){.botnow{display:block}.bn-dot{display:inline-block;margin-right:8px;vertical-align:1px}.bn-main{display:inline}.bn-go{display:block;margin-top:6px}
   .bn-last{display:none}}   /* the phone's first screen is for the coins; the last trade is in «Журнал» one tap away */
-.tag.up{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.lo{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sq{background:var(--accbg);color:var(--acc-t)}
+.tag.up{background:var(--up-tint);color:var(--up-t)}.tag.lo{background:var(--lo-tint);color:var(--lo-t)}.tag.sq{background:var(--accbg);color:var(--acc-t)}
 .tag.upc{background:var(--sig-up);color:#fff}.tag.loc{background:var(--sig-lo);color:#fff}
 .tag.uo{background:transparent;color:var(--up-t);box-shadow:inset 0 0 0 1px var(--bad-line)}.tag.lout{background:transparent;color:var(--lo-t);box-shadow:inset 0 0 0 1px var(--ok-line)}
-.tag.tp{background:rgba(34,197,94,.12);color:var(--lo-t)}.tag.sl{background:rgba(240,82,95,.12);color:var(--up-t)}.tag.ts{background:var(--s3);color:var(--tag-t)}
+.tag.tp{background:var(--lo-tint);color:var(--lo-t)}.tag.sl{background:var(--up-tint);color:var(--up-t)}.tag.ts{background:var(--s3);color:var(--tag-t)}
 td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:1.5;text-wrap:pretty}td.tbl-empty button{margin:8px auto 0;display:flex}   /* a long «why empty» wraps instead of widening the table */
 .tbl-err{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 12px;text-align:center;white-space:normal}.tbl-err button{margin-top:8px}
 .sk td{color:transparent}
@@ -366,9 +368,9 @@ td.tbl-empty{padding:28px 16px;text-align:center;white-space:normal;line-height:
 /* ---------- banners, intro, toasts ---------- */
 .banner{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:var(--r);border:1px solid var(--line);background:var(--s1);margin-bottom:14px;font-size:14px;line-height:1.55}
 .banner svg.i{width:20px;height:20px;margin-top:1px}
-.banner.ok{border-color:var(--ok-line);background:linear-gradient(0deg,rgba(34,197,94,.07),rgba(34,197,94,.07)),var(--s1)}.banner.ok svg{color:var(--lo)}
+.banner.ok{border-color:var(--ok-line);background:linear-gradient(0deg,color-mix(in srgb,var(--lo) 7%,transparent),color-mix(in srgb,var(--lo) 7%,transparent)),var(--s1)}.banner.ok svg{color:var(--lo)}
 .banner.warn{border-color:var(--warn-line);background:linear-gradient(0deg,var(--accbg),var(--accbg)),var(--s1)}.banner.warn svg{color:var(--acc)}
-.banner.bad{border-color:var(--bad-line);background:linear-gradient(0deg,rgba(240,82,95,.08),rgba(240,82,95,.08)),var(--s1)}.banner.bad svg{color:var(--up)}
+.banner.bad{border-color:var(--bad-line);background:linear-gradient(0deg,color-mix(in srgb,var(--up) 8%,transparent),color-mix(in srgb,var(--up) 8%,transparent)),var(--s1)}.banner.bad svg{color:var(--up)}
 .banner.info svg{color:var(--blue)}
 .banner .btrand{margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}.banner .btrand button{margin-left:4px;vertical-align:middle}
 .banner b{color:var(--text)}.banner .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
@@ -533,7 +535,7 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .bgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
 .bbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .bsym{flex:0 1 160px}.bsym input{width:100%}
-.ind-btn{gap:8px;font-weight:600}.ind-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue);color:#fff;font-size:12px;font-weight:600}
+.ind-btn{gap:8px;font-weight:600}.ind-n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--blue-fill);color:#fff;font-size:12px;font-weight:600}
 #btOut{transition:opacity var(--dur-2) var(--ease)}#btOut.stale{opacity:.45}
 .bchart{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .bpanes{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);min-width:0}.bpanes[data-lay="2"],.bpanes[data-lay="4"]{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -581,8 +583,8 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 /* 2 and 4 charts: the chips stay one line that scrolls sideways (the wheel scrolls it too), so they don't eat the chart's height */
 .bpanes:not([data-lay="1"]) .bchips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}.bpanes:not([data-lay="1"]) .bchip,.bpanes:not([data-lay="1"]) .bchip-t{flex:0 0 auto;max-width:none}.bpanes[data-lay="4"] .bchip .s{display:none}
 .sel-cfg .pf{display:grid;gap:7px;font-size:12px;color:var(--mute)}.sel-cfg .pf>span{display:flex;justify-content:space-between;gap:8px}.sel-cfg .pf b{color:var(--blue);font-weight:600}
-.pseg{display:flex;gap:4px;flex-wrap:wrap}.pseg button{height:30px;padding:0 10px;font-size:12px;font-weight:600}.pseg button.on{background:var(--blue);border-color:var(--blue);color:#fff}
-.btools .tab{min-width:34px;padding:0 9px;font-weight:600}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue);color:#fff}
+.pseg{display:flex;gap:4px;flex-wrap:wrap}.pseg button{height:30px;padding:0 10px;font-size:12px;font-weight:600}.pseg button.on{background:var(--blue-fill);border-color:var(--blue-fill);color:#fff}
+.btools .tab{min-width:34px;padding:0 9px;font-weight:600}.btools i{width:1px;align-self:stretch;margin:4px 3px;background:var(--line2)}.btools .tab.on{background:var(--blue-fill);color:#fff}
 .bchart{position:relative}.bhint{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;display:flex;gap:10px;align-items:center;padding:7px 8px 7px 14px;border-radius:999px;background:var(--s1);border:1px solid var(--blue);box-shadow:var(--shadow);font-size:13px;white-space:nowrap;animation:popin var(--dur-2) var(--ease)}
 .bhint button{height:28px;padding:0 10px;font-size:12px}
 .bph .bpx{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--text)}.bph .live{font-size:12px}
@@ -619,14 +621,14 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 @container cbar (max-width:900px){.cbeta .bbar .ib-t{display:none}.cbeta #bIndBtn .ib-s{display:inline}}
 .bpop.draw{width:min(340px,calc(100vw - 32px))}.bpop.draw .pact button{flex:1;white-space:nowrap;padding:0 8px}.bpop .pdraw{display:grid;gap:4px}
 .bpop .pdraw button{justify-content:flex-start;gap:10px;height:38px;padding:0 10px;font-weight:600}.bpop .pdraw kbd{margin-left:auto}
-.bpop .pdraw button.on{background:var(--blue);border-color:var(--blue);color:#fff}.bpop.draw .pact button{gap:6px;font-size:12px}
+.bpop .pdraw button.on{background:var(--blue-fill);border-color:var(--blue-fill);color:#fff}.bpop.draw .pact button{gap:6px;font-size:12px}
 /* phone: the tool hint covers the chart's header (legend, chips), not the plot, and doesn't push the chart down — a chart that
    moved under the finger between choosing a tool and drawing, and jumped back after it */
 @media(max-width:700px){#bLay [data-lay="4"]{display:none}.bhint{top:0;bottom:auto;left:0;right:0;transform:none;justify-content:space-between;white-space:normal;border-radius:var(--r-l);line-height:1.35}}
 @media(pointer:coarse) and (max-height:500px){#bLay [data-lay="4"]{display:none}}   /* a phone on its side: still two charts at most (SMALL in beta.js) */
 .bpop{position:absolute;z-index:30;background:var(--s1);border:1px solid var(--line2);border-radius:var(--r-l);box-shadow:var(--shadow);padding:14px;width:min(340px,calc(100vw - 32px));animation:popin var(--dur-2) var(--ease)}
 .bpop h4{margin:0 0 10px;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px}.bpop h4 button{width:30px;height:30px;padding:0}
-.bpop .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.bpop .pgrid button{height:36px;padding:0;font-weight:600}.bpop .pgrid button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.bpop .pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.bpop .pgrid button{height:36px;padding:0;font-weight:600}.bpop .pgrid button.on{background:var(--blue-fill);border-color:var(--blue-fill);color:#fff}
 .bpop .phint{font-size:12px;color:var(--faint);margin:10px 0 0;line-height:1.4}
 .bpop textarea{width:100%;min-height:64px;resize:vertical;font:inherit;font-size:14px}
 .bpop .pcols{display:flex;gap:8px;margin:10px 0}.bpop .pcols button{width:28px;height:28px;padding:0;border-radius:999px;border:2px solid transparent}.bpop .pcols button.on{border-color:var(--text)}
@@ -644,16 +646,16 @@ div.row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
 .indbox{width:min(920px,100%);max-height:84vh}
 .ind-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px 6px}.ind-h b{font-size:18px;display:flex;gap:8px;align-items:center}
 .ind-quick{padding:0 16px 8px}.ind-chips{display:flex;flex-wrap:wrap;gap:6px}
-.ind-chip{height:32px;border-radius:999px;font-size:13px;padding:0 12px;gap:6px}.ind-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.ind-chip{height:32px;border-radius:999px;font-size:13px;padding:0 12px;gap:6px}.ind-chip.on{background:var(--blue-fill);border-color:var(--blue-fill);color:#fff}
 .ind-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;min-height:0;overflow:hidden;border-top:1px solid var(--line)}
 .ind-cats{overflow:auto;padding:10px 12px;max-height:56vh}.ind-sel{border-left:1px solid var(--line);padding:12px 14px;overflow:auto;max-height:56vh}
 .ind-selh{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.ind-selh button{height:30px;font-size:12px}
 .ind-cat{border:1px solid var(--line);border-radius:var(--r-l);margin-bottom:8px;background:var(--s1)}
 .ind-cat>summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:600;display:flex;justify-content:space-between;align-items:center}.ind-cat>summary::-webkit-details-marker{display:none}
 .ind-it{display:flex;gap:12px;align-items:center;padding:10px 12px;margin:0 8px 8px;border-radius:var(--r);background:var(--s2)}
-.ind-it .ii{width:34px;height:34px;border-radius:var(--r);display:grid;place-items:center;background:var(--blue);color:#fff;flex:0 0 auto}.ind-it .ii svg{width:17px;height:17px}
+.ind-it .ii{width:34px;height:34px;border-radius:var(--r);display:grid;place-items:center;background:var(--blue-fill);color:#fff;flex:0 0 auto}.ind-it .ii svg{width:17px;height:17px}
 .ind-it .it{flex:1;min-width:0}.ind-it .it b{display:block;font-size:14px}.ind-it .it span{font-size:12px;color:var(--faint);line-height:1.35;display:block}
-.ind-it button{width:34px;height:34px;padding:0}.ind-it.on button{background:var(--blue);border-color:var(--blue);color:#fff}
+.ind-it button{width:34px;height:34px;padding:0}.ind-it.on button{background:var(--blue-fill);border-color:var(--blue-fill);color:#fff}
 .ind-it.soon{opacity:.55}.ind-it.soon .ii{background:var(--s3);color:var(--mute)}
 .sel-it{display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);margin-bottom:6px;font-size:13px}.sel-it span{flex:1}.sel-it button{width:30px;height:30px;padding:0;background:transparent;border-color:transparent}
 .sel-it .off{opacity:.45}
@@ -893,7 +895,7 @@ tr.row.stale{opacity:.55}
 .dlgbox h3{margin:0 0 6px;font-size:18px}.dlgbox p{margin:0;color:var(--mute);font-size:14px;line-height:1.5}
 .dlgbox input:not([type=checkbox]):not([type=range]){width:100%;margin-top:14px}
 .dlga{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}.dlga button{height:40px;padding:0 16px}
-button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight:600}button.danger:hover{filter:brightness(1.08);background:var(--up);border-color:var(--up)}
+button.danger{background:var(--sig-up);border-color:var(--sig-up);color:#fff;font-weight:600}button.danger:hover{filter:brightness(1.08);background:var(--sig-up);border-color:var(--sig-up)}
 @media(max-width:560px){.dlga button{flex:1}}
 /* profile form: sticky "unsaved changes" bar */
 .pfbar{align-items:center!important}.pfbar.dirty{position:sticky;bottom:12px;z-index:5}
@@ -903,7 +905,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 @media(max-width:560px){.pfbar.dirty .pfbt{flex-basis:100%}.pfbar button{flex:1}}
 /* events popover under the bell */
 #ntf{position:relative}
-.nbadge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--up);color:#fff;font-size:11px;font-weight:600;line-height:16px;box-shadow:0 0 0 2px var(--bg)}
+.nbadge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--sig-up);color:#fff;font-size:11px;font-weight:600;line-height:16px;box-shadow:0 0 0 2px var(--bg)}
 .evp{position:fixed;top:64px;right:16px;z-index:45;width:min(380px,calc(100vw - 32px));background:var(--s2);border:1px solid var(--line2);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
 .evp:not(.open){display:none}
 .evh{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 8px 14px;border-bottom:1px solid var(--line)}
@@ -920,7 +922,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 @media(max-width:700px){.evp{top:62px;right:10px;width:calc(100vw - 20px)}}
 /* journal: change chips and the one-line takeaway */
 .dchip{display:inline-block;vertical-align:middle;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
-.dchip.pos{background:rgba(34,197,94,.12)}.dchip.neg{background:rgba(240,82,95,.12)}
+.dchip.pos{background:var(--lo-tint)}.dchip.neg{background:var(--up-tint)}
 .insight{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13px;color:var(--text);line-height:1.5}.insight svg{color:var(--blue);margin-top:2px}
 /* live freshness: pulsing dot + ticking "updated N s ago" */
 .live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -1000,7 +1002,7 @@ button.danger{background:var(--up);border-color:var(--up);color:#fff;font-weight
 .hero .hv{font-size:40px;font-weight:600;letter-spacing:-.03em;margin:4px 0 8px;font-variant-numeric:tabular-nums;line-height:1.1}
 .htop{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
 .hchg{font-size:13px}.hchg .chip{display:inline-block;padding:3px 10px;border-radius:999px;font-weight:600;margin-right:6px;font-variant-numeric:tabular-nums}
-.hchg .chip.pos{background:rgba(34,197,94,.12)}.hchg .chip.neg{background:rgba(240,82,95,.12)}.hchg .chip.flat{background:var(--s3)}
+.hchg .chip.pos{background:var(--lo-tint)}.hchg .chip.neg{background:var(--up-tint)}.hchg .chip.flat{background:var(--s3)}
 /* the journal's day headings (newest-first order): the date, how many trades and the day's result */
 #jclosed tr.jday td{padding:16px 10px 6px;font-size:12px;font-weight:600;color:var(--mute);border-bottom:1px solid var(--line);background:transparent;text-align:left}
 #jclosed tr.jday:first-child td{padding-top:8px}

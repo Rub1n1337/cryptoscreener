@@ -1,6 +1,11 @@
-// Older «Что нового» entries (2.97 and before), loaded only when that page opens, so the site's first load doesn't carry them.
+// Older «Что нового» entries (those CHANGELOG in app/changes.js no longer holds), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in app/changes.js; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.120', date:'12 ноября 2026', title:'Два новых модуля учёбы', items:[
+    'Добавлен модуль «Популярные идеи и что с ними на истории»: отскок от канала, Фибоначчи, SMC, ставка финансирования, тренд на недели и модели-прогнозисты.',
+    'Добавлен модуль «Риск и деньги»: размер позиции, просадка, серии убытков и бумажный бот.',
+    'Исправлено: тейк из правил профиля или урока иногда сбрасывался в бэктесте на «к центру канала».',
+  ]},
   {v:'2.119', date:'12 ноября 2026', title:'Удобнее уроки', items:[
     'Добавлен блок «Главное» в начале каждого урока.',
     'Схемы в уроках стали нагляднее.',

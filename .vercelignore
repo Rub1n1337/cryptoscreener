@@ -1,4 +1,5 @@
-# only the site goes to Vercel: index.html, beta.js and the shared strategy math it imports
+# only the site goes to Vercel: index.html, app.css, app/, beta.js, history.js, learn.js, changelog.js, fonts/ and the shared strategy math
+theory
 server
 docs
 CLAUDE.md

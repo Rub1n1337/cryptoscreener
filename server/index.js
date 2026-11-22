@@ -35,7 +35,8 @@ const niceStep = (p, share = 0.0005) => { const raw = p * share, m = 10 ** Math.
 async function api(path, mkt = 'spot') {
   let err;
   for (const b of REST[mkt]) {
-    try { const r = await fetch(b + path); if (r.ok) return await r.json(); err = new Error(`HTTP ${r.status} ${path}`); if (r.status === 418 || r.status === 429) await sleep(60e3); }
+    // a timeout: a hung connection would otherwise keep a book «syncing» for good or stall the start
+    try { const r = await fetch(b + path, {signal:AbortSignal.timeout(15e3)}); if (r.ok) return await r.json(); err = new Error(`HTTP ${r.status} ${path}`); if (r.status === 418 || r.status === 429) await sleep(60e3); }
     catch (e) { err = e; }
   }
   throw err;
@@ -168,7 +169,9 @@ function prune(c) {   // drop levels too far from the price (they only cost memo
 
 // ---------- trades -> clusters ----------
 function onTrade(c, x) {
-  c.last = +x.p; if (!c.base) return;
+  // a broken price (not a number, 0) would make closeFp allocate a huge array and crash the process (closeFp also caps the span)
+  const p = +x.p; if (!Number.isFinite(p) || p <= 0) return;
+  c.last = p; if (!c.base) return;
   const t = Math.floor(x.T / 6e4) * 6e4;
   if (c.fpT !== t) { closeFp(c); c.fpT = t; c.fpCur = new Map(); }
   const k = Math.floor(+x.p / c.base), r = c.fpCur.get(k) || [0, 0], usd = +x.p * +x.q;
@@ -176,7 +179,9 @@ function onTrade(c, x) {
 }
 function closeFp(c) {
   if (!c.fpCur?.size) return;
-  const ks = [...c.fpCur.keys()], k0 = Math.min(...ks), n = Math.max(...ks) - k0 + 1, buy = new Float32Array(n), sell = new Float32Array(n);
+  const ks = [...c.fpCur.keys()], k0 = Math.min(...ks), n = Math.max(...ks) - k0 + 1;
+  if (!(n > 0 && n <= 1e5)) { c.fpCur = new Map(); return; }   // never expected: a minute's trades span a few hundred steps
+  const buy = new Float32Array(n), sell = new Float32Array(n);
   for (const [k, [b, s]] of c.fpCur) { buy[k - k0] = b; sell[k - k0] = s; }
   const rec = {t:c.fpT, k0, buy, sell}; c.fp.push(rec); if (c.fp.length > KEEP_MIN) c.fp.shift();
   disk.append(c, 'fp', rec);
@@ -396,8 +401,9 @@ http.createServer((req, res) => {
     if (req.headers['x-scan-token'] !== SCAN_TOKEN) return send(req, res, 403, {error:'forbidden'});
     if (!allowed(req)) return send(req, res, 429, {error:'too many requests, slow down'}, {'retry-after':'60'});
     let size = 0; const parts = [];
-    req.on('data', d => { size += d.length; if (size > 256e3) req.destroy(); else parts.push(d); });
+    req.on('data', d => { size += d.length; if (size > 256e3) { if (!res.headersSent) { res.on('finish', () => req.destroy()); send(req, res, 413, {error:'body too large'}, {connection:'close'}); } } else parts.push(d); });
     req.on('end', async () => {
+      if (size > 256e3) return;   // answered 413 above
       let body; try { body = JSON.parse(Buffer.concat(parts).toString()); } catch { return send(req, res, 400, {error:'bad json'}); }
       try { send(req, res, 200, encode(await scan(body))); } catch (e) { send(req, res, 500, {error:e.message}); }
     });

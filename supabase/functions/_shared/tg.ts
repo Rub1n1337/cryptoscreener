@@ -46,7 +46,9 @@ async function ctx(db: any, chat: number) {
 const visited = (db: any, c: any) => c.bot ? db.from("user_bots").update({ last_seen: new Date().toISOString() })
   .eq("id", c.bot.id).lt("last_seen", new Date(Date.now() - 6e5).toISOString()) : null;
 const profileOf = (bot: any) => { const ps = Array.isArray(bot?.config?.profiles) ? bot.config.profiles : []; return ps.find((p: any) => p.name === bot.active_profile) || ps[0] || null; };
-const sigMinOf = (set: any) => Math.max(40, Number(set?.minScore ?? 60));
+// a number for the message text: stored settings are not trusted to be numbers (a string would go into the HTML as it is)
+const numOr = (v: any, d: number) => { const n = Number(v ?? d); return Number.isFinite(n) ? n : d; };
+const sigMinOf = (set: any) => Math.max(40, numOr(set?.minScore, 60));
 // the linked bot's notification settings (user_bots.alerts) are read by alertsView (./alerts.js, one copy with the site and the bot)
 const WHEN: Record<string, string> = { confirmed: "Только подтверждённые", touch: "Сразу при касании" };
 const topName = (n: number) => n ? `топ-${n}` : "как у бота";
@@ -122,7 +124,7 @@ async function notifyScreen(_db: any, c: any): Promise<Screen> {
 
 const posLine = (p: any) => {
   const sg = p.side === "LONG" ? 1 : -1, last = p.last ?? p.entry, pnl = sg * (last - p.entry) * p.qty, risk = p.risk || Math.abs(p.entry - p.sl) * p.qty;
-  return `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side} ${coin(p.sym)}</b> · ${fp(p.entry)} → ${fp(last)} · <b>${usd(pnl)}</b>${risk ? rr(pnl / risk) : ""}\n   🎯 ${fp(p.tp)} · 🛑 ${fp(p.sl)} · ${dur(Date.now() - p.time)} в сделке`;
+  return `${p.side === "LONG" ? "🟢" : "🔴"} <b>${p.side === "LONG" ? "LONG" : "SHORT"} ${coin(p.sym)}</b> · ${fp(p.entry)} → ${fp(last)} · <b>${usd(pnl)}</b>${risk ? rr(pnl / risk) : ""}\n   🎯 ${fp(p.tp)} · 🛑 ${fp(p.sl)} · ${dur(Date.now() - p.time)} в сделке`;
 };
 const tradeLine = (t: any) => `${t.pnl > 0 ? "✅" : "❌"} ${coin(t.sym)} ${t.side} · ${esc(t.reason || "")} · <b>${usd(t.pnl)}</b>${rr(t.r)} · ${ago(t.tclose)}`;
 const stats = (ts: any[]) => { const n = ts.length, w = ts.filter((t) => t.pnl > 0).length; return n ? `Сделок ${n} · прибыльных ${Math.round(w / n * 100)}% · итого ${usd(ts.reduce((s, t) => s + (t.pnl || 0), 0))}` : "Сделок пока нет"; };
@@ -138,7 +140,7 @@ async function sharedScreen(db: any): Promise<Screen> {
   const S = st?.settings || {}, reg = st?.regime?.state ?? regimeOf(st?.regime?.by, S.erMax ?? 0.15), ts = tr ?? [];
   const doing = S.strategy !== "switch" ? "" : reg === "flat" ? " → ищет отскоки от границ канала" : reg === "up" ? " → ищет пробои вверх (только LONG)" : reg === "down" ? " → не входит, ждёт" : "";
   const parts = [
-    `📊 <b>Общий бот</b> — один на всех, торгует на бумаге\n<i>${esc(STRAT[S.strategy] || S.strategy)} · ${TFN[S.tf] || S.tf} · топ-${S.top} монет · сила от ${S.minScore}</i>`,
+    `📊 <b>Общий бот</b> — один на всех, торгует на бумаге\n<i>${esc(STRAT[S.strategy] || S.strategy)} · ${esc(TFN[S.tf] || S.tf)} · топ-${numOr(S.top, 0)} монет · сила от ${numOr(S.minScore, 60)}</i>`,
     `${balLine(st?.balance ?? 0, st?.start_balance ?? 10000)}\n${stats(ts)}`,
     reg ? `<b>Рынок сейчас</b> <i>(по ${TFN[st?.regime?.tf] || TFN[S.tf] || S.tf}-свечам, как торгует бот)</i><b>:</b> ${REG[reg]}${doing}` : "",
     pos?.length ? `<b>Открытые позиции</b>\n${pos.map(posLine).join("\n")}` : "Открытых позиций нет — бот ждёт сигнала.",
@@ -161,7 +163,7 @@ async function mineScreen(db: any, c: any): Promise<Screen> {
   const P = profileOf(bot), set = P?.set || {}, ts = (tr ?? []).map((x: any) => x.data), op = (pos ?? []).map((x: any) => x.data);
   const auto = bot.config?.mode === "auto", reg = bot.regime?.state;
   const parts = [
-    `🤖 <b>Мой бот</b> · «${esc(bot.active_profile || P?.name || "—")}»\n<i>${esc(STRAT[set.strategy] || set.strategy || "отскок от границы")} · ${esc(set.tf || "15m")} · сила от ${set.minScore ?? 60}${auto ? " · профиль выбирается по рынку" : ""}</i>`,
+    `🤖 <b>Мой бот</b> · «${esc(bot.active_profile || P?.name || "—")}»\n<i>${esc(STRAT[set.strategy] || set.strategy || "отскок от границы")} · ${esc(set.tf || "15m")} · сила от ${numOr(set.minScore, 60)}${auto ? " · профиль выбирается по рынку" : ""}</i>`,
     `${balLine(bot.balance ?? 0, bot.start_balance ?? 10000)}\n${stats(ts)}`,
     reg ? `<b>Рынок сейчас:</b> ${REG[reg] || esc(reg)}` : "",
     op.length ? `<b>Открытые позиции</b>\n${op.map(posLine).join("\n")}` : "Открытых позиций нет — бот ждёт сигнала.",
@@ -227,6 +229,8 @@ async function loginPrompt(db: any, nonce: string, say: (t: string, kb?: any[][]
 async function onLogin(db: any, q: any, call: Call, raw: string) {
   const [, nonce, pick] = raw.split(":"), chat = q.message?.chat?.id, mid = q.message?.message_id;
   const edit = (t: string) => call("editMessageText", { chat_id: chat, message_id: mid, text: t, parse_mode: "HTML" });
+  // the person who presses is the one signed in: only in a private chat is that the person who started the sign-in
+  if (q.message?.chat?.type !== "private") return call("answerCallbackQuery", { callback_query_id: q.id });
   const r = await loginReq(db, nonce);
   if (!r) { await call("answerCallbackQuery", { callback_query_id: q.id }); return edit("⌛ Этот вход уже завершён или устарел."); }
   const now = new Date().toISOString();
@@ -253,7 +257,8 @@ async function onMessage(db: any, m: any, call: Call) {
   if (!chat || !text.startsWith("/")) return;
   const [cmd0, arg = ""] = text.split(/\s+/, 2), cmd = cmd0.replace(/@.*$/, "").toLowerCase();
   const say = (t: string, kb?: any[][]) => call("sendMessage", { chat_id: chat, text: t, parse_mode: "HTML", disable_web_page_preview: true, ...(kb ? { reply_markup: { inline_keyboard: kb } } : {}) });
-  if (cmd === "/start" && arg.startsWith("login_")) return loginPrompt(db, arg.slice(6), say);   // signing in doesn't subscribe anyone
+  // signing in doesn't subscribe anyone. Only in a private chat: in a group the code would be seen and pressed by its other members
+  if (cmd === "/start" && arg.startsWith("login_")) return m.chat?.type === "private" ? loginPrompt(db, arg.slice(6), say) : say("Вход на сайт — только в личном чате с ботом.");
   let c = await ctx(db, chat);
   await visited(db, c);
   // only a profile's bot writes here, and only to its profile's Telegram: it is turned on on the site («Мой бот» → Telegram),

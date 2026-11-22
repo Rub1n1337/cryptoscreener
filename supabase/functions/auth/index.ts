@@ -49,6 +49,15 @@ async function poll(b: any) {
   // one session per request: whoever marks it used first gets the token
   const { data: took } = await db.from("login_requests").update({ used_at: new Date().toISOString() }).eq("nonce", nonce).is("used_at", null).select("nonce");
   if (!took?.length) return json({ state: "expired" });
+  // a failure after this point gives the request back (the site polls again) and keeps the details in the log, not in the answer
+  const fail = async (what: string, detail?: unknown) => {
+    console.error("auth poll:", what, detail ?? "");
+    await db.from("login_requests").update({ used_at: null }).eq("nonce", nonce);
+    return json({ error: "internal" }, 500);
+  };
+  try { return await finish(q, fail); } catch (e) { return await fail("exception", (e as Error)?.message); }
+}
+async function finish(q: any, fail: (what: string, detail?: unknown) => Promise<Response>) {
   const email = `tg${q.tg_id}@users.invalid`;
   let { data: p } = await db.from("profiles").select("id").eq("tg_id", q.tg_id).maybeSingle();
   if (!p) {
@@ -56,12 +65,12 @@ async function poll(b: any) {
     let uid = u?.user?.id;
     // the Auth user can exist without a profile (an earlier sign-in stopped between the two): find it through its link
     if (!uid) { const { data: l } = await db.auth.admin.generateLink({ type: "magiclink", email }); uid = l?.user?.id; }
-    if (!uid) return json({ error: "user" }, 500);
+    if (!uid) return fail("user");
     const { error: e2 } = await db.from("profiles").upsert({ id: uid, tg_id: q.tg_id, tg_name: q.tg_name, tg_username: q.tg_username });
-    if (e2) return json({ error: "profile" }, 500);
+    if (e2) return fail("profile", e2.message);
   } else await db.from("profiles").update({ tg_name: q.tg_name, tg_username: q.tg_username, seen_at: new Date().toISOString() }).eq("id", p.id);
   const { data: link, error: e3 } = await db.auth.admin.generateLink({ type: "magiclink", email });
-  if (e3 || !link?.properties?.hashed_token) return json({ error: "link: " + (e3?.message || "?") }, 500);
+  if (e3 || !link?.properties?.hashed_token) return fail("link", e3?.message);
   return json({ state: "ok", token_hash: link.properties.hashed_token });
 }
 
@@ -78,11 +87,12 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
   if (req.method !== "POST") return json({ error: "POST only" }, 405);
   let b: any; try { b = await req.json(); } catch { return json({ error: "bad request" }, 400); }
-  const ip = (req.headers.get("x-forwarded-for") || "").split(",")[0].trim().slice(0, 64) || "?";
+  // the same address as the SQL limit (_rl): Cloudflare's header first, the caller cannot set it; x-forwarded-for only as a fallback
+  const ip = (req.headers.get("cf-connecting-ip") || (req.headers.get("x-forwarded-for") || "").split(",")[0]).trim().slice(0, 64) || "?";
   try {
     if (b?.op === "start") return await start(b, ip);
     if (b?.op === "poll") return await poll(b);
     if (b?.op === "delete") return await remove(req);
-  } catch (e) { return json({ error: String((e as Error)?.message || e).slice(0, 200) }, 500); }
+  } catch (e) { console.error("auth:", (e as Error)?.message || e); return json({ error: "internal" }, 500); }
   return json({ error: "unknown op" }, 400);
 });

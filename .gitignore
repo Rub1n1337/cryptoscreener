@@ -6,3 +6,5 @@ tests/_ref/
 research/data/
 research/kronos/.ext/
 research/kronos/__pycache__/
+# the owner's library of papers (PDF, ~360 MB): local only, the repository is public
+theory/*.pdf
