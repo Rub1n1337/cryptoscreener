@@ -472,7 +472,8 @@ async function runUserBots(now: number, reqStart: number) {
     if (RM.has(key)) { ac.set(key, RM.get(key)); return ac.get(key); }
     if (!K?.length) return null;
     let memo = AW.get(K); if (!memo) AW.set(K, memo = new Map());
-    if (!memo.has(key)) { memo.set(key, M.analyze(s, K, S, now, true)   // the full N and N + 20 candles, as in the backtest (no shrunk window on 1d since 2.133)); computed++; }
+    // the full N and N + 20 candles, as in the backtest (no shrunk window on 1d since 2.133)
+    if (!memo.has(key)) { memo.set(key, M.analyze(s, K, S, now, true)); computed++; }
     ac.set(key, memo.get(key));
     return ac.get(key);
   };
