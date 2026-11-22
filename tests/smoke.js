@@ -3,7 +3,7 @@
 // Returns a short report: version, width, theme, horizontal scroll, what sticks out of the screen, cut text (including the
 // short card titles drawn by ::after, which scrollWidth doesn't see), touch targets under 36 px on touch screens, and
 // browser-storage keys that index.html's KEYS doesn't declare (keys), modules imported at start without a modulepreload
-// link (preload).
+// link (preload), modules that read the storage at load without app/account.js in their import chain (early).
 // Errors are not here: read_console_messages has them, including the ones before this loads.
 const sel = el => el.id ? '#' + el.id : el.tagName.toLowerCase() + (el.classList.length ? '.' + [...el.classList].slice(0, 2).join('.') : '');
 const shown = el => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
@@ -38,11 +38,21 @@ export async function run({ limit = 8 } = {}) {
   const imports = (txt, base) => [...txt.matchAll(/^\s*import\s[^'"()]*?['"]([^'"]+)['"]/gm)].map(m => new URL(m[1], base));
   const page = await (await fetch(location.pathname, { cache: 'no-store' })).text();
   let todo = [...page.matchAll(/<script type="module">([\s\S]*?)<\/script>/g)].flatMap(m => imports(m[1], location.href));
+  const deps = {}, early = [];
   while (todo.length) {
     const u = todo.shift(); if (u.origin !== location.origin || seen.has(u.pathname)) continue; seen.add(u.pathname);
     if (!pre.has(u.pathname)) miss.push(u.pathname);
-    try { todo.push(...imports(await (await fetch(u.pathname)).text(), u.href)); } catch {}
+    try {
+      const txt = await (await fetch(u.pathname)).text(), d = imports(txt, u.href);
+      deps[u.pathname] = d.map(x => x.pathname); todo.push(...d);
+      if (/^(?:export\s+)?(?:let|const|var)\s[^\n]*\bload\(\s*'sr_/m.test(txt)) early.push(u.pathname);
+    } catch {}
   }
   if (miss.length) out.preload = miss;
+  // a module that reads the browser storage at load must wait for the profile: app/account.js awaits it at its top level, so it
+  // has to be in the module's import chain (docs/PLAN-UNTANGLE-modules.md 3.2), else it may read before the profile's values
+  const ACC = '/app/account.js', reaches = (p, s = new Set()) => p === ACC || (!s.has(p) && (s.add(p), (deps[p] || []).some(q => reaches(q, s))));
+  const lateLoad = early.filter(p => p !== ACC && !(deps[p] || []).some(q => reaches(q)));
+  if (lateLoad.length) out.early = lateLoad;
   return out;
 }
