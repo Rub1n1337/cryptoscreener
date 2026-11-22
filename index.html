@@ -890,7 +890,8 @@ const dur = ms => ms == null || !isFinite(ms) ? '—' : ms < 36e5 ? Math.round(m
 const base = s => s.replace(/USDT$/, '');
 const pair = s => s.replace(/USDT$/, '/USDT');
 const tfOf = ms => Object.keys(TFMS).find(k => TFMS[k] === ms);
-// on daily/weekly candles most coins have less history than N bars: shrink the window to what exists
+// drawing only: on daily/weekly candles a young coin has less history than N bars, the chart's channel shrinks to what exists.
+// Every judgement (screener, verdict, bots, collector) uses the full N and N + 20 candles, as the backtest does (2.133)
 const effN = (len, set = S) => (set.tf === '1d' || set.tf === '1w') ? Math.max(20, Math.min(set.N, len - 20)) : set.N;
 // candles an analysis looks at: the same length as the server bots and the collector (M.BARS), so RSI and EWMA — which depend on
 // where the series starts — give the same strength on the site as at the bots; longer only when the channel needs it
@@ -977,7 +978,7 @@ async function scan() {
     scanAsked = new Set(list);
     const limit = barsFor(set), res = [], fresh = {}, failed = new Set(), ctx = JSON.stringify(set); let done = 0, fails = 0;
     await pool(list, 10, async sym => {
-      try { const K = await klines(sym, tf, limit); fresh[sym] = K; const r = M.analyze(sym, K, {...set, N:effN(K.length, set)}); if (r) res.push(r); }
+      try { const K = await klines(sym, tf, limit); fresh[sym] = K; const r = M.analyze(sym, K, set); if (r) res.push(r); }
       catch { fails++; failed.add(sym); }
       if (++done % 10 === 0) foot.textContent = `сканирую ${done}/${list.length}…`;
     });
@@ -1686,7 +1687,7 @@ function compsHtml(x, side, noChecks = false) {
 function renderDetail() {
   const el = $('#detail');
   if (!chartK) { el.innerHTML = ''; return; }
-  const KA = forAnalysis(chartK), r = M.analyze(chartSym, KA, {...S, N:effN(KA.length)});   // the chart shows more; the verdict reads what the bots read
+  const KA = forAnalysis(chartK), r = M.analyze(chartSym, KA, S);   // the chart shows more; the verdict reads what the bots read
   if (!r) { el.innerHTML = '<div class="mute">Мало истории для расчёта канала — уменьшите N.</div>'; return; }
   const name = base(chartSym), pct = (r.pB * 100).toFixed(0) + '%';
   const hlTxt = isFinite(r.hl) && r.hl * TFMS[S.tf] < 30 * 864e5
@@ -2367,7 +2368,7 @@ async function botStep() {
     const same = set.tf === S.tf && set.N === S.N, own = {}, nb = barsFor(set);
     await pool(list.filter(s => !(same && cache[s])), 8, async s => { try { own[s] = await klines(s, set.tf, nb); } catch {} });
     const kOf = s => { const K = (same && cache[s]) || own[s]; return K && K.length > nb ? K.slice(-nb) : K; };
-    const botRows = list.map(s => { const K = kOf(s); return K ? M.analyze(s, K, {...set, N:effN(K.length, set)}) : null; }).filter(Boolean);
+    const botRows = list.map(s => { const K = kOf(s); return K ? M.analyze(s, K, set) : null; }).filter(Boolean);
     // exits are checked on each position's own timeframe
     const exitK = {};
     // enough candles to cover the time since the last check: after the tab was closed for long (more than 150 candles of the

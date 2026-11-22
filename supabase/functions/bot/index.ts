@@ -387,7 +387,6 @@ const quietNow = (q: any) => {
   return q.from <= q.to ? h >= q.from && h < q.to : h >= q.from || h < q.to;
 };
 const tfOf = (ms: number) => Object.keys(M.TFMS).find((k) => (M.TFMS as any)[k] === ms);
-const effN = (len: number, S: any) => (S.tf === "1d" || S.tf === "1w") ? Math.max(20, Math.min(S.N, len - 20)) : S.N;
 // the market regime of a timeframe as the backtest computes it (M.marketOn: BTC/ETH/SOL, closed candles), once per run and
 // timeframe. Every bot trades by the regime of its own timeframe; "the market now" (the auto mode's choice of profile, the site's
 // line) is 1h. Before 2.34 the personal bots used 1h for everything, which on 4h disagreed with the backtest ~30% of the time
@@ -473,7 +472,7 @@ async function runUserBots(now: number, reqStart: number) {
     if (RM.has(key)) { ac.set(key, RM.get(key)); return ac.get(key); }
     if (!K?.length) return null;
     let memo = AW.get(K); if (!memo) AW.set(K, memo = new Map());
-    if (!memo.has(key)) { memo.set(key, M.analyze(s, K, { ...S, N: effN(K.length, S) }, now, true)); computed++; }
+    if (!memo.has(key)) { memo.set(key, M.analyze(s, K, S, now, true)   // the full N and N + 20 candles, as the backtest (no shrunk window on 1d since 2.133)); computed++; }
     ac.set(key, memo.get(key));
     return ac.get(key);
   };

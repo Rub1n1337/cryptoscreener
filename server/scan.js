@@ -107,7 +107,7 @@ export async function scan(body) {
       if (!s?.K.length) { out[sym] = null; continue; }
       // the same candles and settings within a minute give the same answer (volume is projected by `now`): reuse it
       if (s.anMin !== minute) { s.an = new Map(); s.anMin = minute; }
-      if (!s.an.has(ck)) { s.an.set(ck, m.analyze(sym, s.K, {...S, N:t.tf === '1d' ? Math.max(20, Math.min(S.N, s.K.length - 20)) : S.N}, now, true)); ST.analyses++; }
+      if (!s.an.has(ck)) { s.an.set(ck, m.analyze(sym, s.K, S, now, true)); ST.analyses++; }
       else ST.reused++;
       out[sym] = s.an.get(ck);
     }

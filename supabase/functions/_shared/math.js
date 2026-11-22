@@ -140,7 +140,9 @@ function sdRange(a, from, to) {
 // null when there is no forming bar (the last bar is already closed: the row itself is that judgement); false when the closed
 // bar gives nothing to judge.
 export function analyze(sym, K, S, now = Date.now(), lite = false) {
-  if (K.length < S.N + 10) return null;
+  // N + 20 candles, the backtest's own minimum (it trades a coin only from bar N + 19): a younger coin is not judged at all,
+  // so the bots never trade what no backtest run could include (until 2.133 analyze took N + 10)
+  if (K.length < S.N + 20) return null;
   const P = prepare(K, S), i = P.n - 1, r = signalAt(P, i, sym, now, lite);
   if (r) r.atClose = P.t[i] + TFMS[S.tf] <= now ? null : (i - 1 >= S.N + 9 && signalAt(P, i - 1, sym, P.t[i], true)) || false;
   return r;
