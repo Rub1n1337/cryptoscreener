@@ -1,6 +1,10 @@
 // Older «Что нового» entries (those CHANGELOG in app/changes.js no longer holds), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in app/changes.js; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.123', date:'13 ноября 2026', title:'Уроки с исследованиями', items:[
+    'Уроки модуля «Чтение графика» дополнены выводами научных исследований.',
+    'В «Источниках» уроков остались только общедоступные исследования.',
+  ]},
   {v:'2.122', date:'13 ноября 2026', title:'Учёба: чтение графика и аукцион', items:[
     'Добавлен модуль «Чтение графика»: свечи, структура, уровни, пробои, ATR, объём и ограничения индикаторов.',
     'Добавлен модуль «Аукцион и зона стоимости»: рыночный профиль, зона стоимости, типы дней, баланс и тренд.',

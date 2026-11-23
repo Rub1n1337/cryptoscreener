@@ -242,7 +242,7 @@
             <option value="ewma">EWMA (экспон. σ)</option>
           </select></label>
           <label title="Длина окна: по скольким последним свечам считается канал">N <input type="range" id="N" min="20" max="300" step="1"><input type="number" id="Nv" inputmode="numeric" enterkeyhint="done" min="20" max="300" step="1" aria-label="N: длина окна, свечей"></label>
-          <label title="Ширина канала в σ. 2 — классические полосы Боллинджера, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="4" step="0.1"><input type="number" id="kv" enterkeyhint="done" min="1" max="4" step="0.1" aria-label="k: ширина канала в σ"></label>
+          <label title="Ширина канала в σ. 2 — классические полосы Боллинджера, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="5" step="0.1"><input type="number" id="kv" enterkeyhint="done" min="1" max="5" step="0.1" aria-label="k: ширина канала в σ"></label>
           <label title="Сколько свечей истории загрузить. Сколько из них видно — меняется колёсиком, кнопками − + или двумя пальцами">История <input type="range" id="cn" min="100" max="800" step="10"><input type="number" id="cnv" inputmode="numeric" enterkeyhint="done" min="100" max="800" step="10" aria-label="История: сколько свечей загрузить"></label>
           <button id="reset" title="Вернуть стандартные настройки">Сбросить</button>
           <div class="mute" style="font-size:12px;flex-basis:100%" id="mhint"></div>
