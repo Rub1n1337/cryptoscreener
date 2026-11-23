@@ -1562,8 +1562,8 @@ function fillSuggest(rows) {   // the coin search suggests the coins of the mark
 function renderList() {
   if (!K.rows.length) { setList('<div class="mute" style="padding:12px;font-size:13px">Загружаю монеты…</div>'); return; }
   fillSuggest(K.rows);
-  const q = listQ.trim().toUpperCase(), rows = q ? K.rows.filter(r => K.base(r.sym).includes(q)) : K.rows;
-  if (!rows.length) { setList(`<div class="mute" style="padding:12px;font-size:13px">Монеты «${q.replace(/[<>&"]/g, '')}» нет в списке «Рынка».</div>`); return; }
+  const q = K.normQ(listQ), rows = q ? K.rows.filter(r => K.base(r.sym).includes(q)) : K.rows;
+  if (!rows.length) { setList(`<div class="mute" style="padding:12px;font-size:13px">Монеты «${listQ.trim().replace(/[<>&"]/g, '')}» нет в списке «Рынка».</div>`); return; }
   const cur = act()?.sym, shown = new Map(panes.map((p, i) => [p.sym, i + 1]));
   // change over the last 24 h of the market scan's candles (whatever its timeframe is)
   const bars = k => k.length > 1 ? Math.max(1, Math.round(864e5 / (k[1][0] - k[0][0]))) : 1;
@@ -1689,7 +1689,7 @@ function wire() {
   $('#bListQ').oninput = e => { listQ = e.target.value; renderList(); };
   $('#bListQ').onkeydown = e => { if (e.key === 'Enter') { const b = $('#bList [data-sym]'); if (b) setSym(b.dataset.sym); } };   // Enter opens the first match
   $('#bList').onclick = e => { const b = e.target.closest('[data-sym]'); if (b) setSym(b.dataset.sym); };
-  const goSym = el => { let v = el.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!v) return; if (!v.endsWith('USDT')) v += 'USDT'; el.value = ''; el.blur(); setSym(v); };
+  const goSym = el => { let v = K.coinQ(el.value); if (!v) return; if (!v.endsWith('USDT')) v += 'USDT'; el.value = ''; el.blur(); setSym(v); };
   $('#bSym').onkeydown = e => { if (e.key === 'Enter') goSym(e.target); if (e.key === 'Escape') { e.target.value = ''; e.target.blur(); } };
   $('#bSym').oninput = e => { if (!e.inputType || e.inputType === 'insertReplacementText') goSym(e.target); };   // a coin picked from the suggestions
   // the ruler / range is finished on release, wherever the pointer is; a range becomes a fixed-range profile

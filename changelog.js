@@ -1,6 +1,11 @@
 // Older «Что нового» entries (those CHANGELOG in app/changes.js no longer holds), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in app/changes.js; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.122', date:'13 ноября 2026', title:'Учёба: чтение графика и аукцион', items:[
+    'Добавлен модуль «Чтение графика»: свечи, структура, уровни, пробои, ATR, объём и ограничения индикаторов.',
+    'Добавлен модуль «Аукцион и зона стоимости»: рыночный профиль, зона стоимости, типы дней, баланс и тренд.',
+    'Кнопки в уроках открывают график монеты и включают нужные индикаторы.',
+  ]},
   {v:'2.121', date:'13 ноября 2026', title:'Сигналы понятнее', items:[
     'Сигнал в Telegram начинается с плана сделки: вход, тейк и стоп; цену можно скопировать нажатием.',
     'Причины сигнала собраны в одну строку, а если разворота ещё нет, сказано, чего не хватает.',

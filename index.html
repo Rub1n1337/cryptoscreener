@@ -240,9 +240,9 @@
             <option value="robust">Робастная (медиана ± MAD)</option>
             <option value="ewma">EWMA (экспон. σ)</option>
           </select></label>
-          <label title="Длина окна: по скольким последним свечам считается канал">N <input type="range" id="N" min="20" max="300" step="1"><b id="Nv"></b></label>
-          <label title="Ширина канала в σ. 2 — классические полосы Боллинджера, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="4" step="0.1"><b id="kv"></b></label>
-          <label title="Сколько свечей истории загрузить. Сколько из них видно — меняется колёсиком, кнопками − + или двумя пальцами">История <input type="range" id="cn" min="100" max="800" step="10"><b id="cnv"></b></label>
+          <label title="Длина окна: по скольким последним свечам считается канал">N <input type="range" id="N" min="20" max="300" step="1"><input type="number" id="Nv" inputmode="numeric" enterkeyhint="done" min="20" max="300" step="1" aria-label="N: длина окна, свечей"></label>
+          <label title="Ширина канала в σ. 2 — классические полосы Боллинджера, 3 — только редкие выходы">k <input type="range" id="k" min="1" max="4" step="0.1"><input type="number" id="kv" enterkeyhint="done" min="1" max="4" step="0.1" aria-label="k: ширина канала в σ"></label>
+          <label title="Сколько свечей истории загрузить. Сколько из них видно — меняется колёсиком, кнопками − + или двумя пальцами">История <input type="range" id="cn" min="100" max="800" step="10"><input type="number" id="cnv" inputmode="numeric" enterkeyhint="done" min="100" max="800" step="10" aria-label="История: сколько свечей загрузить"></label>
           <button id="reset" title="Вернуть стандартные настройки">Сбросить</button>
           <div class="mute" style="font-size:12px;flex-basis:100%" id="mhint"></div>
         </div>
@@ -419,8 +419,19 @@
         <th title="Нереализованный PnL после комиссии на вход и выход">PnL сейчас</th><th title="Текущий результат в R: 1R — сумма, которую потеряем на стопе">R сейчас</th><th>Сила</th><th aria-label="Закрыть"></th>
       </tr></thead><tbody id="jopen"></tbody></table></div>
     </div>
-    <div class="panel"><div class="ptitle">Закрытые сделки <span>· клик по строке — карточка сделки<span class="sorthint">, по заголовку — сортировка</span></span></div>
-      <div class="tablewrap"><table><thead><tr id="jhead">
+    <div class="panel" id="jclosedP"><div class="ptitle">Закрытые сделки <span id="jhintL">· клик по строке — карточка сделки<span class="sorthint">, по заголовку — сортировка</span></span><span id="jhintC" class="hidden"><span class="sorthint">· клик по заголовку — сортировка</span></span></div>
+      <div class="filters hidden" id="jfilters">
+        <div class="search"><svg class="i"><use href="#i-search"/></svg><input id="jq" type="search" enterkeyhint="search" autocapitalize="characters" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Поиск монеты" aria-label="Поиск монеты в закрытых сделках"></div>
+        <div class="seg mini" id="jres" role="group" aria-label="Результат"><button class="tab on" data-jr="" aria-pressed="true">Все</button><button class="tab" data-jr="win" aria-pressed="false" title="Сделки в плюсе после комиссий; в сводке — монеты с PnL больше нуля">Прибыльные</button><button class="tab" data-jr="loss" aria-pressed="false" title="Остальные: в минусе или в ноль после комиссий">Убыточные</button></div>
+        <div class="seg mini" id="jview" role="group" aria-label="Вид"><button class="tab on" data-jv="list" aria-pressed="true">Сделки</button><button class="tab" data-jv="coins" aria-pressed="false" title="Сводка: сколько сделок по каждой монете и что они принесли">По монетам</button></div>
+        <select id="jcsort" class="hidden" aria-label="Сортировка монет"></select>
+      </div>
+      <div class="fchips hidden" id="jshown" aria-live="polite"></div>
+      <div class="tablewrap hidden" id="jcoinsW"><table id="jcoins"><thead><tr id="jchead">
+        <th data-s="sym">Монета</th><th data-s="n">Сделок</th><th data-s="win" title="Сделки в плюсе после комиссий">Прибыльных</th><th data-s="loss" title="Сделки в минусе или в ноль после комиссий">Убыточных</th>
+        <th data-s="pnl" title="Сумма итогов всех сделок монеты после комиссий">PnL</th><th data-s="r" title="Сумма итогов в R: +1R — заработали столько, сколько рисковали; −1R — полный стоп">R</th>
+      </tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap" id="jlistW"><table><thead><tr id="jhead">
         <th data-s="tclose">Закрыта</th><th data-s="sym">Монета</th><th data-s="side">Сторона</th><th data-s="entry">Вход</th><th data-s="exit">Выход</th>
         <th data-s="size" class="hm" title="Сумма позиции в долларах">Размер</th><th data-s="reason">Причина выхода</th><th data-s="hold" class="hm">Длит.</th>
         <th data-s="gross" class="hm" title="Результат по цене, без учёта комиссий">PnL до ком.</th><th data-s="fee" class="hm" title="Комиссия биржи за вход и выход">Комиссия</th>
@@ -722,7 +733,7 @@ import {CHANGELOG} from './app/changes.js';
 // everything below, which reads the settings, starts after the profile's newer values are in storage
 import * as CORE from './app/core.js';
 import {$, firstShow, DEF, SCAN_MS, load, save, PC, pal, fp, usd, rr, cl, hm, dt, dur, base, pair, tfOf, coin, plainHtml, toast, api, klines,
-  pool, esc, beep, ask, money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone} from './app/core.js';
+  pool, esc, beep, ask, money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone, layoutFix, coinQ, normQ} from './app/core.js';
 import * as ACC from './app/account.js';
 import {SB_URL, SB_KEY, AUTH, ME, LOCKED, KEYS, syncReady, canon, fits, authedFetch, openAuth} from './app/account.js';
 import * as BT from './app/backtest.js';   // wave 2
@@ -906,8 +917,6 @@ const hlTip = hl => !isFinite(hl) || hl * TFMS[S.tf] >= 30 * 864e5 ? 'Монет
 // ---------- table filters ----------
 // quick filter (the segment above the table), position, strength, T½ and side; with the search they all combine
 const TF_FILTERS = ['#fl', '#fz', '#fmin', '#fhl', '#fside'];
-// «ARB», «arb/usdt», «ARB USDT» all find ARB; «USDT» alone is not a coin
-const normQ = v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/USDT$/, '');
 const QUICK = {sig:r => r.rev || r.wasRev, touch:r => r.touch || r.kind === 'out', sq:r => r.squeeze, bot:r => botSet().has(r.sym), fav:r => favs.has(r.sym)};
 // «Бот»: the coins «Мой бот» trades now — the active profile's own list, or its top-N by volume picked as the bot picks it
 // (math.js pickSymbols, from the scan's ticker). In «Авто» the profile follows the market, and the filter follows the profile
@@ -2541,7 +2550,7 @@ function renderJournalNow() {
   renderServer();
   const D = journalData(), shared = jMode === 'shared';
   const slots = M.slotsOf(shared ? SJ?.settings : profSet(activeProfile()));   // how many positions this bot may hold at once
-  if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jwarn', '#jcards', '#jopen', '#jclosed'].forEach(s => $(s).innerHTML = ''); return; }
+  if (!D) { $('#jdesc').textContent = shared ? 'Загружаю журнал общего бота…' : 'Загружаю журнал вашего бота с сервера…'; ['#jwarn', '#jcards', '#jopen', '#jclosed', '#jcoins tbody'].forEach(s => $(s).innerHTML = ''); ['#jfilters', '#jshown'].forEach(s => $(s).classList.add('hidden')); return; }
   const st = M.journalStats(baseOf(D), D.closed), set = shared ? SJ.settings : S;
   $('#jwarn').innerHTML = shared && sharedNoEdge() ? `<div class="banner warn noedge"><svg class="i"><use href="#i-warn"/></svg><div><b>У правил общего бота не найдено преимущества.</b>
         На честной проверке — топ-50 монет на каждый момент, включая снятые с биржи, — они в минусе каждый из трёх последних лет: <span class="term" title="R — риск одной сделки: сумма, которую она теряет, если сработал стоп. −0.42R на сделку — в среднем каждая сделка теряла почти половину этой суммы">−0.42R, −0.40R и −0.30R на сделку</span>.
@@ -2595,8 +2604,52 @@ function renderJournalNow() {
       <td class="jx">${jMode === 'mine' ? `<button data-close="${p.id}"${p.closeReq ? ' disabled' : ''} title="Закрыть позицию по рынку">${p.closeReq ? 'закрывается…' : 'Закрыть'}</button>` : ''}</td></tr>`;
   }).join('') || '<tr><td colspan="12" class="mute">Нет открытых позиций — бот ждёт подтверждённого сигнала</td></tr>';
   $('#jcloseAll').classList.toggle('hidden', jMode !== 'mine' || D.open.filter(p => !p.closeReq).length < 2);
-  const list = D.closed.map(M.normTrade).sort((a, b) => { const x = a[jSort], y = b[jSort]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * jDir; });
-  document.querySelectorAll('#jhead th').forEach(th => { th.classList.toggle('sorted', th.dataset.s === jSort); th.dataset.dir = th.dataset.s === jSort ? (jDir > 0 ? 'asc' : 'desc') : ''; th.setAttribute('aria-sort', th.dataset.s === jSort ? (jDir > 0 ? 'ascending' : 'descending') : 'none'); });
+  renderClosed(D);
+}
+// «Закрытые сделки»: the search and the result filter, over the trades or over the summary by coin. All of it is this visit's
+// view, not saved: a reload shows every trade. A trade is profitable as in the cards above (M.journalStats): pnl > 0, the rest
+// are losses; in the summary the filter goes by the coin's total
+let jRes = '', jView = 'list', cSort = 'n', cDir = -1;
+const C_SORTS = {sym:['Монета', 'А → Я', 'Я → А'], n:['Сделок'], win:['Прибыльных'], loss:['Убыточных'], pnl:['PnL'], r:['R']};
+$('#jcsort').innerHTML = Object.entries(C_SORTS).flatMap(([k, [t, up = 'меньше сначала', dn = 'больше сначала']]) =>
+  (k === 'sym' ? [[1, up], [-1, dn]] : [[-1, dn], [1, up]]).map(([d, w]) => `<option value="${k}:${d}">${t}: ${w}</option>`)).join('');
+const sortHead = (head, k, d) => document.querySelectorAll(head + ' th').forEach(th => { const on = th.dataset.s === k;
+  th.classList.toggle('sorted', on); th.dataset.dir = on ? (d > 0 ? 'asc' : 'desc') : ''; th.setAttribute('aria-sort', on ? (d > 0 ? 'ascending' : 'descending') : 'none'); });
+const sortBy = (k, d) => (a, b) => { const x = a[k], y = b[k]; return (typeof x === 'string' ? x.localeCompare(y) : (x ?? -1e9) - (y ?? -1e9)) * d; };
+function coinSums(trades) {
+  const m = new Map();
+  for (const x of trades) {
+    let g = m.get(x.sym); if (!g) m.set(x.sym, g = {sym:x.sym, n:0, win:0, loss:0, pnl:0, r:null});
+    g.n++; x.pnl > 0 ? g.win++ : g.loss++; g.pnl += x.pnl;
+    if (x.r != null && isFinite(x.r)) g.r = (g.r ?? 0) + x.r;
+  }
+  return [...m.values()];
+}
+function renderClosed(D = journalData()) {
+  if (!D) return;
+  const all = D.closed.map(M.normTrade), coins = jView === 'coins' && all.length > 0, q = normQ($('#jq').value);
+  const seg = (sel, k, v) => document.querySelectorAll(sel + ' .tab').forEach(b => { const on = b.dataset[k] === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  seg('#jres', 'jr', jRes); seg('#jview', 'jv', jView);
+  $('#jfilters').classList.toggle('hidden', !all.length);
+  $('#jcsort').classList.toggle('hidden', !coins); $('#jcsort').value = `${cSort}:${cDir}`;
+  ['#jcoinsW', '#jhintC'].forEach(s => $(s).classList.toggle('hidden', !coins)); ['#jlistW', '#jhintL'].forEach(s => $(s).classList.toggle('hidden', coins));
+  const src = coins ? coinSums(all) : all, on = all.length > 0 && !!(q || jRes);
+  const list = src.filter(x => (!q || base(x.sym).includes(q)) && (!jRes || (x.pnl > 0) === (jRes === 'win')));
+  $('#jshown').classList.toggle('hidden', !on);
+  $('#jshown').innerHTML = on ? `<span class="mute">Показано <b>${list.length}</b> из ${src.length}</span><button class="chip clear" data-jclear>Сбросить</button>` : '';
+  // nothing left: what was looked for is named, so the trades don't look lost
+  const kind = jRes === 'win' ? 'прибыльных ' : jRes === 'loss' ? 'убыточных ' : '';
+  const empty = n => `<tr><td colspan="${n}" class="mute tbl-empty">${!all.length ? 'Сделок пока нет. Пропуск сделок — норма: бот ждёт подтверждённых сигналов.'
+    : `${q ? `По запросу «${esc($('#jq').value.trim())}» ${kind}${coins ? 'монет' : 'сделок'} нет` : `${kind[0].toUpperCase() + kind.slice(1)}${coins ? 'монет' : 'сделок'} нет`} <button data-jclear>Сбросить фильтры</button>`}</td></tr>`;
+  if (coins) {
+    sortHead('#jchead', cSort, cDir);
+    list.sort((a, b) => sortBy(cSort, cDir)(a, b) || b.n - a.n || a.sym.localeCompare(b.sym));
+    $('#jcoins tbody').innerHTML = list.map(g => `<tr><td>${coin(g.sym)}</td><td data-l="Сделок">${g.n}</td><td data-l="Прибыльных">${g.win}</td><td data-l="Убыточных">${g.loss}</td>
+      <td data-l="PnL" class="${cl(g.pnl)}"><b>${usd(g.pnl)}</b></td><td data-l="R" class="${cl(g.r)}">${rr(g.r)}</td></tr>`).join('') || empty(6);
+    return;
+  }
+  list.sort(sortBy(jSort, jDir));
+  sortHead('#jhead', jSort, jDir);
   // in the usual order (newest first) the trades come in days, each headed with its count and result: a log of what each day
   // brought. Sorted by anything else there are no days to group by
   const byDay = jSort === 'tclose' && jDir < 0, dayOf = t => new Date(t).toDateString(), days = {};
@@ -2611,7 +2664,7 @@ function renderJournalNow() {
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
     <td class="${cl(x.pnl)}"><b>${usd(x.pnl)}</b></td><td class="${cl(x.r)}">${rr(x.r)}</td></tr>`).join('')
-    || '<tr><td colspan="12" class="mute">Сделок пока нет. Пропуск сделок — норма: бот ждёт подтверждённых сигналов.</td></tr>';
+    || empty(12);
 }
 
 // ---------- trade card ----------
@@ -2742,8 +2795,7 @@ function renderChangelog() {
 // ---------- UI wiring ----------
 function syncInputs() {
   $('#tf').value = S.tf; $('#method').value = S.method; $('#top').value = S.top; $('#mhint').textContent = METHOD_HINT[S.method];
-  $('#N').value = S.N; $('#Nv').textContent = S.N; $('#k').value = S.k; $('#kv').textContent = S.k;
-  $('#cn').value = S.candles; $('#cnv').textContent = S.candles;
+  $('#N').value = $('#Nv').value = S.N; $('#k').value = $('#kv').value = S.k; $('#cn').value = $('#cnv').value = S.candles;
   document.querySelectorAll('#tfseg .tab').forEach(b => b.classList.toggle('on', b.dataset.tf === S.tf));
 }
 // timeframe segmented control drives the (hidden) #tf select
@@ -2760,24 +2812,35 @@ setMore(load('sr_more', false));
 let scanTimer;
 // the server bot's config has no market settings: Telegram's «Рынок» keeps its own, saved by its button (alerts.mkt)
 const rescanSoon = () => { save('sr_settings', S); clearTimeout(scanTimer); scanTimer = setTimeout(scan, 600); };
-$('#N').oninput = e => { S.N = +e.target.value; $('#Nv').textContent = S.N; computeChartSoon(); };
-$('#k').oninput = e => { S.k = +e.target.value; $('#kv').textContent = S.k; computeChartSoon(); };
-$('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').textContent = S.candles; chartView = null; drawChartSoon(); };
+$('#N').oninput = e => { S.N = +e.target.value; $('#Nv').value = S.N; computeChartSoon(); };
+$('#k').oninput = e => { S.k = +e.target.value; $('#kv').value = S.k; computeChartSoon(); };
+$('#cn').oninput = e => { S.candles = +e.target.value; $('#cnv').value = S.candles; chartView = null; drawChartSoon(); };
 $('#N').onchange = () => { loadChart(); rescanSoon(); };
 $('#k').onchange = rescanSoon;
 $('#cn').onchange = () => { save('sr_settings', S); loadChart(); };
+// the same three typed as numbers: taken when confirmed (Enter, leaving the field, its arrows), the nearest allowed value for
+// one out of range; an empty field returns to the current value. The slider's limits are the field's own
+const typed = (sel, key, dig, apply) => $(sel).onchange = e => {
+  const f = e.target, v = parseFloat(f.value), old = S[key];
+  if (isFinite(v)) S[key] = +Math.min(+f.max, Math.max(+f.min, v)).toFixed(dig);
+  syncInputs();
+  if (S[key] !== old) apply();
+};
+typed('#Nv', 'N', 0, () => { computeChartSoon(); $('#N').onchange(); });
+typed('#kv', 'k', 1, () => { computeChartSoon(); $('#k').onchange(); });
+typed('#cnv', 'candles', 0, () => { chartView = null; $('#cn').onchange(); });
 $('#method').onchange = e => { S.method = e.target.value; $('#mhint').textContent = METHOD_HINT[S.method]; computeChart(); rescanSoon(); };
 $('#tf').onchange = e => { S.tf = e.target.value; loadChart(); rescanSoon(); };
 $('#top').onchange = e => { S.top = +e.target.value; rescanSoon(); };
 $('#reset').onclick = () => { Object.assign(S, {method:DEF.method, N:DEF.N, k:DEF.k, tf:DEF.tf, candles:DEF.candles}); syncInputs(); loadChart(); rescanSoon(); };
 $('#csym').onkeydown = e => {
   if (e.key !== 'Enter') return;
-  let v = e.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''); if (!v) return;
+  let v = coinQ(e.target.value); if (!v) return;
   if (!v.endsWith('USDT')) v += 'USDT';
   loadChart(v); e.target.value = '';
 };
 $('#csym').oninput = e => { // picking from the datalist loads immediately
-  const v = e.target.value.trim().toUpperCase();
+  const v = coinQ(e.target.value);
   if (rows.some(r => base(r.sym) === v) && e.inputType !== 'insertText' && e.inputType !== 'deleteContentBackward') { loadChart(v + 'USDT'); e.target.value = ''; }
 };
 $('#refresh').onclick = () => { clearTimeout(scanTimer); scan(); };
@@ -2887,8 +2950,22 @@ document.addEventListener('keydown', e => {
 function setSort(k, d) { sortKey = k; sortDir = d; save('sr_msort', [k, d]); renderTable(); }
 document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; setSort(k, sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1)); });
 document.querySelectorAll('#jhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; jDir = jSort === k ? -jDir : (k === 'sym' || k === 'reason' ? 1 : -1); jSort = k; save('sr_jsort', [jSort, jDir]); renderJournal(); });
+// the closed trades' search, filter and summary by coin (renderClosed): redrawn alone, the balance above stays as it is
+const cSortBy = (k, d) => { cSort = k; cDir = d; renderClosed(); };
+document.querySelectorAll('#jchead th').forEach(th => th.onclick = () => { const k = th.dataset.s; cSortBy(k, cSort === k ? -cDir : (k === 'sym' ? 1 : -1)); });
+$('#jcsort').onchange = e => { const [k, d] = e.target.value.split(':'); cSortBy(k, +d); };   // phones: the summary is cards, without a head to sort by
+let jqT = 0;
+$('#jq').oninput = e => { clearTimeout(jqT); jqT = setTimeout(renderClosed, 120); };
+$('#jq').onkeydown = e => { if (e.key === 'Escape' && e.target.value) { e.preventDefault(); clearTimeout(jqT); e.target.value = ''; renderClosed(); } };
+$('#jclosedP').addEventListener('click', e => {
+  const r = e.target.closest('[data-jr]'), v = e.target.closest('[data-jv]');
+  if (r) jRes = r.dataset.jr; else if (v) jView = v.dataset.jv;
+  else if (e.target.closest('[data-jclear]')) { clearTimeout(jqT); $('#jq').value = ''; jRes = ''; if (!isPhone()) $('#jq').focus({preventScroll:true}); }
+  else return;
+  renderClosed();
+});
 // sortable headers work from the keyboard too: Tab to a header, Enter or Space sorts by it
-document.querySelectorAll('#mhead th[data-s], #jhead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
+document.querySelectorAll('#mhead th[data-s], #jhead th[data-s], #jchead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { jMode = b.dataset.m; save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
 // ---------- «Учёба»: #learn — the modules, #learn/<module>/<lesson> — a lesson ----------
 // The texts are in learn.js (MODULES: {id, title, lead, lessons:[{id, title, min, body, try, check}], soon}), loaded on the first
@@ -3620,9 +3697,7 @@ if (!load('sr_intro', false) && !LOCKED) $('#intro').classList.remove('hidden');
 $('#introOk').onclick = () => { $('#intro').classList.add('hidden'); save('sr_intro', true); };
 
 // ---------- quick jump (Ctrl+K): coins, pages, profiles and individual settings ----------
-// Keywords are in both languages; a query typed in the wrong keyboard layout ("ыщд" for "sol") is tried as well.
-const RU_KEYS = 'йцукенгшщзхъфывапролджэячсмитьбю', EN_KEYS = "qwertyuiop[]asdfghjkl;'zxcvbnm,.";
-const layoutFix = s => [...s].map(ch => { const i = RU_KEYS.indexOf(ch); return i >= 0 ? EN_KEYS[i] : ch; }).join('');
+// Keywords are in both languages; a query typed in the wrong keyboard layout ("ыщд" for "sol", layoutFix) is tried as well.
 const focusEl = sel => setTimeout(() => {
   const el = $(sel); if (!el) return;
   el.scrollIntoView({block:'center', behavior:'smooth'}); el.focus?.({preventScroll:true});
@@ -3937,7 +4012,7 @@ setInterval(checkUpdate, 3 * 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
 window.__sr = {get rows() { return rows; }, get J() { return J; }, get SJ() { return SJ; }, get btHist() { return btHist; }, openTrade, M, KEYS};
 // the toolkit the Beta module (beta.js) builds on — the same chart, zoom, data and helpers as the rest of the site
-window.__sr.kit = {renderChart, attachZoom, viewRange, wheelPx, wheelZoom, hoverIndex, priceAt, barAt, api, fp, usd, money, dt, hm, base, pair, toast, load, save, isPhone, openCoin,
+window.__sr.kit = {renderChart, attachZoom, viewRange, wheelPx, wheelZoom, hoverIndex, priceAt, barAt, api, fp, usd, money, dt, hm, base, pair, toast, load, save, isPhone, openCoin, coinQ, normQ,
   PC, get rows() { return rows; }, get favs() { return favs; }, get cache() { return cache; }};
 </script>
 </body>

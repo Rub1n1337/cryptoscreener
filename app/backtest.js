@@ -3,7 +3,7 @@
 // tests/backtest-audit.js. What ran at load in the page is start(), called by the page at the same place as before.
 import * as M from '../supabase/functions/_shared/math.js';
 import * as HS from '../history.js';
-import {$, load, save, fp, usd, rr, cl, dt, dur, base, coin, toast, api, pool, sleep, ask, money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone} from './core.js';
+import {$, load, save, fp, usd, rr, cl, dt, dur, base, coin, toast, api, pool, sleep, ask, money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone, layoutFix} from './core.js';
 const { TFMS, clamp } = M;
 
 // the page's own functions and values this code needs: given by start() as wrappers, since some are declared further down the page
@@ -55,8 +55,8 @@ function trimHistory(keep) {
     if (!keep(key)) { histCache.delete(key); histBars -= K.length; }
   }
 }
-// custom coin list: "btc, eth sol" → ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']
-const parseCoins = txt => [...new Set(String(txt).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/[^A-Z0-9]/g, '')).filter(Boolean)
+// custom coin list: "btc, eth sol" → ['BTCUSDT', 'ETHUSDT', 'SOLUSDT']; the layout is fixed first, so the comma key («б») splits
+const parseCoins = txt => [...new Set(layoutFix(String(txt)).toUpperCase().split(/[\s,;]+/).map(x => x.replace(/[^A-Z0-9]/g, '')).filter(Boolean)
   .map(x => x.endsWith('USDT') ? x : x + 'USDT'))].slice(0, 300);
 // The honest top («на каждый момент») trades, at each moment, only that moment's top-N by 24 h turnover, out of a pool loaded
 // in advance — so the pool must hold every coin that was in that top at some moment of the period. Until 2.79 it was today's
