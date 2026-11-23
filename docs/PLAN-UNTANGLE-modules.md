@@ -264,3 +264,39 @@
       `../changelog.js`.
     - При загрузке выполняются обработчики `#hGlossD`, `#learnBody` и `document` (подсказки терминов) → `start()` на прежнем
       месте раздела «Учёба»; `renderChangelog()` страница зовёт сама после `BT.start`.
+- 23.11 — владелец: «Yes, start wave 3». **Волна 3 сделана** (после 2.134, без новой версии: пользователь ничего не видит).
+  `app/learn-ui.js` (~250 строк): раздел «Учёба» (список, урок, словарь, подсказки терминов, «Проверьте себя», «Проверьте
+  сами», словарь в справке) и «Что нового» целиком. `index.html`: ~4 020 → ~3 795 строк.
+  - Замер (462 имени до переноса, повторов нет) совпал со списком волны 2: присваиваний чужих переменных семь —
+    `learnPath` ← страница в шести местах (`readHash`, вкладка, Ctrl+K — «Учёба», «Словарь», урок, термин) →
+    `setLearnPath(p)`; `betaMod` ← `learnGo` → обёртка `loadBeta` (страница грузит `beta.js`, присваивает свою `betaMod` и
+    отдаёт модуль). Из переносимых переменных страница больше ничего не пишет.
+  - `start({…})` на прежнем месте раздела «Учёба» (перед маршрутизацией): `page` и `cmode` функциями, `PROFILE_DEF`
+    значением (объявлена выше), `go`, `setHash`, `setTitle`, `setCmode`, `openCoin`, `showOb`, `loadBeta` — обёртками. Там же
+    все обработчики, порядок слушателей документа прежний; `renderChangelog()` — по-прежнему после `BT.start`. Хранилище при
+    загрузке модуль не читает. Из импортов страницы ушли `fmtDay`, `btFill`, `runBacktest`, `fits`.
+  - Проверено сравнением «до» и «после» (со входом на поддельном Supabase): текст и заголовки всех 37 уроков, список,
+    словарь, неверный адрес урока, словарь в справке, «Что нового» — одинаковы; клики — вкладка, урок, «Дальше», назад /
+    вперёд, подсказка термина (наведение, уход, нажатие, мимо, Enter, пробел, Esc, ссылка в словарь), фильтр словаря,
+    вопросы, источники, «Пройдено» (запись, отправка в профиль, перезагрузка, снятие, значение с другого устройства), Ctrl+K
+    (урок, термин, «Словарь», «Учёба»), «Проверьте сами» (канал, индикатор и отмена, фьючерсы и отмена, бэктест, второй
+    запуск при занятом), нет `learn.js` → «Повторить», уход с «Учёбы» во время загрузки. Наведение, нажатие и Esc — ещё и
+    настоящей мышью. smoke 320 / 375 / компьютер без замечаний (`preload`, `early` чистые; «a 135×19» — ссылка
+    «Продолжить» внутри текста, не от переноса), `math.html` 133/0.
+  - **Для волны 4 (`app/chart.js`; замер после волны 3, 444 имени):** разделы «chart renderer», «zoom & pan», «market chart» и
+    «second timeframe» (последний заканчивается на `zmT = attachZoom(…)`: дальше в нём же `sharedProf`, `BT.start`,
+    `renderChangelog` — они не про график).
+    - Чужие присваивания: `chartView` ← `#cn.oninput`, `#cnv` (UI wiring) и обработчик `zm` («вид профиля»); `chartSym` ←
+      `readHash`; `hoverI`, `hoverY` ← обработчики `cv` (раздел «events»), `zm` ← «вид профиля» — эти обработчики про график,
+      их переносить; `cmode` ← `setCmode`, `bexp` ← `setCmode` / `setExp` (раздел «live charts») — `cmode` и `bexp` объявлены в
+      «market chart», но пишет их только «live charts»: оставить обе `let` в странице. Из графика наружу одно: `zmT` (объявлена
+      у карточки сделки) — её `attachZoom` оставить в странице.
+    - Берёт извне: `S`, `J`, `SJ`, `rows`, `favs`, `page`, `jMode`, `SB_MINE` (функциями), `effN`, `setHash`, `renderDetail`,
+      `loadWalls`, `betaSync`, `checkLevels`, `pickLevel`, `renderLv`, `lvOf`, `hlCls`, `hlTip`, `tickCls`, `tcard`, `drawCard`,
+      `cv`, `cw`, `tcv`, `tgName`, `activeProfile`, `BP` и др.; `bands`, `rsi`, `halfLife`, `parse` — из `math.js`.
+    - Отдаёт: `renderChart`, `attachZoom`, `viewRange`, `wheelPx`, `wheelZoom`, `hoverIndex`, `priceAt`, `barAt` (их берёт и
+      `window.__sr.kit` для `beta.js`), `chart`, `chartK`, `chartSym`, `chartView`, `chartGeo`, `chart2Geo`, `tf2On`, `setTf2`,
+      `loadChart`, `computeChart`, `computeChartSoon`, `drawChart`, `drawChartSoon`, `drawChart2Soon`, `drawCardSoon`,
+      `perFrame`, `openPnl`, `myOpen`, `botPositions`, `chartTop`, `chartDefSpan`, `zm`.
+    - `chartSym` (и `cmode`) читают хранилище при объявлении: модуль обязан импортировать `account.js`.
+    - Поддельный вход теперь — `tests/_ref/serve8773.ps1` (см. `docs/LESSONS.md`, строка волны 3).
