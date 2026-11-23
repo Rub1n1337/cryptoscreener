@@ -4,6 +4,7 @@
 import * as M from '../supabase/functions/_shared/math.js';
 import * as HS from '../history.js';
 import {$, load, save, fp, usd, rr, cl, dt, dur, base, coin, toast, api, pool, sleep, ask, money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone, layoutFix} from './core.js';
+import {showTrade, equityChart, eqRestore} from './journal.js';
 const { TFMS, clamp } = M;
 
 // the page's own functions and values this code needs: given by start() as wrappers, since some are declared further down the page
@@ -430,7 +431,7 @@ function renderBacktest() {
            <div>Сделок<b>${st.n}</b></div>
          </div>
        </div>
-       ${hooks.equityChart(D, r.to + TFMS[s.tf], 'bt')}
+       ${equityChart(D, r.to + TFMS[s.tf], 'bt')}
      </div>
      ${st.n ? `<div class="statrow">
        ${card('Winrate', st.wr == null ? '—' : st.wr.toFixed(0) + '%', `${st.win} в плюс · ${st.loss} в минус`, '', 'Доля прибыльных сделок. Сама по себе мало что говорит: при тейке вдвое дальше стопа хватает и 35%')}
@@ -459,7 +460,7 @@ function renderBacktest() {
   $('#btTrades').innerHTML = btRowsHtml(btAll ? btList : btList.slice(0, BT_ROWS))
     + (!btAll && btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
     || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
-  hooks.eqRestore('bt');
+  eqRestore('bt');
 }
 const BT_ROWS = 300;
 let btList = [], btAll = false;   // btAll: «Показать все» was pressed for this result — a redraw (the theme) keeps the list open
@@ -578,7 +579,7 @@ $('#btTrades').onclick = e => {
   if (e.target.closest('[data-btmore]')) { btAll = true; e.target.closest('tr').outerHTML = btRowsHtml(btList.slice(BT_ROWS)); return; }
   const tr = e.target.closest('tr.row'); if (!tr || !btRes) return;
   const x = btRes.trades.find(t => String(t.id) === tr.dataset.id);
-  if (x) hooks.showTrade(x, {isOpen:false, who:'бэктест', set:btRes.settings});
+  if (x) showTrade(x, {isOpen:false, who:'бэктест', set:btRes.settings});
 };
 // the backtest opens on the rules that held up over a year (the shared bot trades by the same), not on a setup that loses
 $('#btDays').value = '60'; btFromProf(hooks.firstPreset());

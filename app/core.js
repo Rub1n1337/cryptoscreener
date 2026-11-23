@@ -195,6 +195,22 @@ function start() {
   // browsers keep sound started by a timer muted until the page is clicked or a key is pressed; the next touch unmutes it
   for (const ev of ['pointerup', 'keydown']) addEventListener(ev, () => { if (actx?.state === 'suspended') actx.resume(); }, {passive:true});
 }
+// rewriting a block's HTML drops the keyboard focus inside it, and the profile list and the journal are redrawn every
+// 30-60 s: the focused element is found again by its id and data- attributes and focused back
+function keepFocus(fn) {
+  const a = document.activeElement;
+  if (!a || a === document.body) return fn();
+  const key = a.tagName.toLowerCase() + [...a.attributes].filter(x => x.name === 'id' || x.name.startsWith('data-')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`).join('');
+  const r = fn();
+  if (!a.isConnected && key.includes('[')) document.querySelector(key)?.focus({preventScroll:true});
+  return r;
+}
+// a table's order is remembered if its column still exists; the market's default 'ext' (favourites, then signals) has no
+// header — the «Сортировка» chip above the table brings it back
+function savedSort(k, head, def) {
+  const m = load(k, null);
+  return Array.isArray(m) && [...document.querySelectorAll(head + ' th')].some(th => th.dataset.s === m[0]) ? [m[0], m[1] > 0 ? 1 : -1] : def;
+}
 
 export {$, firstShow, DEF, SCAN_MS, load, save, setOnSaved, PC, pal, fp, usd, rr, cl, hm, dt, dur, base, pair, tfOf, coin, plainHtml,
-  money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone, layoutFix, coinQ, normQ, toast, BASES, api, KST, klines, pool, esc, sleep, beep, ask, start, startTips};
+  money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone, layoutFix, coinQ, normQ, savedSort, keepFocus, toast, BASES, api, KST, klines, pool, esc, sleep, beep, ask, start, startTips};

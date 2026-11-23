@@ -45,7 +45,7 @@ export async function run({ limit = 8 } = {}) {
     try {
       const txt = await (await fetch(u.pathname)).text(), d = imports(txt, u.href);
       deps[u.pathname] = d.map(x => x.pathname); todo.push(...d);
-      if (/^(?:export\s+)?(?:let|const|var)\s[^\n]*\bload\(\s*'sr_/m.test(txt)) early.push(u.pathname);
+      if (/^(?:export\s+)?(?:let|const|var)\s[^\n]*\b(?:load|savedSort)\(\s*'sr_/m.test(txt)) early.push(u.pathname);
     } catch {}
   }
   if (miss.length) out.preload = miss;
