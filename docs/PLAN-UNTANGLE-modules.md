@@ -300,3 +300,36 @@
       `perFrame`, `openPnl`, `myOpen`, `botPositions`, `chartTop`, `chartDefSpan`, `zm`.
     - `chartSym` (и `cmode`) читают хранилище при объявлении: модуль обязан импортировать `account.js`.
     - Поддельный вход теперь — `tests/_ref/serve8773.ps1` (см. `docs/LESSONS.md`, строка волны 3).
+- 23.11 — владелец: «Yes, wave 4» на узкий разрез — рисовалка и зум. **Волна 4 сделана** (после 2.135, без новой версии:
+  пользователь ничего не видит). `app/chart.js` (364 строки): разделы «chart renderer» и «zoom & pan» строка в строку, плюс
+  импорты (`PC`, `fp`, `dt` из `core.js`, `clamp` из `math.js`) и экспорт. `index.html`: 3 795 → 3 441 строка. «Market chart» и
+  «second timeframe» остались в странице (волна 7, `app/market.js`): широкий список «Для волны 4» выше — для неё.
+  - Замер (444 имени, повторов нет): присваиваний чужих переменных ноль в обе стороны, обёрток и `start()` не нужно — при
+    загрузке модуль ничего не выполняет и хранилище не читает. Наружу 9 имён: `renderChart`, `hoverIndex`, `priceAt`,
+    `viewRange`, `wheelPx`, `wheelZoom`, `perFrame`, `attachZoom`, `barAt` (`MIN_SPAN` — внутри). Из «чужих» имён `cv`, `cw`,
+    `api` — локальные тёзки. `drawChartSoon` / `drawChart2Soon` / `drawCardSoon` / `computeChartSoon` остались в странице, в
+    начале «market chart»: они зовут её функции.
+  - `window.__sr.kit` отдаёт `beta.js` те же функции (проверено: это функции из `app/chart.js`); цвета — по-прежнему `PC`.
+  - Сравнение «до / после» хэшами `toDataURL`: рисовалка и зум на фикстуре — 96 из 96 (4 метода канала × 2 темы × 10 видов
+    графика, `viewRange`, колёсико, перетаскивание, щипок, двойной клик, клавиши, кнопки); страница на фикстуре с поддельным
+    входом — 138 из 138 на 1280 (график рынка, методы, ползунки, уровни, второй таймфрейм, «во всю ширину», темы, карточка
+    открытой и закрытой сделки, кривая капитала, «Стакан», «Развернуть») и 13 из 13 на 375 (лист монеты, щипок, свайп,
+    кнопки, 2 ТФ, уровень). Настоящей мышью — наведение, перетаскивание, колёсико, двойной клик; на живых данных —
+    «Стакан», «Развернуть», 4 графика, «Свернуть». smoke 320 / 375 / 1280 без замечаний со входом и без (`preload`, `early`
+    чистые), `math.html` 133/0.
+  - Не проверено: щипок настоящими пальцами (только синтетические `TouchEvent`), Safari и Firefox.
+  - **Для волны 5 (`app/journal.js`; замер после волны 4, 443 имени):** разделы «journal» и «trade card».
+    - Чужие присваивания — все из страницы в журнал: `jSort`, `jDir` (`#jhead`), `cSort`, `cDir` (`cSortBy`), `jRes`, `jView`
+      (`#jclosedP`) — обработчики журнала в «UI wiring», переносить вместе с `jqT` и `#jq`; `zmT` ← конец «second timeframe»
+      (`zmT = attachZoom(tcv, …)`) — переносить с обработчиками `tcv` (раздел «events»). Из журнала наружу ни одного.
+    - Импортом: `core.js`, `math.js`, `chart.js` (`renderChart`, `viewRange`, `barAt`, `attachZoom`, `hoverIndex`, `perFrame`),
+      `account.js` обязательно: `savedSort('sr_jsort')` читает хранилище при объявлении.
+    - Обёртками в `start`: `J`, `S`, `SJ`, `jMode`, `BP`, `SB_MINE`, `tgBot` (функциями — страница их переприсваивает),
+      `savedSort` (нужен при объявлении: перенести в `core.js`), `keepFocus`, `renderServer`, `profSet`, `activeProfile`,
+      `sharedNoEdge`, `sharedIdle`, `sharedProf`, `profPlain`, `profSummary`, `liveTag`, `tickLive`, `openPnl`, `compsHtml`,
+      `chartTop`; `tcv`, `drawCardSoon` станут своими.
+    - Отдаёт: `renderJournal`, `renderClosed`, `drawCard`, `capJournal`, `baseOf`, `openTrade`, `showTrade`, `closeModal`,
+      `equityChart`, `eqRestore` (две последние и `showTrade` бэктест берёт через `start` — станут импортом), `tcard`.
+    - При загрузке выполняются слушатели документа кривой капитала и заполнение `#jcsort` → `start()` на прежнем месте.
+      `drawCardSoon` зовут ещё `window.onresize` и конец «live charts».
+    - Готовое для сравнения: `tests/_ref/chart-pages.js` на `fixed8774` (`?old=1` отдаёт `tests/_ref/index.before.html`).
