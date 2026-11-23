@@ -224,3 +224,43 @@
     `S`/`effN`/`barsFor`/`forAnalysis` переезжают в модуль (например `app/settings.js`, импортирующий `account.js` — он
     читает `sr_settings` при загрузке). Модуль, импортированный страницей, может кэшироваться: поддельный вход через
     `document.write` работает только на свежей вкладке (`/README.md` по `navigate`, не после загрузки сайта в ней).
+- 23.11 — **волна 2 сделана** (после 2.133, без новой версии: пользователь ничего не видит). `app/backtest.js` (~590 строк):
+  раздел бэктеста целиком, `btCacheShow`, `btTfNote`, `btFromProf`, `profToBacktest` и все обработчики формы, вывода и
+  таблицы сделок — в `start()`, который страница зовёт на прежнем месте обработчиков (сразу после графика второго
+  таймфрейма, перед `renderChangelog()`); там же удаление `sr_delisted` и «Дополнительно» формы (`sr_btadv`; `.bmore` бота —
+  в странице). `index.html`: ~4 510 → ~3 950 строк.
+  - Замер (506 имён, повторов нет). Присваивания чужих переменных: из страницы в бэктест — `histBars` (кнопка «Кэш»),
+    `btAll` («Показать все») — этот код переехал к владельцу; из бэктеста в страницу — одно, `jMode` (тост «Сохранить как
+    профиль») → обёртка `goMine()`; там же изменение `BP.profiles` с `saveBP`/`renderBotPanel`/`syncServerBot` →
+    `addProfile(p)`. `btList` пишет только бэктест; `tcard`/`modalBack` он сам не пишет — только зовёт `showTrade`.
+    `rr` в `btModeShow` и `btSave` — локальные тёзки.
+  - Из страницы в `start({…})` обёртками: `S()`, `SJ()` (функции, а не значения: обе `let` страница переприсваивает), `go`,
+    `showTrade`, `equityChart`, `eqRestore`, `profSet`, `activeProfile`, `sharedProf`, `firstPreset`, `cleanName`,
+    `addProfile`, `goMine`. Модуля `settings` не делали: бэктесту от `S` нужны два обработчика, `effN`/`barsFor` не нужны.
+    С волнами 5 (журнал) и 6 (бот) обёртки `showTrade`/`equityChart`/`eqRestore` и `profSet`/… станут импортами.
+  - В `app/core.js` переехали без правок `money`, `curH`, `plural`, `reasonTag`, `METHOD_NAME`, `hlOpts`, `isPhone`
+    (чистые помощники, нужны и бэктесту, и странице).
+  - Страница импортирует `parseCoins`, `fmtDay`, `btBusy`, `btRes`, `btHist`, `btFill`, `btEstimate`, `runBacktest`,
+    `renderBacktest`, `btCacheShow`, `profToBacktest`; `window.__sr.btHist` — прежний геттер над живой привязкой.
+  - Проверено: один и тот же прогон (01.09–31.10.2026, честный топ-50, 4h) до и после переноса — все семь блоков итога
+    совпали дословно (29 сделок, сравнение со случайным входом тоже); `recount` bad = [], `cut` sameEntries и sameClosed,
+    `replay` 28 из 28 общих сделок, расхождений нет. Клик-пути (со входом на поддельном Supabase): запуск, двойной клик,
+    «Прервать», нет сети, устаревший итог и возврат, «Проверка», «Проверить честно», «Прервать»/«Сравнить» у случайного
+    входа, карточка сделки, «Показать все» и смена темы, кэш (в том числе во время прогона), три «Подставить», быстрый
+    старт, «В бэктест» из профиля и из журнала общего бота, «Сохранить как профиль» → журнал, Ctrl+K «Бэктест за год»,
+    «Проверьте сами» из урока. smoke 320 / 375 / 1024 без замечаний (`preload`, `early` чистые), `math.html` 133/0,
+    `alerts.html` 12/0.
+  - **Для волны 3 (`app/learn-ui.js`, «Учёба» + «Что нового»; замер после волны 2):**
+    - Чужие присваивания: `learnPath` ← страница в шести местах (`readHash`, вкладка, Ctrl+K — четыре) → `setLearnPath(p)`
+      у владельца; `betaMod` ← `learnGo` (`betaMod ||= await import('./beta.js')`) → обёртка страницы, которая грузит модуль
+      и отдаёт его.
+    - Импортом: `./core.js` (`$`, `load`, `save`, `toast`, `plural`, `isPhone`), `./account.js` (`fits` — и он же держит
+      порядок чтения хранилища), `./changes.js` (`CHANGELOG`), `./backtest.js` (`btBusy`, `btFill`, `runBacktest`, `fmtDay`;
+      кольца нет: бэктест «Учёбу» не знает). Обёртками в `start`: `page` (функцией), `go`, `setHash`, `setTitle`,
+      `PROFILE_DEF`, `cmode` (функцией), `setCmode`, `openCoin`, `showOb`, `betaMod`.
+    - Отдаёт странице: `renderChangelog`, `loadOldChangelog`, `renderLearn`, `learnLesson`, `learnPath`, `LEARN`, `GLOSS`,
+      `loadLearn`. `setTitle` при старте зовёт `learnLesson` — имя должно быть готово до первого `go()`.
+    - Динамические импорты считаются от адреса модуля: `./learn.js?v=…` и `./changelog.js` из `app/` → `../learn.js`,
+      `../changelog.js`.
+    - При загрузке выполняются обработчики `#hGlossD`, `#learnBody` и `document` (подсказки терминов) → `start()` на прежнем
+      месте раздела «Учёба»; `renderChangelog()` страница зовёт сама после `BT.start`.

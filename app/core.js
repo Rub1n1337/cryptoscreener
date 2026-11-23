@@ -38,6 +38,15 @@ const dur = ms => ms == null || !isFinite(ms) ? '—' : ms < 36e5 ? Math.round(m
 const base = s => s.replace(/USDT$/, '');
 const pair = s => s.replace(/USDT$/, '/USDT');
 const tfOf = ms => Object.keys(TFMS).find(k => TFMS[k] === ms);
+const money = v => v.toLocaleString('ru', {minimumFractionDigits:2, maximumFractionDigits:2});
+// a large sum with the currency set lighter than the value (DESIGN-RULES п. 67): «$» in .cur, after a sign if there is one
+const curH = s => String(s).replace(/^([+−-]?)\$/, '$1<span class="cur">$</span>');
+const plural = (n, f) => f[n % 10 === 1 && n % 100 !== 11 ? 0 : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20) ? 1 : 2];
+const reasonTag = r => `<span class="tag ${r === 'тейк' ? 'tp' : r === 'стоп' ? 'sl' : 'ts'}">${r || '—'}</span>`;
+const METHOD_NAME = {log:'лог-канал', classic:'классика', robust:'робастная', ewma:'EWMA'};
+// the T½ filter counts candles: show what that is in time on the chosen timeframe
+function hlOpts(sel, tf) { for (const o of $(sel).options) if (+o.value) o.textContent = `T½ ≤ ${o.value} (≈ ${dur(+o.value * TFMS[tf])})`; }
+const isPhone = () => matchMedia('(max-width:700px)').matches;
 // coin avatar: first letter on a colour derived from the ticker
 const coin = sym => { const b = base(sym); let h = 0; for (const ch of b) h = (h * 31 + ch.charCodeAt(0)) % 360; return `<span class="coin"><i style="--h:${h}">${b.replace(/^1000+/, '')[0] || '?'}</i><b>${b}</b></span>`; };
 // title and body are plain text (the same go to the browser's Notification): escaped here, so a server's error message can't
@@ -181,4 +190,4 @@ function start() {
 }
 
 export {$, firstShow, DEF, SCAN_MS, load, save, setOnSaved, PC, pal, fp, usd, rr, cl, hm, dt, dur, base, pair, tfOf, coin, plainHtml,
-  toast, BASES, api, KST, klines, pool, esc, sleep, beep, ask, start, startTips};
+  money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone, toast, BASES, api, KST, klines, pool, esc, sleep, beep, ask, start, startTips};
