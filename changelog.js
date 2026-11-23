@@ -1,6 +1,11 @@
 // Older «Что нового» entries (those CHANGELOG in app/changes.js no longer holds), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in app/changes.js; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.124', date:'13 ноября 2026', title:'Учёба: как устроен рынок', items:[
+    'Добавлен модуль «Как устроен рынок»: биржа и стакан, цена сделки, плечо и ликвидация, фьючерсы и финансирование, участники рынка.',
+    'В модуль «Риск и деньги» добавлены уроки о прибыли к риску, лимите потерь, плане сделки, журнале и тильте.',
+    'Кнопки уроков о фьючерсах открывают график монеты на фьючерсах.',
+  ]},
   {v:'2.123', date:'13 ноября 2026', title:'Уроки с исследованиями', items:[
     'Уроки модуля «Чтение графика» дополнены выводами научных исследований.',
     'В «Источниках» уроков остались только общедоступные исследования.',
