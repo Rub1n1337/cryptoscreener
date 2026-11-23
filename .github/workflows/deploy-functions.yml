@@ -21,6 +21,13 @@ jobs:
       PROJECT_REF: aumldylzccbmddavtrqe
     steps:
       - uses: actions/checkout@v4
+      # all three before the first deploy: code that doesn't parse (2.133) stops the run with nothing deployed, so it cannot leave
+      # bot, tg and auth on different versions. What is checked: scripts/check-functions.sh. Deno is pinned like the CLI below
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.8
+      - name: Check that the functions parse and their imports resolve
+        run: bash scripts/check-functions.sh
       # pinned: «latest» became the 3.0 major on 02.11.2026 and the deploy failed; move up only after a manual run passes
       - uses: supabase/setup-cli@v1
         with:

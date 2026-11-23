@@ -8,12 +8,23 @@ name: Tests
 
 on:
   push:   # every branch: a session's or Lovable's branch is checked before it is merged
-    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', 'history.js', 'app/**', '**.css']
+    paths: ['supabase/functions/**', 'scripts/check-functions.sh', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', 'history.js', 'app/**', '**.css']
   pull_request:
-    paths: ['supabase/functions/_shared/**', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', 'history.js', 'app/**', '**.css']
+    paths: ['supabase/functions/**', 'scripts/check-functions.sh', 'tests/**', '.github/workflows/tests.yml', 'index.html', 'beta.js', 'learn.js', 'changelog.js', 'history.js', 'app/**', '**.css']
   workflow_dispatch:
 
 jobs:
+  # the Edge Functions parse and their imports resolve (no types); on main the same check stands before the deploy itself
+  functions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 2.9.8
+      - name: Edge Functions syntax and imports
+        run: bash scripts/check-functions.sh
   checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
