@@ -5,7 +5,7 @@
 import * as M from '../supabase/functions/_shared/math.js';
 import {TOPS as AL_TOPS, alertsView} from '../supabase/functions/_shared/alerts.js';
 import {$, firstShow, load, save, fp, usd, rr, cl, dt, dur, base, pair, tfOf, toast, api, klines, pool, esc, ask, money, plural, METHOD_NAME, hlOpts, isPhone, keepFocus} from './core.js';
-import {SB_URL, SB_KEY, AUTH, ME, syncReady, canon, authedFetch} from './account.js';   // it also keeps the order: J, BP and UB read the storage below, when this module loads
+import {SB_URL, SB_KEY, AUTH, ME, syncReady, canon, fits, authedFetch} from './account.js';   // it also keeps the order: J, BP and UB read the storage below, when this module loads
 import {parseCoins, profToBacktest} from './backtest.js';
 import {renderJournal, capJournal, baseOf, openTrade} from './journal.js';
 const { TFMS, clamp } = M;
@@ -51,14 +51,23 @@ const sharedNoEdge = () => !!SJ?.settings && Object.entries(SHARED_TESTED).every
 const presetTag = p => !PRESETS.some(x => x.id === p.id) ? '' : ` <span class="tag" title="${p.id === 'p-sw4h'
   ? 'Правила общего бота. Честная проверка — топ-50 монет на каждый момент, включая снятые с биржи, — в минусе все три последних года: −0.42R, −0.40R и −0.30R на сделку. Прежние «+0.38R за год» получались только на сегодняшнем топ-50, который год назад знать было нельзя'
   : 'Готовый пример настроек, а не проверенная стратегия: честной проверкой на нескольких годах (топ монет на каждый момент, включая снятые с биржи) не подтверждён. Проверьте его в бэктесте'}">не подтверждён</span>`;
-let BP = load('sr_bot', null) || {profiles:PRESETS, mode:'single', active:'p-sw4h', flat:'p-flat1h', impulse:'p-imp', erMax:0.15};
-if (!BP.profiles.some(p => p.id === 'p-flat1h')) BP.profiles.unshift(PRESETS[1]);   // older setups get the presets they miss
-if (!BP.profiles.some(p => p.id === 'p-sw4h')) BP.profiles.unshift(PRESETS[0]);
-BP.profiles.forEach(p => { if (p.id === 'p-sw4h' && p.set.k === 3 && !p.set.maxHL) p.set = {...PRESETS[0].set}; });   // the first version of this preset (one day old) gets the tuned rules
-// presets that did not hold up on an honest check: drop the "проверен за год" their names were saved with
-BP.profiles.forEach(p => { if ((p.id === 'p-flat1h' || p.id === 'p-sw4h') && / \(проверен за год\)$/.test(p.name)) p.name = p.name.replace(/ \(проверен за год\)$/, ''); });
-BP.where ||= 'browser';
-BP.profiles.forEach(p => { p.name = cleanName(p.name); });
+// what is kept in storage, made whole. Older setups get the presets they miss and the tuned rules once (v, saved with the next
+// change): until 3.2 it was done at every start — a deleted preset came back, and «Переключатель» set to k = 3 without T½ was
+// taken for the preset's first version, and both went to the server bot
+function fixBP(b) {
+  if (!(b.v >= 1)) {
+    if (!b.profiles.some(p => p.id === 'p-flat1h')) b.profiles.unshift(PRESETS[1]);
+    if (!b.profiles.some(p => p.id === 'p-sw4h')) b.profiles.unshift(PRESETS[0]);
+    b.profiles.forEach(p => { if (p.id === 'p-sw4h' && p.set.k === 3 && !p.set.maxHL) p.set = {...PRESETS[0].set}; });   // the first version of this preset (one day old) gets the tuned rules
+    b.v = 1;
+  }
+  // presets that did not hold up on an honest check: drop the "проверен за год" their names were saved with
+  b.profiles.forEach(p => { if ((p.id === 'p-flat1h' || p.id === 'p-sw4h') && / \(проверен за год\)$/.test(p.name)) p.name = p.name.replace(/ \(проверен за год\)$/, ''); });
+  b.where ||= 'browser';
+  b.profiles.forEach(p => { p.name = cleanName(p.name); });
+  return b;
+}
+let BP = fixBP(load('sr_bot', null) || {profiles:[...PRESETS], mode:'single', active:'p-sw4h', flat:'p-flat1h', impulse:'p-imp', erMax:0.15});
 let UB = load('sr_ubot', null);   // {id} of the profile's server bot (see profileBot); {id, secret} — a bot no profile has yet
 let SB_MINE = null;               // the server bot's journal, when it runs on the server
 let alertsQ = Promise.resolve(), alertsAt = 0;   // its notification settings' saves, one after another (saveAlerts)
@@ -77,7 +86,7 @@ const profSummary = p => { const s = profSet(p);
     + (s.timeStop ? ` · тайм-стоп ${s.timeStop} свечей` : ' · без тайм-стопа')
     + ` · позиций одновременно: ${M.slotsOf(s)}`
     + ` · ${p.coins.mode === 'list' ? p.coins.list.map(base).join(', ') : 'топ-' + p.coins.top + ' монет'}`; };
-let botRegime = null, botBusy = false, tickerCache = null, botProfile = null, botErr = '';   // botErr: the browser bot's last failed step
+let botRegime = null, botBusy = false, tickerCache = null, botProfile = null, botMkt = null, botErr = '';   // botMkt: the market at its last step {flat, er}; botErr: its last failed step
 // the market regime on a timeframe, measured as the backtest and the server bots do (M.marketOn: BTC/ETH/SOL, closed candles).
 // "The market now" (the auto mode's choice of profile, the line in «Мой бот») is 1h; a profile trades by the regime of its own
 // timeframe. Kept 3 minutes per timeframe
@@ -129,8 +138,8 @@ const RPC_TEXT = {'forbidden':'нет доступа к этому боту: е�
   'too many bots created, try later':'сейчас создаётся слишком много ботов, попробуйте позже',
   'start balance must be 100 … 10000000':'стартовый баланс — от 100 до 10 000 000'};
 const rpcIs = (e, re) => re.test(e?.raw || e?.message || '');
-async function rpc(fn, args) {
-  const r = await authedFetch(SB_URL + 'rpc/' + fn, {method:'POST', body:JSON.stringify(args)});
+async function rpc(fn, args, init) {
+  const r = await authedFetch(SB_URL + 'rpc/' + fn, {method:'POST', body:JSON.stringify(args), ...init});
   if (!r.ok) {
     const t = await r.text(); let j = null; try { j = JSON.parse(t); } catch {}
     const raw = String(j?.message || t || `HTTP ${r.status}`).slice(0, 200), e = new Error(RPC_TEXT[raw] || raw);
@@ -166,22 +175,36 @@ async function profileBot() {
 const serverConfig = () => ({profiles:BP.profiles, mode:BP.mode, active:BP.active, flat:BP.flat, impulse:BP.impulse, erMax:BP.erMax});
 // on/off goes only with the person's own «Пауза» / «Продолжить» (on); other pushes leave it as the server has it: every device
 // pushes to the one profile bot, and a device's own journal flag would pause it for all of them
-let syncTimer, ubOn = null, cfgChecked = false;
+let syncTimer = 0, ubOn = null, ubWas = null, cfgChecked = false;   // ubWas: the browser journal's own flag before «Пауза» / «Продолжить» (setOn)
 function syncServerBot(on) {   // push profiles/mode to the server bot (debounced)
   if (BP.where !== 'server' || !UB) return;
   if (on != null) ubOn = on;
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => { const en = ubOn; ubOn = null;
-    if (BP.where !== 'server' || !UB) return;   // the bot went meanwhile (deleted, the profile too)
-    rpc('ub_set', ubArgs({p_config:serverConfig(), p_enabled:en})).then(() => fetchServerBot())
-      .catch(e => { toast('Не удалось сохранить на сервере', String(e.message || e), 'bad'); fetchServerBot(); }); }, 400);   // the panel shows what the server has
+  clearTimeout(syncTimer); syncTimer = setTimeout(pushServerBot, 400);
 }
+function pushServerBot() {
+  clearTimeout(syncTimer); syncTimer = 0;
+  const en = ubOn, was = ubWas; ubOn = ubWas = null;
+  if (BP.where !== 'server' || !UB) return;   // the bot went meanwhile (deleted, the profile too)
+  const args = ubArgs({p_config:serverConfig(), p_enabled:en});
+  // keepalive: the request outlives a page closed right after the press (a body over 64 KB can't have it)
+  rpc('ub_set', args, {keepalive:JSON.stringify(args).length < 2e4}).then(() => fetchServerBot()).catch(e => {
+    toast('Не удалось сохранить на сервере', String(e.message || e), 'bad');
+    // refused: the browser bot's flag goes back too (until 3.2 it stayed as pressed), unless the person has pressed again
+    if (en != null && was != null) { if (ubOn == null) { J = load('sr_journal', J); J.on = was; save('sr_journal', J); } else ubWas = was; }
+    fetchServerBot();   // the panel shows what the server has
+  });
+}
+const dropPush = () => { clearTimeout(syncTimer); syncTimer = 0; ubOn = ubWas = null; };
+// answers can come out of order: one older than what is shown is dropped (until 3.2 it brought the old journal back, and the next
+// poll told about the same trades again)
+let ubReq = 0, ubSeen = 0, shReq = 0, shSeen = 0;
 async function fetchServerBot() {
   if (BP.where !== 'server' || !UB) return;
-  const id = UB.id, sent = Date.now();
+  const id = UB.id, sent = Date.now(), req = ++ubReq;
   try {
     const r = await rpc('ub_get', ubArgs()), b = r.bot, prev = SB_MINE;
-    if (UB?.id !== id) return;   // the device moved to the profile's bot meanwhile
+    if (UB?.id !== id || req < ubSeen) return;   // the device moved to the profile's bot meanwhile, or a later poll has answered
+    ubSeen = req;
 
     // the server trades on its own: compare with the previous poll to tell the owner about new trades
     if (prev) {
@@ -199,7 +222,7 @@ async function fetchServerBot() {
     if (!$('#journal').classList.contains('hidden')) renderJournal();
     if (hooks.chart()) drawChart();
   } catch (e) {
-    if (UB?.id !== id) return;
+    if (UB?.id !== id || req < ubSeen) return;
     if (rpcIs(e, /forbidden/)) profileBot();   // deleted on another device: the profile may have another bot, or none
     // any other failure (no connection, a timeout, a server error) was dropped and the panel kept old numbers as if fresh
     else if (SB_MINE) { SB_MINE.fetchError = String(e.message || e); renderGuard(); }
@@ -208,7 +231,7 @@ async function fetchServerBot() {
 // this device no longer has the profile's server bot (deleted here or on another device, asleep and removed, or the profile
 // went): the bot carries on in this tab. One place for the three ways it happens
 function botGone() {
-  clearTimeout(syncTimer); ubOn = null;
+  dropPush();
   UB = null; save('sr_ubot', null); SB_MINE = null;
   if (BP.where === 'server' || BP.srvPaused != null) { BP.where = 'browser'; delete BP.srvPaused; saveBP(); }
 }
@@ -227,8 +250,9 @@ async function setWhere(w) {
     else {
       fresh = true;
       // a new server bot starts at $10 000; with another start in the browser it begins from the same amount
-      const start = J.start >= 100 && J.start <= 1e7 ? Math.round(J.start) : 10000;
-      if (start !== 10000) await rpc('ub_reset', ubArgs({p_start:start})).catch(() => {});
+      let start = J.start >= 100 && J.start <= 1e7 ? Math.round(J.start) : 10000;
+      if (start !== 10000) try { await rpc('ub_reset', ubArgs({p_start:start})); }
+      catch { toast('Стартовая сумма не перенеслась', 'Задать её можно кнопкой «Сбросить журнал»', 'warn'); start = 10000; }
       toast('Ваш бот теперь работает на сервере 24/7', `торгует по выбранному профилю, даже когда сайт закрыт. Журнал — отдельный, начинается с $${start.toLocaleString('ru')}`, 'ok');
     }
   }
@@ -243,7 +267,7 @@ async function setWhere(w) {
     try {
     // the bot's state not loaded yet (a tap in the first second): asked here, so a bot the person had paused isn't resumed later
     paused = SB_MINE ? SB_MINE.on !== false : await rpc('ub_get', ubArgs()).then(r => r.bot?.enabled !== false, () => true);
-    clearTimeout(syncTimer); ubOn = null;
+    dropPush();
     try { await rpc('ub_set', ubArgs({p_config:serverConfig(), p_enabled:false})); }
     catch (e) { toast('Не удалось поставить серверного бота на паузу', String(e.message || e), 'bad'); renderBotPanel(); return; }   // the switch stays where it was
     } finally { ubPausing = false; }
@@ -271,8 +295,11 @@ async function botStep() {
     const now = Date.now();
     botRegime = await regimeOn('1h');   // "the market now": the auto mode picks the profile by it
     const P = activeProfile(), set = profSet(P);
-    if (botProfile && botProfile !== P.id && BP.mode === 'auto') notifyUser(`Мой бот: профиль «${P.name}»`, `рынок сменился — ${M.regimeOf(botRegime, {erMax:BP.erMax, regimeSrc:'majors'}) === 'flat' ? 'боковик' : 'импульс'}`, 'warn');
-    botProfile = P.id;
+    // said only when the market itself changed: a role, the border or the mode changed by hand also brings another profile. The
+    // regime unknown (BTC, ETH or SOL did not load) is not a change either
+    const reg = M.regimeOf(botRegime, {erMax:BP.erMax, regimeSrc:'majors'}), mkt = reg && {flat:reg === 'flat', er:BP.erMax};
+    if (mkt && botMkt && mkt.er === botMkt.er && mkt.flat !== botMkt.flat && botProfile && botProfile !== P.id && BP.mode === 'auto') notifyUser(`Мой бот: профиль «${P.name}»`, `рынок сменился — ${mkt.flat ? 'боковик' : 'импульс'}`, 'warn');
+    if (mkt) { botMkt = mkt; botProfile = P.id; }
     let list;
     if (P.coins.mode === 'list') list = [...P.coins.list];
     else { if (!tickerCache || now - tickerCache.t > 5 * 6e4) tickerCache = {t:now, d:await api('/api/v3/ticker/24hr')}; list = M.pickSymbols(tickerCache.d, P.coins.top, [], now); }
@@ -541,7 +568,7 @@ function renderBotPanelNow() {
   document.querySelectorAll('#bmode .tab').forEach(b => b.classList.toggle('on', b.dataset.m === BP.mode));
   document.querySelectorAll('#bwhere .tab').forEach(b => b.classList.toggle('on', b.dataset.w === BP.where));
   $('#bdelOpt').classList.toggle('hidden', !UB);
-  const srv = BP.where === 'server', act = srv && SB_MINE?.profile ? (BP.profiles.find(p => p.name === SB_MINE.profile) || activeProfile()) : activeProfile();
+  const srv = BP.where === 'server', mine = activeProfile(), act = srv && SB_MINE?.profile && mine.name !== SB_MINE.profile ? (BP.profiles.find(p => p.name === SB_MINE.profile) || mine) : mine;
   const on = srv && SB_MINE ? SB_MINE.on : J.on;
   if (srv && SB_MINE?.regime?.by) botRegime = {...M.marketOf(s => SB_MINE.regime.by[s] || null), by:SB_MINE.regime.by};
   const reg = botRegime ? M.regimeOf(botRegime, {erMax:BP.erMax, regimeSrc:'majors'}) : null;   // "the market now", 1h
@@ -632,6 +659,7 @@ async function sb(path) {
 }
 let sharedErr = '';   // the last failed request for the shared bot's data ('' after a good one)
 async function fetchShared() {
+  const req = ++shReq;
   try {
     const [st, open, closed, runs] = await Promise.all([
       sb('bot_state?id=eq.1&select=balance,start_balance,settings,checked_at,last_error,scanned,regime'),
@@ -639,6 +667,8 @@ async function fetchShared() {
       sb('trades?select=*&order=tclose.desc&limit=1000'),
       sb('bot_runs?select=ts,ok,ms,scanned,signals,opened,closed,error&order=ts.desc&limit=240').catch(() => []),
     ]);
+    if (req < shSeen) return;   // a later poll has answered (see fetchServerBot)
+    shSeen = req;
     const s = st[0], prev = SJ;
     SJ = {balance:s.balance, start:s.start_balance, settings:s.settings, error:s.last_error, scanned:s.scanned, regime:s.regime || null,
           checked:s.checked_at ? Date.parse(s.checked_at) : 0, open, closed, runs, on:true};
@@ -648,7 +678,7 @@ async function fetchShared() {
       for (const t of closed.filter(t => !seenC.has(t.id))) notifyUser(`Общий бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => openJournal('shared'));
     }
     sharedErr = '';
-  } catch (e) { sharedErr = String(e.message || e); if (SJ) SJ.fetchError = sharedErr; }   // kept and said (renderGuard), not swallowed
+  } catch (e) { if (req < shSeen) return; sharedErr = String(e.message || e); if (SJ) SJ.fetchError = sharedErr; }   // kept and said (renderGuard), not swallowed
   renderGuard(); renderBotNow(); renderAway();
   if (!$('#journal').classList.contains('hidden')) renderJournal();
   if (hooks.chart()) { drawChart(); renderDetail(); }
@@ -749,7 +779,8 @@ let formBase = null;
 const formDirty = () => formBase != null && !$('#bform').classList.contains('hidden') && formState() !== formBase;
 function syncSavebar() { const d = formDirty(); $('#pfBar').classList.toggle('dirty', d); $('#pfBarT').textContent = d ? 'Есть несохранённые изменения' : ''; }
 // main button of the status card: pause / resume / move to the server
-const setOn = v => { J.on = v; save('sr_journal', J); if (SB_MINE) SB_MINE.on = v; renderGuard(); renderBotPanel(); syncServerBot(v); };
+// the journal is read from storage first: another tab may have closed a position while this tab's step loads candles
+const setOn = v => { J = load('sr_journal', J); if (BP.where === 'server' && UB && ubOn == null) ubWas = J.on; J.on = v; save('sr_journal', J); if (SB_MINE) SB_MINE.on = v; renderGuard(); renderBotPanel(); syncServerBot(v); };
 const pickProfile = id => { if (BP.active === id && BP.mode === 'single') return; BP.active = id; BP.mode = 'single'; saveBP(); renderBotPanel(); renderJournal(); syncServerBot(); runBot();
   toast(`Бот торгует по профилю «${profById(id).name}»`, BP.where === 'server' ? 'сервер подхватит его на следующей проверке — в течение минуты' : 'со следующей проверки рынка', 'ok'); };
 // the shared bot's rules as a profile, for showing them and for the backtest
@@ -764,12 +795,25 @@ window.addEventListener('storage', e => {
     J = load('sr_journal', J); renderGuard(); renderBotPanel();
     if (!$('#journal').classList.contains('hidden')) renderJournal();
   }
+  // the profiles, the mode or the place changed in another tab: this one goes on from them. Until 3.2 it kept its own copy, and
+  // its next change undid the other tab's, on the server too
+  if (e.key === 'sr_bot' || e.key === 'sr_ubot') {
+    const where = BP.where, id = UB?.id, v = load('sr_bot', null);
+    if (fits('sr_bot', v)) BP = fixBP(v);
+    UB = load('sr_ubot', null);
+    if (BP.where !== where || UB?.id !== id) { dropPush(); SB_MINE = null; fetchServerBot(); }
+    renderBotPanel(); renderGuard();
+    if (!$('#journal').classList.contains('hidden')) renderJournal();
+  }
 });
+// the page closed or reloaded within the 0.4 s a change waits to be sent: it goes now
+window.addEventListener('pagehide', () => { if (syncTimer) pushServerBot(); });
 $('#pimp').onclick = e => {
   const a = e.target.closest('[data-imp]')?.dataset.imp; if (!a) return;
   if (a === 'add' && pendingImport) {
     const p = {...pendingImport, id:'p' + Date.now()};
-    if (BP.profiles.some(x => x.name === p.name)) p.name = cleanName(p.name + ' (копия)');
+    const taken = s => BP.profiles.some(x => x.name === s), copy = n => cleanName(pendingImport.name.slice(0, 46) + (n > 1 ? ` (копия ${n})` : ' (копия)'));   // the server names its active profile: each name once
+    if (taken(p.name)) { let n = 1; while (taken(copy(n))) n++; p.name = copy(n); }
     BP.profiles.push(p); saveBP(); renderBotPanel(); syncServerBot();
     toast(`Профиль «${p.name}» добавлен`, 'нажмите на него в списке, чтобы бот торговал по нему', 'ok');
   }
@@ -874,8 +918,9 @@ $('#blist').onclick = async e => {
     const inUse = ['active', 'flat', 'impulse'].some(k => BP[k] === p.id);
     if (!(await ask({title:`Удалить профиль «${p.name}»?`, ok:'Удалить', danger:true,
       text:`Сделки в журнале останутся.${inUse ? ` Бот сейчас использует этот профиль — вместо него возьмёт «${next.name}».` : ''}`}))) return;
-    BP.profiles = BP.profiles.filter(x => x.id !== p.id);
-    for (const k of ['active', 'flat', 'impulse']) if (BP[k] === p.id) BP[k] = next.id;
+    const rest = BP.profiles.filter(x => x.id !== p.id); if (!rest.length) return;   // another tab deleted the others while the question was open
+    BP.profiles = rest;
+    for (const k of ['active', 'flat', 'impulse']) if (BP[k] === p.id) BP[k] = (rest.find(x => x.id === next.id) || rest[0]).id;
     if (editId === p.id) { formBase = null; syncSavebar(); $('#bform').classList.add('hidden'); }   // or saving would bring it back
     saveBP(); renderBotPanel(); renderJournal(); syncServerBot();
   }
@@ -894,7 +939,7 @@ $('#jreset').onclick = async () => {
     catch (e) { toast('Не удалось сбросить', String(e.message || e), 'bad'); }
     fetchServerBot(); return;
   }
-  J = {balance:start, start, open:[], closed:[], on:J.on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
+  J = {balance:start, start, open:[], closed:[], on:load('sr_journal', J).on}; save('sr_journal', J); renderJournal(); renderGuard(); drawChart();
   toast(`Журнал начат заново с $${start.toLocaleString('ru')}`, '', 'ok');
 };
 // the server copy goes entirely (ub_delete): trades, positions, the Telegram link — for every device of the profile. The profiles
@@ -903,7 +948,7 @@ $('#ubdel').onclick = async () => {
   if (!UB) return;
   if (!(await ask({title:'Удалить бота с сервера?', ok:'Удалить', danger:true,
     text:'Серверный бот профиля удалится на всех ваших устройствах: его сделки, позиции и Telegram. Отменить это нельзя. Профили останутся, бот продолжит работать в этой вкладке.'}))) return;
-  clearTimeout(syncTimer); ubOn = null;
+  dropPush();
   try { await rpc('ub_delete', ubArgs()); }
   catch (e) { if (!rpcIs(e, /forbidden/)) { toast('Не удалось удалить', String(e.message || e), 'bad'); return; } }   // forbidden: it is gone already
   botGone();
