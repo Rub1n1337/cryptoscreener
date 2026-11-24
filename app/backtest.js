@@ -4,7 +4,7 @@
 import * as M from '../supabase/functions/_shared/math.js';
 import * as HS from '../history.js';
 import {$, load, save, fp, usd, rr, cl, dt, dur, base, coin, toast, api, pool, sleep, ask, money, curH, plural, reasonTag, METHOD_NAME, hlOpts, isPhone, layoutFix} from './core.js';
-import {showTrade, equityChart, eqRestore} from './journal.js';
+import {showTrade, equityChart, eqRestore, coinSums, coinRows, sortCoins, sortHead, sortBy, segOn} from './journal.js';
 const { TFMS, clamp } = M;
 
 // the page's own functions and values this code needs: given by start() as wrappers, since some are declared further down the page
@@ -455,15 +455,37 @@ function renderBacktest() {
   // «Можно ли верить»: the part the settings were picked on and the held-out part (#btHold), and what made the result incomplete
   $('#btPartsT').innerHTML = groupHead + '<tbody>' + groupRow(name[0] + ' периода · подбор', fit) + groupRow(name[1] + ' · проверка', out) + '</tbody>';
   $('#btWarn').innerHTML = (r.warn || []).map(([k, t]) => `<div class="banner ${k}"><svg class="i"><use href="#i-${k}"/></svg><div>${t}</div></div>`).join('');
-  btList = tr.map(M.normTrade).sort((a, b) => b.tclose - a.tclose);
-  // the newest BT_ROWS first, the rest on request: a long 15m run drew thousands of rows at once and froze a phone for a moment
-  $('#btTrades').innerHTML = btRowsHtml(btAll ? btList : btList.slice(0, BT_ROWS))
-    + (!btAll && btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
-    || '<tr><td colspan="13" class="mute">Сделок нет — сигналов с такой силой за период не было</td></tr>';
+  renderBtTrades();
   eqRestore('bt');
 }
+// «Сделки бэктеста»: the result filter, the summary by coin and sorting by the head, as «Закрытые сделки» in the journal
+// (renderClosed, app/journal.js). This visit's view: it stays for the next run, so runs compare in the same view; not saved
+let bRes = '', bView = 'list', bSort = 'tclose', bDir = -1, bcSort = 'n', bcDir = -1;
+function renderBtTrades() {
+  const all = btRes.trades.map(x => ({...M.normTrade(x), score:x.snap?.score ?? null})), coins = bView === 'coins' && all.length > 0;
+  segOn('#btRes', 'br', bRes); segOn('#btView', 'bv', bView);
+  $('#btFilters').classList.toggle('hidden', !all.length);
+  $('#btcsort').classList.toggle('hidden', !coins); $('#btcsort').value = `${bcSort}:${bcDir}`;
+  ['#btCoinsW', '#btHintC'].forEach(s => $(s).classList.toggle('hidden', !coins)); ['#btListW', '#btHintL'].forEach(s => $(s).classList.toggle('hidden', coins));
+  const src = coins ? coinSums(all) : all, on = all.length > 0 && !!bRes, list = src.filter(x => !bRes || (x.pnl > 0) === (bRes === 'win'));
+  $('#btShown').classList.toggle('hidden', !on);
+  $('#btShown').innerHTML = on ? `<span class="mute">Показано <b>${list.length}</b> из ${src.length}</span><button class="chip clear" data-bclear>Сбросить</button>` : '';
+  const empty = n => `<tr><td colspan="${n}" class="mute tbl-empty">${!all.length ? 'Сделок нет — сигналов с такой силой за период не было'
+    : `${bRes === 'win' ? 'Прибыльных' : 'Убыточных'} ${coins ? 'монет' : 'сделок'} нет <button data-bclear>Сбросить фильтр</button>`}</td></tr>`;
+  if (coins) {
+    sortHead('#btchead', bcSort, bcDir);
+    $('#btCoins tbody').innerHTML = coinRows(sortCoins(list, bcSort, bcDir)) || empty(6);
+    return;
+  }
+  sortHead('#bthead', bSort, bDir);
+  btList = list.sort((a, b) => sortBy(bSort, bDir)(a, b) || b.tclose - a.tclose);
+  // the first BT_ROWS, the rest on request: a long 15m run drew thousands of rows at once and froze a phone for a moment
+  $('#btTrades').innerHTML = btRowsHtml(btAll ? btList : btList.slice(0, BT_ROWS))
+    + (!btAll && btList.length > BT_ROWS ? `<tr class="btmore"><td colspan="13"><button data-btmore>Показать все ${btList.length} сделок</button></td></tr>` : '')
+    || empty(13);
+}
 const BT_ROWS = 300;
-let btList = [], btAll = false;   // btAll: «Показать все» was pressed for this result — a redraw (the theme) keeps the list open
+let btList = [], btAll = false;   // btList: the trades as shown (filtered, sorted); btAll: «Показать все» was pressed for this result — a redraw (the theme) keeps the list open
 const btRowsHtml = list => list.map(x => `<tr tabindex="0" class="row" data-id="${x.id}"><td>${dt(x.tclose)}</td><td>${coin(x.sym)}</td>
     <td class="${x.side === 'LONG' ? 'pos' : 'neg'}">${x.side}</td><td>${fp(x.entry)}</td><td>${fp(x.exit)}</td><td class="hm">$${x.size.toFixed(0)}</td>
     <td>${reasonTag(x.reason)}</td><td class="hm mute">${dur(x.hold)}</td><td class="hm ${cl(x.gross)}">${usd(x.gross)}</td><td class="hm neg">${usd(-x.fee)}</td>
@@ -575,6 +597,16 @@ $('#btTf').addEventListener('change', () => hlOpts('#btHL', $('#btTf').value));
 hlOpts('#btHL', $('#btTf').value);
 $('#btCustom').oninput = btEstimate;
 $('#btTop').addEventListener('change', () => { if ($('#btTop').value === 'custom') $('#btCustom').focus(); });
+const numFirst = k => k === 'sym' || k === 'reason' ? 1 : -1;   // a first click: names from А, numbers from the biggest
+document.querySelectorAll('#bthead th').forEach(th => th.onclick = () => { const k = th.dataset.s; bDir = bSort === k ? -bDir : numFirst(k); bSort = k; if (btRes) renderBtTrades(); });
+const bcSortBy = (k, d) => { bcSort = k; bcDir = d; if (btRes) renderBtTrades(); };
+document.querySelectorAll('#btchead th').forEach(th => th.onclick = () => { const k = th.dataset.s; bcSortBy(k, bcSort === k ? -bcDir : numFirst(k)); });
+$('#btcsort').onchange = e => { const [k, d] = e.target.value.split(':'); bcSortBy(k, +d); };   // phones: the summary is cards, without a head to sort by
+$('#btTradesP').addEventListener('click', e => {
+  const r = e.target.closest('[data-br]'), v = e.target.closest('[data-bv]');
+  if (r) bRes = r.dataset.br; else if (v) bView = v.dataset.bv; else if (e.target.closest('[data-bclear]')) bRes = ''; else return;
+  if (btRes) renderBtTrades();
+});
 $('#btTrades').onclick = e => {
   if (e.target.closest('[data-btmore]')) { btAll = true; e.target.closest('tr').outerHTML = btRowsHtml(btList.slice(BT_ROWS)); return; }
   const tr = e.target.closest('tr.row'); if (!tr || !btRes) return;

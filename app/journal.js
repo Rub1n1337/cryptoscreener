@@ -246,11 +246,15 @@ function coinSums(trades) {
   }
   return [...m.values()];
 }
+// the summary's rows, the segments' state: the backtest's trades use them too (app/backtest.js)
+const coinRows = list => list.map(g => `<tr><td>${coin(g.sym)}</td><td data-l="Сделок">${g.n}</td><td data-l="Прибыльных">${g.win}</td><td data-l="Убыточных">${g.loss}</td>
+      <td data-l="PnL" class="${cl(g.pnl)}"><b>${usd(g.pnl)}</b></td><td data-l="R" class="${cl(g.r)}">${rr(g.r)}</td></tr>`).join('');
+const sortCoins = (list, k, d) => list.sort((a, b) => sortBy(k, d)(a, b) || b.n - a.n || a.sym.localeCompare(b.sym));
+const segOn = (sel, k, v) => document.querySelectorAll(sel + ' .tab').forEach(b => { const on = b.dataset[k] === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
 function renderClosed(D = journalData()) {
   if (!D) return;
   const all = D.closed.map(M.normTrade), coins = jView === 'coins' && all.length > 0, q = normQ($('#jq').value);
-  const seg = (sel, k, v) => document.querySelectorAll(sel + ' .tab').forEach(b => { const on = b.dataset[k] === v; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
-  seg('#jres', 'jr', jRes); seg('#jview', 'jv', jView);
+  segOn('#jres', 'jr', jRes); segOn('#jview', 'jv', jView);
   $('#jfilters').classList.toggle('hidden', !all.length);
   $('#jcsort').classList.toggle('hidden', !coins); $('#jcsort').value = `${cSort}:${cDir}`;
   ['#jcoinsW', '#jhintC'].forEach(s => $(s).classList.toggle('hidden', !coins)); ['#jlistW', '#jhintL'].forEach(s => $(s).classList.toggle('hidden', coins));
@@ -264,9 +268,7 @@ function renderClosed(D = journalData()) {
     : `${q ? `По запросу «${esc($('#jq').value.trim())}» ${kind}${coins ? 'монет' : 'сделок'} нет` : `${kind[0].toUpperCase() + kind.slice(1)}${coins ? 'монет' : 'сделок'} нет`} <button data-jclear>Сбросить фильтры</button>`}</td></tr>`;
   if (coins) {
     sortHead('#jchead', cSort, cDir);
-    list.sort((a, b) => sortBy(cSort, cDir)(a, b) || b.n - a.n || a.sym.localeCompare(b.sym));
-    $('#jcoins tbody').innerHTML = list.map(g => `<tr><td>${coin(g.sym)}</td><td data-l="Сделок">${g.n}</td><td data-l="Прибыльных">${g.win}</td><td data-l="Убыточных">${g.loss}</td>
-      <td data-l="PnL" class="${cl(g.pnl)}"><b>${usd(g.pnl)}</b></td><td data-l="R" class="${cl(g.r)}">${rr(g.r)}</td></tr>`).join('') || empty(6);
+    $('#jcoins tbody').innerHTML = coinRows(sortCoins(list, cSort, cDir)) || empty(6);
     return;
   }
   list.sort(sortBy(jSort, jDir));
@@ -428,7 +430,7 @@ document.addEventListener('keydown', e => {
   e.preventDefault(); eqShow(el, i, true);
 });
 document.addEventListener('focusout', e => { if (e.target.matches?.('.hchart[data-eq]') && !EQH.sticky) eqHide(e.target); });
-$('#jcsort').innerHTML = Object.entries(C_SORTS).flatMap(([k, [t, up = 'меньше сначала', dn = 'больше сначала']]) =>
+$('#jcsort').innerHTML = $('#btcsort').innerHTML = Object.entries(C_SORTS).flatMap(([k, [t, up = 'меньше сначала', dn = 'больше сначала']]) =>
   (k === 'sym' ? [[1, up], [-1, dn]] : [[-1, dn], [1, up]]).map(([d, w]) => `<option value="${k}:${d}">${t}: ${w}</option>`)).join('');
 $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
@@ -463,4 +465,4 @@ tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCar
 zmT = attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCardSoon(); }});
 }
 
-export {renderJournal, drawCard, drawCardSoon, capJournal, baseOf, openTrade, showTrade, closeModal, equityChart, eqRestore, start};
+export {renderJournal, drawCard, drawCardSoon, capJournal, baseOf, openTrade, showTrade, closeModal, equityChart, eqRestore, coinSums, coinRows, sortCoins, sortHead, sortBy, segOn, start};

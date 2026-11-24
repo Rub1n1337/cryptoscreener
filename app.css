@@ -194,7 +194,7 @@ input[type=range]{padding:0;width:120px;accent-color:var(--acc)}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}.filters>*{flex:1;min-width:110px}
 .filters>.icon,.filters>.seg{flex:0 0 auto;min-width:0}
 /* the closed trades' summary sorts by its head; on a phone it is cards and sorts by this list */
-@media(min-width:701px){#jcsort{display:none}}
+@media(min-width:701px){#jcsort,#btcsort{display:none}}
 .search{position:relative;display:flex;align-items:center}
 .search input:not([type=checkbox]):not([type=range]){width:100%;padding-left:34px}
 .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
@@ -806,13 +806,13 @@ tr.row.stale{opacity:.55}
   .tablewrap:has(#jopen) thead,.tablewrap:has(#jclosed) thead,.tablewrap:has(#btTrades) thead{display:none}
   /* the backtest's summaries by group (strength, side and exit, the two parts of the period): a card per group too, the group's
      name over its five numbers, each with its name — the same as the trades under them, no sideways scroll */
-  :is(#btScore,#btSplit,#btPartsT,#jcoins) thead{display:none}
-  .tablewrap:has(:is(#btScore,#btSplit,#btPartsT,#jcoins)){overflow-x:hidden}
-  :is(#btScore,#btSplit,#btPartsT,#jcoins),:is(#btScore,#btSplit,#btPartsT,#jcoins) tbody{display:block;width:100%;min-width:0}
-  :is(#btScore,#btSplit,#btPartsT,#jcoins) tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
-  :is(#btScore,#btSplit,#btPartsT,#jcoins) td{display:block;padding:0;border:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  :is(#btScore,#btSplit,#btPartsT,#jcoins) td:first-child{grid-column:1/-1;font-weight:600;white-space:normal}
-  :is(#btScore,#btSplit,#btPartsT,#jcoins) td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--faint);font-weight:400}
+  :is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins) thead{display:none}
+  .tablewrap:has(:is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins)){overflow-x:hidden}
+  :is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins),:is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins) tbody{display:block;width:100%;min-width:0}
+  :is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins) tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  :is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins) td{display:block;padding:0;border:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  :is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins) td:first-child{grid-column:1/-1;font-weight:600;white-space:normal}
+  :is(#btScore,#btSplit,#btPartsT,#jcoins,#btCoins) td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--faint);font-weight:400}
   .tablewrap:has(:is(#jopen,#jclosed,#btTrades)) :is(table,tbody){display:block;width:100%}.tablewrap:has(:is(#jopen,#jclosed,#btTrades)){overflow-x:hidden}
   .sorthint{display:none}
   #jclosed tr.jday,#jclosed tr.jday td{display:block}#jclosed tr.jday td{padding:14px 12px 6px}
@@ -1120,7 +1120,7 @@ details.dis>.dbody{padding:0 16px 16px}
   .ctrl label{flex:1 1 44%;min-width:0}   /* 0: at 320 px the channel model's list ran past the panel */
   /* a slider with its number takes the row: N, k and «История» start their sliders at one line */
   .ctrl label:has([type=range]){flex:1 1 100%;display:grid;grid-template-columns:56px minmax(0,1fr) auto}.ctrl input[type=range]{width:100%}.ctrl select{flex:1;min-width:0}
-  #jfilters .seg{flex:1 1 auto}#jfilters .seg .tab{flex:1;padding:0 6px}#jfilters>select{flex:1 1 100%}
+  :is(#jfilters,#btFilters) .seg{flex:1 1 auto}:is(#jfilters,#btFilters) .seg .tab{flex:1;padding:0 6px}:is(#jfilters,#btFilters)>select{flex:1 1 100%}
   .filters>*{min-width:0}.filters>.search{flex:1 1 100%!important}.filters>select{flex:1 1 44%}
   .cact{width:100%}.cact .search{flex:1 1 140px}.cact .search input{width:100%!important}
   #toasts{top:66px;bottom:auto;left:10px;right:10px;width:auto}

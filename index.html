@@ -520,9 +520,19 @@
         <div class="panel" id="btScoreP"><div class="ptitle">По силе сигнала <span>· работает ли «сила»: у сильных сигналов результат должен быть лучше</span></div><div class="tablewrap"><table id="btScore"></table></div></div>
         <div class="panel"><div class="ptitle">По стороне, причине выхода и режиму рынка</div><div class="tablewrap"><table id="btSplit"></table></div></div>
       </div>
-      <div class="panel" style="margin-top:12px"><div class="ptitle">Сделки бэктеста <span>· клик — карточка сделки</span></div>
-        <div class="tablewrap"><table><thead><tr>
-          <th>Закрыта</th><th>Монета</th><th>Сторона</th><th>Вход</th><th>Выход</th><th class="hm">Размер</th><th>Причина выхода</th><th class="hm">Длит.</th><th class="hm">PnL до ком.</th><th class="hm">Комиссия</th><th>PnL</th><th>R</th><th class="hm">Сила</th>
+      <div class="panel" id="btTradesP" style="margin-top:12px"><div class="ptitle">Сделки бэктеста <span id="btHintL">· клик по строке — карточка сделки<span class="sorthint">, по заголовку — сортировка</span></span><span id="btHintC" class="hidden"><span class="sorthint">· клик по заголовку — сортировка</span></span></div>
+        <div class="filters hidden" id="btFilters">
+          <div class="seg mini" id="btRes" role="group" aria-label="Результат"><button class="tab on" data-br="" aria-pressed="true">Все</button><button class="tab" data-br="win" aria-pressed="false" title="Сделки в плюсе после комиссий; в сводке — монеты с PnL больше нуля">Прибыльные</button><button class="tab" data-br="loss" aria-pressed="false" title="Остальные: в минусе или в ноль после комиссий">Убыточные</button></div>
+          <div class="seg mini" id="btView" role="group" aria-label="Вид"><button class="tab on" data-bv="list" aria-pressed="true">Сделки</button><button class="tab" data-bv="coins" aria-pressed="false" title="Сводка: сколько сделок по каждой монете и что они принесли">По монетам</button></div>
+          <select id="btcsort" class="hidden" aria-label="Сортировка монет"></select>
+        </div>
+        <div class="fchips hidden" id="btShown" aria-live="polite"></div>
+        <div class="tablewrap hidden" id="btCoinsW"><table id="btCoins"><thead><tr id="btchead">
+          <th data-s="sym">Монета</th><th data-s="n">Сделок</th><th data-s="win" title="Сделки в плюсе после комиссий">Прибыльных</th><th data-s="loss" title="Сделки в минусе или в ноль после комиссий">Убыточных</th>
+          <th data-s="pnl" title="Сумма итогов всех сделок монеты после комиссий">PnL</th><th data-s="r" title="Сумма итогов в R: +1R — заработали столько, сколько рисковали; −1R — полный стоп">R</th>
+        </tr></thead><tbody></tbody></table></div>
+        <div class="tablewrap" id="btListW"><table><thead><tr id="bthead">
+          <th data-s="tclose">Закрыта</th><th data-s="sym">Монета</th><th data-s="side">Сторона</th><th data-s="entry">Вход</th><th data-s="exit">Выход</th><th data-s="size" class="hm">Размер</th><th data-s="reason">Причина выхода</th><th data-s="hold" class="hm">Длит.</th><th data-s="gross" class="hm">PnL до ком.</th><th data-s="fee" class="hm">Комиссия</th><th data-s="pnl">PnL</th><th data-s="r">R</th><th data-s="score" class="hm">Сила</th>
         </tr></thead><tbody id="btTrades"></tbody></table></div>
       </div>
       <div class="faint" style="font-size:12px;margin-top:8px">Ограничения: в режиме «на каждый момент» учтены все монеты, которые в какой-то день периода были в топе по обороту, — и те, что потом выпали из топа или были сняты с Binance; в режиме «по сегодняшнему» их нет, а сегодняшний топ берётся на весь период — это завышает результат. Даты — по UTC. Исполнение по свечам, без стакана; если за одну свечу задеты тейк и стоп — считаем стоп. Комиссия 0.075% за сторону, проскальзывание 0.05%, заём под шорт и плечо — 0.03% в сутки (оценка: реальная ставка бывает выше, особенно по альткоинам). Прошлое не гарантирует будущего.</div>
@@ -1391,7 +1401,7 @@ document.addEventListener('keydown', e => {
 function setSort(k, d) { sortKey = k; sortDir = d; save('sr_msort', [k, d]); renderTable(); }
 document.querySelectorAll('#mhead th').forEach(th => th.onclick = () => { const k = th.dataset.s; setSort(k, sortKey === k ? -sortDir : (k === 'sym' ? 1 : -1)); });
 // sortable headers work from the keyboard too: Tab to a header, Enter or Space sorts by it
-document.querySelectorAll('#mhead th[data-s], #jhead th[data-s], #jchead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
+document.querySelectorAll('#mhead th[data-s], #jhead th[data-s], #jchead th[data-s], #bthead th[data-s], #btchead th[data-s]').forEach(th => { th.tabIndex = 0; th.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); th.click(); } }; });
 document.querySelectorAll('.jm').forEach(b => b.onclick = () => { setJMode(b.dataset.m); save('sr_jmode', jMode); renderJournal(); if (jMode === 'shared') fetchShared(); else fetchServerBot(); });
 // ---------- «Учёба»: the section is app/learn-ui.js (wave 3); its listeners start here ----------
 LEARN_UI.start({page:() => page, go:t => go(t), setHash:() => setHash(), setTitle:() => setTitle(), PROFILE_DEF, cmode:() => cmode, setCmode:m => setCmode(m),
