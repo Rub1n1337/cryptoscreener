@@ -1,6 +1,13 @@
 // Older «Что нового» entries (those CHANGELOG in app/changes.js no longer holds), loaded only when that page opens, so the site's first load doesn't carry them.
 // The newest ones stay in CHANGELOG in app/changes.js; when that list grows past ~12, its oldest move here (newest first).
 export const OLD = [
+  {v:'2.127', date:'16 ноября 2026', title:'Журнал и таблица удобнее', items:[
+    'Баланс бота в «Журнале» стал виден сразу, без прокрутки.',
+    'Список монет на компьютере остаётся на экране, пока читаете разбор сигнала.',
+    'Окно закрытия позиции показывает, с каким результатом она закроется.',
+    'Метка LONG стала контрастнее.',
+    'Недоступные кнопки больше не похожи на загрузку.',
+  ]},
   {v:'2.126', date:'16 ноября 2026', title:'Учёба: словарь и вопросы', items:[
     'Добавлен словарь терминов в разделе «Учёба»; справка показывает его основные термины.',
     'Термины в уроках подчёркнуты: при наведении или нажатии видно объяснение и ссылку в словарь.',
