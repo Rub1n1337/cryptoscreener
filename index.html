@@ -745,7 +745,7 @@ import * as LEARN_UI from './app/learn-ui.js';   // wave 3
 import {LEARN, GLOSS, loadLearn, learnPath, setLearnPath, learnLesson, renderLearn, renderChangelog, loadOldChangelog} from './app/learn-ui.js';
 import {renderChart, hoverIndex, priceAt, viewRange, wheelPx, wheelZoom, perFrame, attachZoom, barAt} from './app/chart.js';   // wave 4
 import * as JOURNAL from './app/journal.js';   // wave 5
-import {renderJournal, drawCard, drawCardSoon, capJournal, baseOf, openTrade} from './app/journal.js';
+import {renderJournal, drawCard, drawCardSoon, capJournal, baseOf, openTrade, closeModal} from './app/journal.js';
 // ?history=off: the backtest ignores the stored history and loads everything from Binance, as before 2.78 — to run the same
 // settings both ways and compare
 if (new URLSearchParams(location.search).get('history') === 'off') HS.config({off:true});
@@ -1441,7 +1441,7 @@ async function fetchServerBot() {
 
     // the server trades on its own: compare with the previous poll to tell the owner about new trades
     if (prev) {
-      const seenO = new Set(prev.open.map(p => p.id)), seenC = new Set(prev.closed.map(t => t.id)), toJ = () => { jMode = 'mine'; go('journal'); };
+      const seenO = new Set(prev.open.map(p => p.id)), seenC = new Set(prev.closed.map(t => t.id)), toJ = () => openJournal('mine');
       for (const p of (r.open || []).filter(p => !seenO.has(p.id))) notifyUser(`Мой бот: ${p.side} ${pair(p.sym)}`, `${p.snap?.profile ? `«${p.snap.profile}» · ` : ''}вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', toJ);
       for (const t of (r.closed || []).filter(t => !seenC.has(t.id))) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', toJ);
     }
@@ -1560,8 +1560,8 @@ async function botStep() {
     for (const p of res.opened) { p.note = `«${P.name}» · ${p.note}`; p.snap.profile = P.name; }
     J.open = [...res.stillOpen, ...res.opened];
     J.closed = [...res.closed, ...J.closed]; capJournal();
-    for (const p of res.opened) notifyUser(`Мой бот: ${p.side} ${pair(p.sym)}`, `«${P.name}» · вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', () => { jMode = 'mine'; go('journal'); });
-    for (const t of res.closed) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => { jMode = 'mine'; go('journal'); });
+    for (const p of res.opened) notifyUser(`Мой бот: ${p.side} ${pair(p.sym)}`, `«${P.name}» · вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', () => openJournal('mine'));
+    for (const t of res.closed) notifyUser(`Мой бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => openJournal('mine'));
     J.balance = res.balance; J.checked = now; J.scanned = botRows.length;
     save('sr_journal', J); renderGuard(); renderBotPanel();
     if (!$('#journal').classList.contains('hidden')) renderJournal();
@@ -1941,8 +1941,8 @@ async function fetchShared() {
           checked:s.checked_at ? Date.parse(s.checked_at) : 0, open, closed, runs, on:true};
     if (prev) { // tell the user about the shared bot's new trades since the last poll
       const seenO = new Set(prev.open.map(p => p.id)), seenC = new Set(prev.closed.map(t => t.id));
-      for (const p of open.filter(p => !seenO.has(p.id))) notifyUser(`Общий бот: ${p.side} ${pair(p.sym)}`, `вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', () => { jMode = 'shared'; go('journal'); });
-      for (const t of closed.filter(t => !seenC.has(t.id))) notifyUser(`Общий бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => { jMode = 'shared'; go('journal'); });
+      for (const p of open.filter(p => !seenO.has(p.id))) notifyUser(`Общий бот: ${p.side} ${pair(p.sym)}`, `вход ${fp(p.entry)} · тейк ${fp(p.tp)} · стоп ${fp(p.sl)}`, 'info', () => openJournal('shared'));
+      for (const t of closed.filter(t => !seenC.has(t.id))) notifyUser(`Общий бот: ${pair(t.sym)} закрыта — ${t.reason}`, `${usd(t.pnl)} (${rr(t.r)})`, t.pnl > 0 ? 'ok' : 'bad', () => openJournal('shared'));
     }
     sharedErr = '';
   } catch (e) { sharedErr = String(e.message || e); if (SJ) SJ.fetchError = sharedErr; }   // kept and said (renderGuard), not swallowed
@@ -2180,6 +2180,7 @@ function go(t, push = true) {
   // a phone's open sheet belongs to the market: a notification that leads to another section closes it (it would stay
   // «open» out of sight and keep the page from scrolling)
   if (t !== 'market' && document.body.classList.contains('sheet')) closeSheet(true);
+  closeModal();   // an open trade card belongs to the section it was opened from («Назад», a toast, a link)
   page = t;
   document.querySelectorAll('.tab[data-t]').forEach(x => { x.classList.toggle('on', x.dataset.t === t); x.dataset.t === t ? x.setAttribute('aria-current', 'page') : x.removeAttribute('aria-current'); });
   $('.top .tab[data-t=help]').classList.toggle('on-ph', t === 'learn');   // a phone has no «Учёба» tab: it lives in «Справка»
@@ -2196,6 +2197,8 @@ function go(t, push = true) {
   setTitle();
   window.scrollTo({top:0, behavior:'instant'});
 }
+// the journal of a bot, from a toast, Ctrl+K…: remembered like the switch above the journal
+function openJournal(m) { jMode = m; save('sr_jmode', m); go('journal'); }
 // the browser tab says where it is — «PLUME · Sigma Radar», «Журнал · Sigma Radar» — so several open tabs can be told apart
 const PAGE_TITLE = {journal:'Журнал', backtest:'Бэктест', learn:'Учёба', help:'Как это работает', changes:'Что нового', legal:'Правовая информация', gate:'Вход'};
 function setTitle() {
@@ -2663,7 +2666,7 @@ $('#pfTf').addEventListener('change', () => hlOpts('#pfHL', $('#pfTf').value));
 // the backtest's handlers and its first filling of the form; what it needs from the page, until those parts are modules too
 BT.start({S:() => S, SJ:() => SJ, go:t => go(t),
   profSet:p => profSet(p), activeProfile:() => activeProfile(), sharedProf:() => sharedProf(), firstPreset:() => PRESETS[0], cleanName:s => cleanName(s),
-  addProfile(p) { BP.profiles.push(p); saveBP(); renderBotPanel(); syncServerBot(); }, goMine() { jMode = 'mine'; go('journal'); }});
+  addProfile(p) { BP.profiles.push(p); saveBP(); renderBotPanel(); syncServerBot(); }, goMine:() => openJournal('mine')});
 renderChangelog();
 if (!LOCKED) {   // signed out, the bot panel would fetch the market regime for a page nobody can see
   renderBotPanel();
@@ -2680,7 +2683,7 @@ const focusEl = sel => setTimeout(() => {
   el.scrollIntoView({block:'center', behavior:'smooth'}); el.focus?.({preventScroll:true});
   el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
 }, 150);
-const openMine = () => { jMode = 'mine'; save('sr_jmode', jMode); go('journal'); };
+const openMine = () => openJournal('mine');
 // the channel chart's commands (its settings, a level, the second timeframe): the card in «Канал», on a phone opened —
 // in «Стакан» and under «Развернуть» the channel chart is hidden
 const showCh = () => { go('market'); if (cmode !== 'ch') setCmode('ch'); if (isPhone()) openSheet(); };

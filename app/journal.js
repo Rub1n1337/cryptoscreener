@@ -289,7 +289,7 @@ function renderClosed(D = journalData()) {
 }
 
 // ---------- trade card ----------
-let tcard = null, zmT = null; // {d, opts}; the trade chart's zoom controls
+let tcard = null, zmT = null, cardReq = 0; // {d, opts}; the trade chart's zoom controls; the open card's request for candles
 function openTrade(kind, id) {
   const S = hooks.S(), SJ = hooks.SJ(), jMode = hooks.jMode();
   const D = journalData();
@@ -358,12 +358,14 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
     why += `<div class="mute" style="font-size:12px">${x.note || ''}<br>Подробный снимок сигнала не сохранён: сделка открыта до обновления журнала.</div>`;
   }
   $('#maside').innerHTML = html; $('#mwhy').innerHTML = why;
-  // chart
+  // chart; candles that come after the card was closed or another opened are dropped (they were drawn over the next card)
+  const req = ++cardReq;
   tcard = null; renderChart($('#tcv'), null);
   const cv = $('#tcv'), g = cv.getContext('2d'); cv.width = cv.clientWidth; cv.height = cv.clientHeight; g.fillStyle = PC.mute; g.font = '13px system-ui'; g.fillText('Загружаю свечи…', 16, 24);
   try {
     const start = Math.floor(x.time / tfms) * tfms - (set.N + 120) * tfms, end = isOpen ? Date.now() : x.tclose + 40 * tfms;
     const K = await api(`/api/v3/klines?symbol=${x.sym}&interval=${tf}&startTime=${start}&limit=${Math.min(1000, Math.ceil((end - start) / tfms) + 1)}`);
+    if (req !== cardReq) return;
     const d = parse(K); d.B = bands(d.c, set.N, set.k, set.method); d.R = rsi(d.c);
     const ei = barAt(d.t, x.time), xi = isOpen ? d.c.length - 1 : barAt(d.t, x.tclose);
     const levels = [
@@ -379,6 +381,7 @@ async function showTrade(raw, {isOpen, who, set: fallback}) {
     tcard = {d, minFrom:set.N - 1, defSpan:d.c.length - from0, view:null, opts:{levels, marks, zones:[{i0:ei, i1:xi, entry:x.entry, tp:x.tp, sl:x.sl}], live:isOpen, hoverI:null}};
     drawCard();
   } catch (e) {
+    if (req !== cardReq) return;
     g.clearRect(0, 0, cv.width, cv.height); g.fillStyle = PC.up; g.fillText('Не удалось загрузить свечи: ' + e.message, 16, 24);
   }
 }
@@ -393,7 +396,7 @@ const drawCardSoon = perFrame(() => drawCard());
 let modalBack = null;
 function closeModal() {
   if ($('#modal').classList.contains('hidden')) return;
-  $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null;
+  $('#modal').classList.add('hidden'); document.body.style.overflow = ''; tcard = null; cardReq++;
   if (modalBack?.isConnected) modalBack.focus({preventScroll:true});
   modalBack = null;
 }
@@ -460,4 +463,4 @@ tcv.onmouseleave = () => { if (!tcard) return; tcard.opts.hoverI = null; drawCar
 zmT = attachZoom(tcv, {state:() => tcard && {n:tcard.d.c.length, minFrom:tcard.minFrom, defSpan:tcard.defSpan, view:tcard.view, geo:tcard.geo}, set:v => { tcard.view = v; drawCardSoon(); }});
 }
 
-export {renderJournal, drawCard, drawCardSoon, capJournal, baseOf, openTrade, showTrade, equityChart, eqRestore, start};
+export {renderJournal, drawCard, drawCardSoon, capJournal, baseOf, openTrade, showTrade, closeModal, equityChart, eqRestore, start};
