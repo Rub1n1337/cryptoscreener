@@ -1,7 +1,7 @@
 // The journal and the trade card (docs/PLAN-UNTANGLE-modules.md, wave 5): the balance chart and its pointer, the cards, the tables,
 // their sorting and filters; the card of a trade, opened from the journal and the backtest. What ran at load in the page is start(),
-// called by the page at the same place as before. The journals themselves (J, SJ, SB_MINE), closing by hand and the reset stay with
-// the bot in the page.
+// called by the page at the same place as before. The journals themselves (J, SJ, SB_MINE), closing by hand and the reset are with
+// the bot, app/bot.js; the page hands them over in start(): an import here would close a circle (bot.js imports this module).
 import * as M from '../supabase/functions/_shared/math.js';
 import {$, firstShow, save, savedSort, keepFocus, PC, fp, usd, rr, cl, dt, dur, base, pair, tfOf, coin, money, curH, plural, reasonTag, METHOD_NAME, isPhone, normQ, api, esc} from './core.js';
 import './account.js';   // savedSort below reads the storage when this module loads: after the profile's values are there
@@ -9,7 +9,7 @@ import {renderChart, hoverIndex, viewRange, perFrame, attachZoom, barAt} from '.
 const { TFMS, clamp, bands, rsi, parse } = M;
 
 // the page's own functions and values this code needs: given by start() as wrappers, since some are declared further down the page
-// and J, S, SJ, SB_MINE, BP, jMode, tgBot are assigned anew there
+// and J, SJ, SB_MINE, BP, jMode, tgBot are assigned anew in app/bot.js
 const hooks = {};
 
 // ---------- journal ----------
